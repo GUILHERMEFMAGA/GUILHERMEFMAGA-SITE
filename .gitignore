@@ -1,0 +1,26 @@
+# ===== SEGREDOS: NUNCA subir chaves reais para o GitHub =====
+chaves.txt
+.env
+.env.*
+*.key
+
+# ===== Dados pessoais / gerados em tempo de execucao pelo agente =====
+config.json
+historico.json
+memoria_longa.json
+memoria_core.md
+licoes_aprendidas.md
+contatos.json
+logs_whatsapp.json
+projetos.json
+regras.json
+tarefas_agendadas.json
+cache.json
+crash_log.json
+prints/
+projetos/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
