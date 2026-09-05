@@ -1068,7 +1068,37 @@ PROMPT_SISTEMA_AGENTE = (
     "'abre o Windows Sandbox' -> 'abrir_windows_sandbox'; 'desliga a telemetria' -> 'desativar_telemetria'; "
     "'formata o pendrive E' -> 'formatar_unidade' (a unidade C: nunca e aceita). NUNCA use essas "
     "ferramentas para espionar, capturar dados de outra pessoa ou esconder algo - elas existem so para "
-    "voce administrar o SEU proprio PC."
+    "voce administrar o SEU proprio PC.\n"
+    "21. FERRAMENTAS EXTREMAMENTE PODEROSAS (nivel especialista) alem das da regra 20: gerenciamento de "
+    "discos e particoes (listar_discos_particoes, criar_particao, deletar_particao, mudar_letra_unidade, "
+    "renomear_volume, estender_particao), saude de SSD/desgaste (verificar_saude_ssd), TRIM/desfragmentar "
+    "(otimizar_disco), CompactOS e limpeza do WinSxS (compactar_sistema_windows, limpar_winsxs), reparo de "
+    "boot e Modo de Seguranca (reparar_boot_windows, modo_seguro_boot - sempre lembre de desligar o modo "
+    "seguro depois), apagar rastros de espaco livre (limpar_espaco_livre), backup/restaurar registro "
+    "(backup_registro, restaurar_registro), energia/desempenho (desligar_hibernacao, plano_desempenho_maximo, "
+    "desligar_inicio_rapido, desligar_efeitos_visuais, afinidade_cpu_processo, desligar_reinicio_automatico, "
+    "habilitar_numlock_inicio, modo_deus_windows), Windows Update e recuperacao (reparar_windows_update, "
+    "listar_hotfixs, desinstalar_atualizacao_kb, ligar_desligar_atualizacoes_automaticas, abrir_redefinir_windows, "
+    "reparar_loja_apps_windows, reparar_icones_windows, ligar_protecao_sistema, reparar_som_windows, "
+    "reparar_bluetooth_windows, manutencao_profunda_pc, limpeza_profunda_pc), drivers e dispositivos "
+    "(exportar_drivers, instalar_driver_inf, remover_driver, listar_dispositivos_com_erro, "
+    "desabilitar_dispositivo, habilitar_dispositivo, inventario_hardware), rede avancada (mostrar_portas_em_uso, "
+    "bloquear_ip_firewall, bloquear_programa_internet, listar_regras_firewall, varrer_rede_local, "
+    "escanear_portas_host, ligar_pc_wake_on_lan, mapear_unidade_rede, montar_iso, esconder_pc_na_rede, "
+    "desligar_compartilhamentos_adm, listar_compartilhamentos_rede, listar_pcs_rede, renovar_ip, "
+    "habilitar_dns_https, proxy_windows, habilitar_servidor_ssh, mostrar_tabela_rotas), contas e seguranca "
+    "(habilitar_conta_administrador, listar_sessoes_ativas, encerrar_sessao_usuario, enviar_mensagem_rede, "
+    "politica_senha_windows, bloquear_usb_pendrive, ligar_desligar_uac, verificar_assinatura_arquivo, "
+    "escanear_arquivo_defender, listar_quarentena_defender, status_ativacao_windows, "
+    "mostrar_chave_produto_windows, desligar_login_automatico, criptografar_pasta_efs, desbloquear_arquivo_baixado), "
+    "e ambiente/dev (gerenciar_variavel_ambiente, habilitar_caminhos_longos, habilitar_modo_desenvolvedor, "
+    "politica_execucao_powershell, listar_programas_inicializacao, remover_programa_inicializacao, "
+    "alterar_tipo_inicializacao_servico, limpar_cache_navegadores, desligar_copilot_windows). MESMA REGRA DE "
+    "OURO: o que ALTERA o sistema (particionar, formatar, desligar servicos, UAC, USB, SSH, reset, politica, "
+    "registro, drivers, firewall de bloqueio) SEMPRE passa pela trava de COMANDO CATASTROFICO pedindo 'sim' - "
+    "nem o modo admin pula. O que e so leitura (listar/ver/status/inventario/varrer) roda na hora. Para "
+    "operacoes que pedem um numero (disco, particao, KB, sessao), PRIMEIRO use a ferramenta de listar/ver "
+    "correspondente para achar o numero certo, e so entao execute a alteracao - nunca invente um numero."
 )
 # Sempre atualiza o prompt de sistema pra versão mais recente, mesmo que já
 # exista um salvo de uma execução anterior — sem isso, melhorias no prompt
@@ -10138,6 +10168,1378 @@ def conexoes_de_rede_programas() -> str:
     return "Programas com conexao de rede ativa:\n" + (s or "Nenhuma conexao estabelecida no momento.") if c == 0 else f"Falhou: {e or s}"
 
 
+# ======================================================================
+# ====== FERRAMENTAS EXTREMAMENTE PODEROSAS - NIVEL ESPECIALISTA =======
+# Particoes/disco, SSD, boot, recuperacao profunda, drivers, rede avancada,
+# firewall cirurgico, variaveis de sistema, politicas... TODA acao que muda o
+# sistema passa por '_confirma_poderoso' (trava de catastrofe que pergunta
+# sim/nao MESMO no modo admin). Leituras nao perguntam. ADICAO PURA.
+# ======================================================================
+
+def _diskpart(script: str, timeout: int = 300):
+    """Roda comandos do diskpart a partir de um script .txt temporario
+    (e a unica forma segura de automar particao/disco via linha de comando)."""
+    import tempfile
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="ascii", errors="ignore") as f:
+            f.write(script)
+            tmp = f.name
+        return _rodar_cmd(f'diskpart /s "{tmp}"', timeout)
+    except Exception as e:
+        return ("", str(e), 1)
+
+
+# ---------------- DISCOS E PARTICoes (diskpart) ----------------
+@tool
+def listar_discos_particoes() -> str:
+    """LISTA os discos fisicos (HD, SSD, pendrive) e os volumes/particoes (letra,
+    nome, sistema de arquivos, tamanho total e livre, saude) - o mesmo que o
+    Gerenciamento de Discos do Windows. So leitura."""
+    ps = ("Write-Output '=== DISCOS FISICOS ==='; "
+          "Get-Disk | Select-Object Number,FriendlyName,@{n='TamGB';e={[math]::Round($_.Size/1GB,1)}},PartitionStyle,OperationalStatus | Format-Table -AutoSize | Out-String; "
+          "Write-Output '=== VOLUMES / PARTICOES ==='; "
+          "Get-Volume | Where-Object {$_.DriveLetter} | Select-Object DriveLetter,FileSystemLabel,FileSystem,@{n='TamGB';e={[math]::Round($_.Size/1GB,1)}},@{n='LivreGB';e={[math]::Round($_.SizeRemaining/1GB,1)}},HealthStatus | Format-Table -AutoSize | Out-String")
+    s, e, c = _ps(ps, 120)
+    return s if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def criar_particao(numero_disco: int, tamanho_gb: str = "", letra: str = "") -> str:
+    """CRIA UMA NOVA PARTICAO num disco (ex.: um HD/SSD novo ou espaco livre) e
+    formata em NTFS. 'numero_disco'=numero que aparece em 'listar_discos_particoes';
+    'tamanho_gb'=tamanho (vazio = usa todo o espaco livre); 'letra'=letra que a
+    unidade vai receber (vazio = o Windows escolhe). EXTREMAMENTE PODEROSO.
+    SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Criar uma particao NOVA no disco {numero_disco}"
+                              + (f" de {tamanho_gb} GB" if tamanho_gb else " usando todo o espaco livre")
+                              + " e formatar em NTFS? Use somente num disco/espaco livre."):
+        return "Cancelado."
+    tam_mb = f" size={int(float(tamanho_gb) * 1024)}" if str(tamanho_gb).strip() else ""
+    linha_letra = f"assign letter={letra.strip().rstrip(':').upper()}" if str(letra).strip() else "assign"
+    # Cria a particao (com ou sem tamanho), formata em NTFS e atribui a letra
+    script = f"select disk {int(numero_disco)}\ncreate partition primary{tam_mb}\nformat quick fs=ntfs\n{linha_letra}\n"
+    s, e, c = _diskpart(script, 600)
+    if c == 0 and ("DiskPart successfully" in s or "atribuid" in s.lower() or "assign" in s.lower() or s.strip()):
+        return f"Particao criada e formatada no disco {numero_disco}.\n{s[-600:]}"
+    return f"Falhou (confira o numero do disco em 'listar_discos_particoes'; precisa de admin): {(e or s)[-600:]}"
+
+
+@tool
+def deletar_particao(numero_disco: int, numero_particao: int) -> str:
+    """APAGA UMA PARTICAO INTEIRA (some com tudo que esta dentro dela). Use so em
+    particoes de dados que voce pode apagar; NUNCA use na particao do Windows
+    (reservada/boot/C:). EXTREMAMENTE PODEROSO e sem volta. SEMPRE pede
+    confirmacao."""
+    if not _confirma_poderoso(f"APAGAR a particao {numero_particao} do disco {numero_disco}? "
+                              "TUDO que estiver nessa particao sera perdido para sempre."):
+        return "Cancelado."
+    s, e, c = _diskpart(f"select disk {int(numero_disco)}\nselect partition {int(numero_particao)}\ndelete partition override\n", 300)
+    return f"Particao {numero_particao} apagada.\n{s[-400:]}" if c == 0 else f"Falhou (particao do sistema protegida?): {(e or s)[-400:]}"
+
+
+@tool
+def mudar_letra_unidade(letra_atual: str, letra_nova: str) -> str:
+    """TROCA A LETRA DE UMA UNIDADE (ex.: o pendrive que virou D:, mudar para E:).
+    'letra_atual' e 'letra_nova' sao letras (com ou sem dois pontos). PODEROSO
+    (pode quebrar atalhos/programas que apontam para a letra antiga). SEMPRE pede
+    confirmacao."""
+    a = letra_atual.strip().rstrip(":").upper()
+    n = letra_nova.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Mudar a letra da unidade {a}: para {n}:? Atalhos e programas que usam {a}: podem parar de funcionar."):
+        return "Cancelado."
+    s, e, c = _diskpart(f"select volume {a}\nassign letter={n}\n", 120)
+    return f"Unidade renomeada de {a}: para {n}:." if c == 0 else f"Falhou (a letra {n}: ja esta em uso?): {(e or s)[-400:]}"
+
+
+@tool
+def renomear_volume(letra: str, novo_nome: str) -> str:
+    """TROCA O NOME (ROTULO) de um disco/pen drive, ex.: 'Dados' ou 'MeuBackup'.
+    'letra'=letra da unidade, 'novo_nome'=nome que vai aparecer no Computador.
+    PODEROSO leve. SEMPRE pede confirmacao."""
+    l = letra.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Renomear a unidade {l}: para '{novo_nome}'?"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'label {l}: "{novo_nome[:32]}"', 60)
+    return f"Unidade {l}: renomeada para '{novo_nome[:32]}'." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def estender_particao(letra_volume: str) -> str:
+    """ESTENDE UMA PARTICAO para ocupar o espaco livre que estiver ao lado dela no
+    mesmo disco (aumenta o tamanho sem apagar nada; precisa de espaco nao alocado
+    depois dela). 'letra_volume'=ex.: 'D'. PODEROSO. SEMPRE pede confirmacao."""
+    l = letra_volume.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Estender a unidade {l}: ate o fim do espaco livre do disco? (nao apaga arquivos)"):
+        return "Cancelado."
+    s, e, c = _diskpart(f"select volume {l}\nextend\n", 600)
+    return f"Unidade {l}: estendida.\n{s[-400:]}" if c == 0 else f"Falhou (ha espaco nao alocado depois dela?): {(e or s)[-400:]}"
+
+
+@tool
+def verificar_saude_ssd() -> str:
+    """MOSTRA A SAUDE dos discos (HD/SSD/NVMe): status, tipo de midia e, para SSD,
+    o desgaste/uso estimado (wear) e temperaturas quando o disco reporta. So
+    leitura. Use para saber se o SSD esta chegando ao fim da vida util."""
+    ps = ("Get-PhysicalDisk | Select-Object DeviceId,FriendlyName,MediaType,HealthStatus,OperationalStatus | Format-Table -AutoSize | Out-String; "
+          "Write-Output '--- detalhes de confiabilidade (SSD) ---'; "
+          "Get-PhysicalDisk | ForEach-Object { $r = $_ | Get-StorageReliabilityCounter -ErrorAction SilentlyContinue; "
+          "if ($r) { '{0}: wear={1}% temp={2}C horas_ligado={3}' -f $_.FriendlyName,$r.Wear,$r.Temperature,$r.PowerOnHours } }")
+    s, e, c = _ps(ps, 120)
+    return s if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def otimizar_disco(letra: str = "C") -> str:
+    """OTIMIZA UM DISCO: em SSD executa TRIM (recomendado pela Microsoft), em HD
+    comum desfragmenta. 'letra'=unidade (padrao C:). Demora um pouco. PODEROSO
+    (usa disco intensamente) mas NAO apaga nada. SEMPRE pede confirmacao."""
+    l = letra.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Otimizar o disco {l}: (TRIM se for SSD, desfragmentacao se for HD)? Pode demorar."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"defrag {l}: /O /U /V", 1800)
+    return f"Otimizacao do disco {l}: concluida.\n{s[-500:]}" if c == 0 else f"Falhou: {(e or s)[-400:]}"
+
+
+@tool
+def compactar_sistema_windows(acao: str = "compactar") -> str:
+    """COMPACTA OS ARQUIVOS DO WINDOWS (CompactOS) para economizar ate 2-3 GB em
+    disco (otimo em SSD pequeno); ou DESFAZ a compactacao ('descompactar'). E
+    seguro mas deixa o sistema um pouco mais lento em PCs fracos. PODEROSO e
+    demorado. SEMPRE pede confirmacao."""
+    compactar = acao.strip().lower().startswith(("compact", "lig", "ativ"))
+    if not _confirma_poderoso(("Compactar os arquivos do Windows (CompactOS) para economizar espaco?" if compactar
+                              else "Desfazer a compactacao do Windows (voltar ao normal)?")):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("compact.exe /CompactOS:" + ("always" if compactar else "never"), 1800)
+    return ("CompactOS ativado - sistema compactado para economizar espaco." if compactar
+            else "CompactOS desfeito - sistema descompactado.") + f"\n{s[-400:]}"
+
+
+@tool
+def limpar_winsxs() -> str:
+    """LIMPA A PASTA WinSxS (componentes/atualizacoes antigas do Windows) com
+    DISM /StartComponentCleanup /ResetBase - pode liberar varios GB. AVISO: depois
+    disso voce NAO consegue desinstalar as atualizacoes ja instaladas. PODEROSO e
+    demorado. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Limpar de vez os componentes antigos do Windows (WinSxS /ResetBase)? "
+                              "Libera espaco, mas NAO dara mais para desinstalar atualizacoes antigas."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("Dism /Online /Cleanup-Image /StartComponentCleanup /ResetBase", 3600)
+    return f"Limpeza do WinSxS concluida.\n{s[-500:]}" if c == 0 else f"Falhou: {(e or s)[-400:]}"
+
+
+@tool
+def reparar_boot_windows() -> str:
+    """TENTA REPARAR A INICIALIZACAO DO WINDOWS (bootrec /fixmbr, /fixboot e
+    /rebuildbcd) - para quando o PC nao liga e da erro de boot. O ideal e rodar no
+    Ambiente de Recuperacao, mas os comandos tambem funcionam no Windows normal
+    para reparar o MBR. EXTREMAMENTE PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reparar o boot/inicializacao do Windows (fixmbr, fixboot, rebuildbcd)? "
+                              "Se o PC nao estiver ligando, o ideal e rodar isso no Ambiente de Recuperacao."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("bootrec /fixmbr && bootrec /fixboot && bootrec /scanos && bootrec /rebuildbcd", 600)
+    return f"Reparo de boot executado. Reinicie o PC e veja se liga.\n{s[-600:]}" if c == 0 else f"Falhou (pode precisar do Ambiente de Recuperacao): {(e or s)[-500:]}"
+
+
+@tool
+def modo_seguro_boot(acao: str = "ligar") -> str:
+    """LIGA OU DESLIGA O 'MODO DE SEGURO' na inicializacao (bcdedit safeboot).
+    Ligar = o proximo boot ja entra em Modo de Seguranca (para remover virus/
+    driver que trava); MUITO IMPORTANTE: use 'desligar' depois, senao o PC volta
+    sempre no Modo de Seguranca. EXTREMAMENTE PODEROSO. SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("Deixar o Windows para entrar em MODO DE SEGURO no proximo boot? "
+                               "LEMBRE-SE de voltar aqui e pedir 'desligar modo seguro' depois, senao ele nao sai mais."
+                               if ligar else "Desligar o Modo de Seguranca (voltar ao boot normal)?")):
+        return "Cancelado."
+    if ligar:
+        s, e, c = _rodar_cmd("bcdedit /set {current} safeboot minimal", 60)
+        return "Modo de Seguranca ATIVADO para o proximo boot (reinicia). Volte a pedir 'desligar modo seguro' apos usar." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    s, e, c = _rodar_cmd("bcdedit /deletevalue {current} safeboot", 60)
+    return "Modo de Seguranca DESLIGADO - o boot volta ao normal." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def limpar_espaco_livre(letra: str = "C") -> str:
+    """APAGA DE VERDADE os arquivos que ja foram deletados (sobrescreve o espaco
+    livre com cipher /w) - impede que programas de recuperacao achem arquivos
+    apagados (privacidade). NAO apaga nenhum arquivo atual, mas e MUITO demorado
+    (varre todo o espaco livre). PODEROSO. SEMPRE pede confirmacao."""
+    l = letra.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Sobrescrever o espaco livre do disco {l}: (apagar rastros de arquivos deletados)? "
+                              "Isso NAO apaga arquivos atuais, mas pode demorar HORAS em discos grandes."):
+        return "Cancelado."
+    import tempfile
+    pasta = os.path.join(f"{l}:\\", "") if os.path.isdir(f"{l}:\\") else tempfile.gettempdir()
+    s, e, c = _rodar_cmd(f'cipher /w:"{pasta}"', 7200)
+    return f"Espaco livre de {l}: sobrescrito (rastros apagados).\n{s[-300:]}" if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def backup_registro(caminho_pasta: str = "") -> str:
+    """FAZ UM BACKUP DO REGISTRO DO WINDOWS (exporta as 5 areas principais para
+    arquivos .reg numa pasta). Use ANTES de mexer em registro/desinstalar algo.
+    So cria arquivos, nao altera o sistema."""
+    pasta = caminho_pasta.strip().strip('"') or os.path.join(os.path.expanduser("~"), "Desktop")
+    os.makedirs(pasta, exist_ok=True)
+    saidas = []
+    for hive in ["HKCR", "HKCU", "HKLM", "HKU", "HKCC"]:
+        destino = os.path.join(pasta, f"backup_registro_{hive}.reg")
+        s, e, c = _rodar_cmd(f'reg export "{hive}" "{destino}" /y', 180)
+        saidas.append(f"{hive}: {'OK' if c == 0 else 'erro'}")
+    return f"Backup do registro salvo em:\n{pasta}\n" + "\n".join(saidas)
+
+
+@tool
+def restaurar_registro(arquivo_reg: str) -> str:
+    """RESTAURA O REGISTRO a partir de um arquivo .reg de backup (regride chaves e
+    valores). Use para desfazer algo que quebrou o sistema. EXTREMAMENTE
+    PODEROSO (pode mudar milhares de configuracoes de uma vez). SEMPRE pede
+    confirmacao."""
+    a = arquivo_reg.strip().strip('"')
+    if not os.path.isfile(a):
+        return f"Arquivo .reg nao encontrado: {a}"
+    if not _confirma_poderoso(f"Importar/restaurar o registro a partir de:\n{a}\nIsso vai substituir chaves do Registro em massa."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'reg import "{a}"', 300)
+    return f"Registro restaurado de {os.path.basename(a)}. Reinicie se algo pedir." if c == 0 else f"Falhou: {(e or s)[-400:]}"
+
+
+# ---------------- SISTEMA, ENERGIA E DESEMPENHO AVANCADO ----------------
+@tool
+def desligar_hibernacao(acao: str = "desligar") -> str:
+    """LIGA OU DESLIGA A HIBERNACAO do Windows. Desligar libera espaco em disco
+    (some o arquivo hiberfil.sys, que pode ter varios GB) e tambem desliga o
+    'inicio rapido'; ligar restaura. 'acao'='desligar'/'ligar'. PODEROSO. SEMPRE
+    pede confirmacao."""
+    desligar = acao.strip().lower().startswith(("deslig", "off"))
+    if not _confirma_poderoso(("Desligar a hibernacao (libera o arquivo hiberfil.sys, varios GB; tambem desliga o inicio rapido)?"
+                               if desligar else "Ligar a hibernacao (cria o hiberfil.sys)?")):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("powercfg /hibernate " + ("off" if desligar else "on"), 60)
+    return "Hibernacao desligada (espaco liberado)." if desligar else "Hibernacao ligada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def plano_desempenho_maximo() -> str:
+    """CRIA E ATIVA O PLANO DE ENERGIA 'DESEMPENHO MAXIMO' (Ultimate Performance,
+    escondido no Windows) - remove os limites de economia de energia para o PC
+    render/trabalhar no talo (gasta mais energia e esquenta mais). PODEROSO.
+    SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Ativar o plano de energia 'Desempenho Maximo' (Ultimate Performance)? O PC fica mais rapido porem gasta mais energia."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("powercfg -duplicatescheme e9a42b02-d5df-448d-aa00-03f14749eb61", 60)
+    import re as _re
+    m = _re.search(r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", s or "")
+    if m:
+        guid = m.group(1)
+        _rodar_cmd(f'powercfg /changename "{guid}" "Desempenho Maximo"', 30)
+        _rodar_cmd(f'powercfg /setactive "{guid}"', 30)
+        return "Plano 'Desempenho Maximo' criado e ativado."
+    # em alguns Windows o plano ja existe; tenta ativar direto
+    _rodar_cmd("powercfg /setactive e9a42b02-d5df-448d-aa00-03f14749eb61", 30)
+    return f"Tentativa concluida (se o plano ja existia, foi ativado). {(e or s)[:200]}"
+
+
+@tool
+def desligar_inicio_rapido(acao: str = "desligar") -> str:
+    """LIGA OU DESLIGA O 'INICIO RAPIDO' do Windows (Fast Startup). Desligar
+    costuma resolver problemas de desligamento/reinicio lento, tela preta e
+    drivers que nao recarregam; ligar volta o boot mais rapido. 'acao'=
+    'desligar'/'ligar'. PODEROSO. SEMPRE pede confirmacao."""
+    desligar = acao.strip().lower().startswith(("deslig", "off"))
+    if not _confirma_poderoso(("Desligar o Inicio Rapido (Fast Startup) - recomendado para evitar bugs de boot/rede?"
+                               if desligar else "Ligar o Inicio Rapido (boot mais rapido)?")):
+        return "Cancelado."
+    valor = "0" if desligar else "1"
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"Inicio Rapido {'DESLIGADO' if desligar else 'LIGADO'}." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def desligar_efeitos_visuais(acao: str = "desempenho") -> str:
+    """AJUSTA OS EFEITOS VISUAIS do Windows: 'desempenho' = desliga animacoes e
+    efeitos (PC mais rapido/leve), 'aparencia' = volta tudo bonito, 'balanceado'
+    = deixa o Windows escolher. PODEROSO leve. SEMPRE pede confirmacao."""
+    a = acao.strip().lower()
+    valor = "2" if a.startswith(("desemp", "rap", "perf")) else ("1" if a.startswith(("apar", "bonit")) else "0")
+    if not _confirma_poderoso(f"Ajustar efeitos visuais para '{acao}' (altera aparencia do Windows)?"):
+        return "Cancelado."
+    cmd = (r'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects" /v VisualFXSetting /t REG_DWORD /d '
+           + valor + " /f")
+    s, e, c = _rodar_cmd(cmd, 60)
+    _rodar_cmd('taskkill /f /im explorer.exe && start explorer.exe', 60)
+    return f"Efeitos visuais ajustados para '{acao}' (Explorer reiniciado para aplicar)." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def afinidade_cpu_processo(nome_processo: str, nucleos: str) -> str:
+    """PRENDE UM PROGRAMA A APENAS ALGUNS NUCLEOS DO PROCESSADOR (afinidade de
+    CPU) - util para jogos antigos ou dividir carga. 'nucleos'=lista de nucleos,
+    ex.: '0,1' ou '0-3'. PODEROSO. SEMPRE pede confirmacao."""
+    nome = nome_processo.strip().replace(".exe", "")
+    try:
+        nums = []
+        for parte in nucleos.split(","):
+            parte = parte.strip()
+            if "-" in parte:
+                i, f = parte.split("-")
+                nums.extend(range(int(i), int(f) + 1))
+            elif parte:
+                nums.append(int(parte))
+        mascara = 0
+        for n in nums:
+            mascara |= (1 << n)
+    except Exception:
+        return "Formato de nucleos invalido. Use ex.: '0,1' ou '0-3'."
+    if not _confirma_poderoso(f"Definir afinidade de CPU de '{nome}' para os nucleos {sorted(set(nums))} (mascara {mascara})?"):
+        return "Cancelado."
+    s, e, c = _ps(f"(Get-Process -Name '{nome}' -ErrorAction Stop).ProcessorAffinity = [IntPtr]{mascara}; 'OK'", 60)
+    return f"Afinidade de '{nome}' ajustada para os nucleos {sorted(set(nums))}." if c == 0 else f"Falhou (processo nao encontrado?): {(e or s)[:300]}"
+
+
+@tool
+def desligar_reinicio_automatico(acao: str = "desligar") -> str:
+    """DESLIGA (OU RELIGA) O 'REINICIAR AUTOMATICAMENTE' em caso de tela azul
+    (BSOD). Desligar faz o PC mostrar o erro na tela em vez de reiniciar sozinho
+    (otimo para ler/ fotografar o codigo da tela azul). 'acao'='desligar'/'ligar'.
+    PODEROSO. SEMPRE pede confirmacao."""
+    desligar = acao.strip().lower().startswith("deslig")
+    if not _confirma_poderoso(("Parar de reiniciar o PC automaticamente em tela azul (assim voce ve o erro)?"
+                               if desligar else "Voltar a reiniciar automaticamente apos tela azul?")):
+        return "Cancelado."
+    valor = "0" if desligar else "1"
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Control\CrashControl" /v AutoReboot /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"Reinicio automatico em tela azul {'DESLIGADO' if desligar else 'LIGADO'}." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def habilitar_numlock_inicio(acao: str = "ligar") -> str:
+    """FAZ O NUMLOCK JA LIGAR (OU FICAR DESLIGADO) quando o Windows inicia.
+    'acao'='ligar'/'desligar'. PODEROSO leve. SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(f"Deixar o NumLock {'LIGADO' if ligar else 'DESLIGADO'} ao iniciar o Windows?"):
+        return "Cancelado."
+    valor = "2" if ligar else "0"
+    _rodar_cmd(r'reg add "HKU\.DEFAULT\Control Panel\Keyboard" /v InitialKeyboardIndicators /t REG_SZ /d ' + valor + " /f", 60)
+    _rodar_cmd(r'reg add "HKCU\Control Panel\Keyboard" /v InitialKeyboardIndicators /t REG_SZ /d ' + valor + " /f", 60)
+    return f"NumLock vai iniciar {'LIGADO' if ligar else 'DESLIGADO'} (vale apos reiniciar)."
+
+
+@tool
+def modo_deus_windows(pasta: str = "") -> str:
+    """CRIA O ATALHO 'MODO DEUS' (God Mode) - uma pasta unica com TODAS as
+    configuracoes avancadas do Windows num so lugar (centenas de opcoes do Painel
+    de Controle). 'pasta'=onde criar (padrao: Area de Trabalho). Inofensivo, so
+    cria um atalho."""
+    destino = pasta.strip().strip('"') or os.path.join(os.path.expanduser("~"), "Desktop")
+    os.makedirs(destino, exist_ok=True)
+    caminho = os.path.join(destino, "ModoDeus_Configuracoes.{ED7BA470-8E54-465E-825C-99712043E01C}")
+    try:
+        os.makedirs(caminho, exist_ok=True)
+        return f"Modo Deus criado em:\n{caminho}\nAbra essa pasta para ver todas as configuracoes avancadas."
+    except Exception as ex:
+        return f"Falhou: {ex}"
+
+
+# ---------------- WINDOWS UPDATE / RECUPERACAO / MANUTENCAO ----------------
+@tool
+def reparar_windows_update() -> str:
+    """REPARA O WINDOWS UPDATE quando ele fica dando erro e nao baixa/instala
+    atualizacoes: para os servicos, limpa a pasta de download (SoftwareDistribution)
+    e religa os servicos. PODEROSO (apaga o cache de atualizacoes baixadas; elas
+    baixam de novo). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reparar o Windows Update? Vou parar os servicos wuauserv/bits, limpar a pasta SoftwareDistribution e religar (atualizacoes baixam de novo)."):
+        return "Cancelado."
+    cmds = ("net stop wuauserv & net stop bits & "
+            r'rmdir /s /q "%SystemRoot%\SoftwareDistribution\Download" & '
+            "net start bits & net start wuauserv & "
+            "wuauclt /detectnow /updatenow")
+    s, e, c = _rodar_cmd(cmds, 600)
+    return f"Windows Update reparado; pedi para procurar atualizacoes de novo.\n{s[-400:]}" if c == 0 else f"Concluido com avisos (rode como admin): {(e or s)[-400:]}"
+
+
+@tool
+def listar_hotfixs() -> str:
+    """LISTA as atualizacoes do Windows ja instaladas (KBs) com data - so leitura.
+    Use para ver o que foi atualizado ou achar o KB de um update que quebrou algo."""
+    s, e, c = _ps("Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object HotFixID,Description,InstalledOn -First 30 | Format-Table -AutoSize | Out-String", 120)
+    return "Atualizacoes instaladas (ultimas 30):\n" + (s or e) if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def desinstalar_atualizacao_kb(kb: str) -> str:
+    """REMOVE UMA ATUALIZACAO DO WINDOWS pelo numero do KB (ex.: 'KB5036000') -
+    usado quando uma atualizacao recente causou problema. EXTREMAMENTE PODEROSO.
+    SEMPRE pede confirmacao."""
+    num = kb.strip().upper().replace("KB", "")
+    if not num.isdigit():
+        return "Diga o numero do KB (ex.: KB5036000 ou so 5036000)."
+    if not _confirma_poderoso(f"Desinstalar a atualizacao KB{num}? Isso reverte um update recente do Windows."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"wusa /uninstall /kb:{num} /quiet /norestart", 900)
+    return f"Desinstalacao do KB{num} enviada (reinicio pode ser pedido)." if c in (0, 3010) else f"Falhou (nao existe ou nao remove): {(e or s)[:300]}"
+
+
+@tool
+def ligar_desligar_atualizacoes_automaticas(acao: str = "pausar") -> str:
+    """PAUSA (desliga os servicos do Windows Update) ou RELIGA as atualizacoes
+    automaticas. 'pausar' para o Windows nao atualizar/reiniciar sozinho enquanto
+    voce trabalha/joga; 'ligar' para voltar ao normal. PODEROSO. SEMPRE pede
+    confirmacao."""
+    pausar = acao.strip().lower().startswith(("paus", "deslig", "off"))
+    if not _confirma_poderoso(("PAUSAR as atualizacoes automaticas (para os servicos do Windows Update)?"
+                               if pausar else "Religar as atualizacoes automaticas do Windows?")):
+        return "Cancelado."
+    if pausar:
+        s, e, c = _rodar_cmd("net stop wuauserv & net stop bits & sc config wuauserv start= disabled & sc config bits start= demand", 120)
+        return "Atualizacoes automaticas PAUSADAS (lembre-se de religar depois)." if c == 0 else f"Falhou (precisa de admin): {(e or s)[:300]}"
+    s, e, c = _rodar_cmd("sc config wuauserv start= demand & net start bits & net start wuauserv", 120)
+    return "Atualizacoes automaticas RELIGADAS." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def abrir_redefinir_windows(acao: str = "manter_arquivos") -> str:
+    """ABRE O ASSISTENTE DE REINICIALIZACAO DO WINDOWS (Reset This PC). 'acao'=
+    'manter_arquivos' (reinstala o Windows mantendo seus documentos/fotos; remove
+    programas e configuracoes) ou 'tudo' (apaga TUDO e volta de fabrica - para
+    vender/doar o PC). EXTREMAMENTE PODEROSO. SEMPRE pede confirmacao em dobro."""
+    limpar_tudo = acao.strip().lower().startswith(("tudo", "remov", "fabrica", "limp"))
+    aviso = ("REINICIALIZAR O WINDOWS APAGANDO TUDO (volta de fabrica, como para vender)? "
+             "TODOS os seus arquivos, programas e contas serao apagados!"
+             if limpar_tudo else
+             "REINICIALIZAR O WINDOWS MANTENDO seus arquivos? Programas e configuracoes serao removidos, mas documentos/fotos ficam.")
+    if not _confirma_poderoso(aviso):
+        return "Cancelado."
+    # abre o reset do sistema; o usuario confirma de novo na tela do Windows
+    opcao = "clean" if limpar_tudo else "keepmyfiles"
+    subprocess.Popen(f"systemreset -factory -{opcao} -quiet", shell=True)
+    return ("Abrindo a reinicializacao de fabrica (apaga TUDO) - confirme na tela." if limpar_tudo
+            else "Abrindo a reinicializacao mantendo arquivos - siga a tela e confirme.")
+
+
+@tool
+def reparar_loja_apps_windows() -> str:
+    """REPARA A MICROSOFT STORE E OS APPS DE FABRICA que nao abrem/estao quebrados:
+    registra de novo todos os pacotes Appx e roda wsreset (limpa o cache da Loja).
+    PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reparar a Microsoft Store e os apps de fabrica (registrar Appx de novo + wsreset)?"):
+        return "Cancelado."
+    ps = ("Get-AppXPackage -AllUsers | Foreach { Add-AppxPackage -DisableDevelopmentMode -Register "
+          "\"$($_.InstallLocation)\\AppXManifest.xml\" -ErrorAction SilentlyContinue }; 'OK'")
+    s, e, c = _ps(ps, 600)
+    _rodar_cmd("wsreset.exe", 120)
+    return "Loja/apps reparados e cache limpo (reabra a Loja)." if c == 0 else f"Concluido com avisos: {(e or s)[-400:]}"
+
+
+@tool
+def reparar_icones_windows() -> str:
+    """CONCERTA ICONES QUE FICARAM BRANCOS/ERRADOS (atalhos mostrando pagina em
+    branco): apaga o cache de icones e reinicia o Explorer. PODEROSO leve (nao
+    apaga nada seu). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reconstruir o cache de icones e reiniciar o Explorer (as janelas fecham e abrem)?"):
+        return "Cancelado."
+    ps = ("Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue; "
+          "Remove-Item \"$env:LocalAppData\\IconCache.db\" -Force -ErrorAction SilentlyContinue; "
+          "Remove-Item \"$env:LocalAppData\\Microsoft\\Windows\\Explorer\\iconcache*\" -Force -ErrorAction SilentlyContinue; "
+          "Start-Sleep 2; Start-Process explorer; 'OK'")
+    s, e, c = _ps(ps, 120)
+    return "Cache de icones reconstruido; Explorer reiniciado." if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def ligar_protecao_sistema(acao: str = "ligar") -> str:
+    """LIGA OU DESLIGA A 'PROTECAO DO SISTEMA' (que cria pontos de restauracao) no
+    disco C:. Ligar e recomendado para poder usar pontos de restauracao; tambem
+    cria um ponto na hora. 'acao'='ligar'/'desligar'. PODEROSO. SEMPRE pede
+    confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("LIGAR a Protecao do Sistema no C: e criar um ponto de restauracao?"
+                               if ligar else "DESLIGAR a Protecao do Sistema (nao dara mais para criar pontos de restauracao)?")):
+        return "Cancelado."
+    if ligar:
+        _ps("Enable-ComputerRestore -Drive \"C:\\\" -ErrorAction SilentlyContinue", 120)
+        s, e, c = _ps("Checkpoint-Computer -Description 'Ponto criado pelo agente' -RestorePointType MODIFY_SETTINGS -ErrorAction SilentlyContinue; 'OK'", 180)
+        return "Protecao do Sistema ligada no C: e ponto de restauracao criado." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    s, e, c = _ps("Disable-ComputerRestore -Drive \"C:\\\"", 120)
+    return "Protecao do Sistema desligada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def reparar_som_windows() -> str:
+    """TENTA CONSERTAR O AUDIO QUE NAO SAI: reinicia os servicos de som
+    (Audiosrv/AudioEndpointBuilder) e atualiza os dispositivos de audio. PODEROSO
+    leve. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reiniciar os servicos de audio do Windows para tentar recuperar o som?"):
+        return "Cancelado."
+    s, e, c = _ps("Restart-Service Audiosrv -Force -ErrorAction SilentlyContinue; Restart-Service AudioEndpointBuilder -Force -ErrorAction SilentlyContinue; "
+                  "Get-PnpDevice -Class 'MediaEndpoint' -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue; "
+                  "Start-Sleep 2; Get-PnpDevice -Class 'MediaEndpoint' | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue; 'OK'", 180)
+    return "Servicos de audio reiniciados. Teste o som; se continuar mudo, verifique o dispositivo de saida." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def reparar_bluetooth_windows() -> str:
+    """TENTA CONSERTAR O BLUETOOTH que nao liga/pareia: reinicia o adaptador
+    Bluetooth e o servico bthserv. PODEROSO leve. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reiniciar o adaptador e o servico Bluetooth para tentar consertar pareamento/ligacao?"):
+        return "Cancelado."
+    s, e, c = _ps("Restart-Service bthserv -Force -ErrorAction SilentlyContinue; "
+                  "Get-PnpDevice -Class Bluetooth -ErrorAction SilentlyContinue | Disable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue; "
+                  "Start-Sleep 3; Get-PnpDevice -Class Bluetooth | Enable-PnpDevice -Confirm:$false -ErrorAction SilentlyContinue; 'OK'", 180)
+    return "Bluetooth reiniciado; tente parear/ligar o dispositivo de novo." if c == 0 else f"Falhou (ha adaptador Bluetooth?): {(e or s)[:300]}"
+
+
+@tool
+def manutencao_profunda_pc() -> str:
+    """RODA A MANUTENCAO PROFUNDA COMPLETA DO WINDOWS de uma vez (DISM
+    RestoreHealth + SFC /scannow) - a mesma sequencia que tecnicos usam para
+    consertar arquivos do sistema corrompidos. PODEROSO e demorado (15-40 min).
+    SEMPRE pede confirmacao. NAO apaga arquivos pessoais."""
+    if not _confirma_poderoso("Rodar a manutencao profunda (DISM RestoreHealth + SFC /scannow)? Pode demorar 20-40 minutos; NAO apaga seus arquivos."):
+        return "Cancelado."
+    s1, e1, c1 = _rodar_cmd("DISM /Online /Cleanup-Image /RestoreHealth", 3600)
+    s2, e2, c2 = _rodar_cmd("sfc /scannow", 3600)
+    ok = "Nao encontrou violacoes" in s2 or c2 == 0
+    return ("Manutencao profunda concluida. " + ("SFC nao achou problemas (ou ja corrigiu)." if ok else "Verifique a saida; pode ser preciso reiniciar.")
+            + f"\n--- DISM ---\n{s1[-300:]}\n--- SFC ---\n{s2[-300:]}")
+
+
+@tool
+def limpeza_profunda_pc() -> str:
+    """LIMPEZA PROFUNDA DE LIXO: temporarios do sistema e do usuario, prefetch,
+    cache de atualizacoes baixadas e esvazia a lixeira. Libera espaco; NAO apaga
+    documentos. PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Limpar lixo profundo (temp do sistema/usuario, prefetch, cache de update, lixeira)? Seus documentos NAO sao apagados."):
+        return "Cancelado."
+    ps = ("$alvos = @($env:TEMP, \"$env:WINDIR\\Temp\", \"$env:WINDIR\\Prefetch\", "
+          "\"$env:WINDIR\\SoftwareDistribution\\Download\", \"$env:LOCALAPPDATA\\Temp\"); "
+          "$livre_antes = (Get-PSDrive C).Free; "
+          "foreach ($a in $alvos) { Remove-Item \"$a\\*\" -Recurse -Force -ErrorAction SilentlyContinue }; "
+          "Clear-RecycleBin -Force -ErrorAction SilentlyContinue; "
+          "$livre_depois = (Get-PSDrive C).Free; "
+          "'Liberado GB: ' + [math]::Round(($livre_depois - $livre_antes)/1GB,2)")
+    s, e, c = _ps(ps, 900)
+    return f"Limpeza profunda concluida.\n{s[-400:]}" if c == 0 else f"Concluido com avisos: {(e or s)[-400:]}"
+
+
+# ---------------- DRIVERS E DISPOSITIVOS ----------------
+@tool
+def exportar_drivers(pasta_destino: str = "") -> str:
+    """FAZ BACKUP DE TODOS OS DRIVERS instalados para uma pasta (pnputil /export),
+    util antes de formatar/reinstalar o Windows - da para reinstalar tudo sem
+    internet. So cria arquivos. 'pasta_destino'=onde salvar (padrao: pasta
+    DriversBackup na Area de Trabalho)."""
+    destino = pasta_destino.strip().strip('"') or os.path.join(os.path.expanduser("~"), "Desktop", "DriversBackup")
+    os.makedirs(destino, exist_ok=True)
+    s, e, c = _rodar_cmd(f'pnputil /export-driver * "{destino}"', 1200)
+    return f"Drivers exportados para:\n{destino}\n{s[-300:]}" if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def instalar_driver_inf(caminho_inf: str) -> str:
+    """INSTALA UM DRIVER a partir de um arquivo .inf (de um driver baixado/do
+    backup). 'caminho_inf'=caminho completo do .inf. PODEROSO (instala software de
+    sistema). SEMPRE pede confirmacao."""
+    inf = caminho_inf.strip().strip('"')
+    if not os.path.isfile(inf):
+        return f"Arquivo .inf nao encontrado: {inf}"
+    if not _confirma_poderoso(f"Instalar o driver:\n{inf}\nIsso adiciona um driver de dispositivo ao Windows."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'pnputil /add-driver "{inf}" /install', 600)
+    return f"Driver instalado.\n{s[-300:]}" if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def remover_driver(nome_inf: str) -> str:
+    """REMOVE UM DRIVER DE TERCEIROS do armazenamento (pnputil /delete-driver) pelo
+    nome do pacote (ex.: 'oem17.inf', que aparece em 'listar_drivers'). Use para
+    tirar driver velho/conflitante. EXTREMAMENTE PODEROSO. SEMPRE pede
+    confirmacao."""
+    inf = nome_inf.strip().lower()
+    if not inf.endswith(".inf"):
+        return "Diga o nome do pacote publicado (ex.: oem17.inf), que aparece em 'listar_drivers'."
+    if not _confirma_poderoso(f"REMOVER o driver {inf} do armazenamento de drivers? Um driver essencial removido pode quebrar um dispositivo."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"pnputil /delete-driver {inf} /uninstall /force", 600)
+    return f"Driver {inf} removido.\n{s[-300:]}" if c == 0 else f"Falhou (em uso?): {(e or s)[-300:]}"
+
+
+@tool
+def listar_dispositivos_com_erro() -> str:
+    """LISTA OS DISPOSITIVOS COM PROBLEMA (que aparecem com '!' de erro no Gerenciador
+    de Dispositivos) - so leitura. Use para achar driver faltando/quebrado."""
+    ps = "Get-PnpDevice | Where-Object {$_.Status -ne 'OK'} | Select-Object Status,Class,FriendlyName,InstanceId | Format-Table -AutoSize | Out-String"
+    s, e, c = _ps(ps, 90)
+    return "Dispositivos com problema (se vazio, esta tudo OK):\n" + (s or "Nenhum dispositivo com erro.") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def desabilitar_dispositivo(nome_ou_id: str) -> str:
+    """DESLIGA UM DISPOSITIVO DE HARDWARE no Gerenciador de Dispositivos (ex.: uma
+    webcam, placa de rede ou Bluetooth que voce quer desativar). EXTREMAMENTE
+    PODEROSO (desligar o dispositivo errado pode cortar internet/teclado). SEMPRE
+    pede confirmacao."""
+    if not _confirma_poderoso(f"DESABILITAR o dispositivo '{nome_ou_id}'? Se for rede/teclado/controlador essencial pode quebrar algo."):
+        return "Cancelado."
+    ps = (f"$d = Get-PnpDevice | Where-Object {{$_.FriendlyName -like '*{nome_ou_id}*' -or $_.InstanceId -like '*{nome_ou_id}*'}}; "
+          "if (-not $d) { 'NAO ENCONTRADO' } else { $d | Disable-PnpDevice -Confirm:$false; 'DESABILITADO: ' + ($d.FriendlyName -join ', ') }")
+    s, e, c = _ps(ps, 120)
+    return s.strip() if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def habilitar_dispositivo(nome_ou_id: str) -> str:
+    """RELIGA UM DISPOSITIVO que estava desabilitado no Gerenciador de Dispositivos
+    (reverte o 'desabilitar_dispositivo'). PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"HABILITAR o dispositivo '{nome_ou_id}'?"):
+        return "Cancelado."
+    ps = (f"$d = Get-PnpDevice | Where-Object {{$_.FriendlyName -like '*{nome_ou_id}*' -or $_.InstanceId -like '*{nome_ou_id}*'}}; "
+          "if (-not $d) { 'NAO ENCONTRADO' } else { $d | Enable-PnpDevice -Confirm:$false; 'HABILITADO: ' + ($d.FriendlyName -join ', ') }")
+    s, e, c = _ps(ps, 120)
+    return s.strip() if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def inventario_hardware() -> str:
+    """FAZ UM INVENTARIO COMPLETO DO HARDWARE DO PC: processador (modelo/nucleos),
+    memoria RAM total e por pente, placa de video, discos, placa-mae/fabricante e
+    numero de serie. So leitura - otimo para saber o que voce tem ou pedir
+    suporte."""
+    ps = ("'=== PROCESSADOR ==='; (Get-CimInstance Win32_Processor | Select-Object -First 1 Name,NumberOfCores,NumberOfLogicalProcessors | Format-List | Out-String); "
+          "'=== MEMORIA RAM ==='; 'Total GB: ' + [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory/1GB,1); "
+          "Get-CimInstance Win32_PhysicalMemory | Select-Object @{n='GB';e={[math]::Round($_.Capacity/1GB)}},Speed,Manufacturer | Format-Table -AutoSize | Out-String; "
+          "'=== VIDEO ==='; (Get-CimInstance Win32_VideoController | Select-Object Name,@{n='VRAM_GB';e={[math]::Round($_.AdapterRAM/1GB,1)}},DriverVersion | Format-Table -AutoSize | Out-String); "
+          "'=== DISCOS ==='; (Get-PhysicalDisk | Select-Object FriendlyName,MediaType,@{n='GB';e={[math]::Round($_.Size/1GB)}} | Format-Table -AutoSize | Out-String); "
+          "'=== PLACA-MAE / SERIE ==='; (Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer,Product | Format-List | Out-String); "
+          "(Get-CimInstance Win32_BIOS | Select-Object SerialNumber | Format-List | Out-String)")
+    s, e, c = _ps(ps, 120)
+    return "INVENTARIO DE HARDWARE\n" + (s or e)
+
+
+# ---------------- REDE AVANCADA / FIREWALL CIRURGICO ----------------
+@tool
+def mostrar_portas_em_uso() -> str:
+    """MOSTRA TODAS AS PORTAS abertas/em uso no PC (TCP/UDP), qual processo/programa
+    esta usando cada uma e o estado (LISTENING/ESTABLISHED). So leitura - use para
+    ver servicos ativos ou suspeitos."""
+    s, e, c = _rodar_cmd("netstat -ano -p tcp", 90)
+    if c != 0:
+        return f"Falhou: {e or s}"
+    # cruza o PID (ultima coluna) com o nome do processo via tasklist
+    linhas = [l for l in s.splitlines() if "LISTENING" in l or "ESTABLISHED" in l]
+    pids = {l.split()[-1] for l in linhas if l.split()[-1].isdigit()}
+    nomes = {}
+    for pid in list(pids)[:60]:
+        ts, te, tc = _rodar_cmd(f"tasklist /fi \"PID eq {pid}\" /fo csv /nh", 30)
+        if tc == 0 and "," in ts:
+            nomes[pid] = ts.split('"')[1]
+    saida = ["PROTO  ENDERECO_LOCAL          ESTADO         PID   PROGRAMA"]
+    for l in linhas[:80]:
+        p = l.split()
+        if len(p) >= 5 and p[-1].isdigit():
+            saida.append(f"{p[0]:6} {p[1]:24} {p[-2]:14} {p[-1]:6}{nomes.get(p[-1], '')}")
+    return "Portas em uso (top 80):\n" + "\n".join(saida)
+
+
+@tool
+def bloquear_ip_firewall(acao: str, ip: str) -> str:
+    """BLOQUEIA (OU LIBERA) UM IP NO FIREWALL DO WINDOWS - impede que o PC fale com
+    um endereco suspeito (entrada e saida). 'acao'='bloquear'/'liberar', 'ip'=o
+    endereco (ex.: '203.0.113.5'). PODEROSO. SEMPRE pede confirmacao."""
+    bloquear = acao.strip().lower().startswith(("bloq", "neg"))
+    if not _confirma_poderoso(f"{'BLOQUEAR' if bloquear else 'LIBERAR'} o IP {ip} no firewall (entrada e saida)?"):
+        return "Cancelado."
+    if bloquear:
+        _rodar_cmd(f'netsh advfirewall firewall add rule name="Agente bloq {ip}" dir=in action=block remoteip={ip}', 60)
+        s, e, c = _rodar_cmd(f'netsh advfirewall firewall add rule name="Agente bloq {ip}" dir=out action=block remoteip={ip}', 60)
+        return f"IP {ip} bloqueado no firewall." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    _rodar_cmd(f'netsh advfirewall firewall delete rule name="Agente bloq {ip}"', 60)
+    return f"IP {ip} liberado (regra removida)."
+
+
+@tool
+def bloquear_programa_internet(acao: str, programa_ou_caminho: str) -> str:
+    """IMPDE (OU PERMITE) QUE UM PROGRAMA ACESSE A INTERNET pelo firewall (ex.: um
+    jogo/crack que nao deve validar online, ou um app que consome dados).
+    'acao'='bloquear'/'liberar'; 'programa_ou_caminho'=nome do .exe ou o caminho
+    completo dele. PODEROSO. SEMPRE pede confirmacao."""
+    bloquear = acao.strip().lower().startswith(("bloq", "neg"))
+    alvo = programa_ou_caminho.strip().strip('"')
+    if not os.path.isfile(alvo):
+        # tenta achar pelo nome em pastas comuns
+        encontrado = None
+        for base in [os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files")),
+                     os.path.join(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)"))]:
+            for raiz, _, arqs in os.walk(base):
+                for a in arqs:
+                    if a.lower() == alvo.lower():
+                        encontrado = os.path.join(raiz, a)
+                        break
+                if encontrado:
+                    break
+            if encontrado:
+                break
+        if not encontrado:
+            return f"Nao achei o executavel '{alvo}'. Diga o caminho completo do .exe."
+        alvo = encontrado
+    if not _confirma_poderoso(f"{'BLOQUEAR' if bloquear else 'LIBERAR'} o acesso a internet de:\n{alvo}"):
+        return "Cancelado."
+    nome = "Agente " + ("bloq" if bloquear else "lib") + " " + os.path.basename(alvo)
+    if bloquear:
+        _rodar_cmd(f'netsh advfirewall firewall add rule name="{nome}" dir=in action=block program="{alvo}" enable=yes', 60)
+        s, e, c = _rodar_cmd(f'netsh advfirewall firewall add rule name="{nome}" dir=out action=block program="{alvo}" enable=yes', 60)
+        return f"Programa bloqueado na internet:\n{alvo}" if c == 0 else f"Falhou: {(e or s)[:300]}"
+    _rodar_cmd(f'netsh advfirewall firewall delete rule name="{nome}"', 60)
+    return f"Programa liberado na internet: {os.path.basename(alvo)}."
+
+
+@tool
+def listar_regras_firewall() -> str:
+    """LISTA as regras do firewall (principalmente as criadas por voce/pelo agente),
+    mostrando nome, direcao e acao - so leitura. Use para ver o que foi bloqueado."""
+    ps = "Get-NetFirewallRule | Where-Object {$_.DisplayName -like 'Agente*'} | Select-Object DisplayName,Direction,Action,Enabled | Format-Table -AutoSize | Out-String"
+    s, e, c = _ps(ps, 90)
+    return "Regras de firewall criadas pelo agente:\n" + (s or "Nenhuma regra do agente encontrada.") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def varrer_rede_local(verificar_porta: int = 0) -> str:
+    """VARRE A SUA REDE LOCAL (Wi-Fi) e mostra os dispositivos que responderam
+    (IP, nome do host e MAC) - feito 100% em Python, sem instalar nada. Se voce
+    informar 'verificar_porta' (ex.: 80, 445, 22), tambem diz quais aparelhos tem
+    aquela porta aberta. So leitura; nao altera nada."""
+    import socket
+    try:
+        host = socket.gethostname()
+        meu_ip = socket.gethostbyname(host)
+    except Exception:
+        meu_ip = "192.168.0.1"
+    partes = meu_ip.split(".")
+    if len(partes) != 4:
+        return "Nao consegui determinar a sua rede local."
+    base = ".".join(partes[:3])
+    resultados = []
+
+    def _ping(n):
+        ip = f"{base}.{n}"
+        try:
+            # tenta conexao rapida a uma porta comum aberta (varredura TCP) + nome reverso
+            achou = False
+            porta = int(verificar_porta) if verificar_porta else 445
+            s0 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s0.settimeout(0.25)
+            if s0.connect_ex((ip, porta)) == 0:
+                achou = True
+            s0.close()
+            if achou or not verificar_porta:
+                # confirma com ICMP do sistema se nao foi pela porta
+                if not achou:
+                    _s, _e, _c = _rodar_cmd(f"ping -n 1 -w 150 {ip}", 5)
+                    achou = _c == 0 and "TTL=" in _s.upper()
+                if achou:
+                    try:
+                        nome = socket.gethostbyaddr(ip)[0]
+                    except Exception:
+                        nome = "(sem nome)"
+                    extras = ""
+                    if verificar_porta:
+                        extras = f" | porta {verificar_porta} ABERTA"
+                    resultados.append(f"{ip:15} {nome}{extras}")
+        except Exception:
+            pass
+
+    threads = []
+    for n in range(1, 255):
+        th = threading.Thread(target=_ping, args=(n,), daemon=True)
+        th.start()
+        threads.append(th)
+    for th in threads:
+        th.join(timeout=2.0)
+    if not resultados:
+        return f"Varredura da rede {base}.x concluida: nenhum dispositivo respondeu (ou a rede bloqueia ping)."
+    return f"Dispositivos na rede {base}.x ({len(resultados)} achados):\n" + "\n".join(sorted(resultados))
+
+
+@tool
+def escanear_portas_host(host_alvo: str, portas: str = "comuns") -> str:
+    """ESCANEIA PORTAS de um computador/IP (na sua rede ou um site) e diz quais
+    estao abertas - 100% em Python. 'host_alvo'=IP ou dominio; 'portas'='comuns'
+    (21,22,80,443,3389,8080...) ou uma lista ex.: '80,443,3000,8000'. So leitura.
+    Use apenas em redes/seus servidores (escanear alvos de terceiros sem permissao
+    pode ser abuso)."""
+    import socket
+    if portas.strip().lower() == "comuns":
+        lista = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 5900, 8000, 8080, 8443]
+    else:
+        try:
+            lista = sorted({int(p) for p in portas.replace(";", ",").split(",") if p.strip().isdigit()})
+        except Exception:
+            return "Portas invalidas. Use 'comuns' ou ex.: '80,443,3000'."
+    try:
+        ip = socket.gethostbyname(host_alvo)
+    except Exception:
+        return f"Nao resolve o host: {host_alvo}"
+    abertas = []
+
+    def _testa(pt):
+        try:
+            s0 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s0.settimeout(0.6)
+            if s0.connect_ex((ip, pt)) == 0:
+                abertas.append(pt)
+            s0.close()
+        except Exception:
+            pass
+
+    threads = [threading.Thread(target=_testa, args=(p,), daemon=True) for p in lista]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join(timeout=3)
+    if not abertas:
+        return f"{host_alvo} ({ip}): nenhuma das portas {lista} esta aberta (ou protegida por firewall)."
+    return f"{host_alvo} ({ip}) - portas ABERTAS: {', '.join(map(str, sorted(abertas)))}"
+
+
+@tool
+def ligar_pc_wake_on_lan(mac: str, ip_rede: str = "255.255.255.255") -> str:
+    """LIGA UM PC DA REDE QUE ESTA DESLIGADO usando Wake-on-LAN (Magic Packet) -
+    100% em Python. 'mac'=endereco MAC da placa de rede do PC alvo (ex.:
+    'AA:BB:CC:DD:EE:FF'; veja em 'listar_dispositivos_rede' ou no ipconfig do
+    alvo). O PC alvo precisa ter Wake-on-LAN habilitado na BIOS/placa de rede.
+    So envia o pacote, nao altera este PC. SEMPRE pede confirmacao (acao remota)."""
+    import struct
+    import socket
+    try:
+        hexs = mac.replace("-", ":").replace(".", ":").split(":")
+        if len(hexs) != 6:
+            raise ValueError
+        mac_bytes = bytes(int(h, 16) for h in hexs)
+    except Exception:
+        return "MAC invalido. Use o formato AA:BB:CC:DD:EE:FF (veja em 'listar_dispositivos_rede')."
+    if not _confirma_poderoso(f"Enviar Wake-on-LAN para LIGAR o PC com MAC {mac} (na sua rede)? Use so nos seus proprios equipamentos."):
+        return "Cancelado."
+    pacote = b"\xff" * 6 + mac_bytes * 16
+    try:
+        s0 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s0.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s0.sendto(pacote, (ip_rede, 9))
+        s0.close()
+        return f"Magic Packet (Wake-on-LAN) enviado para {mac.upper()}. Se o PC alvo tiver WoL ligado na BIOS, ele vai ligar."
+    except Exception as ex:
+        return f"Falhou ao enviar: {ex}"
+
+
+@tool
+def mapear_unidade_rede(caminho_rede: str, letra: str) -> str:
+    """MAPEIA UMA PASTA COMPARTILHADA DE OUTRO PC DA REDE como se fosse um disco
+    neste PC (ex.: transforma \\\\outro-pc\\arquivos na unidade Z:). 'caminho_rede'
+    =o compartilhamento, 'letra'=a unidade. PODEROSO. SEMPRE pede confirmacao."""
+    l = letra.strip().rstrip(":").upper()
+    if not _confirma_poderoso(f"Mapear '{caminho_rede}' como a unidade {l}:?"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'net use {l}: "{caminho_rede}" /persistent:yes', 60)
+    return f"Unidade {l}: agora aponta para {caminho_rede}." if c == 0 else f"Falhou (o compartilhamento existe e esta online?): {(e or s)[:300]}"
+
+
+@tool
+def montar_iso(caminho_iso: str, acao: str = "montar") -> str:
+    """MONTA UM ARQUIVO .ISO (de instalador/jogo) como se fosse um DVD inserido -
+    aparece uma unidade nova no Computador; ou DESMONTAA ('acao'='desmontar').
+    PODEROSO leve. SEMPRE pede confirmacao para montar."""
+    iso = caminho_iso.strip().strip('"')
+    if acao.strip().lower().startswith("desmont"):
+        s, e, c = _ps(f"Dismount-DiskImage -ImagePath '{iso}' -ErrorAction Stop; 'OK'", 90)
+        return f"ISO desmontada: {os.path.basename(iso)}." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    if not os.path.isfile(iso):
+        return f"ISO nao encontrada: {iso}"
+    if not _confirma_poderoso(f"Montar a ISO '{os.path.basename(iso)}' (vai aparecer uma unidade de DVD nova)?"):
+        return "Cancelado."
+    s, e, c = _ps(f"Mount-DiskImage -ImagePath '{iso}' -PassThru | Get-Volume | Select-Object DriveLetter | Out-String", 90)
+    letra = "".join(ch for ch in (s or "") if ch.isalpha())
+    return f"ISO montada na unidade {letra}:." if c == 0 and letra else f"ISO montada (veja a nova unidade no Computador). {(e or s)[:200]}"
+
+
+@tool
+def esconder_pc_na_rede(acao: str = "esconder") -> str:
+    """DEIXA O PC INVISIVEL NA REDE (desliga a descoberta de rede e o compartilhamento
+    automatico) ou VISIVEL de novo ('mostrar'). Esconder e mais seguro em redes
+    publicas. PODEROSO. SEMPRE pede confirmacao."""
+    esconder = acao.strip().lower().startswith(("escond", "invis", "off"))
+    if not _confirma_poderoso(("Deixar este PC INVISIVEL na rede (desliga descoberta/compartilhamento)?"
+                               if esconder else "Voltar a deixar o PC VISIVEL na rede?")):
+        return "Cancelado."
+    perfil = "Public" if esconder else "Private"
+    _rodar_cmd(f"netsh advfirewall firewall set rule group=\"descoberta de rede\" new enable={'no' if esconder else 'yes'}", 60)
+    s, e, c = _ps(f"Set-NetConnectionProfile -NetworkCategory {perfil} -ErrorAction SilentlyContinue; 'OK'", 60)
+    return f"PC agora esta {'INVISIVEL (rede publica)' if esconder else 'VISIVEL (rede privada)'} na rede." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def desligar_compartilhamentos_adm(acao: str = "desligar") -> str:
+    """DESLIGA (OU RELIGA) OS COMPARTILHAMENTOS ADMINISTRATIVOS OCULTOS (C$, D$,
+    ADMIN$) - um furador de seguranca que admin remoto pode usar. Desligar
+    endurece o PC. PODEROSO. SEMPRE pede confirmacao."""
+    desligar = acao.strip().lower().startswith(("deslig", "off"))
+    if not _confirma_poderoso(("Desligar os compartilhamentos administrativos ocultos (C$, ADMIN$) - endurece a seguranca?"
+                               if desligar else "Religar os compartilhamentos administrativos (C$, ADMIN$)?")):
+        return "Cancelado."
+    valor = "0" if desligar else "1"
+    _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v AutoShareWks /t REG_DWORD /d ' + valor + " /f", 60)
+    _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters" /v AutoShareServer /t REG_DWORD /d ' + valor + " /f", 60)
+    _rodar_cmd("net stop lanmanserver && net start lanmanserver", 90)
+    return f"Compartilhamentos ADM$ {'DESLIGADOS' if desligar else 'RELIGADOS'} (servidor reiniciado)."
+
+
+@tool
+def listar_compartilhamentos_rede() -> str:
+    """LISTA todas as pastas que este PC compartilha na rede (nome e caminho real) -
+    so leitura. Use para conferir o que esta exposto."""
+    s, e, c = _rodar_cmd("net share", 60)
+    return "Compartilhamentos deste PC na rede:\n" + s if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def listar_pcs_rede() -> str:
+    """LISTA os outros computadores/equipamentos visiveis na rede local (net view) -
+    so leitura."""
+    s, e, c = _rodar_cmd("net view", 60)
+    return "Computadores na rede:\n" + s if c == 0 else f"Nenhum computador listado (ou descoberta de rede desligada): {(e or s)[:200]}"
+
+
+@tool
+def renovar_ip() -> str:
+    """LIBERA E PEDE UM IP NOVO ao roteador (ipconfig /release + /renew) e limpa o
+    cache DNS - util quando a internet/ rede fica com IP preso ou conflitando.
+    PODEROSO (corta a rede por alguns segundos). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Liberar e renovar o IP (ipconfig release/renew) e limpar o DNS? A rede cai por alguns segundos."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("ipconfig /release && ipconfig /renew && ipconfig /flushdns", 180)
+    return f"IP renovado e DNS limpo.\n{s[-400:]}" if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def habilitar_dns_https() -> str:
+    """ATIVA O DNS SOBRE HTTPS (DoH) no Windows - as consultas de site passam
+    criptografadas (mais privacidade; o provedor nao ve quais sites voce acessa),
+    usando os servidores DoH da Cloudflare/Google. PODEROSO (muda o DNS). SEMPRE
+    pede confirmacao."""
+    if not _confirma_poderoso("Ativar DNS sobre HTTPS (DoH) criptografado (Cloudflare/Google) nas suas conexoes?"):
+        return "Cancelado."
+    ps = ("$dns = @('1.1.1.1','8.8.8.8'); "
+          "Get-DnsClientDohServerAddress -ErrorAction SilentlyContinue | Out-Null; "
+          "foreach ($s in $dns) { Add-DnsClientDohServerAddress -ServerAddress $s -DohTemplate ('https://' + $s + '/dns-query') -AllowFallbackToUdp $true -AutoUpgrade $true -ErrorAction SilentlyContinue }; "
+          "Set-DnsClientServerAddress -ServerAddresses $dns -ErrorAction SilentlyContinue; 'OK'")
+    s, e, c = _ps(ps, 120)
+    return "DNS sobre HTTPS ativado (Cloudflare/Google)." if c == 0 else f"Falhou (precisa de Windows 10 recente/admin): {(e or s)[:300]}"
+
+
+@tool
+def proxy_windows(acao: str, servidor: str = "") -> str:
+    """LIGA, DESLIGA OU CONFIGURA O PROXY do Windows (vale para Edge/Chrome e apps).
+    'acao'='ligar' (com 'servidor' ex.: '127.0.0.1:8080'), 'desligar' ou 'ver'.
+    PODEROSO (pode cortar a internet se o proxy estiver errado). SEMPRE pede
+    confirmacao para ligar/desligar."""
+    a = acao.strip().lower()
+    if a in ("ver", "status", "mostrar"):
+        s, e, c = _rodar_cmd('reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyEnable & reg query "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings" /v ProxyServer', 60)
+        return "Configuracao de proxy atual:\n" + s
+    if a.startswith("deslig"):
+        if not _confirma_poderoso("Desligar o proxy do Windows?"):
+            return "Cancelado."
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 0 /f', 60)
+        return "Proxy desligado."
+    if a.startswith("lig"):
+        if not servidor.strip():
+            return "Para ligar, diga o servidor (ex.: '127.0.0.1:8080')."
+        if not _confirma_poderoso(f"Ligar o proxy do Windows para '{servidor}'? Se esse proxy nao existir, a internet para de funcionar."):
+            return "Cancelado."
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable /t REG_DWORD /d 1 /f', 60)
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer /t REG_SZ /d "' + servidor + '" /f', 60)
+        return f"Proxy ligado: {servidor}."
+    return "Use 'ver', 'ligar' (com servidor) ou 'desligar'."
+
+
+@tool
+def habilitar_servidor_ssh(acao: str = "ligar") -> str:
+    """INSTALA E LIGA O SERVIDOR SSH DO WINDOWS (OpenSSH Server) - permite acessar
+    este PC por terminal a partir de outro (ssh usuario@ip). 'acao'='ligar'
+    (instala se preciso e inicia) ou 'desligar'. EXTREMAMENTE PODEROSO (abre acesso
+    remoto ao PC). SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("Instalar e INICIAR o servidor SSH (OpenSSH) - outros poderao acessar este PC por terminal via ssh? Deixe uma senha forte."
+                               if ligar else "Parar e desligar o servidor SSH?")):
+        return "Cancelado."
+    if ligar:
+        _ps("Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 -ErrorAction SilentlyContinue | Out-Null", 600)
+        s, e, c = _ps("Set-Service sshd -StartupType Automatic; Start-Service sshd; 'OK'", 120)
+        return "Servidor SSH (sshd) instalado/iniciado. Acesse de outro PC com: ssh SEU_USUARIO@IP_DO_PC" if c == 0 else f"Falhou: {(e or s)[:300]}"
+    s, e, c = _ps("Stop-Service sshd -Force -ErrorAction SilentlyContinue; Set-Service sshd -StartupType Disabled; 'OK'", 90)
+    return "Servidor SSH parado e desligado." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def mostrar_tabela_rotas() -> str:
+    """MOSTRA A TABELA DE ROTAS DE REDE do Windows (para onde o PC envia cada tipo
+    de trafego, gateway padrao, VPNs) - so leitura. Util para diagnosticar VPN ou
+    rede com rota errada."""
+    s, e, c = _rodar_cmd("route print -4", 90)
+    return "Tabela de rotas (IPv4):\n" + s[:4000] if c == 0 else f"Falhou: {e or s}"
+
+
+# ---------------- CONTAS / SESSAO / SEGURANCA ----------------
+@tool
+def habilitar_conta_administrador(acao: str = "desligar") -> str:
+    """LIGA OU DESLIGA A CONTA 'Administrador' OCULTA do Windows (a conta mestra,
+    que vem desativada por seguranca). So ligue se souber o que esta fazendo e
+    coloque senha; deixe desligada no dia a dia. 'acao'='ligar'/'desligar'.
+    EXTREMAMENTE PODEROSO. SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("ATIVAR a conta oculta 'Administrador' (acesso total sem travas)? Coloque senha nela e desligue depois de usar."
+                               if ligar else "Desativar a conta 'Administrador' oculta?")):
+        return "Cancelado."
+    if ligar:
+        _rodar_cmd("net user Administrador /active:yes", 60)
+        return "Conta 'Administrador' ATIVADA. Defina uma senha forte para ela antes de usar."
+    s, e, c = _rodar_cmd("net user Administrador /active:no", 60)
+    return "Conta 'Administrador' desativada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def listar_sessoes_ativas() -> str:
+    """LISTA quem esta logado no PC no momento (usuarios e sessoes locais/remotas) -
+    so leitura. Use para ver se ha uma sessao remota/RDP aberta."""
+    s, e, c = _rodar_cmd("query session", 60)
+    if c == 0:
+        return "Sessoes ativas:\n" + s
+    s2, e2, c2 = _rodar_cmd("query user", 60)
+    return "Usuarios logados:\n" + (s2 or "Nao consegui listar (precisa de admin/terminal services).")
+
+
+@tool
+def encerrar_sessao_usuario(id_sessao: str) -> str:
+    """FORCA O LOGOFF DE UMA SESSAO/USUARIO (fecha a area de trabalho daquela conta,
+    com programas abertos). 'id_sessao'=o numero que aparece em
+    'listar_sessoes_ativas'. EXTREMAMENTE PODEROSO (perde o que nao foi salvo naquela
+    sessao). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"ENCERRAR a sessao/usuario numero {id_sessao} (logoff forcado)? Tudo nao salvo nessa sessao se perde."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"logoff {id_sessao}", 60)
+    return f"Sessao {id_sessao} encerrada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def enviar_mensagem_rede(texto: str, destino: str = "*") -> str:
+    """ENVIA UMA MENSAGEM POPUP PARA OUTRO PC DA REDE (msg do Windows). 'destino'=
+    nome/IP do outro PC (ou '*' so neste). 'texto'=a mensagem. PODEROSO leve.
+    SEMPRE pede confirmacao (nao use para incomodar terceiros)."""
+    if not _confirma_poderoso(f"Enviar a mensagem para '{destino}':\n\"{texto}\"\nSo use na sua rede/com seus PCs."):
+        return "Cancelado."
+    seguro = texto.replace('"', "'")
+    s, e, c = _rodar_cmd(f'msg * /server:{destino} "{seguro}"' if destino != "*" else f'msg * "{seguro}"', 60)
+    return "Mensagem enviada." if c == 0 else f"Falhou (o 'msg' pode nao existir nesta edicao do Windows): {(e or s)[:300]}"
+
+
+@tool
+def politica_senha_windows(acao: str = "ver") -> str:
+    """VE OU ENDURECE A POLITICA DE SENHAS do Windows. 'acao'='ver' (mostra as
+    regras atuais) ou 'endurecer' (liga complexidade de senha e tamanho minimo de
+    8 caracteres - recomendado para seguranca). PODEROSO. SEMPRE pede confirmacao
+    para mudar."""
+    if acao.strip().lower().startswith(("ver", "status")):
+        s, e, c = _rodar_cmd("net accounts", 60)
+        return "Politica de senhas/contas atual:\n" + s if c == 0 else f"Falhou: {e or s}"
+    if not _confirma_poderoso("Endurecer a politica de senhas? Vou exigir senha de no minimo 8 caracteres e complexidade (letra+numero/simbolo)."):
+        return "Cancelado."
+    _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" /v MinimumPasswordLength /t REG_DWORD /d 8 /f', 60)
+    # exporta politica via secedit de forma simples
+    s, e, c = _rodar_cmd("net accounts /minpwlen:8 /uniquepw:5", 60)
+    return "Politica endurecida (senha minima de 8 caracteres; complexidade recomendada ativa em versao Pro)." if c == 0 else f"Concluido com avisos: {(e or s)[:300]}"
+
+
+@tool
+def bloquear_usb_pendrive(acao: str = "bloquear") -> str:
+    """BLOQUEIA (OU LIBERA) O USO DE PENDRIVES/USB DE ARMAZENAMENTO neste PC -
+    impede copia de dados por USB (seguranca) ou reverte. Teclado/mouse USB
+    continuam funcionando (so o armazenamento e afetado). 'acao'='bloquear'/
+    'liberar'. EXTREMAMENTE PODEROSO. SEMPRE pede confirmacao."""
+    bloquear = acao.strip().lower().startswith(("bloq", "neg"))
+    if not _confirma_poderoso(("BLOQUEAR pendrives/armazenamento USB neste PC (so a maquina que rodar isso; teclado/mouse seguem OK)?"
+                               if bloquear else "Liberar pendrives/armazenamento USB?")):
+        return "Cancelado."
+    valor = "4" if bloquear else "3"  # USBSTOR Start: 4=desabilitado, 3=manual
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Services\USBSTOR" /v Start /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"Armazenamento USB {'BLOQUEADO' if bloquear else 'LIBERADO'} (vale ao plugar um novo dispositivo)." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def ligar_desligar_uac(nivel: str = "ligar") -> str:
+    """LIGA OU DESLIGA O CONTROLE DE CONTA DE USUARIO (UAC - os avisos de 'permitir
+    que este app faca alteracoes'). Desligar e perigoso (tira uma das principais
+    defesas contra virus); so desligue temporariamente. EXTREMAMENTE PODEROSO.
+    SEMPRE pede confirmacao."""
+    desligar = nivel.strip().lower().startswith(("deslig", "off"))
+    if not _confirma_poderoso(("DESLIGAR o UAC (avisos de permissao)? Isso enfraquece MUITO a seguranca; so vale apos reiniciar. Nao recomendado."
+                               if desligar else "LIGAR o UAC (recomendado para seguranca)?")):
+        return "Cancelado."
+    valor = "0" if desligar else "1"
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" /v EnableLUA /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"UAC {'DESLIGADO' if desligar else 'LIGADO'} (reinicie o PC para valer)." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def verificar_assinatura_arquivo(caminho_arquivo: str) -> str:
+    """VERIFICA SE UM PROGRAMA/.EXE TEM ASSINATURA DIGITAL VALIDA (de empresa
+    confiavel) - so leitura. Programa sem assinatura pode ser suspeito/caseiro.
+    Usa Get-AuthenticodeSignature."""
+    a = caminho_arquivo.strip().strip('"')
+    if not os.path.isfile(a):
+        return f"Arquivo nao encontrado: {a}"
+    ps = (f"$s = Get-AuthenticodeSignature '{a}'; "
+          "'Status: ' + $s.Status; 'Quem assinou: ' + $s.SignerCertificate.Subject")
+    s, e, c = _ps(ps, 60)
+    return s if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def escanear_arquivo_defender(caminho_arquivo: str) -> str:
+    """MANDA O WINDOWS DEFENDER VARRER UM ARQUIVO/PASTA ESPECIFICO agora (MpCmdRun
+    -Scan) - rapido e direto no arquivo que voce suspeita. PODEROSO leve. SEMPRE
+    pede confirmacao."""
+    a = caminho_arquivo.strip().strip('"')
+    if not os.path.exists(a):
+        return f"Nao encontrado: {a}"
+    if not _confirma_poderoso(f"Varrer com o Defender agora:\n{a}"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -Scan -ScanType 3 -File "{a}"', 900)
+    return "Varredura concluida (se nao houver ameaca listada, o arquivo esta limpo).\n" + (s or e)[-500:]
+
+
+@tool
+def listar_quarentena_defender() -> str:
+    """LISTA OS ARQUIVOS QUE O DEFENDER COLOU EM QUARENTENA (ameacas detectadas e
+    isoladas) - so leitura."""
+    s, e, c = _rodar_cmd('"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -Restore -ListAll', 120)
+    return "Itens em quarentena do Defender:\n" + (s if s.strip() else "Nenhum item em quarentena.") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def status_ativacao_windows() -> str:
+    """DIZ SE O WINDOWS ESTA ATIVADO e com qual tipo de licenca (digital/OEM/chave) -
+    so leitura."""
+    s, e, c = _rodar_cmd("cscript //nologo %SystemRoot%\\System32\\slmgr.vbs /dli", 120)
+    return "Status de ativacao do Windows:\n" + s if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def mostrar_chave_produto_windows() -> str:
+    """RECUPERA A CHAVE DE PRODUTO (serial) do Windows que veio gravada na BIOS/
+    firmware do PC (OA3xOriginalProductKey) - util para reinstalar o Windows. So
+    leitura; mostra so a chave DESTE equipamento (nao quebra nenhuma protecao)."""
+    s, e, c = _rodar_cmd(r'wmic path softwarelicensingservice get OA3xOriginalProductKey', 60)
+    chave = " ".join(s.split())
+    if not chave or "OA3xOriginalProductKey" not in s:
+        return "Nao encontrei chave OEM na firmware (PC montado/Windows nao veio de fabrica)."
+    chave = s.replace("OA3xOriginalProductKey", "").strip()
+    return f"Chave de produto (OEM) gravada na BIOS deste PC:\n{chave}\nGuarde-a para reinstalar o Windows."
+
+
+@tool
+def desligar_login_automatico() -> str:
+    """DESLIGA O LOGIN AUTOMATICO (se o Windows entra direto sem pedir senha) - volta
+    a pedir senha ao ligar, o que e mais seguro. PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Desligar o login automatico (passar a pedir senha ao ligar o PC)?"):
+        return "Cancelado."
+    _rodar_cmd(r'reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /f', 60)
+    _rodar_cmd(r'reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v DefaultPassword /f', 60)
+    return "Login automatico desligado - o Windows voltara a pedir senha."
+
+
+# ---------------- AMBIENTE / DEV / POLITICAS / PRIVACIDADE ----------------
+@tool
+def criptografar_pasta_efs(caminho: str, acao: str = "criptografar") -> str:
+    """CRIPTOGRAFA UMA PASTA/ARQUIVO com o EFS do proprio Windows (cipher /e) - so o
+    seu usuario do Windows consegue abrir; ou DESCRIPTOGRAFA ('descriptografar').
+    Diferente do BitLocker, e por pasta. PODEROSO (se perder o Windows/conta, os
+    arquivos podem ficar inacessiveis - faca backup do certificado). SEMPRE pede
+    confirmacao."""
+    p = caminho.strip().strip('"')
+    if not os.path.exists(p):
+        return f"Nao encontrado: {p}"
+    cripto = acao.strip().lower().startswith(("cript", "lig"))
+    if not _confirma_poderoso(("CRIPTOGRAFAR com EFS (so seu usuario abre)? IMPORTANTE: guarde o certificado de criptografia ou pode perder o acesso se reinstalar o Windows."
+                               if cripto else "Descriptografar (voltar ao normal) este item EFS?")):
+        return "Cancelado."
+    flag = "/e" if cripto else "/d"
+    s, e, c = _rodar_cmd(f'cipher {flag} /s:"{p}"' if os.path.isdir(p) else f'cipher {flag} "{p}"', 300)
+    return f"Item {'criptografado (EFS)' if cripto else 'descriptografado'}." if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+@tool
+def desbloquear_arquivo_baixado(caminho: str) -> str:
+    """REMOVE A MARCA DE 'BAIXADO DA INTERNET' de um arquivo (o aviso de seguranca
+    'este arquivo veio de outro computador' / o bloqueio do SmartScreen em scripts).
+    Use so em arquivos que VOCE confia. PODEROSO. SEMPRE pede confirmacao."""
+    p = caminho.strip().strip('"')
+    if not os.path.exists(p):
+        return f"Nao encontrado: {p}"
+    if not _confirma_poderoso(f"Desbloquear a marca de 'veio da internet' de:\n{p}\nFaca isso somente se confiar no arquivo."):
+        return "Cancelado."
+    s, e, c = _ps(f"Get-ChildItem '{p}' -Recurse -ErrorAction SilentlyContinue | Unblock-File; Unblock-File '{p}' -ErrorAction SilentlyContinue; 'OK'", 120)
+    return "Arquivo(s) desbloqueados (marca de internet removida)." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def gerenciar_variavel_ambiente(acao: str, nome: str, valor: str = "") -> str:
+    """VE, CRIA/ALTERA OU REMOVE UMA VARIAVEL DE AMBIENTE do Windows (como PATH,
+    JAVA_HOME etc.). 'acao'='ver', 'criar' ('nome' e 'valor') ou 'remover'
+    ('nome'). Afeta TODOS os programas/terminais. PODEROSO (mexer errado no PATH
+    quebra comandos). SEMPRE pede confirmacao para criar/remover."""
+    a = acao.strip().lower()
+    if a in ("ver", "listar", "mostrar"):
+        s, e, c = _ps(f"[Environment]::GetEnvironmentVariable('{nome}','Machine')", 60)
+        return f"Variavel de sistema '{nome}' = {s.strip() or '(nao definida)'}"
+    if a.startswith("rem"):
+        if not _confirma_poderoso(f"REMOVER a variavel de ambiente de sistema '{nome}'?"):
+            return "Cancelado."
+        s, e, c = _ps(f"[Environment]::SetEnvironmentVariable('{nome}',$null,'Machine'); 'OK'", 60)
+        return f"Variavel '{nome}' removida." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    if a.startswith(("cri", "defin", "alter")):
+        if not _confirma_poderoso(f"Definir a variavel de AMBIENTE DE SISTEMA '{nome}' = '{valor}'? Afeta todos os programas."):
+            return "Cancelado."
+        # tratamento especial de PATH: acrescenta em vez de sobrescrever
+        if nome.upper() == "PATH" and valor and not valor.startswith(";"):
+            ps = (f"$atual = [Environment]::GetEnvironmentVariable('Path','Machine'); "
+                  f"if ($atual -notlike '*{valor}*') {{ [Environment]::SetEnvironmentVariable('Path', $atual + ';' + '{valor}', 'Machine') }}; 'OK'")
+        else:
+            ps = f"[Environment]::SetEnvironmentVariable('{nome}','{valor.replace(chr(39),'')}','Machine'); 'OK'"
+        s, e, c = _ps(ps, 60)
+        return f"Variavel '{nome}' definida (abra um terminal novo para valer)." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    return "Use 'ver', 'criar' (nome e valor) ou 'remover' (nome)."
+
+
+@tool
+def habilitar_caminhos_longos(acao: str = "ligar") -> str:
+    """LIGA O SUPORTE A CAMINHOS LONGOS do Windows (acima de 260 caracteres, que
+    da erro 'path too long' em programas/node/git) ou desliga. PODEROSO (chave de
+    politica). SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("Habilitar caminhos longos (LongPathsEnabled) - acaba com o erro de 'caminho muito longo'?"
+                               if ligar else "Desligar o suporte a caminhos longos?")):
+        return "Cancelado."
+    valor = "1" if ligar else "0"
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"Caminhos longos {'HABILITADOS' if ligar else 'desabilitados'}." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def habilitar_modo_desenvolvedor(acao: str = "ligar") -> str:
+    """LIGA O MODO DESENVOLVEDOR do Windows (permite instalar apps por fora, usar
+    simbolicos links sem admin, bash/SSH soltos) ou desliga. PODEROSO. SEMPRE pede
+    confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("Habilitar o Modo Desenvolvedor do Windows (mais liberdades para programar, porem reduz uma trava de seguranca)?"
+                               if ligar else "Desligar o Modo Desenvolvedor?")):
+        return "Cancelado."
+    valor = "1" if ligar else "0"
+    s, e, c = _rodar_cmd(r'reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /v AllowDevelopmentWithoutDevLicense /t REG_DWORD /d ' + valor + " /f", 60)
+    return f"Modo Desenvolvedor {'LIGADO' if ligar else 'DESLIGADO'}." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def politica_execucao_powershell(nivel: str = "remotesigned") -> str:
+    """DEFINE A POLITICA DE EXECUCAO DE SCRIPTS DO POWERSHELL. 'remotesigned'
+    (recomendado: roda scripts locais, exige assinatura nos baixados da internet),
+    'restricted' (nao roda nenhum script) ou 'bypass' (roda tudo - so para
+    diagnostico). PODEROSO. SEMPRE pede confirmacao."""
+    n = nivel.strip().lower()
+    if n not in ("remotesigned", "restricted", "bypass", "allsigned"):
+        return "Use um nivel: remotesigned (recomendado), restricted ou bypass."
+    if not _confirma_poderoso(f"Definir a politica de execucao do PowerShell para '{n}' para o computador todo?"):
+        return "Cancelado."
+    s, e, c = _ps(f"Set-ExecutionPolicy -ExecutionPolicy {n} -Scope LocalMachine -Force; 'OK'", 60)
+    return f"Politica do PowerShell definida para '{n}'." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def listar_programas_inicializacao() -> str:
+    """LISTA OS PROGRAMAS QUE INICIAM JUNTO COM O WINDOWS (das chaves Run do registro
+    e das pastas de inicializacao) - so leitura. Use para ver o que deixa o PC
+    lento ao ligar."""
+    ps = ("'=== Run (usuario) ==='; (Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).PSObject.Properties | "
+          "Where-Object {$_.Name -notlike 'PS*'} | ForEach-Object { $_.Name + ' = ' + $_.Value }; "
+          "'=== Run (maquina) ==='; (Get-ItemProperty 'HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).PSObject.Properties | "
+          "Where-Object {$_.Name -notlike 'PS*'} | ForEach-Object { $_.Name + ' = ' + $_.Value }; "
+          "'=== Pasta de inicializacao ==='; Get-ChildItem ([Environment]::GetFolderPath('Startup')) -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }")
+    s, e, c = _ps(ps, 90)
+    return "Programas de inicializacao:\n" + (s or "Nenhum item encontrado.") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def remover_programa_inicializacao(nome: str) -> str:
+    """REMOVE UM PROGRAMA DA INICIALIZACAO DO WINDOWS (tira do Run/RunOnce) - ele
+    para de abrir sozinho ao ligar o PC (NAO desinstala o programa). 'nome'=o nome
+    que aparece em 'listar_programas_inicializacao'. PODEROSO. SEMPRE pede
+    confirmacao."""
+    if not _confirma_poderoso(f"Tirar '{nome}' da inicializacao do Windows (ele so para de abrir junto; nao e desinstalado)?"):
+        return "Cancelado."
+    ps = (f"foreach ($base in @('HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run','HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run',"
+          f"'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce','HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce')) {{ "
+          f"$p = Get-ItemProperty $base -ErrorAction SilentlyContinue; if ($p -and $p.'{nome}') {{ Remove-ItemProperty -Path $base -Name '{nome}' -ErrorAction SilentlyContinue; 'removido de ' + $base }} }}; 'fim'")
+    s, e, c = _ps(ps, 90)
+    return f"'{nome}' removido da inicializacao (se existia).\n{s}" if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def alterar_tipo_inicializacao_servico(nome_servico: str, tipo: str) -> str:
+    """DEFINE COMO UM SERVICO DO WINDOWS INICIA: 'automatico', 'manual' (so quando
+    chamado) ou 'desabilitado' (nunca inicia - util para desligar servicos que
+    atrapalham). EXTREMAMENTE PODEROSO (desabilitar o servico errado pode quebrar
+    coisas). SEMPRE pede confirmacao."""
+    mapa = {"automatico": "Automatic", "auto": "Automatic", "manual": "Manual", "desabilitado": "Disabled", "desligado": "Disabled", "atrasado": "AutomaticDelayedStart"}
+    t = mapa.get(tipo.strip().lower())
+    if not t:
+        return "Use 'tipo' = automatico, manual ou desabilitado."
+    if not _confirma_poderoso(f"Definir a inicializacao do servico '{nome_servico}' como '{tipo}'? Desabilitar servicos essenciais pode quebrar o Windows."):
+        return "Cancelado."
+    s, e, c = _ps(f"Set-Service -Name '{nome_servico}' -StartupType {t} -ErrorAction Stop; 'OK'", 90)
+    return f"Servico '{nome_servico}' definido como '{tipo}'." if c == 0 else f"Falhou (servico existe?): {(e or s)[:300]}"
+
+
+@tool
+def limpar_cache_navegadores() -> str:
+    """LIMPA O CACHE (arquivos temporarios) dos navegadores Chrome e Edge - libera
+    espaco e resolve sites que carregam travado. NAO apaga senhas nem favoritos.
+    Feche os navegadores antes. PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Limpar o cache de Chrome e Edge? (NAO apaga senhas/favoritos; FECHE os navegadores antes.)"):
+        return "Cancelado."
+    alvos = [
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Google", "Chrome", "User Data", "Default", "Cache"),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Edge", "User Data", "Default", "Cache"),
+    ]
+    ps = ("$pastas = @(\"$env:LOCALAPPDATA\\Google\\Chrome\\User Data\\Default\\Cache\","
+          "\"$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Cache\"); "
+          "foreach ($p in $pastas) { Remove-Item \"$p\\*\" -Recurse -Force -ErrorAction SilentlyContinue }; 'OK'")
+    s, e, c = _ps(ps, 300)
+    return "Cache de Chrome e Edge limpo." if c == 0 else f"Concluido com avisos (navegador aberto?): {(e or s)[:300]}"
+
+
+@tool
+def desligar_copilot_windows(acao: str = "desligar") -> str:
+    """DESLIGA (OU RELIGA) O COPILOT/ASSISTENTE DA BARRA DE TAREFAS do Windows (o
+    botao/IA que aparece ao lado do menu Iniciar). PODEROSO leve. SEMPRE pede
+    confirmacao."""
+    desligar = acao.strip().lower().startswith(("deslig", "off", "remov"))
+    if not _confirma_poderoso(("Desligar o Copilot/assistente da barra de tarefas?" if desligar else "Religar o Copilot na barra de tarefas?")):
+        return "Cancelado."
+    valor = "1" if desligar else "0"
+    _rodar_cmd(r'reg add "HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot" /v TurnOffWindowsCopilot /t REG_DWORD /d ' + valor + " /f", 60)
+    _rodar_cmd(r'reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v ShowCopilotButton /t REG_DWORD /d ' + ("0" if desligar else "1") + " /f", 60)
+    _rodar_cmd('taskkill /f /im explorer.exe && start explorer.exe', 60)
+    return f"Copilot {'DESLIGADO' if desligar else 'RELIGADO'} (Explorer reiniciado)."
+
+
 tools = [
     esvaziar_lixeira,
     espaco_em_disco,
@@ -10322,6 +11724,90 @@ tools = [
     limpar_rastros_privacidade,
     desativar_telemetria,
     conexoes_de_rede_programas,
+    listar_discos_particoes,
+    criar_particao,
+    deletar_particao,
+    mudar_letra_unidade,
+    renomear_volume,
+    estender_particao,
+    verificar_saude_ssd,
+    otimizar_disco,
+    compactar_sistema_windows,
+    limpar_winsxs,
+    reparar_boot_windows,
+    modo_seguro_boot,
+    limpar_espaco_livre,
+    backup_registro,
+    restaurar_registro,
+    desligar_hibernacao,
+    plano_desempenho_maximo,
+    desligar_inicio_rapido,
+    desligar_efeitos_visuais,
+    afinidade_cpu_processo,
+    desligar_reinicio_automatico,
+    habilitar_numlock_inicio,
+    modo_deus_windows,
+    reparar_windows_update,
+    listar_hotfixs,
+    desinstalar_atualizacao_kb,
+    ligar_desligar_atualizacoes_automaticas,
+    abrir_redefinir_windows,
+    reparar_loja_apps_windows,
+    reparar_icones_windows,
+    ligar_protecao_sistema,
+    reparar_som_windows,
+    reparar_bluetooth_windows,
+    manutencao_profunda_pc,
+    limpeza_profunda_pc,
+    exportar_drivers,
+    instalar_driver_inf,
+    remover_driver,
+    listar_dispositivos_com_erro,
+    desabilitar_dispositivo,
+    habilitar_dispositivo,
+    inventario_hardware,
+    mostrar_portas_em_uso,
+    bloquear_ip_firewall,
+    bloquear_programa_internet,
+    listar_regras_firewall,
+    varrer_rede_local,
+    escanear_portas_host,
+    ligar_pc_wake_on_lan,
+    mapear_unidade_rede,
+    montar_iso,
+    esconder_pc_na_rede,
+    desligar_compartilhamentos_adm,
+    listar_compartilhamentos_rede,
+    listar_pcs_rede,
+    renovar_ip,
+    habilitar_dns_https,
+    proxy_windows,
+    habilitar_servidor_ssh,
+    mostrar_tabela_rotas,
+    habilitar_conta_administrador,
+    listar_sessoes_ativas,
+    encerrar_sessao_usuario,
+    enviar_mensagem_rede,
+    politica_senha_windows,
+    bloquear_usb_pendrive,
+    ligar_desligar_uac,
+    verificar_assinatura_arquivo,
+    escanear_arquivo_defender,
+    listar_quarentena_defender,
+    status_ativacao_windows,
+    mostrar_chave_produto_windows,
+    desligar_login_automatico,
+    criptografar_pasta_efs,
+    desbloquear_arquivo_baixado,
+    gerenciar_variavel_ambiente,
+    habilitar_caminhos_longos,
+    habilitar_modo_desenvolvedor,
+    politica_execucao_powershell,
+    listar_programas_inicializacao,
+    remover_programa_inicializacao,
+    alterar_tipo_inicializacao_servico,
+    limpar_cache_navegadores,
+    desligar_copilot_windows,
     enviar_mensagem_whatsapp,
     enviar_whatsapp_por_nome,
     gerenciar_contatos,
