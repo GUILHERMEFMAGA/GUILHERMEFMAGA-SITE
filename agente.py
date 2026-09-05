@@ -1049,7 +1049,26 @@ PROMPT_SISTEMA_AGENTE = (
     "'revisar_codigo'; gerar testes pytest -> 'gerar_testes'; encurtar/expandir link -> 'encurtar_url'; "
     "localizar IP/dominio -> 'localizar_ip'; calcular sub-rede/CIDR -> 'calculadora_subrede'; sortear "
     "times/grupos -> 'sortear_grupos'; pegar cor de um ponto da tela -> 'cor_do_pixel'; matar processo "
-    "travado por nome ou PID -> 'finalizar_processo'; e atualizar o Windows -> 'atualizar_windows'."
+    "travado por nome ou PID -> 'finalizar_processo'; e atualizar o Windows -> 'atualizar_windows'.\n"
+    "20. FERRAMENTAS PODEROSAS DE ADMINISTRACAO (nivel sysadmin - registro, usuarios, BitLocker, "
+    "Defender, disco, reparos do Windows, firewall, agendador, rede, WSL, Hyper-V, Sandbox, bloatware, "
+    "backup/restore, drivers, eventos, processos, privacidade/telemetria): sao FORTES e PODEM MUDAR OU "
+    "DANIFICAR o sistema se usadas errado. REGRA DE SEGURANCA OBRIGATORIA: qualquer uma dessas "
+    "ferramentas que ALTERA o sistema SEMPRE pede a confirmacao final 'deseja confirmar sim ou nao' "
+    "(a trava de COMANDO CATASTROFICO) - e essa trava NAO pode ser pulada em NENHUM modo, nem mesmo "
+    "no 'admin' (o modo admin so apaga as perguntas comuns; a trava de catastrofe continua ativa). "
+    "Nunca diga 'ja executei' antes de a trava ser respondida com 'sim'. Ja as funcoes SO DE LEITURA "
+    "(status_bitlocker, status_defender, listar_usuarios_windows, listar_pontos_restauracao, "
+    "listar_drivers, logs_eventos_windows, listar_dispositivos_rede, listar_wsl, listar_vms_hyperv, "
+    "listar_dispositivos_bluetooth, ler_registro, conexoes_de_rede_programas etc.) NAO mudam nada e "
+    "rodam sem perguntar. Exemplos de uso: 'liga o BitLocker no C' -> 'ativar_bitlocker'; 'cria um "
+    "ponto de restauracao' -> 'ponto_de_restauracao'; 'repara o Windows' -> 'reparar_windows'; "
+    "'abre a porta 3000 no firewall' -> 'regra_firewall'; 'redefine a rede' -> 'redefinir_rede_windows'; "
+    "'o que esta ocupando a porta 8000' -> 'matizar_porta'; 'remove o bloatware' -> 'remover_bloatware'; "
+    "'abre o Windows Sandbox' -> 'abrir_windows_sandbox'; 'desliga a telemetria' -> 'desativar_telemetria'; "
+    "'formata o pendrive E' -> 'formatar_unidade' (a unidade C: nunca e aceita). NUNCA use essas "
+    "ferramentas para espionar, capturar dados de outra pessoa ou esconder algo - elas existem so para "
+    "voce administrar o SEU proprio PC."
 )
 # Sempre atualiza o prompt de sistema pra versão mais recente, mesmo que já
 # exista um salvo de uma execução anterior — sem isso, melhorias no prompt
@@ -9163,6 +9182,962 @@ def atualizar_windows() -> str:
     return executar_com_autocura("atualizar_windows", _atualizar)
 
 
+# ======================================================================
+# ========= FERRAMENTAS PODEROSAS DE ADMINISTRACAO (AVANCADO) ==========
+# Capacidades de sysadmin nivel profissional (registro, usuarios, BitLocker,
+# Defender, disco, reparos do Windows, firewall, agendador, rede, WSL/Hyper-V,
+# drivers, backup...). REGRA DE SEGURANCA: qualquer acao que ALTERA o sistema
+# passa por 'confirmar_catastrofico', que SEMPRE pergunta sim/nao - MESMO no
+# modo admin (e a unica barreira que o modo autonomo nao remove). Acoes so de
+# LEITURA (status/listar/ver) nao perguntam nada. Tudo e ADICAO PURA.
+# ======================================================================
+
+def _ps(comando_ps: str, timeout: int = 120):
+    """Roda um comando PowerShell e devolve (saida, erros, codigo)."""
+    return _rodar_cmd('powershell -NoProfile -Command "' + comando_ps.replace('"', '\\"') + '"', timeout)
+
+
+def _confirma_poderoso(mensagem: str) -> bool:
+    """Trava para as ferramentas poderosas: SEMPRE pede confirmacao, mesmo no
+    modo admin (diferente de pedir_confirmacao, que auto-aprova no admin)."""
+    return confirmar_catastrofico(mensagem)
+
+
+# ---------------- REGISTRO DO WINDOWS ----------------
+@tool
+def ler_registro(chave: str, nome: str = "") -> str:
+    """LE uma chave/valor do Registro do Windows (so leitura). 'chave' ex.:
+    'HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'. 'nome'=valor
+    especifico (opcional; se vazio, lista a chave inteira). Use para ver
+    configuracoes avancadas do sistema."""
+    cmd = f'reg query "{chave}"' + (f' /v "{nome}"' if nome else "")
+    s, e, c = _rodar_cmd(cmd, 60)
+    return s if c == 0 else f"Nao consegui ler: {e or s}"
+
+
+@tool
+def definir_registro(chave: str, nome: str, valor: str, tipo: str = "REG_SZ") -> str:
+    """CRIA/ALTERA um valor no Registro do Windows (PODEROSO - pode afetar o
+    sistema). 'chave' (ex.: HKCU\\...), 'nome' do valor, 'valor' e 'tipo'
+    (REG_SZ=texto, REG_DWORD=numero 0/1, REG_EXPAND_SZ). SEMPRE pede
+    confirmacao. Use so se voce souber o que esta fazendo."""
+    if not _confirma_poderoso(f"Alterar o Registro?\n  Chave: {chave}\n  Valor: {nome} = {valor} ({tipo})"):
+        return "Operacao cancelada."
+    cmd = f'reg add "{chave}" /v "{nome}" /t {tipo} /d "{valor}" /f'
+    s, e, c = _rodar_cmd(cmd, 60)
+    return f"Registro alterado: {chave}\\{nome} = {valor}." if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def deletar_registro(chave: str, nome: str = "") -> str:
+    """APAGA um valor (ou uma chave inteira, se 'nome' ficar vazio) do Registro
+    (PODEROSO e SEM VOLTA para configuracoes do sistema). SEMPRE pede
+    confirmacao. Cuidado redobrado ao mexer em HKLM."""
+    alvo = f"o valor '{nome}' em" if nome else "A CHAVE INTEIRA"
+    if not _confirma_poderoso(f"APAGAR {alvo} {chave}? Isso pode quebrar programas/sistema."):
+        return "Operacao cancelada."
+    cmd = f'reg delete "{chave}"' + (f' /v "{nome}" /f' if nome else " /f")
+    s, e, c = _rodar_cmd(cmd, 60)
+    return "Registro apagado." if c == 0 else f"Falhou: {e or s}"
+
+
+# ---------------- USUARIOS LOCAIS DO WINDOWS ----------------
+@tool
+def listar_usuarios_windows() -> str:
+    """LISTA as contas de usuario locais do Windows (nome, ativa/inativa) - so
+    leitura. Use para 'quais usuarios existem neste PC'."""
+    s, e, _ = _ps("Get-LocalUser | Select-Object Name,Enabled,Description | Format-Table -AutoSize", 60)
+    return "Usuarios locais:\n" + (s or e or "Nao consegui listar.")
+
+
+@tool
+def criar_usuario_windows(nome: str, senha: str, tornar_administrador: bool = False) -> str:
+    """CRIA UMA NOVA CONTA DE USUARIO no Windows (PODEROSO). 'nome' da conta,
+    'senha' inicial; 'tornar_administrador'=True ja coloca a conta no grupo de
+    Administradores. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Criar o usuario '{nome}'" + (" COMO ADMINISTRADOR" if tornar_administrador else "") + "?"):
+        return "Cancelado."
+    ps = (f"$u='{nome}'; $p=ConvertTo-SecureString '{senha}' -AsPlainText -Force; "
+          f"New-LocalUser -Name $u -Password $p -FullName $u -Description 'Criado pelo agente' | Out-Null; "
+          + ("$adm=([Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate([Security.Principal.NTAccount]).Value; "
+             "Add-LocalGroupMember -Group $adm -Member $u; " if tornar_administrador else "")
+          + "'OK'")
+    s, e, c = _ps(ps, 90)
+    return f"Usuario '{nome}' criado" + (" como administrador." if tornar_administrador else ".") if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def remover_usuario_windows(nome: str) -> str:
+    """REMOVE UMA CONTA DE USUARIO do Windows (PODEROSO e SEM VOLTA - apaga a
+    conta e, dependendo, os arquivos do perfil). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"REMOVER a conta de usuario '{nome}'? Isso apaga o login dela."):
+        return "Cancelado."
+    s, e, c = _ps(f"Remove-LocalUser -Name '{nome}'; 'OK'", 90)
+    return f"Usuario '{nome}' removido." if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def alterar_senha_usuario(nome: str, nova_senha: str) -> str:
+    """TROCA A SENHA de uma conta de usuario local do Windows (PODEROSO). SEMPRE
+    pede confirmacao. Use para redefinir uma senha esquecida de uma conta local."""
+    if not _confirma_poderoso(f"Redefinir a senha do usuario '{nome}'?"):
+        return "Cancelado."
+    ps = (f"Set-LocalUser -Name '{nome}' -Password (ConvertTo-SecureString '{nova_senha}' -AsPlainText -Force); 'OK'")
+    s, e, c = _ps(ps, 90)
+    return f"Senha de '{nome}' alterada." if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def ativar_desativar_usuario(nome: str, ativar: bool = True) -> str:
+    """ATIVA ou DESATIVA uma conta de usuario local (PODEROSO; desativar bloqueia
+    o login dela sem apagar). 'ativar'=True ativa, False desativa. SEMPRE pede
+    confirmacao."""
+    acao = "ATIVAR" if ativar else "DESATIVAR"
+    if not _confirma_poderoso(f"{acao} a conta '{nome}'?"):
+        return "Cancelado."
+    cmd = "Enable-LocalUser" if ativar else "Disable-LocalUser"
+    s, e, c = _ps(f"{cmd} -Name '{nome}'; 'OK'", 90)
+    return f"Conta '{nome}' {'ativada' if ativar else 'desativada'}." if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def gerenciar_admin_usuario(acao: str, nome: str) -> str:
+    """ADICIONA ou REMOVE um usuario do grupo de ADMINISTRADORES (PODEROSO: da ou
+    tira privilegios totais). 'acao'='adicionar' ou 'remover'; 'nome'=usuario.
+    SEMPRE pede confirmacao."""
+    a = acao.strip().lower()
+    if a not in ("adicionar", "adicionar_admin", "tornar_admin", "remover", "remover_admin", "rebaixar"):
+        return "Use acao 'adicionar' ou 'remover'."
+    adicionar = a.startswith(("adic", "torn"))
+    if not _confirma_poderoso(f"{'DAR privilegios de ADMINISTRADOR a' if adicionar else 'REMOVER privilegios de administrador de'} '{nome}'?"):
+        return "Cancelado."
+    metodo = "Add-LocalGroupMember" if adicionar else "Remove-LocalGroupMember"
+    ps = (f"$adm=([Security.Principal.SecurityIdentifier]'S-1-5-32-544').Translate([Security.Principal.NTAccount]).Value; "
+          f"{metodo} -Group $adm -Member '{nome}'; 'OK'")
+    s, e, c = _ps(ps, 90)
+    return f"'{nome}' agora {'e' if adicionar else 'nao e mais'} administrador." if c == 0 else f"Falhou: {e or s}"
+
+
+# ---------------- BITLOCKER (CRIPTOGRAFIA DE DISCO) ----------------
+@tool
+def status_bitlocker(unidade: str = "C:") -> str:
+    """MOSTRA O STATUS DO BITLOCKER (criptografia de disco) de uma unidade - so
+    leitura. Diz se esta criptografado/protegido e o progresso. Use para 'o
+    BitLocker esta ligado no C?'."""
+    u = unidade.strip() or "C:"
+    s, e, c = _rodar_cmd(f"manage-bde -status {u}", 90)
+    return s if c == 0 else f"Nao consegui consultar (BitLocker exibe versao Pro/Enterprise; {e or s})"[:800]
+
+
+@tool
+def ativar_bitlocker(unidade: str = "C:") -> str:
+    """LIGA A CRIPTOGRAFIA BITLOCKER numa unidade (PODEROSO; comeca a criptografar
+    o disco e gera chave de recuperacao - ANOTE a chave). SEMPRE pede
+    confirmacao. Requer Windows Pro/Enterprise e TPM (ou configuracao manual)."""
+    u = unidade.strip() or "C:"
+    if not _confirma_poderoso(f"ATIVAR BitLocker em {u}? O disco sera criptografado; GUARDE a chave de recuperacao."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"manage-bde -on {u} -SkipHardwareTest", 300)
+    return (f"BitLocker sendo ativado em {u}. {s or ''}".strip()
+            if c == 0 else f"Nao consegui ativar (precisa de Windows Pro/TPM): {(e or s)[:600]}")
+
+
+@tool
+def desativar_bitlocker(unidade: str = "C:") -> str:
+    """DESLIGA O BITLOCKER e DESCRIPTOGRAFA a unidade (PODEROSO; remove a
+    protecao de criptografia e pode demorar). SEMPRE pede confirmacao."""
+    u = unidade.strip() or "C:"
+    if not _confirma_poderoso(f"DESLIGAR o BitLocker e DESCRIPTOGRAFAR {u}? Isso remove a protecao do disco."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"manage-bde -off {u}", 300)
+    return f"BitLocker sendo desligado em {u} (descriptografa em segundo plano)." if c == 0 else f"Falhou: {(e or s)[:600]}"
+
+
+@tool
+def travar_drive_bitlocker(unidade: str) -> str:
+    """TRAVA UMA UNIDADE DE DADOS protegida por BitLocker (ex.: um pendrive/HD
+    externo D:) sem ejetar - sera preciso a senha/chave para abrir de novo
+    (PODEROSO). SEMPRE pede confirmacao."""
+    u = unidade.strip()
+    if not u:
+        return "Diga a unidade (ex.: 'D:')."
+    if not _confirma_poderoso(f"Travar o drive {u} (sera exigida a senha BitLocker para abrir)?"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"manage-bde -lock {u} -ForceDismount", 120)
+    return f"Drive {u} travado." if c == 0 else f"Falhou: {(e or s)[:500]}"
+
+
+@tool
+def chave_recuperacao_bitlocker(unidade: str = "C:") -> str:
+    """EXIBE A CHAVE DE RECUPERACAO / protetores do BitLocker de uma unidade
+    (PODEROSO e SENSIVEL - e a chave que destrava o disco). SEMPRE pede
+    confirmacao. Anote em lugar seguro."""
+    u = unidade.strip() or "C:"
+    if not _confirma_poderoso(f"Mostrar os protetores/chave de recuperacao do BitLocker de {u}? E um dado sensivel."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"manage-bde -protectors {u} -get", 120)
+    return s if c == 0 else f"Falhou: {(e or s)[:500]}"
+
+
+# ---------------- WINDOWS DEFENDER (ANTIVIRUS) ----------------
+@tool
+def status_defender() -> str:
+    """MOSTRA O STATUS DO WINDOWS DEFENDER (protecao em tempo real ligada,
+    assinatura atualizada) - so leitura."""
+    s, e, _ = _ps("Get-MpComputerStatus | Select-Object AntivirusEnabled,RealTimeProtectionEnabled,AntivirusSignatureLastUpdated | Format-List", 60)
+    return "Windows Defender:\n" + (s or e or "Indisponivel.")
+
+
+@tool
+def protecao_tempo_real_defender(ligar: bool = True) -> str:
+    """LIGA ou DESLIGA A PROTECAO EM TEMPO REAL do Windows Defender (PODEROSO e
+    DE RISCO: desligar deixa o PC SEM protecao contra virus - so use para
+    instalar algo confiavel e ligue de novo depois). SEMPRE pede confirmacao."""
+    estado = "LIGAR" if ligar else "DESLIGAR (deixa o PC sem protecao!)"
+    if not _confirma_poderoso(f"{estado} a protecao em tempo real do Defender?"):
+        return "Cancelado."
+    valor = "$false" if ligar else "$true"  # DisableRealtimeMonitoring: $false = ligado
+    s, e, c = _ps(f"Set-MpPreference -DisableRealtimeMonitoring {valor}; 'OK'", 90)
+    return f"Protecao em tempo real {'LIGADA' if ligar else 'DESLIGADA'}." if c == 0 else f"Falhou (o Windows pode bloquear via Tamper Protection): {(e or s)[:400]}"
+
+
+@tool
+def atualizar_defender() -> str:
+    """ATUALIZA AS ASSINATURAS (virus definitions) do Windows Defender agora
+    (PODEROSO leve - faz download). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Baixar e instalar as assinaturas mais novas do Defender?"):
+        return "Cancelado."
+    s, e, c = _ps("Update-MpSignature; 'OK'", 300)
+    return "Assinaturas do Defender atualizadas." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def scan_completo_defender() -> str:
+    """RODA UMA VERIFICACAO COMPLETA (full scan) do Windows Defender em todo o PC
+    (PODEROSO; pode demorar MUITO - horas). SEMPRE pede confirmacao. Para uma
+    varredura rapida use a 'central_seguranca'."""
+    if not _confirma_poderoso("Rodar uma verificacao COMPLETA do Defender? Pode demorar horas e usar o disco/CPU."):
+        return "Cancelado."
+    s, e, c = _ps("Start-MpScan -ScanType FullScan; 'OK'", 3600)
+    return "Verificacao completa do Defender concluida." if c == 0 else f"Falhou/interrompida: {(e or s)[:400]}"
+
+
+@tool
+def gerenciar_exclusao_defender(acao: str, caminho: str = "") -> str:
+    """GERENCIA EXCLUSOES do Windows Defender (pastas/arquivos que o antivirus
+    IGNORA). PODEROSO e DE RISCO: adicionar exclusao diminui a protecao. Acoes:
+    'listar', 'adicionar' ('caminho'), 'remover' ('caminho'). SEMPRE pede
+    confirmacao para adicionar/remover."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, _ = _ps("(Get-MpPreference).ExclusionPath", 60)
+        return "Exclusoes atuais:\n" + (s or "(nenhuma)")
+    if not caminho.strip():
+        return "Diga o 'caminho' da pasta/arquivo."
+    if not _confirma_poderoso(f"{a.title()} a exclusao do Defender para '{caminho}'? "
+                              + ("Isso faz o antivirus IGNORAR esse local." if a.startswith("adic") else "")):
+        return "Cancelado."
+    if a.startswith("adic"):
+        s, e, c = _ps(f"Add-MpPreference -ExclusionPath '{caminho}'; 'OK'", 90)
+    else:
+        s, e, c = _ps(f"Remove-MpPreference -ExclusionPath '{caminho}'; 'OK'", 90)
+    return f"Exclusao {a} para '{caminho}'." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+# ---------------- APAGAMENTO SEGURO / PERMISSOES / MONITOR ----------------
+@tool
+def apagar_arquivo_seguro(caminho: str) -> str:
+    """APAGA UM ARQUIVO DE FORMA IRRECUPERAVEL: sobrescreve o conteudo com dados
+    aleatorios algumas vezes e so entao remove (para lixo sensivel; mais seguro
+    que mandar pra lixeira). PODEROSO e SEM VOLTA. SEMPRE pede confirmacao. Para
+    limpar espaco livre do disco inteiro use cipher /w via executar_comando."""
+    c = caminho.strip().strip('"')
+    if not os.path.isfile(c):
+        return f"Arquivo nao encontrado: {c}"
+    if not _confirma_poderoso(f"APAGAR IRRECUPERAVELMENTE o arquivo '{c}' (nao da pra recuperar)?"):
+        return "Cancelado."
+    try:
+        tamanho = os.path.getsize(c)
+        with open(c, "r+b") as f:
+            for _ in range(3):
+                f.seek(0)
+                f.write(os.urandom(min(tamanho, 10 * 1024 * 1024)))
+                f.flush()
+                os.fsync(f.fileno())
+        os.remove(c)
+        return f"Arquivo sobrescrito e removido de forma irre recuperavel: {c}"
+    except Exception as e:
+        return f"Nao consegui apagar com seguranca: {e}"
+
+
+@tool
+def reparar_permissoes_pasta(pasta: str) -> str:
+    """TOMA POSSE (takeown) e RESETA AS PERMISSOES (icacls) de uma pasta inteira
+    para o usuario administrador atual - util quando aparece 'Acesso negado' em
+    arquivos que deveriam ser seus. PODEROSO (muda seguranca NTFS). SEMPRE pede
+    confirmacao. Nao use em pastas do sistema sem saber."""
+    p = pasta.strip().strip('"')
+    if not os.path.isdir(p):
+        return f"Pasta nao encontrada: {p}"
+    if not _confirma_poderoso(f"Tomar posse e resetar permissoes (NTFS) de '{p}' e todo o conteudo?"):
+        return "Cancelado."
+    s1, e1, _ = _rodar_cmd(f'takeown /f "{p}" /r /d y', 600)
+    s2, e2, c = _rodar_cmd(f'icacls "{p}" /reset /t /c /q', 600)
+    return f"Permissoes redefinidas em '{p}'." if c == 0 else f"Concluido com avisos: {(e1 or e2 or s2)[-600:]}"
+
+
+@tool
+def monitorar_alteracoes(pasta: str, minutos: int = 5) -> str:
+    """MONITORA UMA PASTA por 'minutos' e avisa (e grava) quais arquivos foram
+    CRIADOS, MODIFICADOS ou APAGADOS nesse tempo - util para ver o que um
+    instalador/programa muda. Roda em segundo plano, nao trava o agente. So
+    leitura/monitoramento, nao altera nada."""
+    p = pasta.strip().strip('"')
+    if not os.path.isdir(p):
+        return f"Pasta nao encontrada: {p}"
+
+    def _vigiar():
+        def _snapshot():
+            estado = {}
+            for raiz, _, arqs in os.walk(p):
+                for a in arqs:
+                    c = os.path.join(raiz, a)
+                    try:
+                        estado[c] = os.path.getmtime(c)
+                    except Exception:
+                        pass
+            return estado
+        antes = _snapshot()
+        time.sleep(max(1, int(minutos)) * 60)
+        depois = _snapshot()
+        novos = sorted(set(depois) - set(antes))
+        removidos = sorted(set(antes) - set(depois))
+        modificados = sorted(k for k in (set(antes) & set(depois)) if antes[k] != depois[k])
+        linhas = [f"[Monitor] Mudancas em '{p}' apos {minutos} min:"]
+        if novos:
+            linhas.append("  NOVOS: " + "; ".join(os.path.basename(x) for x in novos[:30]))
+        if modificados:
+            linhas.append("  MODIFICADOS: " + "; ".join(os.path.basename(x) for x in modificados[:30]))
+        if removidos:
+            linhas.append("  APAGADOS: " + "; ".join(os.path.basename(x) for x in removidos[:30]))
+        if not (novos or modificados or removidos):
+            linhas.append("  Nenhuma alteracao detectada.")
+        print("\n" + "\n".join(linhas))
+        falar("Monitoramento concluido.")
+
+    threading.Thread(target=_vigiar, daemon=True).start()
+    return f"Monitorando '{pasta}' por {minutos} minuto(s) em segundo plano; eu aviso o que mudou."
+
+
+# ---------------- DISCO E REPAROS DO WINDOWS ----------------
+@tool
+def formatar_unidade(letra: str, sistema_arquivos: str = "NTFS", nome: str = "") -> str:
+    """FORMATA UMA UNIDADE (pendrive, HD externo, particao) - APAGA TUDO dela de
+    vez (PODEROSO e IRREVERSIVEL). 'letra' ex.: 'E', 'sistema_arquivos' NTFS/FAT32/exFAT.
+    Nunca formata C:. SEMPRE pede confirmacao com aviso forte."""
+    l = letra.strip().upper().rstrip(":")
+    if l in ("C", "SYS"):
+        return "Nao posso formatar a unidade do sistema (C:) - isso destruiria o Windows."
+    if not _confirma_poderoso(f"FORMATAR a unidade {l}: ? TODOS os arquivos dela serao APAGADOS PARA SEMPRE. Confirma?"):
+        return "Cancelado."
+    rotulo = f' /V:"{nome}"' if nome.strip() else ""
+    s, e, c = _rodar_cmd(f'echo y| format {l}: /FS:{sistema_arquivos} /Q{rotulo}', 900)
+    return f"Unidade {l}: formatada como {sistema_arquivos}." if c == 0 else f"Falhou: {(e or s)[:600]}"
+
+
+@tool
+def reparar_disco(unidade: str = "C:") -> str:
+    """RODA O CHKDSK (verifica e tenta consertar erros de disco/setores) na
+    unidade - PODEROSO (pode demorar e, no C:, agenda para o proximo reinicio).
+    SEMPRE pede confirmacao. Use para travamentos/erros de disco."""
+    u = unidade.strip() or "C:"
+    if not _confirma_poderoso(f"Rodar chkdsk /f /r em {u}? Pode demorar bastante (no C roda na reinicializacao)."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'chkdsk {u} /f /r', 1800)
+    return f"chkdsk iniciado/concluido em {u}.\n{s or e}" if c in (0, 3) else f"Retorno: {(e or s)[-700:]}"
+
+
+@tool
+def reparar_windows() -> str:
+    """CONCERTA ARQUIVOS DO WINDOWS corrompidos: roda DISM /RestoreHealth
+    (repara a imagem do sistema) e depois SFC /scannow (verifica arquivos
+    protegidos). PODEROSO, demora e precisa de internet; as vezes exige reinicio.
+    SEMPRE pede confirmacao. Use para Windows instavel/com erros de sistema."""
+    if not _confirma_poderoso("Rodar reparo completo do Windows (DISM RestoreHealth + SFC scannow)? Pode demorar 20-60 min."):
+        return "Cancelado."
+    saidas = []
+    s1, e1, _ = _rodar_cmd("DISM /Online /Cleanup-Image /RestoreHealth", 2400)
+    saidas.append("DISM: " + (s1 or e1)[-400:])
+    s2, e2, c = _rodar_cmd("sfc /scannow", 2400)
+    saidas.append("SFC: " + (s2 or e2)[-400:])
+    return "\n".join(saidas)
+
+
+# ---------------- FIREWALL E SPOOLER ----------------
+@tool
+def regra_firewall(acao: str, nome: str = "", porta: int = 0, protocolo: str = "TCP") -> str:
+    """CRIA, LISTA ou REMOVE regras do Firewall do Windows (PODEROSO - libera ou
+    bloqueia porta/programa para a rede). Acoes: 'listar' (regras), 'abrir_porta'
+    ('nome' e 'porta'), 'fechar_porta' ('nome' da regra a remover). Abrir/fechar
+    SEMPRE pede confirmacao. Use para liberar um jogo/servidor."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, _ = _ps("Get-NetFirewallRule -Enabled True | Select-Object -First 40 DisplayName,Direction,Action | Format-Table -AutoSize", 90)
+        return "Regras ativas (primeiras 40):\n" + (s or e)
+    if not _confirma_poderoso(f"Alterar o firewall: {a} (regra '{nome}', porta {porta} {protocolo})?"):
+        return "Cancelado."
+    if a in ("abrir_porta", "abrir", "liberar"):
+        ps = (f"New-NetFirewallRule -DisplayName '{nome}' -Direction Inbound -Protocol {protocolo.upper()} "
+              f"-LocalPort {porta} -Action Allow; 'OK'")
+        s, e, c = _ps(ps, 90)
+    elif a in ("fechar_porta", "fechar", "remover", "bloquear"):
+        s, e, c = _ps(f"Remove-NetFirewallRule -DisplayName '{nome}'; 'OK'", 90)
+    else:
+        return "Acao invalida. Use: listar, abrir_porta ou fechar_porta."
+    return f"Firewall: regra '{nome}' {a}." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def desligar_ligar_firewall(ligar: bool = True, perfil: str = "All") -> str:
+    """LIGA OU DESLIGA O FIREWALL DO WINDOWS (PODEROSO; desligar deixa o PC
+    exposto na rede). 'ligar'=True liga, False desliga; 'perfil'=Domain/Private/
+    Public (padrao All/todos). SEMPRE pede confirmacao."""
+    estado = "LIGAR" if ligar else "DESLIGAR (o PC fica exposto!)"
+    if not _confirma_poderoso(f"{estado} o firewall do Windows (perfil {perfil})?"):
+        return "Cancelado."
+    valor = "True" if ligar else "False"
+    s, e, c = _ps(f"Set-NetFirewallProfile -Profile {perfil} -Enabled {valor}; 'OK'", 90)
+    return f"Firewall {'LIGADO' if ligar else 'DESLIGADO'} ({perfil})." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def limpar_spooler_impressao() -> str:
+    """LIPA A FILA DE IMPRESSAO travada: para o servico de spooler, apaga os
+    trabalhos presos e liga de novo (resolve 'documento preso que nao imprime').
+    PODEROSO leve. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Limpar a fila de impressao (reinicia o spooler)?"):
+        return "Cancelado."
+    _rodar_cmd("net stop spooler", 60)
+    _rodar_cmd('del /Q /F "%SystemRoot%\\System32\\spool\\PRINTERS\\*.*"', 60)
+    s, e, c = _rodar_cmd("net start spooler", 60)
+    return "Fila de impressao limpa e spooler religado." if c == 0 else f"Verifique: {(e or s)[:400]}"
+
+
+# ---------------- INICIALIZACAO E TAREFAS DO WINDOWS ----------------
+@tool
+def inicializacao_windows(acao: str, nome: str = "", comando: str = "") -> str:
+    """GERENCIA PROGRAMAS QUE INICIAM COM O WINDOWS (PODEROSO). Acoes: 'listar'
+    (o que abre na inicializacao), 'adicionar' ('nome' e 'comando' = caminho do
+    programa; abre ao logar), 'remover' ('nome'). Adicionar/remover SEMPRE pede
+    confirmacao."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, _ = _ps("Get-CimInstance Win32_StartupCommand | Select-Object Name,Command,Location | Format-Table -AutoSize | Out-String -Width 200", 90)
+        return "Programas na inicializacao:\n" + (s or e)
+    if not _confirma_poderoso(f"{a.title()} '{nome}' na inicializacao do Windows?"):
+        return "Cancelado."
+    chave = r"HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    if a in ("adicionar", "adicionar", "add"):
+        s, e, c = _ps(f"Set-ItemProperty -Path '{chave}' -Name '{nome}' -Value '{comando}'; 'OK'", 90)
+    elif a in ("remover", "remove", "apagar"):
+        s, e, c = _ps(f"Remove-ItemProperty -Path '{chave}' -Name '{nome}' -ErrorAction SilentlyContinue; 'OK'", 90)
+    else:
+        return "Acao invalida. Use: listar, adicionar ou remover."
+    return f"Inicializacao '{nome}' {a}." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def gerenciar_tarefa_agendada_windows(acao: str, nome: str = "", programa: str = "", quando: str = "") -> str:
+    """GERENCIA TAREFAS NO AGENDADOR DO WINDOWS (taskschd) - diferente do
+    agendador interno do agente, estas rodam MESMO com o agente fechado.
+    Acoes: 'listar', 'criar' ('nome', 'programa'=caminho, 'quando'='ONLOGON',
+    'ONSTART' ou 'DAILY 08:00'), 'executar' ('nome'), 'remover' ('nome').
+    Criar/remover SEMPRE pede confirmacao."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, _ = _rodar_cmd("schtasks /query /fo TABLE /nh", 120)
+        return "Tarefas agendadas (amostra):\n" + (s[:3000] or e)
+    if not _confirma_poderoso(f"{a.title()} tarefa no Agendador do Windows: '{nome}'?"):
+        return "Cancelado."
+    if a in ("criar", "criar", "nova"):
+        q = (quando or "ONLOGON").strip().upper()
+        if q.startswith("DAILY"):
+            hora = q.split("DAILY", 1)[1].strip() or "08:00"
+            cmd = f'schtasks /create /tn "{nome}" /tr "{programa}" /sc daily /st {hora} /f'
+        elif q.startswith("ONSTART"):
+            cmd = f'schtasks /create /tn "{nome}" /tr "{programa}" /sc onstart /ru SYSTEM /f'
+        else:
+            cmd = f'schtasks /create /tn "{nome}" /tr "{programa}" /sc onlogon /f'
+        s, e, c = _rodar_cmd(cmd, 90)
+    elif a in ("executar", "rodar", "run"):
+        s, e, c = _rodar_cmd(f'schtasks /run /tn "{nome}"', 60)
+    elif a in ("remover", "remove", "apagar"):
+        s, e, c = _rodar_cmd(f'schtasks /delete /tn "{nome}" /f', 60)
+    else:
+        return "Acao invalida. Use: listar, criar, executar ou remover."
+    return f"Tarefa '{nome}': {a}." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+# ---------------- REDE AVANCADA ----------------
+@tool
+def redefinir_rede_windows() -> str:
+    """RESETA TODAS AS CONFIGURACOES DE REDE do Windows (Winsock, pilha TCP/IP,
+    cache DNS) - resolve internet quebrada/configuracao baguncada. PODEROSO:
+    apaga configuracoes de adaptador e EXIGE REINICIAR o PC para surtir efeito.
+    SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("REDEFINIR a rede (Winsock + TCP/IP + DNS)? Voce precisara REINICIAR o PC depois."):
+        return "Cancelado."
+    _rodar_cmd("netsh winsock reset", 60)
+    s, e, c = _rodar_cmd("netsh int ip reset", 60)
+    _rodar_cmd("ipconfig /flushdns", 30)
+    return "Rede redefinida. REINICIE o PC para aplicar." if c == 0 else f"Verifique: {(e or s)[:400]}"
+
+
+@tool
+def configurar_ip_estatico(interface: str, ip: str, mascara: str = "255.255.255.0", gateway: str = "", dns: str = "") -> str:
+    """CONFIGURA IP ESTATICO (fixo) num adaptador de rede, em vez de DHCP
+    automatico (PODEROSO; pode cortar a internet se errado). 'interface'=nome da
+    rede (ex.: 'Wi-Fi', 'Ethernet'). Para voltar ao automatico use
+    configurar_ip_dhcp. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Definir IP ESTATICO em '{interface}': {ip}/{mascara} gw {gateway or '-'}?"):
+        return "Cancelado."
+    gw = f' {gateway}' if gateway else ""
+    s, e, c = _rodar_cmd(f'netsh interface ip set address name="{interface}" static {ip} {mascara}{gw}', 60)
+    if dns and c == 0:
+        _rodar_cmd(f'netsh interface ip set dns name="{interface}" static {dns}', 60)
+    return f"IP estatico configurado em '{interface}' ({ip})." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def configurar_ip_dhcp(interface: str) -> str:
+    """VOLTA O ADAPTADOR DE REDE para obter IP/DNS automaticamente (DHCP) -
+    desfaz um IP estatico. PODEROSO leve. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Voltar '{interface}' para IP automatico (DHCP)?"):
+        return "Cancelado."
+    _rodar_cmd(f'netsh interface ip set address name="{interface}" dhcp', 60)
+    s, e, c = _rodar_cmd(f'netsh interface ip set dns name="{interface}" dhcp', 60)
+    return f"'{interface}' voltou para DHCP (automatico)." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def gerenciar_adaptador_rede(acao: str, nome: str = "Wi-Fi") -> str:
+    """LIGA OU DESLIGA um adaptador de rede (Wi-Fi/Ethernet/Bluetooth de rede)
+    (PODEROSO; desligar corta a conexao). 'acao'='ligar' ou 'desligar'; 'nome' do
+    adaptador. Requer admin. SEMPRE pede confirmacao."""
+    a = acao.strip().lower()
+    if a not in ("ligar", "ativar", "desligar", "desativar"):
+        return "Use 'ligar' ou 'desligar'."
+    ligar = a.startswith(("lig", "ativ"))
+    if not _confirma_poderoso(f"{'ATIVAR' if ligar else 'DESATIVAR'} o adaptador de rede '{nome}'?"):
+        return "Cancelado."
+    cmd = "Enable-NetAdapter" if ligar else "Disable-NetAdapter"
+    s, e, c = _ps(f"{cmd} -Name '{nome}' -Confirm:$false; 'OK'", 90)
+    return f"Adaptador '{nome}' {'ativado' if ligar else 'desativado'}." if c == 0 else f"Falhou (precisa de admin): {(e or s)[:400]}"
+
+
+@tool
+def matizar_porta(porta: int) -> str:
+    """ENCONTRA E ENCERRA o processo que esta OCUPANDO uma porta TCP (ex.: porta
+    8000/3000/8080 presa por um servidor que nao fecha). PODEROSO (mata o
+    processo). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Encontrar e ENCERRAR o processo que usa a porta {porta}?"):
+        return "Cancelado."
+    s, e, _ = _ps(f"(Get-NetTCPConnection -LocalPort {porta} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess", 60)
+    pid = (s or "").strip()
+    if not pid or not pid.isdigit():
+        return f"Nenhum processo escutando na porta {porta}."
+    s2, e2, c = _rodar_cmd(f"taskkill /PID {pid} /F", 60)
+    return f"Processo PID {pid} (porta {porta}) encerrado." if c == 0 else f"Falhou ao encerrar PID {pid}: {(e2 or s2)[:300]}"
+
+
+# ---------------- REMOTO E ELEVACAO ----------------
+@tool
+def desligar_pc_remoto(computador: str, acao: str = "desligar", mensagem: str = "") -> str:
+    """DESLIGA OU REINICIA OUTRO PC da rede pelo nome/IP (precisa que o PC remoto
+    permita gerenciamento remoto). PODEROSO. 'computador'=nome ou IP, 'acao'=
+    'desligar' ou 'reiniciar'. SEMPRE pede confirmacao."""
+    a = "r" if acao.strip().lower().startswith(("rein", "r")) else "s"
+    host = computador.strip()
+    if not host:
+        return "Diga o nome/IP do computador remoto."
+    if not _confirma_poderoso(f"{'REINICIAR' if a=='r' else 'DESLIGAR'} o computador remoto '{host}'?"):
+        return "Cancelado."
+    aviso = f' /c "{mensagem}"' if mensagem else ""
+    s, e, c = _rodar_cmd(f"shutdown /{a} /m \\\\{host} /t 30 /f{aviso}", 60)
+    return f"Comando enviado para '{host}' (reinicia/desliga em ~30s; cancele no alvo com shutdown /a)." if c == 0 else f"Falhou (precisa permissao/PC remoto configurado): {(e or s)[:400]}"
+
+
+@tool
+def executar_como_administrador(comando: str) -> str:
+    """RELANCA UM COMANDO/PROGRAMA PEDINDO ELEVACAO (abre o UAC como admin),
+    mesmo que o agente esteja sem privilegio naquele momento. PODEROSO. SEMPRE
+    pede confirmacao. Use para algo que exige admin e recusou permissao."""
+    if not _confirma_poderoso(f"Executar COMO ADMINISTRADOR (vai pedir o UAC): {comando}?"):
+        return "Cancelado."
+    try:
+        import ctypes
+        rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", "cmd.exe", f'/c "{comando}"', None, 1)
+        return "Comando disparado como administrador (aceite o UAC)." if rc > 32 else f"O UAC foi recusado/cancelou (cod {rc})."
+    except Exception as e:
+        return f"Falhou: {e}"
+
+
+# ---------------- REMOTO / WINDOWS FEATURES / VIRTUALIZACAO ----------------
+@tool
+def habilitar_rdp(acao: str = "ligar") -> str:
+    """LIGA OU DESLIGA A AREA DE TRABALHO REMOTA (RDP / Remote Desktop) do
+    Windows - permite (ou bloqueia) acessar este PC por outro via Conexao de Area
+    de Trabalho Remota. PODEROSO (expor o PC na rede). 'acao'='ligar'/'desligar'.
+    SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ", "on"))
+    if not _confirma_poderoso(f"{'HABILITAR' if ligar else 'DESABILITAR'} a Area de Trabalho Remota (RDP)?"):
+        return "Cancelado."
+    valor = "0" if ligar else "1"  # fDenyTSConnections: 0 = permitir RDP
+    _rodar_cmd(r'reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d ' + valor + " /f", 60)
+    _rodar_cmd('netsh advfirewall firewall set rule group="remote desktop" new enable=' + ("Yes" if ligar else "No"), 60)
+    return f"Area de Trabalho Remota (RDP) {'HABILITADA' if ligar else 'DESABILITADA'}."
+
+
+@tool
+def compartilhar_pasta_rede(caminho: str, nome_compartilhamento: str = "") -> str:
+    """COMPARTILHA UMA PASTA NA REDE LOCAL (SMB/net share) - outros PCs do mesmo
+    Wi-Fi/rede acessam por \\seu-pc\nome. PODEROSO (expoe arquivos na rede).
+    'caminho'=pasta, 'nome_compartilhamento'=nome (opcional). SEMPRE pede
+    confirmacao."""
+    p = caminho.strip().strip('"')
+    if not os.path.isdir(p):
+        return f"Pasta nao encontrada: {p}"
+    nome = nome_compartilhamento.strip() or os.path.basename(p.rstrip("/\\"))
+    if not _confirma_poderoso(f"Compartilhar '{p}' na rede local (acesso de leitura)?"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f'net share "{nome}"="{p}" /grant:Everyone,READ', 60)
+    return f"Pasta compartilhada na rede como '{nome}'." if c == 0 else f"Falhou: {(e or s)[:400]}"
+
+
+@tool
+def listar_dispositivos_rede() -> str:
+    """LISTA OS DISPOSITIVOS da rede local (tabela ARP: IPs e enderecos MAC que
+    responderam ao seu PC) - so leitura. Bom para ver o que tem no seu Wi-Fi."""
+    s, e, c = _rodar_cmd("arp -a", 60)
+    return "Dispositivos vistos na rede (ARP):\n" + (s or e) if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def gerenciar_recurso_windows(acao: str, recurso: str = "") -> str:
+    """LIGA/DESLIGA RECURSOS DO WINDOWS (IIS, .NET, Hyper-V, WSL, Sandbox, SSH,
+    Linux subsystem etc.). Acoes: 'listar' (recursos habilitados), 'habilitar'
+    ('recurso'=nome do FeatureName), 'desabilitar' ('recurso'). PODEROSO (pode
+    exigir reinicio). SEMPRE pede confirmacao para alterar."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, _ = _ps("Get-WindowsOptionalFeature -Online | Where-Object {$_.State -eq 'Enabled'} | Select-Object -First 40 FeatureName | Format-Table -AutoSize", 120)
+        return "Recursos HABILITADOS (primeiros 40):\n" + (s or e)
+    if not recurso.strip():
+        return "Diga o nome do recurso (FeatureName; veja 'listar')."
+    if not _confirma_poderoso(f"{a.title()} o recurso do Windows '{recurso}'? Pode exigir reinicio."):
+        return "Cancelado."
+    if a.startswith("habil"):
+        s, e, c = _ps(f"Enable-WindowsOptionalFeature -Online -FeatureName '{recurso}' -All -NoRestart -ErrorAction Stop | Out-String", 600)
+    else:
+        s, e, c = _ps(f"Disable-WindowsOptionalFeature -Online -FeatureName '{recurso}' -NoRestart -ErrorAction Stop | Out-String", 600)
+    return f"Recurso '{recurso}' {a} (reinicie se for pedido)." if c == 0 else f"Falhou: {(e or s)[:500]}"
+
+
+@tool
+def listar_wsl() -> str:
+    """LISTA as distribuicoes Linux do WSL instaladas (nome, estado, versao) -
+    so leitura. Se nao houver WSL, avisa como instalar."""
+    s, e, c = _rodar_cmd("wsl -l -v", 60)
+    if c != 0:
+        return "WSL nao encontrado/instalado. Instale com a ferramenta 'gerenciar_wsl' (acao instalar) como admin."
+    return "Distribuicoes WSL:\n" + s
+
+
+@tool
+def gerenciar_wsl(acao: str, distro: str = "Ubuntu") -> str:
+    """GERENCIA O WSL (Linux no Windows). Acoes: 'instalar' (instala Ubuntu),
+    'desligar' (wsl --shutdown, libera memoria), 'encerrar' ('distro'), 'abrir'
+    ('distro'). PODEROSO (instalar/desligar). SEMPRE pede confirmacao para
+    instalar/desligar."""
+    a = acao.strip().lower()
+    if a in ("instalar", "install"):
+        if not _confirma_poderoso("Instalar o WSL com Ubuntu (recurso do Windows + download)?"):
+            return "Cancelado."
+        s, e, c = _rodar_cmd("wsl --install -d " + distro, 1200)
+        return "Instalacao do WSL iniciada (reinicie se pedido)." if c == 0 else f"Falhou: {(e or s)[:500]}"
+    if a in ("desligar", "shutdown"):
+        if not _confirma_poderoso("Desligar TODAS as distros WSL (wsl --shutdown)?"):
+            return "Cancelado."
+        s, e, c = _rodar_cmd("wsl --shutdown", 60)
+        return "WSL desligado (memoria liberada)." if c == 0 else f"Falhou: {e or s}"
+    if a in ("encerrar", "terminate"):
+        s, e, c = _rodar_cmd(f"wsl -t {distro}", 60)
+        return f"Distro '{distro}' encerrada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    if a in ("abrir", "abrir_distro"):
+        subprocess.Popen(f'wsl -d {distro}', shell=True)
+        return f"Abrindo WSL '{distro}'."
+    return "Acao invalida. Use: instalar, desligar, encerrar ou abrir."
+
+
+@tool
+def listar_vms_hyperv() -> str:
+    """LISTA as maquinas virtuais do Hyper-V (nome, estado) - so leitura. Se o
+    Hyper-V nao estiver instalado, avisa."""
+    s, e, c = _ps("Get-VM | Select-Object Name,State | Format-Table -AutoSize", 60)
+    if c != 0:
+        return "Hyper-V nao disponivel neste Windows (precisa Pro/Enterprise). Use 'habilitar_hyperv' para instalar."
+    return "Maquinas virtuais (Hyper-V):\n" + (s or "Nenhuma VM.")
+
+
+@tool
+def gerenciar_vm_hyperv(acao: str, nome_vm: str) -> str:
+    """LIGA OU DESLIGA UMA MAQUINA VIRTUAL do Hyper-V. Acoes: 'iniciar' e
+    'desligar' ('nome_vm'). PODEROSO. SEMPRE pede confirmacao para desligar."""
+    a = acao.strip().lower()
+    if a in ("iniciar", "ligar", "start"):
+        s, e, c = _ps(f"Start-VM -Name '{nome_vm}'; 'OK'", 90)
+        return f"VM '{nome_vm}' iniciada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    if a in ("desligar", "parar", "stop"):
+        if not _confirma_poderoso(f"DESLIGAR a maquina virtual '{nome_vm}'?"):
+            return "Cancelado."
+        s, e, c = _ps(f"Stop-VM -Name '{nome_vm}' -Force; 'OK'", 90)
+        return f"VM '{nome_vm}' desligada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    return "Use 'iniciar' ou 'desligar' com o nome da VM."
+
+
+@tool
+def habilitar_hyperv() -> str:
+    """INSTALA O HYPER-V (virtualizacao da Microsoft) no Windows Pro/Enterprise -
+    permite rodar maquinas virtuais. PODEROSO (ativa recurso, exige reinicio; nao
+    funciona no Windows Home). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Habilitar o Hyper-V (recurso de virtualizacao)? Exige Windows Pro e reinicio."):
+        return "Cancelado."
+    s, e, c = _ps("Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -All -NoRestart | Out-String", 900)
+    return "Hyper-V habilitado. REINICIE o PC para concluir." if c == 0 else f"Falhou (Windows Home?): {(e or s)[:500]}"
+
+
+@tool
+def abrir_windows_sandbox() -> str:
+    """ABRE O WINDOWS SANDBOX - um Windows isolado e descartavel (tudo o que voce
+    faz la some ao fechar; otimo para testar programas suspeitos com seguranca).
+    Se o recurso nao estiver instalado, tenta habilita-lo antes. PODEROSO. SEMPRE
+    pede confirmacao. Requer Windows Pro/Enterprise."""
+    if not _confirma_poderoso("Abrir (ou instalar) o Windows Sandbox (ambiente isolado)?"):
+        return "Cancelado."
+    _ps("Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All -NoRestart -ErrorAction SilentlyContinue | Out-Null", 600)
+    try:
+        subprocess.Popen("WindowsSandbox.exe", shell=True)
+        return "Windows Sandbox sendo aberto (se acabou de instalar, reinicie o PC antes)."
+    except Exception as ex:
+        return f"Nao consegui abrir (Windows Pro?): {ex}"
+
+
+# ---------------- LIMPEZA / BLOATWARE / BACKUP / RESTAURACAO ----------------
+@tool
+def remover_bloatware() -> str:
+    """REMOVE OS APPS DE FABRICA (bloatware) indesejados do Windows (jogos e apps
+    Xbox, Bing Noticias/Clima, Solitaire, Candy Crush, Zune/Music etc.) para o
+    usuario atual. PODEROSO e SEM VOLTA (os apps somem; alguns podem ser
+    reinstalados pela Loja). SEMPRE pede confirmacao. NAO apaga arquivos nem o
+    sistema, so remove esses aplicativos."""
+    if not _confirma_poderoso("Remover os apps de fabrica (bloatware) comuns do Windows? Desinstala Xbox, Bing, Solitaire, Candy, Zune etc."):
+        return "Cancelado."
+    ps = ("Get-AppxPackage -AllUsers | Where-Object {$_.Name -match 'xbox|bing|solitaire|candy|zune|king|mixed|skype|gethelp|people|feedback'} "
+          "| Remove-AppxPackage -ErrorAction SilentlyContinue; 'OK'")
+    s, e, c = _ps(ps, 600)
+    return "Bloatware removido (alguns apps podem pedir reinicio para sumir)." if c == 0 else f"Concluido com avisos: {(e or s)[:400]}"
+
+
+@tool
+def backup_imagem_sistema(destino: str) -> str:
+    """CRIA UMA IMAGEM COMPLETA DE BACKUP DO SISTEMA (wbadmin) num disco externo -
+    da para restaurar o PC inteiro. PODEROSO e demorado. 'destino'=letra do disco
+    externo (ex.: 'E:'). SEMPRE pede confirmacao."""
+    d = destino.strip()
+    if not d:
+        return "Diga o disco de destino do backup (ex.: 'E:' - use um HD externo NTFS)."
+    if not _confirma_poderoso(f"Criar imagem de backup do sistema para {d}? Pode demorar muito e usa espaco em disco."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd(f"wbadmin start backup -backupTarget:{d} -include:C: -allCritical -quiet", 3600)
+    return "Backup de imagem iniciado/concluido (acompanhe na saida)." if c == 0 else f"Falhou (precisa de disco NTFS externo e admin): {(e or s)[:500]}"
+
+
+@tool
+def listar_pontos_restauracao() -> str:
+    """LISTA os pontos de restauracao do sistema existentes - so leitura."""
+    s, e, c = _ps("Get-ComputerRestorePoint | Select-Object SequenceNumber,CreationTime,Description | Format-Table -AutoSize", 90)
+    return "Pontos de restauracao:\n" + (s or "Nenhum ponto encontrado (use 'ponto_de_restauracao' para criar).") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def restaurar_pc_ponto() -> str:
+    """ABRE O ASSISTENTE DE RESTAURACAO DO SISTEMA (rstrui) para voltar o Windows a
+    um ponto anterior - desfaz atualizacoes/configuracoes problematicas. PODEROSO
+    (reverte o sistema; pode reiniciar). SEMPRE pede confirmacao. NAO apaga seus
+    documentos."""
+    if not _confirma_poderoso("Abrir a Restauracao do Sistema (voltar o Windows a um ponto anterior)? Pode reiniciar o PC."):
+        return "Cancelado."
+    try:
+        subprocess.Popen("rstrui.exe", shell=True)
+        return "Assistente de restauracao aberto - siga os passos na tela."
+    except Exception as ex:
+        return f"Nao consegui abrir: {ex}"
+
+
+# ---------------- DRIVERS / EVENTOS / IMPRESSORA / BLUETOOTH ----------------
+@tool
+def listar_drivers() -> str:
+    """LISTA OS DRIVERS instalados (fornecedor, nome) via pnputil - so leitura.
+    Util para ver drivers de terceiros/antigos."""
+    s, e, c = _rodar_cmd("pnputil /enum-drivers", 120)
+    if c != 0:
+        s, e, c = _rodar_cmd("driverquery /fo table", 120)
+    return "Drivers instalados (trecho):\n" + (s[:3500] or e)
+
+
+@tool
+def logs_eventos_windows(tipo: str = "erro", quantidade: int = 12) -> str:
+    """MOSTRA OS EVENTOS DE ERRO RECENTES DO WINDOWS (logs de sistema) - so
+    leitura. 'tipo'='sistema' (log do System) ou 'aplicativo' (Application);
+    'quantidade'=quantos trazer. Use para diagnosticar travadas/tela azul."""
+    log = "Application" if tipo.strip().lower().startswith(("apli", "app")) else "System"
+    ps = (f"Get-WinEvent -FilterHashtable @{{LogName='{log}'; Level=1,2}} -MaxEvents {max(1,int(quantidade))} -ErrorAction SilentlyContinue | "
+          "Select-Object TimeCreated,Id,ProviderName,@{n='Msg';e={$_.Message.Substring(0,[Math]::Min(120,$_.Message.Length))}} | Format-List")
+    s, e, c = _ps(ps, 120)
+    return f"Ultimos eventos de erro ({log}):\n" + (s or "Nenhum erro recente encontrado.") if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def gerenciar_impressora(acao: str, nome_impressora: str = "") -> str:
+    """LISTA IMPRESSORAS ou CANCELA os trabalhos de impressao presos. Acoes:
+    'listar' (impressoras instaladas) ou 'cancelar' ('nome_impressora'; vazio =
+    todas). Cancelar e PODEROSO e pede confirmacao."""
+    a = acao.strip().lower()
+    if a in ("listar", "lista", "ver"):
+        s, e, c = _ps("Get-Printer | Select-Object Name,PrinterStatus | Format-Table -AutoSize", 60)
+        return "Impressoras:\n" + (s or e)
+    if a in ("cancelar", "limpar", "cancelar_fila"):
+        if not _confirma_poderoso(f"Cancelar TODOS os trabalhos de impressao de '{nome_impressora or 'todas'}'?"):
+            return "Cancelado."
+        if nome_impressora.strip():
+            s, e, c = _ps(f"Get-PrintJob -PrinterName '{nome_impressora}' | Remove-PrintJob -ErrorAction SilentlyContinue; 'OK'", 90)
+        else:
+            s, e, c = _ps("Get-Printer | ForEach-Object { Get-PrintJob -PrinterName $_.Name | Remove-PrintJob -ErrorAction SilentlyContinue }; 'OK'", 90)
+        return "Fila de impressao cancelada." if c == 0 else f"Falhou: {(e or s)[:300]}"
+    return "Use 'listar' ou 'cancelar'."
+
+
+@tool
+def listar_dispositivos_bluetooth() -> str:
+    """LISTA os dispositivos Bluetooth (pareados e status) - so leitura."""
+    s, e, c = _ps("Get-PnpDevice -Class Bluetooth | Select-Object FriendlyName,Status | Format-Table -AutoSize", 60)
+    return "Dispositivos Bluetooth:\n" + (s or e or "Nenhum encontrado.") if c == 0 else f"Falhou: {e or s}"
+
+
+# ---------------- PROCESSOS / ENERGIA / SISTEMA AVANCADO ----------------
+@tool
+def criar_esquema_energia_personalizado(nome: str) -> str:
+    """CRIA E ATIVA UM ESQUEMA DE ENERGIA PERSONALIZADO (copia do esquema de Alto
+    Desempenho com o seu nome). PODEROSO leve (muda configuracao de energia).
+    SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Criar e ativar um esquema de energia '{nome}' (baseado em Alto Desempenho)?"):
+        return "Cancelado."
+    s, e, c = _rodar_cmd("powercfg /duplicatescheme 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", 60)
+    import re as _re
+    m = _re.search(r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})", s or "")
+    if not m:
+        return f"Nao consegui criar o esquema: {(e or s)[:300]}"
+    guid = m.group(1)
+    _rodar_cmd(f'powercfg /changename "{guid}" "{nome}"', 30)
+    _rodar_cmd(f'powercfg /setactive "{guid}"', 30)
+    return f"Esquema de energia '{nome}' criado e ativado."
+
+
+@tool
+def prioridade_processo(nome_processo: str, prioridade: str = "alta") -> str:
+    """DEFINE A PRIORIDADE DE UM PROCESSO no Windows (da mais/menos CPU a ele).
+    'prioridade'='baixa', 'normal', 'alta' ou 'tempo_real' (tempo_real pode travar
+    o PC). PODEROSO. SEMPRE pede confirmacao."""
+    mapa = {"baixa": "Idle", "idle": "Idle", "normal": "Normal", "alta": "High",
+            "tempo_real": "RealTime", "realtime": "RealTime", "acima": "AboveNormal", "abaixo": "BelowNormal"}
+    nivel = mapa.get(prioridade.strip().lower(), "High")
+    alerta = " (ATENCAO: tempo real pode travar o PC!)" if nivel == "RealTime" else ""
+    if not _confirma_poderoso(f"Definir prioridade de '{nome_processo}' como {nivel}?{alerta}"):
+        return "Cancelado."
+    nome = nome_processo.strip().replace(".exe", "")
+    s, e, c = _ps(f"Get-Process -Name '{nome}' -ErrorAction Stop | ForEach-Object {{ $_.PriorityClass = '{nivel}' }}; 'OK'", 60)
+    return f"Prioridade de '{nome}' ajustada para {nivel}." if c == 0 else f"Falhou (processo nao encontrado?): {(e or s)[:300]}"
+
+
+@tool
+def forcar_encerrar_travados() -> str:
+    """FORCA O FECHAMENTO DE TODOS OS PROGRAMAS QUE ESTAO 'NAO RESPONDENDO'
+    (travados) de uma vez. PODEROSO (mata os congelados; dados nao salvos nesses
+    programas se perdem). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Encerrar TODOS os programas que estao 'Nao respondendo' (travados)? Mudancas nao salvas neles se perdem."):
+        return "Cancelado."
+    s, e, c = _rodar_cmd('taskkill /f /fi "STATUS eq NOT RESPONDING"', 60)
+    conteudo = s or "Nenhum programa travado no momento."
+    return "Programas travados encerrados.\n" + conteudo
+
+
+@tool
+def mudar_nome_pc(novo_nome: str) -> str:
+    """TROCA O NOME DO COMPUTADOR (aparece na rede e em Configuracoes). PODEROSO
+    (so vale apos REINICIAR). SEMPRE pede confirmacao."""
+    nome = novo_nome.strip()
+    if not nome or not nome.replace("-", "").isalnum() or len(nome) > 15:
+        return "O nome deve ter ate 15 caracteres, apenas letras/numeros/hifen."
+    if not _confirma_poderoso(f"Renomear este PC para '{nome}'? (vale apos reiniciar)"):
+        return "Cancelado."
+    s, e, c = _ps(f"Rename-Computer -NewName '{nome}' -Force -ErrorAction Stop; 'OK'", 90)
+    return f"PC sera renomeado para '{nome}' apos reiniciar." if c == 0 else f"Falhou: {(e or s)[:300]}"
+
+
+@tool
+def limpar_rastros_privacidade() -> str:
+    """LIMPA RASTROS DE USO do PC (itens/arquivos recentes do Explorer, historico
+    do Executar, area de transferencia) - NAO apaga seus documentos, so o historico
+    de uso. PODEROSO. SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Limpar os rastros de uso (itens/arquivos recentes, historico do Executar, clipboard)? Seus documentos NAO sao apagados."):
+        return "Cancelado."
+    ps = ("Remove-Item \"$env:APPDATA\\Microsoft\\Windows\\Recent\\*\" -Recurse -Force -ErrorAction SilentlyContinue; "
+          "Remove-Item 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU' -Recurse -Force -ErrorAction SilentlyContinue; "
+          "Set-Clipboard -Value ''; 'OK'")
+    s, e, c = _ps(ps, 120)
+    return "Rastros de uso limpos (reabra o Explorer se a lista ainda aparecer)." if c == 0 else f"Concluido com avisos: {(e or s)[:300]}"
+
+
+@tool
+def desativar_telemetria(acao: str = "desativar") -> str:
+    """REDUZ A TELEMETRIA/RASTREIO DO WINDOWS (para o servico de Telemetria
+    Conectada DiagTrack e define o diagnostico para o minimo). 'acao'=
+    'desativar' ou 'reativar'. PODEROSO e de privacidade; o Windows pode religar
+    em atualizacoes. SEMPRE pede confirmacao."""
+    desligar = acao.strip().lower().startswith(("deslig", "desat", "off"))
+    if not _confirma_poderoso(f"{'DESATIVAR a telemetria do Windows' if desligar else 'REATIVAR a telemetria'}?"):
+        return "Cancelado."
+    if desligar:
+        _ps("Stop-Service DiagTrack -Force -ErrorAction SilentlyContinue; Set-Service DiagTrack -StartupType Disabled -ErrorAction SilentlyContinue; 'OK'", 90)
+        _rodar_cmd(r'reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f', 60)
+        return "Telemetria reduzida (servico DiagTrack parado/desligado e diagnostico no minimo)."
+    _ps("Set-Service DiagTrack -StartupType Automatic; Start-Service DiagTrack -ErrorAction SilentlyContinue; 'OK'", 90)
+    _rodar_cmd(r'reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 1 /f', 60)
+    return "Telemetria reativada."
+
+
+@tool
+def conexoes_de_rede_programas() -> str:
+    """MOSTRA QUAIS PROGRAMAS/PROCESSOS estao com conexao de rede ativa e para
+    qual IP/porta remota (otimo para ver o que esta 'conversando' na internet) -
+    so leitura, nao encerra nada."""
+    ps = ("Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | "
+          "Select-Object -First 25 @{n='Programa';e={(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName}}, "
+          "LocalPort,RemoteAddress,RemotePort | Format-Table -AutoSize")
+    s, e, c = _ps(ps, 90)
+    return "Programas com conexao de rede ativa:\n" + (s or "Nenhuma conexao estabelecida no momento.") if c == 0 else f"Falhou: {e or s}"
+
+
 tools = [
     esvaziar_lixeira,
     espaco_em_disco,
@@ -9285,6 +10260,68 @@ tools = [
     historico_comandos,
     finalizar_processo,
     atualizar_windows,
+    ler_registro,
+    definir_registro,
+    deletar_registro,
+    listar_usuarios_windows,
+    criar_usuario_windows,
+    remover_usuario_windows,
+    alterar_senha_usuario,
+    ativar_desativar_usuario,
+    gerenciar_admin_usuario,
+    status_bitlocker,
+    ativar_bitlocker,
+    desativar_bitlocker,
+    travar_drive_bitlocker,
+    chave_recuperacao_bitlocker,
+    status_defender,
+    protecao_tempo_real_defender,
+    atualizar_defender,
+    scan_completo_defender,
+    gerenciar_exclusao_defender,
+    apagar_arquivo_seguro,
+    reparar_permissoes_pasta,
+    monitorar_alteracoes,
+    formatar_unidade,
+    reparar_disco,
+    reparar_windows,
+    regra_firewall,
+    desligar_ligar_firewall,
+    limpar_spooler_impressao,
+    inicializacao_windows,
+    gerenciar_tarefa_agendada_windows,
+    redefinir_rede_windows,
+    configurar_ip_estatico,
+    configurar_ip_dhcp,
+    gerenciar_adaptador_rede,
+    matizar_porta,
+    desligar_pc_remoto,
+    executar_como_administrador,
+    habilitar_rdp,
+    compartilhar_pasta_rede,
+    listar_dispositivos_rede,
+    gerenciar_recurso_windows,
+    listar_wsl,
+    gerenciar_wsl,
+    listar_vms_hyperv,
+    gerenciar_vm_hyperv,
+    habilitar_hyperv,
+    abrir_windows_sandbox,
+    remover_bloatware,
+    backup_imagem_sistema,
+    listar_pontos_restauracao,
+    restaurar_pc_ponto,
+    listar_drivers,
+    logs_eventos_windows,
+    gerenciar_impressora,
+    listar_dispositivos_bluetooth,
+    criar_esquema_energia_personalizado,
+    prioridade_processo,
+    forcar_encerrar_travados,
+    mudar_nome_pc,
+    limpar_rastros_privacidade,
+    desativar_telemetria,
+    conexoes_de_rede_programas,
     enviar_mensagem_whatsapp,
     enviar_whatsapp_por_nome,
     gerenciar_contatos,
