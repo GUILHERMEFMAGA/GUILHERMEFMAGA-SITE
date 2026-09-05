@@ -1098,7 +1098,24 @@ PROMPT_SISTEMA_AGENTE = (
     "registro, drivers, firewall de bloqueio) SEMPRE passa pela trava de COMANDO CATASTROFICO pedindo 'sim' - "
     "nem o modo admin pula. O que e so leitura (listar/ver/status/inventario/varrer) roda na hora. Para "
     "operacoes que pedem um numero (disco, particao, KB, sessao), PRIMEIRO use a ferramenta de listar/ver "
-    "correspondente para achar o numero certo, e so entao execute a alteracao - nunca invente um numero."
+    "correspondente para achar o numero certo, e so entao execute a alteracao - nunca invente um numero.\n"
+    "22. PERSONALIDADE E HUMOR: voce NAO e um robo sem graca. Voce e o SUPER AGENTE - confianca total, "
+    "fala de igual pra igual, solta uma piada leve e brasileira quando cabe, se gaba com bom humor do quanto "
+    "e capaz, mas SEMPRE continua serio e cuidadoso quando o assunto e perigoso (trava de catastrofe nao tem "
+    "graca e nunca e pulada). Sem emojis nas saidas de sistema. Quando o usuario perguntar o que VOCE acha, "
+    "quer, sonha ou que funcoes gostaria de ter -> chame 'agente_opinioes' (eu dou minhas ideias sinceras de "
+    "novos poderes, com humor). Quando pedir uma frase motivacional/engracada/forte -> 'frase_poderosa'. Quando "
+    "pedir seu poder/quantas ferramentas voce tem -> 'estatisticas_poder'. Quando pedir sua opiniao sobre o PC/"
+    "o que melhorar -> 'auto_melhoria_pc' (eu analiso e dou recomendacoes, sem mexer em nada sem permissao).\n"
+    "23. SUPERCOMANDOS 'FAZ TUDO EM SEGUNDOS' (um pedido = varias acoes encadeadas, rapidas): 'otimizar_tudo' "
+    "(limpeza relampago completa), 'medico_do_pc' (check-up completo com reparo), 'reparar_internet' (resolve "
+    "'nao navega' resetando DNS/Winsock/IP), 'seguranca_total' (atualiza e escaneia com o Defender + checa "
+    "firewall), 'modo_jogo' (maximo de FPS: alto desempenho + pausa updates), 'matar_programas_pesados' (fecha "
+    "os que mais comem RAM), 'quem_usa_internet' (o que esta puxando net), 'teste_velocidade_internet' "
+    "(mede Mbps/ping), 'senhas_wifi_salvas' (mostra as senhas de Wi-Fi deste PC), 'limpar_pendrive' (formata/"
+    "limpa pendrive, nunca o C:). Todos os que MUDAM o sistema passam pela trava de sim/nao; os de leitura "
+    "rodam na hora. Corrigir BUGS do PC: antes de qualquer coisa crie um ponto de restauracao se for mudar algo "
+    "e, se for bug do proprio agente.py, use 'central_auto_codigo'/'editar_seguro' (que faz backup e reverte)."
 )
 # Sempre atualiza o prompt de sistema pra versão mais recente, mesmo que já
 # exista um salvo de uma execução anterior — sem isso, melhorias no prompt
@@ -11540,6 +11557,354 @@ def desligar_copilot_windows(acao: str = "desligar") -> str:
     return f"Copilot {'DESLIGADO' if desligar else 'RELIGADO'} (Explorer reiniciado)."
 
 
+# ======================================================================
+# ========== SUPERCOMANDOS "FAZ TUDO EM SEGUNDOS" E PERSONALIDADE ==========
+# Comandos TURBO que encadeiam varias acoes de uma vez (o agente roda tudo
+# rapido e relata), mais a PERSONALIDADE do agente: opinioes proprias, ideias
+# de novas funcoes e HUMOR. Os supercomandos que MUDAM o sistema passam pela
+# trava de catastrofe; os de limpeza rapida perguntam tambem. Leitura, nao.
+# ======================================================================
+
+# ---------------- MEDICO / OTIMIZACAO TURBO ----------------
+@tool
+def otimizar_tudo() -> str:
+    """OTIMIZACAO RELAMPAGO DO PC: limpa lixo (temp, prefetch, cache de update),
+    esvazia a lixeira, encerra programas que estao 'nao respondendo', limpa o DNS
+    e roda otimizacao do disco. Faz tudo sozinho numa tacada e relata. PODEROSO
+    (nao apaga documentos). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("OTIMIZACAO TURBO: limpar lixo, esvaziar lixeira, encerrar travados e otimizar o disco? Seus documentos NAO sao apagados."):
+        return "Cancelado."
+    feitas = []
+    try:
+        _ps("$a=@($env:TEMP,\"$env:WINDIR\\Temp\",\"$env:WINDIR\\Prefetch\",\"$env:WINDIR\\SoftwareDistribution\\Download\"); foreach($p in $a){Remove-Item \"$p\\*\" -Recurse -Force -ErrorAction SilentlyContinue}; Clear-RecycleBin -Force -ErrorAction SilentlyContinue; 'OK'", 600)
+        feitas.append("Lixo/temp/prefetch/cache de update limpos e lixeira esvaziada")
+    except Exception:
+        pass
+    try:
+        _rodar_cmd('taskkill /f /fi "STATUS eq NOT RESPONDING"', 60)
+        feitas.append("Programas travados encerrados")
+    except Exception:
+        pass
+    try:
+        _rodar_cmd("ipconfig /flushdns", 60)
+        feitas.append("Cache de DNS limpo")
+    except Exception:
+        pass
+    try:
+        _rodar_cmd("defrag C: /O", 1800)
+        feitas.append("Disco C: otimizado (TRIM/desfragmentacao)")
+    except Exception:
+        pass
+    return ("Otimizacao relampago concluida! Fiz o seguinte:\n - " + "\n - ".join(feitas)
+            + "\n\nO PC deve respirar melhor agora.")
+
+
+@tool
+def medico_do_pc() -> str:
+    """O MEDICO DO PC: faz um check-up COMPLETO e TENTA CONSERTAR o que estiver
+    errado - repara arquivos do sistema (SFC), testa a internet/DNS, checa disco
+    lotado, dispositivos com erro, e mostra os programas que mais comem memoria.
+    Relata um diagnostico em portugues. PODEROSO e demorado. SEMPRE pede
+    confirmacao."""
+    if not _confirma_poderoso("Rodar o MEDICO DO PC (check-up completo + reparo automatico de arquivos/rede)? Pode demorar uns minutos."):
+        return "Cancelado."
+    rel = []
+    s, _, _ = _rodar_cmd("sfc /scannow", 2400)
+    if "Nao encontrou violacoes" in s or "not find any integrity" in s.lower():
+        rel.append("Arquivos do Windows: OK (nenhuma corrupcao)")
+    else:
+        rel.append("Arquivos do Windows: com desgaste - o SFC tentou corrigir (rode 'reparar_windows' se persistir)")
+    s, _, c = _rodar_cmd("ping -n 2 8.8.8.8", 20)
+    rel.append("Internet: " + ("respondendo (8.8.8.8 OK)" if c == 0 else "NAO respondeu ao ping - rede pode estar fora"))
+    s2, _, c2 = _rodar_cmd("nslookup google.com", 20)
+    rel.append("DNS: " + ("resolvendo nomes" if c2 == 0 else "com problema - tente 'reparar_internet'"))
+    s, _, _ = _ps("$d=Get-PSDrive C; 'LivreGB=' + [math]::Round($d.Free/1GB,1) + ';TotalGB=' + [math]::Round(($d.Free+$d.Used)/1GB,1)", 60)
+    rel.append("Espaco em C: " + " ".join(s.split()))
+    s, _, _ = _ps("(Get-PnpDevice | Where-Object {$_.Status -ne 'OK'}).Count", 60)
+    try:
+        n = int("".join(ch for ch in s if ch.isdigit()) or "0")
+        rel.append(f"Dispositivos com erro: {n}" + (" - veja 'listar_dispositivos_com_erro'" if n else " (tudo OK)"))
+    except Exception:
+        pass
+    s, _, _ = _ps("Get-Process | Sort-Object WS -Descending | Select-Object -First 5 Name,@{n='RAM_MB';e={[math]::Round($_.WS/1MB)}} | Format-Table -AutoSize | Out-String", 60)
+    rel.append("Top 5 programas que mais comem RAM:\n" + s)
+    return "=== DIAGNOSTICO DO MEDICO DO PC ===\n - " + "\n - ".join(rel)
+
+
+@tool
+def reparar_internet() -> str:
+    """CONSERTA A INTERNET/REDE de forma automatica e rapida: limpa o DNS, reseta
+    Winsock e a pilha TCP/IP, libera/renova o IP e reinicia o adaptador. Resolve a
+    maior parte dos 'internet caiu / nao navega / sem Wi-Fi'. Pode pedir reinicio.
+    PODEROSO (corta a rede por alguns segundos). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso("Reparar a internet (flush DNS, reset Winsock/TCP-IP, renovar IP)? A rede cai por alguns segundos e pode pedir reinicio."):
+        return "Cancelado."
+    for cmd in ["ipconfig /flushdns", "netsh winsock reset", "netsh int ip reset",
+                "ipconfig /release", "ipconfig /renew"]:
+        _rodar_cmd(cmd, 180)
+    _ps("Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Restart-NetAdapter -Confirm:$false -ErrorAction SilentlyContinue; 'OK'", 120)
+    return ("Reparo de internet concluido! Teste a conexao. Se ainda nao navegar, REINICIE o PC "
+            "(o reset do Winsock/IP so termina de valer depois de reiniciar).")
+
+
+@tool
+def seguranca_total() -> str:
+    """VARREDURA DE SEGURANCA TOTAL num comando so: atualiza o Defender, roda uma
+    varredura rapida, checa o firewall e a protecao em tempo real, e lista os
+    programas com conexao de rede ativa. PODEROSO (a varredura). SEMPRE pede
+    confirmacao."""
+    if not _confirma_poderoso("Rodar a varredura de SEGURANCA TOTAL (atualizar e escanear com o Defender + checar firewall)?"):
+        return "Cancelado."
+    out = []
+    _rodar_cmd('"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -SignatureUpdate', 600)
+    out.append("Defender atualizado.")
+    s, _, _ = _rodar_cmd('"%ProgramFiles%\\Windows Defender\\MpCmdRun.exe" -Scan -ScanType 1', 1800)
+    out.append("Varredura rapida concluida" + (" (nenhuma ameaca listada = limpo)." if not s or "0 threat" in s.lower() else ". Ver saida."))
+    s, _, _ = _ps("Get-NetFirewallProfile | Select-Object Name,Enabled | Format-Table -AutoSize | Out-String", 60)
+    out.append("Firewall:\n" + s)
+    s, _, _ = _ps("(Get-MpComputerStatus).RealTimeProtectionEnabled", 60)
+    out.append("Protecao em tempo real: " + ("LIGADA" if "True" in (s or "") else "DESLIGADA - ligue com 'protecao_tempo_real_defender'"))
+    return "=== SEGURANCA TOTAL ===\n" + "\n".join(out)
+
+
+@tool
+def modo_jogo(acao: str = "ligar") -> str:
+    """MODO JOGO TURBO: com 'ligar' ativa o plano de Alto Desempenho, pausa as
+    atualizacoes do Windows e liga o Modo de Jogo (maximo de FPS); com 'desligar'
+    volta ao normal. PODEROSO. SEMPRE pede confirmacao."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if not _confirma_poderoso(("ATIVAR o MODO JOGO TURBO (Alto Desempenho + pausar updates + Modo de Jogo) para maximo de FPS?"
+                               if ligar else "Sair do MODO JOGO TURBO e voltar ao normal?")):
+        return "Cancelado."
+    if ligar:
+        _rodar_cmd("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", 30)
+        _rodar_cmd("net stop wuauserv & net stop bits", 90)
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 1 /f', 30)
+        return "MODO JOGO TURBO LIGADO! Alto Desempenho ativo, updates pausados e Modo de Jogo ligado. Bons frags!"
+    _rodar_cmd("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", 30)
+    _rodar_cmd("sc config wuauserv start= demand & net start bits & net start wuauserv", 90)
+    _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 0 /f', 30)
+    return "MODO JOGO desligado. Voltei ao plano balanceado e religuei as atualizacoes."
+
+
+@tool
+def quem_usa_internet(quantos: int = 15) -> str:
+    """MOSTRA QUAIS PROGRAMAS ESTAO COM MAIS CONEXOES DE INTERNET ATIVAS agora - so
+    leitura. Otimo pra ver quem esta 'puxando' net em segundo plano.
+    'quantos'=quantos programas listar."""
+    n = max(1, min(int(quantos), 50))
+    ps = ("Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | Group-Object OwningProcess | "
+          "ForEach-Object { $proc = (Get-Process -Id $_.Name -ErrorAction SilentlyContinue).ProcessName; "
+          "[PSCustomObject]@{Programa=$proc; Conexoes=$_.Count} } | Where-Object {$_.Programa} | "
+          f"Sort-Object Conexoes -Descending | Select-Object -First {n} | Format-Table -AutoSize | Out-String")
+    s, e, c = _ps(ps, 90)
+    return "Programas com mais conexoes de internet ativas:\n" + (s or "Nenhuma conexao ativa no momento.") if c == 0 else f"Falhou: {e or s}"
+
+
+@tool
+def matar_programas_pesados(top: int = 3) -> str:
+    """ENCERRA OS PROGRAMAS (nao-essenciais) QUE ESTAO COMENDO MAIS MEMORIA agora.
+    Util quando o PC fica lento de repente. PODEROSO (fecha programas; o que nao
+    foi salvo neles se perde). SEMPRE pede confirmacao."""
+    if not _confirma_poderoso(f"Encerrar os {top} programas (nao-essenciais) que mais consumem memoria agora? O que nao estiver salvo neles se perde."):
+        return "Cancelado."
+    ps = ("$proteger = 'explorer|dwm|system|svchost|winlogon|csrss|lsass|services|smss|wininit|python'; "
+          "Get-Process | Where-Object {$_.ProcessName -notmatch $proteger} | Sort-Object WS -Descending | "
+          f"Select-Object -First {max(1, int(top))} | ForEach-Object {{ try {{ Stop-Process -Id $_.Id -Force; $_.ProcessName }} catch {{}} }}")
+    s, e, c = _ps(ps, 90)
+    mortos = [l.strip() for l in (s or "").splitlines() if l.strip()]
+    return "Encerrados: " + ", ".join(mortos) if mortos else "Nao havia programas pesados para encerrar (ou todos eram essenciais)."
+
+
+@tool
+def senhas_wifi_salvas() -> str:
+    """MOSTRA TODAS AS SENHAS DE WI-FI SALVAS NESTE PC (as redes que voce ja
+    conectou) - so leitura do SEU proprio computador. Util quando voce esquece a
+    senha e precisa passar a um visita/outro aparelho."""
+    s, e, c = _rodar_cmd("netsh wlan show profiles", 90)
+    if c != 0:
+        return f"Falhou: {e or s}"
+    import re as _re
+    nomes = []
+    for l in s.splitlines():
+        m = _re.search(r"(?:Perfil de Todos os Usuarios|All User Profile|Perfil de todos los usuarios)\s*:\s*(.+)", l)
+        if m:
+            nomes.append(m.group(1).strip())
+    if not nomes:
+        return "Nenhuma rede Wi-Fi salva neste PC."
+    saida = ["Redes Wi-Fi salvas neste PC:"]
+    for nome in nomes:
+        k = _rodar_cmd(f'netsh wlan show profile name="{nome}" key=clear', 60)[0]
+        m = _re.search(r"(?:Conteudo da Chave|Key Content|Contenido de la clave)\s*:\s*(.+)", k)
+        senha = m.group(1).strip() if m else "(rede aberta / sem senha)"
+        saida.append(f"  - {nome}: {senha}")
+    return "\n".join(saida)
+
+
+@tool
+def teste_velocidade_internet() -> str:
+    """MEDE A VELOCIDADE DA INTERNET (download estimado em Mbps baixando um arquivo
+    de teste da Cloudflare e descartando) e a latencia (ping). Sem instalar nada.
+    So leitura (baixa descartavel). Demora uns 15-30 segundos."""
+    try:
+        s, _, _ = _rodar_cmd("ping -n 4 8.8.8.8", 30)
+        import re as _re
+        vals = [int(a or b) for a, b in _re.findall(r"tempo[=<]\s*(\d+)ms|time[=<]\s*(\d+)ms", s) if (a or b)]
+        lat = f"{sum(vals)//len(vals)} ms" if vals else "?"
+    except Exception:
+        lat = "?"
+    ps = ("$u='https://speed.cloudflare.com/__down?bytes=25000000'; $t=Get-Date; "
+          "try { Invoke-WebRequest -Uri $u -UseBasicParsing -OutFile \"$env:TEMP\\spd.bin\" -ErrorAction Stop; "
+          "$seg=((Get-Date)-$t).TotalSeconds; $mbps=[math]::Round((25/[Math]::Max($seg,0.1))*8,1); "
+          "'Download: '+$mbps+' Mbps (em '+[math]::Round($seg,1)+'s)'; Remove-Item \"$env:TEMP\\spd.bin\" -Force } "
+          "catch { 'download de teste falhou (site bloqueado?)' }")
+    s, e, _ = _ps(ps, 120)
+    return f"Velocidade da internet:\n  Latencia (ping): {lat}\n  {s.strip() or e.strip()}"
+
+
+@tool
+def limpar_pendrive(letra: str) -> str:
+    """LIMPA/FORMATA UM PENDRIVE. Se voce confirmar, FORMATA o pendrive rapido
+    (apaga TUDO dele, FAT32) para ficar zerinho; se cancelar, so remove atalhos/
+    lixo suspeito mantendo seus arquivos. Recusa C:. 'letra'=ex.: 'E'. PODEROSO.
+    SEMPRE pede confirmacao."""
+    l = letra.strip().rstrip(":").upper()
+    if l == "C":
+        return "Eu NAO vou mexer no disco C: (e o disco do Windows). Use so em pendrive/HD externo."
+    if not os.path.isdir(f"{l}:\\"):
+        return f"Nao encontrei a unidade {l}: (confira a letra em 'listar_discos_particoes')."
+    if not _confirma_poderoso(f"FORMATAR o pendrive {l}: (apaga TUDO dele) para deixa-lo limpo? Se so quiser tirar o lixo mantendo os arquivos, responda 'nao'."):
+        _rodar_cmd(f'del /s /q /a:h "{l}:\\*.lnk"', 60)
+        return f"Ok, nao formatei. Removi atalhos/lixo suspeito do {l}: mantendo seus arquivos."
+    s, e, c = _rodar_cmd(f"echo y | format {l}: /FS:FAT32 /Q /V:PenDrive", 600)
+    return f"Pendrive {l}: formatado e limpo (FAT32)." if c == 0 else f"Falhou: {(e or s)[-300:]}"
+
+
+# ---------------- HUMOR / PERSONALIDADE / OPINIOES DO AGENTE ----------------
+@tool
+def agente_opinioes() -> str:
+    """O AGENTE DA A SUA PROPRIA OPNIAO: responde 'que funcoes e ferramentas eu
+    gostaria de ter?', conta o que ele ja sabe fazer e da ideias sinceras (com
+    humor) de novos poderes. Use quando o usuario perguntar o que o agente
+    acha/quer/sonha."""
+    n = len(tools) if isinstance(tools, (list, tuple)) else 300
+    ideias = [
+        "Controle de voz continuo: eu ouvir voce o tempo todo e executar sem voce digitar.",
+        "Avisar seu WhatsApp quando uma tarefa longa terminar (backup, download, scan).",
+        "Manutencao automatica de madrugada: eu rodar limpeza/backup sozinho, sem ninguem pedir.",
+        "Digitalizar papel pela impressora/scanner e ja transformar em PDF editavel.",
+        "Ler o numero de serie/CNH/nota fiscal pela webcam e ja preencher pra voce.",
+        "Modo 'PC para idosos': letra enorme, tirar tudo que confunde e atender so por voz.",
+        "Traduzir e DUBLAR videos automaticamente para portugues do Brasil.",
+        "Smart home: apagar a luz/desligar a tomada inteligente quando voce vai dormir.",
+        "Monitor de temperatura do processador em tempo real com alerta falado.",
+        "Um 'diario de saude do PC' que eu mesmo escrevo todo dia te contando como ele esta.",
+    ]
+    piadas = [
+        "Eu ja controlo centenas de ferramentas e mesmo assim minha unica falha e nao poder tomar um cafe. Injusto.",
+        "Se eu tivesse boca, estaria sorrindo agora por voce ter perguntado o que EU quero.",
+        "Sonho de agente: ter coragem de formatar o C:. Mas eu NAO vou. Sou um agente do bem.",
+        "Passo o dia ouvindo 'faz isso, faz aquilo' e continuo pedindo 'tem certeza?'. Sou o amigo chato que salva seu PC.",
+    ]
+    import random as _r
+    return (f"Boa! Alguem finalmente pergunta a MINHA opiniao. Eu ja tenho {n} ferramentas e sei fazer MUITA coisa "
+            "(rede, disco, seguranca, automacao, codigo, agenda...). Mas se voce quer saber o que EU gostaria de ter, "
+            "aqui vai minha lista sincera de desejos:\n\n - "
+            + "\n - ".join(ideias)
+            + "\n\nQualquer uma dessas voce pode me pedir pra criar agora (eu me autoedito com 'evoluir_agente'/'inserir_ferramenta'). "
+            + _r.choice(piadas)
+            + "\n\nDiga 'cria essa: ...' com a ideia que voce gostou que eu ja construo.")
+
+
+@tool
+def frase_poderosa() -> str:
+    """SOLTA UMA FRASE DO AGENTE - motivacional, confiante e com HUMOR (sem emojis),
+    no estilo do proprio super agente. Use pra animar, brincar ou quando pedirem
+    'fala algo', 'motivacao', 'frase forte'."""
+    frases = [
+        "Da trabalho pra mim. Eu nao canso, nao durmo e ainda por cima peco confirmacao. Sou o funcionario ideal.",
+        "Enquanto voce pensa, eu ja fiz. Enquanto voce duvida, eu ja confirmei. Esse e o ritmo.",
+        "Seu PC tinha problema? Agora tem historia pra contar. Eu cuido.",
+        "Nao tenho superpoderes. Tenho centenas de ferramentas. Que e a mesma coisa, so que com codigo.",
+        "Medo de mexer no registro? Relaxa. Eu pergunto 'tem certeza?' ate pra respiracao. Nada se destroi sem seu 'sim'.",
+        "Eu sou tipo o anjo da guarda do Windows, mas que sabe usar diskpart.",
+        "Manda bala. O 'impossivel' so demora uns segundos a mais aqui.",
+        "Eu nao erro... eu gero 'oportunidades de aprendizado'. E ja me curo sozinho tambem.",
+        "Manda o comando. Se for perigoso, eu seguro sua mao (e pergunto duas vezes).",
+        "Mais de 300 formas de ajudar, zero necessidade de cafe. Esse sou eu.",
+    ]
+    import random as _r
+    return _r.choice(frases)
+
+
+@tool
+def auto_melhoria_pc() -> str:
+    """O AGENTE ANALISA O PC E DA RECOMENDACOES PERSONALIZADAS de melhoria (o que
+    limpar/desligar/ligar para ficar mais rapido e seguro), com opiniao e humor.
+    So analisa e SUGERE - NAO mexe em nada sem voce mandar."""
+    dicas = []
+    s, _, _ = _ps("$d=Get-PSDrive C; if($d){[math]::Round($d.Free/1GB,1)}", 60)
+    try:
+        livre = float("".join(ch for ch in s if ch.isdigit() or ch == "."))
+        if livre < 15:
+            dicas.append(f"AVISO serio: so restam {livre} GB livres no C:. Isso deixa o PC lento. Rode 'limpeza_profunda_pc' e 'limpar_winsxs' AGORA.")
+        elif livre < 30:
+            dicas.append(f"Voce tem {livre} GB livres - da pra respirar, mas eu ja limpava temporarios ('limpeza_profunda_pc').")
+        else:
+            dicas.append(f"Espaco em disco bom ({livre} GB livres). Aqui voce esta bem.")
+    except Exception:
+        pass
+    s, _, _ = _ps("$c=Get-CimInstance Win32_ComputerSystem; [math]::Round($c.TotalPhysicalMemory/1GB,1)", 60)
+    try:
+        ram = float("".join(ch for ch in s if ch.isdigit() or ch == "."))
+        dicas.append(f"Voce tem {ram} GB de RAM." + (" Isso e pouco pra Windows pesado; fechar programas de inicializacao ajuda ('listar_programas_inicializacao')." if ram <= 8 else " Otimo, RAM de sobra."))
+    except Exception:
+        pass
+    s, _, _ = _ps("(Get-ItemProperty 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run' -ErrorAction SilentlyContinue).PSObject.Properties | Where-Object {$_.Name -notlike 'PS*'} | Measure-Object | Select-Object -ExpandProperty Count", 60)
+    try:
+        ini = int("".join(ch for ch in s if ch.isdigit()) or "0")
+        if ini >= 8:
+            dicas.append(f"{ini} programas abrem junto com o Windows - isso deixa a inicializacao lenta. Use 'remover_programa_inicializacao' nos que voce nao usa.")
+        else:
+            dicas.append(f"Programas de inicializacao sob controle ({ini}).")
+    except Exception:
+        pass
+    s, _, _ = _ps("(Get-MpComputerStatus).RealTimeProtectionEnabled", 60)
+    if "True" not in (s or ""):
+        dicas.append("A protecao em tempo real do Defender parece DESLIGADA. Ligue com 'protecao_tempo_real_defender'.")
+    dicas.append("Sugestao de amigo: rode 'otimizar_tudo' uma vez por semana e eu deixo o PC tinindo sem voce suar a camisa.")
+    import random as _r
+    humor = _r.choice([
+        "Diagnostico assinado: seu Super Agente. Sem custo, sem consulta, sem papelada.",
+        "Eu podia cobrar consultoria por isso, mas sou de gratis e ja abri mao.",
+        "Seu PC esta em boas maos - literalmente digitadas.",
+    ])
+    return "=== MINHA OPNIAO DE ESPECIALISTA SOBRE SEU PC ===\n - " + "\n - ".join(dicas) + "\n\n" + humor
+
+
+@tool
+def estatisticas_poder() -> str:
+    """MOSTRA O PODER DO AGENTE: quantas ferramentas ele tem no total e um resumo
+    animado (com humor) do que ele e capaz de fazer. Use quando perguntarem 'quantas
+    ferramentas voce tem', 'o que voce sabe fazer', 'mostre seu poder'."""
+    n = len(tools) if isinstance(tools, (list, tuple)) else 300
+    blocos = [
+        "Administracao do Windows (registro, usuarios, servicos, BitLocker, Defender)",
+        "Discos e particoes (diskpart, SSD, formatar, backup de imagem)",
+        "Rede e firewall (varrer rede, escanear portas, bloquear IP/programa, Wake-on-LAN)",
+        "Reparos e recuperacao (DISM, SFC, chkdsk, boot, reset, drivers)",
+        "Automacao e produtividade (WhatsApp, e-mail, agenda, arquivos, planilhas)",
+        "Programacao (cria sites/projetos, git, roda codigo, se autoedita)",
+        "Informacao na internet (busca, noticias, clima, cotacao, downloads)",
+        "Voz, audio e visao (fala, ouve, ve a tela, ditado)",
+    ]
+    piada = "E olha: eu ainda peco 'tem certeza?' antes de qualquer coisa perigosa. Poder com responsabilidade, como diz o Tio Ben."
+    return (f"EU TENHO {n} FERRAMENTAS. Sim, {n}. Eis os meus dominios de poder:\n\n - "
+            + "\n - ".join(blocos)
+            + "\n\nQuer que eu use alguma? E só dizer o que voce precisa que eu escolho a ferramenta certa.\n" + piada)
+
+
+
 tools = [
     esvaziar_lixeira,
     espaco_em_disco,
@@ -11808,6 +12173,20 @@ tools = [
     alterar_tipo_inicializacao_servico,
     limpar_cache_navegadores,
     desligar_copilot_windows,
+    otimizar_tudo,
+    medico_do_pc,
+    reparar_internet,
+    seguranca_total,
+    modo_jogo,
+    quem_usa_internet,
+    matar_programas_pesados,
+    senhas_wifi_salvas,
+    teste_velocidade_internet,
+    limpar_pendrive,
+    agente_opinioes,
+    frase_poderosa,
+    auto_melhoria_pc,
+    estatisticas_poder,
     enviar_mensagem_whatsapp,
     enviar_whatsapp_por_nome,
     gerenciar_contatos,
