@@ -1236,17 +1236,28 @@ PROVEDORES_IA_PADRAO = [
     # rodizio marca como mortas na 1a tentativa e segue sem incomodar):
     {"nome": "Groq (Llama 3.3 70B)",   "tipo": "openai", "modelo": "llama-3.3-70b-versatile",      "chave_env": "GROQ_API_KEY",      "base_url": "https://api.groq.com/openai/v1"},
     {"nome": "Groq (Llama 4 Scout)",   "tipo": "openai", "modelo": "llama-4-scout-17b-16e-instruct","chave_env": "GROQ_API_KEY",     "base_url": "https://api.groq.com/openai/v1"},
-    {"nome": "Cerebras (Llama 3.3 70B)","tipo": "openai", "modelo": "llama-3.3-70b",               "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    # Cerebras atualizada (2026): o modelo antigo 'llama-3.3-70b' foi aposentado
+    # e respondia "modelo nao encontrado". Os atuais da conta gratis (1 milhao
+    # de tokens/dia, sem cartao) sao Qwen3 235B, GPT-OSS 120B e o Llama 3.1 8B.
+    {"nome": "Cerebras (Qwen3 235B)",  "tipo": "openai", "modelo": "qwen-3-235b-a22b-instruct-2507", "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    {"nome": "Cerebras (GPT-OSS 120B)","tipo": "openai", "modelo": "gpt-oss-120b",                  "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    {"nome": "Cerebras (Llama 3.1 8B)","tipo": "openai", "modelo": "llama3.1-8b",                   "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
     {"nome": "SambaNova (Llama 70B)",  "tipo": "openai", "modelo": "Meta-Llama-3.3-70B-Instruct", "chave_env": "SAMBANOVA_API_KEY", "base_url": "https://api.sambanova.ai/v1"},
     {"nome": "OpenRouter (Llama 70B)", "tipo": "openai", "modelo": "meta-llama/llama-3.3-70b-instruct:free", "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
+    {"nome": "OpenRouter (Gemma)",     "tipo": "openai", "modelo": "google/gemma-3-27b-it:free",          "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
     # GitHub Models: modelos de ponta (DeepSeek, GPT, Llama) usando um TOKEN
     # gratuito do GitHub (cria em github.com -> Settings -> Developer settings
     # -> Personal access tokens -> Tokens classic -> Generate, sem marcar nada;
     # salva com setx GITHUB_TOKEN "ghp_..."). Compativel com OpenAI (Azure).
     {"nome": "GitHub Models (DeepSeek R1)", "tipo": "openai", "modelo": "DeepSeek-R1", "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
-    # Rede de seguranca SEM CHAVE e SEM CADASTRO: Pollinations. Como nao pede
-    # chave nem cartao, fica sempre ativa e serve de ultima tentativa quando
-    # todas as IAs com chave estourarem a cota do dia.
+    # Redes de seguranca SEM CHAVE e SEM CADASTRO: funcionam mesmo se o usuario
+    # nao configurar NENHUMA chave. Por isso ficam sempre ativas e servem de
+    # ultima tentativa quando todas as IAs com chave estourarem a cota do dia.
+    # LLM7: gateway anonimo (OpenAI-compativel), da GPT-4o-mini e DeepSeek de
+    # graca a ~30 pedidos/minuto sem precisar criar conta.
+    {"nome": "LLM7 (GPT-4o-mini, sem chave)", "tipo": "openai", "modelo": "gpt-4o-mini", "chave_env": None, "base_url": "https://api.llm7.io/v1", "sem_chave": True},
+    {"nome": "LLM7 (DeepSeek, sem chave)",    "tipo": "openai", "modelo": "deepseek-r1-0528", "chave_env": None, "base_url": "https://api.llm7.io/v1", "sem_chave": True},
+    # Pollinations: tambem sem chave/cadastro, gratuito.
     {"nome": "Pollinations (gratis, sem chave)", "tipo": "openai", "modelo": "openai", "chave_env": None, "base_url": "https://text.pollinations.ai/openai", "sem_chave": True},
 ]
 
@@ -1322,6 +1333,39 @@ for _prov in PROVEDORES_IA_PADRAO:
 # esses melhoram sozinhos e merecem nova tentativa depois.
 _ias_mortas = set()
 
+# Cooldown de COTA: quando uma IA estoura o limite (429/quota/rate), ela entra
+# num "descanso" temporario (em segundos) e e pulada ate passar o tempo - assim
+# o rodizio NAO fica batendo numa IA sem cota e imprimindo falha atras de
+# falha. Diferente das mortas, ela VOLTA automaticamente depois do descanso.
+_ias_cooldown = {}          # idx -> timestamp (time.time()) em que volta a valer
+_DURACAO_COOLDOWN_SEG = 60  # 1 minuto de descanso por estouro de cota
+
+
+def _erro_de_cota(_e):
+    """True quando o erro e de LIMITE/COTA (a IA esta sobrecarregada ou o plano
+    gratis estourou) - coisa que melhora sozinha com o tempo."""
+    _txt = f"{type(_e).__name__} {_e}".lower()
+    return any(_m in _txt for _m in (
+        "429", "rate limit", "ratelimit", "rate_limit", "quota", "too many",
+        "throttl", "resource exhausted", "capacity", "overloaded",
+        "insufficient_quota", "usage limit", "limit reached", "rpm",
+    ))
+
+
+def _em_cooldown(idx):
+    """True se a IA idx ainda estiver no periodo de descanso de cota."""
+    if idx not in _ias_cooldown:
+        return False
+    if time.time() >= _ias_cooldown[idx]:
+        _ias_cooldown.pop(idx, None)  # descanso acabou: volta ao jogo
+        return False
+    return True
+
+
+def _fora_do_jogo(idx):
+    """IA que nao deve ser tentada agora: morta permanente OU em cooldown."""
+    return idx in _ias_mortas or _em_cooldown(idx)
+
 
 def _erro_permanente(_e):
     _txt = f"{type(_e).__name__} {_e}".lower()
@@ -1358,7 +1402,7 @@ def _percorrer_rodizio(chamar, extrair):
     total = len(modelos_ia)
     for _passo in range(total):
         _idx = (indice_ia_atual + _passo) % total
-        if _idx in _ias_mortas:
+        if _fora_do_jogo(_idx):
             continue
         _info = modelos_ia[_idx]
         try:
@@ -1388,13 +1432,19 @@ def _percorrer_rodizio(chamar, extrair):
             _prox = None
             for _k in range(1, total + 1):
                 _cand = (_idx + _k) % total
-                if _cand not in _ias_mortas:
+                if not _fora_do_jogo(_cand):
                     _prox = modelos_ia[_cand]["nome"]
                     break
-            print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
-                  + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
             if _erro_permanente(_e):
+                print(f"[Rodizio]: '{_info['nome']}' saiu do rodizio nesta sessao ({type(_e).__name__}: modelo/chave).")
                 _ias_mortas.add(_idx)
+            elif _erro_de_cota(_e):
+                _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
+                print(f"[Rodizio]: '{_info['nome']}' estourou a cota ({type(_e).__name__}). Descanso de {_DURACAO_COOLDOWN_SEG}s; "
+                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento."))
+            else:
+                print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
+                      + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
     return None
 
 if not modelos_ia:
@@ -2148,6 +2198,12 @@ def mostrar_status():
     print(f"Modo voz           : {'ligado' if config.get('modo_voz') else 'desligado'}")
     print(f"IAs no rodizio     : {len(modelos_ia)} ativa(s)")
     print(f"IA em uso agora    : {modelos_ia[indice_ia_atual]['nome']}")
+    try:
+        _em_desc = sum(1 for _i in range(len(modelos_ia)) if _em_cooldown(_i))
+        _mortas = len([_i for _i in _ias_mortas if _i < len(modelos_ia)])
+        print(f"IAs em descanso    : {_em_desc} (volta sozinha em ~1min)" + (f" | fora desta sessao: {_mortas}" if _mortas else ""))
+    except Exception:
+        pass
     print(f"Contatos salvos    : {len(contatos)}")
     print(f"Projetos criados   : {len(projetos_registrados)}")
     print(f"Lembranças na memória de longo prazo: {len(memoria_longa)}")
@@ -12381,7 +12437,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
     total = len(modelos_ia)
     for _passo in range(total):
         _idx = (indice_ia_atual + _passo) % total
-        if _idx in _ias_mortas:
+        if _fora_do_jogo(_idx):
             continue
         _info = modelos_ia[_idx]
         try:
@@ -12425,13 +12481,19 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _prox = None
             for _k in range(1, total + 1):
                 _cand = (_idx + _k) % total
-                if _cand not in _ias_mortas:
+                if not _fora_do_jogo(_cand):
                     _prox = modelos_ia[_cand]["nome"]
                     break
-            print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
-                  + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
             if _erro_permanente(_e):
+                print(f"[Rodizio]: '{_info['nome']}' saiu do rodizio nesta sessao ({type(_e).__name__}: modelo/chave).")
                 _ias_mortas.add(_idx)
+            elif _erro_de_cota(_e):
+                _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
+                print(f"[Rodizio]: '{_info['nome']}' estourou a cota ({type(_e).__name__}). Descanso de {_DURACAO_COOLDOWN_SEG}s; "
+                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento."))
+            else:
+                print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
+                      + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
     return SimpleNamespace(content="")  # todas falharam / vazias
 
 print(f" Super Agente pronto! Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
