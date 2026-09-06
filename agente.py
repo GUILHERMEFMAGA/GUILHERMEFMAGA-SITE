@@ -1092,6 +1092,15 @@ for _prov in PROVEDORES_IA_PADRAO:
         _chave = _chave or "chave-nao-necessaria"
     if not _chave:
         continue  # sem chave configurada para este provedor -> ignora
+    # Avisa (e pula) se a chave do Gemini veio no formato errado: a API key do
+    # Google AI Studio comeca com 'AIza'. Um texto como 'AQ.Ab8...' e outra
+    # coisa (token de sessao), nao a chave - assim evitamos um erro confuso.
+    if _prov.get("tipo") == "gemini" and not _chave.startswith("AIza"):
+        print("[Aviso]: a chave do Gemini (GEMINI_API_KEY) nao parece valida.")
+        print("       A chave certa comeca com 'AIzaSy...' e e criada em:")
+        print("       https://aistudio.google.com/apikey  -> 'Create API key'.")
+        print("       (o texto 'AQ....' que voce colou NAO e a chave da API.)")
+        continue
     try:
         if _prov.get("tipo") == "gemini":
             if _ChatGoogleGenerativeAI is None:
