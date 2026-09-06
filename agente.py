@@ -2279,6 +2279,40 @@ def processar_atalho_rapido(comando: str) -> bool:
                 return True
         cache_respostas.pop(cmd, None)  # expirado, formato antigo ou vazio: recalcula
 
+    # PERGUNTAS DE PERSONALIDADE DO AGENTE: se o usuario pergunta o que o PROPRIO
+    # agente acha/quer/sonha/quantas ferramentas tem, respondemos DIRETO com as
+    # ferramentas de personalidade (sem gastar API e sem a IA inventar funcoes).
+    _cl = cmd.lower().strip()
+    _eh_pergunta_do_agente = (
+        ("gostaria de ter" in _cl or "gostaria de colocar" in _cl or "quer ter" in _cl
+         or "sonha" in _cl or "que voce acha" in _cl or "sua opiniao" in _cl
+         or "opniao" in _cl or "opini" in _cl)
+        and ("ferrament" in _cl or "fun" in _cl or "poder" in _cl or "voce" in _cl or "vc" in _cl)
+    ) or ("quantas ferramentas" in _cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
+    if _eh_pergunta_do_agente:
+        _r = agente_opinioes.invoke({}) if ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl) else (
+            estatisticas_poder.invoke({}) if ("quantas" in _cl or "poder" in _cl) else auto_melhoria_pc.invoke({}))
+        historico_conversas.append({"role": "assistant", "content": _r})
+        salvar_historico()
+        print(f"\n[Agente]: {_r}")
+        falar(_r[:200])
+        return True
+    # Frase de motivacao/humor quando pedem algo como "fala algo", "frase forte"
+    if any(p in _cl for p in ("frase forte", "frase poderosa", "me motiva", "fala algo forte", "fala uma frase")):
+        _r = frase_poderosa.invoke({})
+        historico_conversas.append({"role": "assistant", "content": _r})
+        salvar_historico()
+        print(f"\n[Agente]: {_r}")
+        falar(_r)
+        return True
+    if _cl in ("voce e esperto", "vc e esperto", "você é esperto", "vc é esperto", "voce e inteligente", "vc e foda"):
+        _r = frase_poderosa.invoke({})
+        historico_conversas.append({"role": "assistant", "content": _r})
+        salvar_historico()
+        print(f"\n[Agente]: {_r}")
+        falar(_r)
+        return True
+
     if any(p in cmd for p in PALAVRAS_CONVERSA) and not any(p in cmd for p in PALAVRAS_TAREFA_COMPLEXA):
         # Contexto inteligente tambem no chat rapido: memoria central (fatos
         # permanentes do usuario) + licoes + memorias relevantes, bem curto.
@@ -12223,28 +12257,127 @@ tools = [
 ]
 
 # ======================================================================
+# ========= SELECAO INTELIGENTE DE FERRAMENTAS (anti-estouro de API) =========
+# Mandar as 300+ ferramentas em TODA chamada gera um payload gigante
+# (~25 mil tokens so de descricoes), que as APIs gratuitas rejeitam com
+# "InvalidRequestError" (foi o bug do agente que falhava em todas as IAs).
+# Solucao: para cada pedido, enviamos SO as ferramentas relevantes (um
+# subconjunto enxuto), mantendo as 300+ disponiveis no total. O subconjunto e
+# escolido por pontuacao de palavras-chave (nome + descricao) + um nucleo fixo.
+# ======================================================================
+
+_TOOLS_FIXAS = [
+    # Nucleo que deve estar sempre disponivel (conversa, codigo, comando geral,
+    # ajuda, ferramentas e a personalidade do agente)
+    "listar_ferramentas", "executar_comando", "executar_python", "central_codigo",
+    "central_auto_codigo", "evoluir_agente", "falar_em_voz", "ler_em_voz",
+    "agente_opinioes", "frase_poderosa", "auto_melhoria_pc", "estatisticas_poder",
+    "gravar_memoria_core", "consultar_memoria_core", "buscar_web", "abrir_site_no_navegador",
+]
+
+# Limite seguro de ferramentas por chamada (fica bem abaixo do teto das APIs).
+_MAX_FERRAMENTAS_POR_CHAMADA = 38
+
+
+def _nome_ferramenta(t):
+    """Nome de uma ferramenta seja ela ferramenta LangChain (.name) ou funcao
+    crua decorada (__name__)."""
+    return getattr(t, "name", None) or getattr(t, "__name__", "") or ""
+
+
+def _doc_ferramenta(t):
+    """Descricao de uma ferramenta LangChain (.description) ou docstring."""
+    d = getattr(t, "description", None)
+    if d:
+        return d
+    return getattr(t, "__doc__", "") or ""
+
+
+import re as _re_ferr
+_QUEBRAR_TEXTO = _re_ferr.compile(r"[a-z0-9_]+")
+
+
+def _pontuar_ferramenta(ferramenta, texto):
+    """Da uma pontuacao de relevancia de uma ferramenta para o 'texto' do
+    pedido, com base no nome e na descricao (docstring)."""
+    nome = _nome_ferramenta(ferramenta).lower()
+    alvo = (nome + " " + _doc_ferramenta(ferramenta)).lower()
+    palavras = [p for p in _QUEBRAR_TEXTO.findall(texto.lower()) if len(p) > 2]
+    pontos = 0
+    for p in set(palavras):
+        if p in alvo:
+            # peso maior se bater no nome da funcao
+            pontos += 3 if p in nome else 1
+    return pontos
+
+
+def _selecionar_ferramentas(comando: str):
+    """Devolve a lista ENXUTA de ferramentas relevantes para o pedido.
+    Inclui o nucleo fixo + as mais bem pontuadas, ate o limite seguro."""
+    try:
+        por_nome = {_nome_ferramenta(t): t for t in tools if _nome_ferramenta(t)}
+        selecionadas = []
+        vistos = set()
+        for nome in _TOOLS_FIXAS:
+            if nome in por_nome and nome not in vistos:
+                selecionadas.append(por_nome[nome])
+                vistos.add(nome)
+        # pontua todas as demais
+        rank = []
+        for t in tools:
+            nm = _nome_ferramenta(t)
+            if not nm or nm in vistos:
+                continue
+            rank.append((_pontuar_ferramenta(t, comando), nm, t))
+        rank.sort(key=lambda x: x[0], reverse=True)
+        for pontos, nm, t in rank:
+            if len(selecionadas) >= _MAX_FERRAMENTAS_POR_CHAMADA:
+                break
+            if pontos > 0 and nm not in vistos:
+                selecionadas.append(t)
+                vistos.add(nm)
+        return selecionadas
+    except Exception:
+        # qualquer falha na selecao: manda o nucleo fixo (nunca quebra o agente)
+        fix = [t for t in tools if _nome_ferramenta(t) in _TOOLS_FIXAS]
+        return fix or tools[:_MAX_FERRAMENTAS_POR_CHAMADA]
+
 
 print(" Configurando o Super Agente Otimizado v4.0 ULTRA...")
 
-# Um agente (com ferramentas) para CADA IA do rodizio. E criado sob demanda
-# (lazy) e guardado em cache, so para as IAs que realmente respondem.
+# Ferramentas selecionadas para o pedido atual (subconjunto enxuto). E definido
+# a cada comando no laco principal; o fallback e a lista toda.
+_ferramentas_ativas = tools
+
+# Um agente (com ferramentas) para CADA IA do rodizio e para CADA conjunto de
+# ferramentas selecionado. Criado sob demanda (lazy) e guardado em cache: a chave
+# e (indice_da_IA, tuma_dos_nomes_das_ferramentas). Assim cada pedido manda so as
+# ferramentas relevantes, mantendo o payload pequeno (resolve o InvalidRequest).
 _agentes_por_ia = {}
 
 
-def _pegar_agente(idx):
-    if idx not in _agentes_por_ia:
-        _agentes_por_ia[idx] = create_agent(model=modelos_ia[idx]["llm"], tools=tools)
-    return _agentes_por_ia[idx]
+def _pegar_agente(idx, ferramentas=None):
+    if ferramentas is None:
+        ferramentas = tools
+    _chave = (idx, tuple(sorted(_nome_ferramenta(t) for t in ferramentas)))
+    if _chave not in _agentes_por_ia:
+        _agentes_por_ia[_chave] = create_agent(model=modelos_ia[idx]["llm"], tools=ferramentas)
+    return _agentes_por_ia[_chave]
 
 
-def _invocar_agente_stream(estado):
+def _invocar_agente_stream(estado, ferramentas=None):
     """Roda o agente em STREAMING (mostra a resposta palavra por palavra, em
     vez de esperar tudo - e o maior ganho de velocidade percebida). Percorre
     o rodizio: se uma IA falhar no meio, tenta a proxima. Devolve um objeto
     com .content = texto final (compatível com _extrair_texto). 'estado' e um
-    dict compartilhado; seta estado['impresso']=True quando ja exibiu texto."""
+    dict compartilhado; seta estado['impresso']=True quando ja exibiu texto.
+    'ferramentas' = subconjunto enxuto relevante ao pedido (evita estouro de
+    API por payload grande)."""
     global indice_ia_atual  # atualiza a IA atual ao achar uma que responde
     from types import SimpleNamespace
+    global _ferramentas_ativas
+    if ferramentas is None:
+        ferramentas = _ferramentas_ativas
     total = len(modelos_ia)
     for _passo in range(total):
         _idx = (indice_ia_atual + _passo) % total
@@ -12252,7 +12385,7 @@ def _invocar_agente_stream(estado):
             continue
         _info = modelos_ia[_idx]
         try:
-            _ag = _pegar_agente(_idx)
+            _ag = _pegar_agente(_idx, ferramentas)
             _partes = []
             for _pedaco, _meta in _ag.stream(
                 {"messages": historico_conversas},
@@ -12344,6 +12477,13 @@ while True:
 
     historico_conversas.append({"role": "user", "content": comando_usuario + contexto_extra})
 
+    # Seleciona SO as ferramentas relevantes para ESTE pedido (mantem o payload
+    # pequeno e evita o erro de API por excesso de ferramentas).
+    try:
+        _ferramentas_ativas = _selecionar_ferramentas(comando_usuario)
+    except Exception:
+        _ferramentas_ativas = tools
+
     _estado_stream = {"impresso": False}
 
     def _rodar_agente():
@@ -12365,8 +12505,9 @@ while True:
 
         # 2a tentativa (fallback): invocacao normal SEM streaming, percorrendo
         # o rodizio do mesmo jeito. Caminho estavel e ja testado.
+        _ferr = _ferramentas_ativas
         _texto = _percorrer_rodizio(
-            lambda _idx, _llm: _pegar_agente(_idx).invoke(
+            lambda _idx, _llm: _pegar_agente(_idx, _ferr).invoke(
                 {"messages": historico_conversas},
                 config={"recursion_limit": 18},
             ),
