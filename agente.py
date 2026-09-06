@@ -1235,13 +1235,17 @@ PROVEDORES_IA_PADRAO = [
     # Reserva (algumas contas/regioes ainda tem estes; se nao existirem, o
     # rodizio marca como mortas na 1a tentativa e segue sem incomodar):
     {"nome": "Groq (Llama 3.3 70B)",   "tipo": "openai", "modelo": "llama-3.3-70b-versatile",      "chave_env": "GROQ_API_KEY",      "base_url": "https://api.groq.com/openai/v1"},
-    {"nome": "Groq (Llama 4 Scout)",   "tipo": "openai", "modelo": "llama-4-scout-17b-16e-instruct","chave_env": "GROQ_API_KEY",     "base_url": "https://api.groq.com/openai/v1"},
-    # Cerebras atualizada (2026): o modelo antigo 'llama-3.3-70b' foi aposentado
-    # e respondia "modelo nao encontrado". Os atuais da conta gratis (1 milhao
-    # de tokens/dia, sem cartao) sao Qwen3 235B, GPT-OSS 120B e o Llama 3.1 8B.
-    {"nome": "Cerebras (Qwen3 235B)",  "tipo": "openai", "modelo": "qwen-3-235b-a22b-instruct-2507", "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
-    {"nome": "Cerebras (GPT-OSS 120B)","tipo": "openai", "modelo": "gpt-oss-120b",                  "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
-    {"nome": "Cerebras (Llama 3.1 8B)","tipo": "openai", "modelo": "llama3.1-8b",                   "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    {"nome": "Groq (Llama 3.1 8B rapido)","tipo": "openai", "modelo": "llama-3.1-8b-instant",       "chave_env": "GROQ_API_KEY",     "base_url": "https://api.groq.com/openai/v1"},
+    {"nome": "Groq (Qwen 32B)",          "tipo": "openai", "modelo": "qwen/qwen3-32b",              "chave_env": "GROQ_API_KEY",     "base_url": "https://api.groq.com/openai/v1"},
+    # OBS: 'llama-4-scout-17b-16e-instruct' foi DESCONTINUADO no Groq em
+    # 17/07/2026 (dava "model not found") - por isso saiu da lista.
+    # Cerebras (2026, 1 milhao de tokens/dia gratis): IDs exatos do catalogo.
+    # gpt-oss-120b = o mais capaz e com suporte a ferramentas; qwen-3-32b =
+    # production; llama3.1-8b (sem hifen) = rapido. O Qwen 235B e so 'preview'
+    # (nao entra na conta gratis), por isso foi removido.
+    {"nome": "Cerebras (GPT-OSS 120B)","tipo": "openai", "modelo": "gpt-oss-120b",                 "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    {"nome": "Cerebras (Qwen 32B)",   "tipo": "openai", "modelo": "qwen-3-32b",                   "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
+    {"nome": "Cerebras (Llama 3.1 8B)","tipo": "openai", "modelo": "llama3.1-8b",                  "chave_env": "CEREBRAS_API_KEY", "base_url": "https://api.cerebras.ai/v1"},
     {"nome": "SambaNova (Llama 70B)",  "tipo": "openai", "modelo": "Meta-Llama-3.3-70B-Instruct", "chave_env": "SAMBANOVA_API_KEY", "base_url": "https://api.sambanova.ai/v1"},
     {"nome": "OpenRouter (Llama 70B)", "tipo": "openai", "modelo": "meta-llama/llama-3.3-70b-instruct:free", "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
     {"nome": "OpenRouter (Gemma)",     "tipo": "openai", "modelo": "google/gemma-3-27b-it:free",          "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
@@ -1342,13 +1346,19 @@ _DURACAO_COOLDOWN_SEG = 60  # 1 minuto de descanso por estouro de cota
 
 
 def _erro_de_cota(_e):
-    """True quando o erro e de LIMITE/COTA (a IA esta sobrecarregada ou o plano
-    gratis estourou) - coisa que melhora sozinha com o tempo."""
+    """True SOMENTE quando o erro e de LIMITE/COTA real (429, rate limit, quota,
+    sobrecarga). Um erro de requisicao invalida (400/InvalidRequest, ex.: nome
+    de modelo ou payload) NAO e cota e NAO deve dar cooldown - senao a IA toma
+    'castigo' sem necessidade e o chat puro tambem fica sem ela. Quando o
+    proprio texto diz que e rate/quota/429, mesmo vindo como APIStatusError,
+    ai sim e cota."""
     _txt = f"{type(_e).__name__} {_e}".lower()
+    # so tratamos como cota se houver marcador EXPLICITO de limite
     return any(_m in _txt for _m in (
         "429", "rate limit", "ratelimit", "rate_limit", "quota", "too many",
-        "throttl", "resource exhausted", "capacity", "overloaded",
-        "insufficient_quota", "usage limit", "limit reached", "rpm",
+        "throttl", "resource exhausted", "overloaded",
+        "insufficient_quota", "usage limit", "limit reached",
+        "capacity", "rate_limit_exceeded", "rpm",
     ))
 
 
@@ -1393,16 +1403,21 @@ _TEXTO_TODAS_FALHARAM = (
 )
 
 
-def _percorrer_rodizio(chamar, extrair):
+def _percorrer_rodizio(chamar, extrair, ignorar_penalidades=False):
     """Tenta cada IA ativa, comecando pela ultima que funcionou. Em erro
     permanente (modelo/chave), marca a IA como morta nesta sessao e pula;
-    em erro de cota/rede, so avisa e tenta a proxima. Retorna o que
-    'extrair(resposta)' devolver, ou None se todas falharem."""
+    em erro de cota/rede, da cooldown e tenta a proxima. Retorna o que
+    'extrair(resposta)' devolver, ou None se todas falharem.
+
+    ignorar_penalidades=True (usado pelo CHAT PURO/sem ferramentas): testa
+    TODAS as IAs, inclusive as que estao de castigo/fora por falha no caminho
+    de ferramentas - um erro de ferramenta (400) nao significa que a IA esteja
+    sem cota no chat puro, que usa payload pequeno."""
     global indice_ia_atual
     total = len(modelos_ia)
     for _passo in range(total):
         _idx = (indice_ia_atual + _passo) % total
-        if _fora_do_jogo(_idx):
+        if (not ignorar_penalidades) and _fora_do_jogo(_idx):
             continue
         _info = modelos_ia[_idx]
         try:
@@ -1432,13 +1447,14 @@ def _percorrer_rodizio(chamar, extrair):
             _prox = None
             for _k in range(1, total + 1):
                 _cand = (_idx + _k) % total
-                if not _fora_do_jogo(_cand):
+                if ignorar_penalidades or not _fora_do_jogo(_cand):
                     _prox = modelos_ia[_cand]["nome"]
                     break
             if _erro_permanente(_e):
-                print(f"[Rodizio]: '{_info['nome']}' saiu do rodizio nesta sessao ({type(_e).__name__}: modelo/chave).")
-                _ias_mortas.add(_idx)
-            elif _erro_de_cota(_e):
+                if not ignorar_penalidades:
+                    _ias_mortas.add(_idx)
+                print(f"[Rodizio]: '{_info['nome']}' indisponivel ({type(_e).__name__}: modelo/chave).")
+            elif (not ignorar_penalidades) and _erro_de_cota(_e):
                 _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
                 print(f"[Rodizio]: '{_info['nome']}' estourou a cota ({type(_e).__name__}). Descanso de {_DURACAO_COOLDOWN_SEG}s; "
                       + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento."))
@@ -1603,11 +1619,15 @@ def executar_com_autocura(nome_ferramenta: str, funcao, *args, max_tentativas=3,
 def invocar_com_fallback(mensagens):
     # Ponto unico de chamada do modelo. Mantive o nome da funcao para nao
     # precisar alterar as dezenas de ferramentas que ja a usam. Percorre o
-    # rodizio de IAs (ver _percorrer_rodizio).
+    # rodizio de IAs (ver _percorrer_rodizio). O chat PURO (sem ferramentas)
+    # usa payload pequeno, entao ele IGNORA o cooldown/IA-morta marcados pelo
+    # caminho de ferramentas - assim, mesmo que o agente com ferramentas tenha
+    # falhado em toda IA, a conversa direta ainda consegue responder.
     from types import SimpleNamespace
     _resultado = _percorrer_rodizio(
         lambda _idx, _llm: _llm.invoke(mensagens),
         lambda _resp: _resp,
+        ignorar_penalidades=True,
     )
     if _resultado is not None:
         return _resultado
@@ -2114,6 +2134,13 @@ PALAVRAS_CONVERSA = [
     "ola", "olá", "oi", "oie", "ei", "bom dia", "boa tarde", "boa noite",
     "tudo bem", "tudo bom", "como vai", "como você esta", "como voce esta",
     "obrigad", "valeu", "tchau", "ate logo", "até logo", "que bom",
+    # Variantes de saudacao/papo curto (respondem no chat PURO, sem montar o
+    # agente de ferramentas - assim "iae/eai/salve/fala/blz" nunca caem no
+    # caminho que manda ferramentas e pode dar InvalidRequest):
+    "iae", "i ae", "eai", "e ai", "eae", "eaew", "salve", "salve salve",
+    "falae", "fala ai", "fala aí", "fala", "hey", "hello", "hola",
+    "beleza", "blz", "tranquilo", "firmeza", "boa", "tudo otimo", "tudo otimo",
+    "como voce ta", "como você tá", "de boa", "vamos la", "vamos lá",
 ]
 PALAVRAS_TAREFA_COMPLEXA = [
     "crie", "delete", "pasta", "arquivo", "whatsapp", "manda mensagem",
@@ -12592,7 +12619,9 @@ while True:
             _so_ms = [m for m in historico_conversas if m.get("role") != "system"]
             _ctx_curto = historico_conversas[:1] + _so_ms[-6:]
             _txt_chat = _extrair_texto(invocar_com_fallback(_ctx_curto).content)
-            if _txt_chat and str(_txt_chat).strip():
+            # So aproveita se veio uma RESPOSTA DE VERDADE (nao o aviso de
+            # "todas falharam" - nesse caso deixamos o raise abaixo tratar).
+            if _txt_chat and str(_txt_chat).strip() and not _txt_chat.startswith("Todas as IAs"):
                 _p = (".\n\n[Modo contorno]: as ferramentas automaticas estao instantes nesta "
                       "IA agora, mas eu continuo aqui. Se voce pediu uma ACAO no PC (abrir "
                       "programa/site, otimizar, etc.), pode repetir com a frase direta (ex.: "
