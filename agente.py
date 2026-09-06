@@ -1031,10 +1031,14 @@ PROVEDORES_IA_PADRAO = [
     {"nome": "OpenRouter (Llama 70B)", "tipo": "openai", "modelo": "meta-llama/llama-3.3-70b-instruct:free", "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
     {"nome": "OpenRouter (Gemma)",     "tipo": "openai", "modelo": "google/gemma-3-27b-it:free",          "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
     # GitHub Models: modelos de ponta (GPT-4o, DeepSeek, Llama) usando um TOKEN
-    # gratuito do GitHub. Voce JA tem conta no GitHub (e onde fica o agente):
-    # github.com -> Settings -> Developer settings -> Personal access tokens ->
-    # Tokens (classic) -> Generate new token -> NAO marque nenhuma permissao ->
-    # gere e cole o "ghp_..." no chaves.txt como GITHUB_TOKEN=ghp_...
+    # gratuito do GitHub. Voce JA tem conta no GitHub (e onde fica o agente).
+    # Caminho MAIS GARANTIDO (token classico, ghp_): abra direto
+    # https://github.com/settings/tokens/new -> deixa sem marcar NENHUMA
+    # permissao -> Generate new token -> cole o "ghp_..." no chaves.txt como
+    # GITHUB_TOKEN=ghp_...
+    # Token fine-grained (github_pat_) TAMBEM funciona, mas ele PRECISA da
+    # permissao "Models: Read" (em Permissions, procure "Models" e deixe em
+    # Read-only); sem ela o GitHub Models responde com erro de acesso.
     # Sem cartao e sem cadastro extra. gpt-4o-mini e leve/rapido (otimo para o
     # dia a dia e ferramentas); gpt-4o e mais forte; DeepSeek raciocina.
     {"nome": "GitHub (GPT-4o-mini)", "tipo": "openai", "modelo": "gpt-4o-mini", "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
