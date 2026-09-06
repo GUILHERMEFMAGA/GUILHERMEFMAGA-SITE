@@ -794,6 +794,7 @@ ARQ_LOG_WHATS = os.path.join(PASTA_BASE, "logs_whatsapp.json")
 ARQ_MEMORIA_LONGA = os.path.join(PASTA_BASE, "memoria_longa.json")
 ARQ_MEMORIA_CORE = os.path.join(PASTA_BASE, "memoria_core.md")      # fatos permanentes (sempre no contexto)
 ARQ_LICOES = os.path.join(PASTA_BASE, "licoes_aprendidas.md")       # licoes do autocura (Reflexion)
+ARQ_IAS_MORTAS = os.path.join(PASTA_BASE, "ias_mortas.txt")         # IAs que ja deram erro permanente (puladas nas proximas)
 ARQ_PROJETOS_REGISTRO = os.path.join(PASTA_BASE, "projetos.json")
 ARQ_REGRAS = os.path.join(PASTA_BASE, "regras.json")
 ARQ_TAREFAS_AGENDADAS = os.path.join(PASTA_BASE, "tarefas_agendadas.json")
@@ -1138,7 +1139,16 @@ for _prov in PROVEDORES_IA_PADRAO:
                 timeout=90,
                 max_retries=0,  # o rodizio ja faz a nossa propria tentativa
             )
-        modelos_ia.append({"nome": _prov.get("nome", _prov.get("modelo")), "llm": _modelo})
+        # Servidor (host) desta IA: serve para o cooldown de REDE (quando um
+        # servidor inteiro nao responde, pulamos todas as IAs dele juntas).
+        _host = ""
+        if _prov.get("tipo") == "gemini":
+            _host = "generativelanguage.googleapis.com"
+        else:
+            _b = _prov.get("base_url") or ""
+            if "//" in _b:
+                _host = _b.split("//", 1)[-1].split("/", 1)[0].split(":", 1)[0].lower()
+        modelos_ia.append({"nome": _prov.get("nome", _prov.get("modelo")), "llm": _modelo, "host": _host})
     except Exception as _e:
         # Provedor indisponivel (ex.: falta a biblioteca langchain-openai):
         # so avisa e segue com os demais, nunca derruba o agente.
@@ -1156,6 +1166,75 @@ _ias_mortas = set()
 # falha. Diferente das mortas, ela VOLTA automaticamente depois do descanso.
 _ias_cooldown = {}          # idx -> timestamp (time.time()) em que volta a valer
 _DURACAO_COOLDOWN_SEG = 60  # 1 minuto de descanso por estouro de cota
+
+# Cooldown de REDE: quando uma IA falha por NAO CONSEGUIR CHEGAR ao servidor
+# (Connection error, timeout, DNS), nao adianta martelar as outras IAs do MESMO
+# servidor (ex.: as 3 do GitHub Models ficam em models.inference.ai.azure.com):
+# colocamos o HOST inteiro de descanso curto, evitando espera longa (timeout)
+# e repeticao da mesma falha. Diferente da cota, some sozinho em ~2 minutos.
+_cooldown_rede_host = {}    # host -> timestamp em que volta a valer
+_DURACAO_COOLDOWN_REDE_SEG = 120  # 2 minutos de descanso por falha de conexao
+
+
+def _erro_de_rede(_e):
+    """True quando a falha e de CONECTIVIDADE (nao chegou a responder): falha
+    de conexao, tempo esgotado, DNS, reset de conexao. Nao e cota nem chave -
+    e a maquina (antivirus/firewall/proxy/rede) nao alcancando o servidor."""
+    _txt = f"{type(_e).__name__} {_e}".lower()
+    return any(_m in _txt for _m in (
+        "connection error", "connectionerror", "apiconnectionerror",
+        "timed out", "timeout", "time out", "tempo esgotado",
+        "getaddrinfo", "failed to resolve", "name or service not known",
+        "no address associated", "connection reset", "connection refused",
+        "temporarily unavailable in name resolution", "max retries",
+        "unreachable", "network is unreachable", "econnreset",
+    ))
+
+
+def _marcar_host_em_cooldown(host):
+    if host:
+        _cooldown_rede_host[host] = time.time() + _DURACAO_COOLDOWN_REDE_SEG
+
+
+def _host_em_cooldown(idx):
+    _host = modelos_ia[idx].get("host", "") if idx < len(modelos_ia) else ""
+    if not _host or _host not in _cooldown_rede_host:
+        return ""
+    if time.time() >= _cooldown_rede_host[_host]:
+        _cooldown_rede_host.pop(_host, None)
+        return ""
+    return _host
+
+
+def _marcar_morta(idx):
+    """Marca a IA idx como morta NESTA sessao e grava o nome dela num arquivo
+    de memoria - assim, na proxima abertura, as IAs que ja sabemos que nao
+    funcionam (exigem cartao, modelo inexistente, chave sem acesso) ja entram
+    puladas, sem reimprimir o mural de falhas."""
+    if idx not in _ias_mortas:
+        _ias_mortas.add(idx)
+        try:
+            if 0 <= idx < len(modelos_ia):
+                _nome = modelos_ia[idx]["nome"]
+                _ja = []
+                if os.path.exists(ARQ_IAS_MORTAS):
+                    with open(ARQ_IAS_MORTAS, "r", encoding="utf-8", errors="ignore") as _f:
+                        _ja = [l.strip() for l in _f if l.strip()]
+                if _nome not in _ja:
+                    with open(ARQ_IAS_MORTAS, "a", encoding="utf-8") as _f:
+                        _f.write(_nome + "\n")
+        except Exception:
+            pass
+
+
+def _limpar_memoria_ias_mortas():
+    """Apaga o arquivo de IAs mortas (comando 'revalidar'): limpa o castigo
+    persistido para que TODAS as IAs sejam testadas de novo na proxima."""
+    try:
+        if os.path.exists(ARQ_IAS_MORTAS):
+            os.remove(ARQ_IAS_MORTAS)
+    except Exception:
+        pass
 
 
 def _erro_de_cota(_e):
@@ -1186,8 +1265,11 @@ def _em_cooldown(idx):
 
 
 def _fora_do_jogo(idx):
-    """IA que nao deve ser tentada agora: morta permanente OU em cooldown."""
-    return idx in _ias_mortas or _em_cooldown(idx)
+    """IA que nao deve ser tentada agora: morta permanente, em cooldown de
+    cota, ou com o SERVIDOR dela em cooldown de rede."""
+    if idx in _ias_mortas or _em_cooldown(idx):
+        return True
+    return bool(_host_em_cooldown(idx))
 
 
 def _erro_permanente(_e):
@@ -1304,8 +1386,15 @@ def _percorrer_rodizio(chamar, extrair, ignorar_penalidades=False):
             _detalhe = _detalhe_erro(_e)
             if _erro_permanente(_e):
                 if not ignorar_penalidades:
-                    _ias_mortas.add(_idx)
+                    _marcar_morta(_idx)
                 print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
+            elif (not ignorar_penalidades) and _erro_de_rede(_e):
+                _h = _info.get("host", "")
+                _marcar_host_em_cooldown(_h)
+                print(f"[Rodizio]: '{_info['nome']}' sem conexao com o servidor"
+                      + (f" ({_h})" if _h else "") + ". Servidor em descanso de "
+                      + f"{_DURACAO_COOLDOWN_REDE_SEG}s (verifique antivirus/firewall/rede)."
+                      + (f" Tentando '{_prox}'..." if _prox else ""))
             elif (not ignorar_penalidades) and _erro_de_cota(_e):
                 _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
                 print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
@@ -1328,9 +1417,61 @@ if not modelos_ia:
 llm = modelos_ia[0]["llm"]
 indice_ia_atual = 0
 
+# IAs ja conhecidas como mortas (de uma sessao anterior): carregamos os nomes
+# e ja as pulamos, para o mural de falhas (Cerebras/SambaNova/etc.) NAO
+# reaparecer toda abertura. 'revalidar' limpa essa memoria e testa de novo.
+_mortas_salvas = []
+try:
+    if os.path.exists(ARQ_IAS_MORTAS):
+        with open(ARQ_IAS_MORTAS, "r", encoding="utf-8", errors="ignore") as _f:
+            _mortas_salvas = [l.strip() for l in _f if l.strip()]
+except Exception:
+    _mortas_salvas = []
+for _i, _mm in enumerate(modelos_ia):
+    if _mm.get("nome") in _mortas_salvas:
+        _ias_mortas.add(_i)
+
+# Teste rapido de CONECTIVIDADE (socket TCP na porta 443) com cada servidor.
+# Se um host (ex.: o Azure do GitHub Models) nem responde na abertura, ja damos
+# o cooldown de rede e avisamos o motivo provavel (antivirus/firewall/DNS) -
+# em vez de o usuario descobrir so numa acao, esperando timeouts longos.
+try:
+    from urllib.request import getproxies as _getproxies
+    _tem_proxy_sistema = bool(_getproxies().get("http") or _getproxies().get("https"))
+except Exception:
+    _tem_proxy_sistema = False
+_tem_proxy_env = bool(os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
+                      or os.environ.get("http_proxy") or os.environ.get("https_proxy"))
+if not (_tem_proxy_env or _tem_proxy_sistema):
+    import socket as _socket
+    _hosts_unicos = []
+    for _mm in modelos_ia:
+        _hh = _mm.get("host", "")
+        if _hh and _hh not in _hosts_unicos:
+            _hosts_unicos.append(_hh)
+    for _hh in _hosts_unicos:
+        try:
+            _sock = _socket.create_connection((_hh, 443), timeout=3)
+            _sock.close()
+        except Exception:
+            _marcar_host_em_cooldown(_hh)
+            _qtd = sum(1 for _mm in modelos_ia if _mm.get("host") == _hh)
+            print(f"[Rede]: nao consegui alcancar o servidor '{_hh}' (atinge {_qtd} IA(s)).")
+            print(f"       Causa mais comum: antivirus/firewall bloqueando, ou DNS. Se so esse")
+            print(f"       servidor falha (e outros, como o Groq, funcionam), libere esse")
+            print(f"       endereco no seu antivirus/firewall ou teste outra rede.")
+
 print(" IAs ativas no rodizio:")
-for _i, _m in enumerate(modelos_ia):
-    print(f"   {_i + 1}. {_m['nome']}")
+_num = 0
+for _i, _mm in enumerate(modelos_ia):
+    if _i in _ias_mortas:
+        continue  # morta persistida de outra sessao: nao lista como ativa
+    _num += 1
+    _aviso = "   [servidor sem conexao agora]" if _host_em_cooldown(_i) else ""
+    print(f"   {_num}. {_mm['nome']}{_aviso}")
+_puladas = [_mm["nome"] for _i, _mm in enumerate(modelos_ia) if _i in _ias_mortas]
+if _puladas:
+    print(f"   ({len(_puladas)} IA(s) ja marcada(s) como indisponivel antes - digite 'revalidar' para testa-las de novo)")
 
 # Memória semântica de verdade: usa embeddings do Gemini pra comparar
 # SIGNIFICADO, não só texto parecido. Se a API de embeddings falhar por
@@ -2075,12 +2216,16 @@ def mostrar_status():
     print("=" * 50)
     print(f"Nível de permissão : {config.get('nivel_permissao')}")
     print(f"Modo voz           : {'ligado' if config.get('modo_voz') else 'desligado'}")
-    print(f"IAs no rodizio     : {len(modelos_ia)} ativa(s)")
-    print(f"IA em uso agora    : {modelos_ia[indice_ia_atual]['nome']}")
+    _vivas = len(modelos_ia) - len([_i for _i in _ias_mortas if _i < len(modelos_ia)])
+    print(f"IAs no rodizio     : {_vivas} ativa(s)")
     try:
-        _em_desc = sum(1 for _i in range(len(modelos_ia)) if _em_cooldown(_i))
+        _em_desc = sum(1 for _i in range(len(modelos_ia)) if _i not in _ias_mortas and (_em_cooldown(_i) or _host_em_cooldown(_i)))
         _mortas = len([_i for _i in _ias_mortas if _i < len(modelos_ia)])
-        print(f"IAs em descanso    : {_em_desc} (volta sozinha em ~1min)" + (f" | fora desta sessao: {_mortas}" if _mortas else ""))
+        print(f"IAs em descanso    : {_em_desc} (volta sozinha)" + (f" | marcadas como indisponiveis: {_mortas} (revalidar)" if _mortas else ""))
+    except Exception:
+        pass
+    try:
+        print(f"IA em uso agora    : {modelos_ia[indice_ia_atual]['nome']}")
     except Exception:
         pass
     print(f"Contatos salvos    : {len(contatos)}")
@@ -12387,7 +12532,14 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _detalhe = _detalhe_erro(_e)
             if _erro_permanente(_e):
                 print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
-                _ias_mortas.add(_idx)
+                _marcar_morta(_idx)
+            elif _erro_de_rede(_e):
+                _h = _info.get("host", "")
+                _marcar_host_em_cooldown(_h)
+                print(f"[Rodizio]: '{_info['nome']}' sem conexao com o servidor"
+                      + (f" ({_h})" if _h else "") + ". Servidor em descanso de "
+                      + f"{_DURACAO_COOLDOWN_REDE_SEG}s (verifique antivirus/firewall/rede)."
+                      + (f" Tentando '{_prox}'..." if _prox else ""))
             elif _erro_de_cota(_e):
                 _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
                 print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
@@ -12407,6 +12559,17 @@ while True:
     if not comando_usuario.strip():
         # Enter sem nada digitado: não envia mensagem vazia pro modelo (isso
         # causava o erro "última mensagem precisa ser do usuário").
+        continue
+
+    if comando_usuario.strip().lower() in ("revalidar", "revalidar ias", "revalidar chaves", "resetar ias", "testar ias"):
+        # Limpa o castigo das IAs (mortas persistidas + cooldowns de cota/rede)
+        # para que TODAS sejam testadas de novo a partir da proxima mensagem.
+        _limpar_memoria_ias_mortas()
+        _ias_mortas.clear()
+        _ias_cooldown.clear()
+        _cooldown_rede_host.clear()
+        print("[Revalidar]: memoria de IAs falhas limpa. Todas as IAs vao ser testadas de novo")
+        print("            na proxima mensagem (se uma voltar a falhar, ela e marcada de novo).")
         continue
 
     verificar_regras(comando_usuario)
