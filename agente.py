@@ -1316,14 +1316,19 @@ for _prov in PROVEDORES_IA_PADRAO:
             _modelo = ChatGoogleGenerativeAI(model=_prov["modelo"], temperature=0)
         else:
             # Provedores OpenAI-compativeis (Groq, Cerebras, SambaNova,
-            # OpenRouter...): todos usam a MESMA biblioteca (ChatOpenAI),
+            # OpenRouter, LLM7...): todos usam a MESMA biblioteca (ChatOpenAI),
             # mudando so o endereco (base_url), a chave e o nome do modelo.
+            # IMPORTANTE: NAO enviamos 'temperature' - os modelos de raciocinio
+            # (gpt-oss e similares) REJEITAM esse parametro e devolvem 400
+            # InvalidRequest. Sem ele, tanto modelos de chat quanto de
+            # raciocinio funcionam no endpoint compativel.
             from langchain_openai import ChatOpenAI
             _modelo = ChatOpenAI(
                 model=_prov["modelo"],
                 base_url=_prov["base_url"],
                 api_key=_chave,
-                temperature=0,
+                timeout=90,
+                max_retries=0,  # o rodizio ja faz a nossa propria tentativa
             )
         modelos_ia.append({"nome": _prov.get("nome", _prov.get("modelo")), "llm": _modelo})
     except Exception as _e:
@@ -1379,11 +1384,44 @@ def _fora_do_jogo(idx):
 
 def _erro_permanente(_e):
     _txt = f"{type(_e).__name__} {_e}".lower()
+    # "model ... not found/does not exist/no such model" e erro de autenticacao
+    # sao permanentes. Cota (429) NAO cai aqui (vira cooldown).
     return any(_m in _txt for _m in (
         "modelnotfound", "notfound", "model_not_found", "does not exist",
-        "no such model", "authentication", "unauthorized", "invalid api key",
-        "invalidapikey", "permission", "forbidden", "401", "404",
+        "no such model", "model_decommissioned", "unknown model",
+        "authentication", "unauthorized", "invalid api key",
+        "invalidapikey", "permission denied", "forbidden",
+        "status code 401", "status code 404", "error 401", "error 404",
+        "'401'", "'404'",
     ))
+
+
+def _detalhe_erro(_e, tamanho: int = 140) -> str:
+    """Extrai a mensagem REAL do erro (a API costuma trazer o motivo dentro de
+    'response'/'body'/'message') resumida em uma linha - para o log do rodizio
+    mostrar o PORQUE da falha, nao so o nome da classe de excecao."""
+    try:
+        resp = getattr(_e, "response", None)
+        if resp is not None:
+            data = getattr(resp, "json", None)
+            if callable(data):
+                try:
+                    j = data()
+                    msg = (j.get("error", {}) or {}).get("message") if isinstance(j, dict) else None
+                    if msg:
+                        return str(msg)[:tamanho]
+                except Exception:
+                    pass
+            txt = getattr(resp, "text", None)
+            if txt:
+                return str(txt)[:tamanho]
+    except Exception:
+        pass
+    msg = str(_e)
+    if not msg:
+        return type(_e).__name__
+    # remove quebras de linha e resume
+    return " ".join(msg.split())[:tamanho]
 
 
 def _eh_erro_de_recursao(_e) -> bool:
@@ -1450,17 +1488,18 @@ def _percorrer_rodizio(chamar, extrair, ignorar_penalidades=False):
                 if ignorar_penalidades or not _fora_do_jogo(_cand):
                     _prox = modelos_ia[_cand]["nome"]
                     break
+            _detalhe = _detalhe_erro(_e)
             if _erro_permanente(_e):
                 if not ignorar_penalidades:
                     _ias_mortas.add(_idx)
-                print(f"[Rodizio]: '{_info['nome']}' indisponivel ({type(_e).__name__}: modelo/chave).")
+                print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
             elif (not ignorar_penalidades) and _erro_de_cota(_e):
                 _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
-                print(f"[Rodizio]: '{_info['nome']}' estourou a cota ({type(_e).__name__}). Descanso de {_DURACAO_COOLDOWN_SEG}s; "
-                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento."))
+                print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
+                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento.") + f" ({_detalhe})")
             else:
-                print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
-                      + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
+                print(f"[Rodizio]: '{_info['nome']}' falhou: {_detalhe}"
+                      + (f" -> tentando '{_prox}'..." if _prox else " -> sem outras IAs ativas."))
     return None
 
 if not modelos_ia:
@@ -12514,16 +12553,17 @@ def _invocar_agente_stream(estado, ferramentas=None):
                 if not _fora_do_jogo(_cand):
                     _prox = modelos_ia[_cand]["nome"]
                     break
+            _detalhe = _detalhe_erro(_e)
             if _erro_permanente(_e):
-                print(f"[Rodizio]: '{_info['nome']}' saiu do rodizio nesta sessao ({type(_e).__name__}: modelo/chave).")
+                print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
                 _ias_mortas.add(_idx)
             elif _erro_de_cota(_e):
                 _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
-                print(f"[Rodizio]: '{_info['nome']}' estourou a cota ({type(_e).__name__}). Descanso de {_DURACAO_COOLDOWN_SEG}s; "
-                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento."))
+                print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
+                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento.") + f" ({_detalhe})")
             else:
-                print(f"[Rodizio]: '{_info['nome']}' falhou ({type(_e).__name__})."
-                      + (f" Tentando '{_prox}'..." if _prox else " Sem outras IAs ativas."))
+                print(f"[Rodizio]: '{_info['nome']}' falhou: {_detalhe}"
+                      + (f" -> tentando '{_prox}'..." if _prox else " -> sem outras IAs ativas."))
     return SimpleNamespace(content="")  # todas falharam / vazias
 
 print(f" Super Agente pronto! Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
