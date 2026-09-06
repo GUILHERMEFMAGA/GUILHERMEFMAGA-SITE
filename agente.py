@@ -1030,11 +1030,16 @@ PROVEDORES_IA_PADRAO = [
     {"nome": "SambaNova (Llama 70B)",  "tipo": "openai", "modelo": "Meta-Llama-3.3-70B-Instruct", "chave_env": "SAMBANOVA_API_KEY", "base_url": "https://api.sambanova.ai/v1"},
     {"nome": "OpenRouter (Llama 70B)", "tipo": "openai", "modelo": "meta-llama/llama-3.3-70b-instruct:free", "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
     {"nome": "OpenRouter (Gemma)",     "tipo": "openai", "modelo": "google/gemma-3-27b-it:free",          "chave_env": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"},
-    # GitHub Models: modelos de ponta (DeepSeek, GPT, Llama) usando um TOKEN
-    # gratuito do GitHub (cria em github.com -> Settings -> Developer settings
-    # -> Personal access tokens -> Tokens classic -> Generate, sem marcar nada;
-    # salva com setx GITHUB_TOKEN "ghp_..."). Compativel com OpenAI (Azure).
-    {"nome": "GitHub Models (DeepSeek R1)", "tipo": "openai", "modelo": "DeepSeek-R1", "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
+    # GitHub Models: modelos de ponta (GPT-4o, DeepSeek, Llama) usando um TOKEN
+    # gratuito do GitHub. Voce JA tem conta no GitHub (e onde fica o agente):
+    # github.com -> Settings -> Developer settings -> Personal access tokens ->
+    # Tokens (classic) -> Generate new token -> NAO marque nenhuma permissao ->
+    # gere e cole o "ghp_..." no chaves.txt como GITHUB_TOKEN=ghp_...
+    # Sem cartao e sem cadastro extra. gpt-4o-mini e leve/rapido (otimo para o
+    # dia a dia e ferramentas); gpt-4o e mais forte; DeepSeek raciocina.
+    {"nome": "GitHub (GPT-4o-mini)", "tipo": "openai", "modelo": "gpt-4o-mini", "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
+    {"nome": "GitHub (GPT-4o)",      "tipo": "openai", "modelo": "gpt-4o",      "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
+    {"nome": "GitHub (DeepSeek R1)", "tipo": "openai", "modelo": "DeepSeek-R1", "chave_env": "GITHUB_TOKEN", "base_url": "https://models.inference.ai.azure.com"},
     # Redes de seguranca SEM CHAVE e SEM CADASTRO: funcionam mesmo se o usuario
     # nao configurar NENHUMA chave. Por isso ficam sempre ativas e servem de
     # ultima tentativa quando todas as IAs com chave estourarem a cota do dia.
