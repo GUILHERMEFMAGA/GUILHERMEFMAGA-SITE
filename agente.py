@@ -2346,8 +2346,11 @@ def processar_atalho_rapido(comando: str) -> bool:
         and ("ferrament" in _cl or "fun" in _cl or "poder" in _cl or "voce" in _cl or "vc" in _cl)
     ) or ("quantas ferramentas" in _cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
     if _eh_pergunta_do_agente:
-        _r = agente_opinioes.invoke({}) if ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl) else (
-            estatisticas_poder.invoke({}) if ("quantas" in _cl or "poder" in _cl) else auto_melhoria_pc.invoke({}))
+        _pediu_poder = ("quantas" in _cl or "poder" in _cl) and ("melhor" not in _cl and "deixa" not in _cl and "pc" not in _cl)
+        _pediu_ideias = ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl
+                         or "opini" in _cl or "opniao" in _cl or "que voce acha" in _cl or "ideia" in _cl)
+        _r = (estatisticas_poder.invoke({}) if _pediu_poder and not _pediu_ideias else (
+            agente_opinioes.invoke({}) if _pediu_ideias else auto_melhoria_pc.invoke({})))
         historico_conversas.append({"role": "assistant", "content": _r})
         salvar_historico()
         print(f"\n[Agente]: {_r}")
@@ -12577,6 +12580,26 @@ while True:
         )
         if _texto and str(_texto).strip():
             return _texto
+
+        # 3a tentativa (REDE DE SEGURANCA DEFINITIVA): se o agente COM
+        # ferramentas falhou em TODAS as IAs, NAO mostramos aquela parede de
+        # erros - caímos pro CHAT PURO (sem ferramentas), que usa um payload
+        # pequeno e responde mesmo quando o caminho de ferramentas e rejeitado
+        # (foi o caso de "InvalidRequest" em massa). Assim o agente nunca mais
+        # fica mudo; ele responde conversando e, se voce pediu uma ACAO, avisa
+        # que vai tentar de outro jeito/atalho.
+        try:
+            _so_ms = [m for m in historico_conversas if m.get("role") != "system"]
+            _ctx_curto = historico_conversas[:1] + _so_ms[-6:]
+            _txt_chat = _extrair_texto(invocar_com_fallback(_ctx_curto).content)
+            if _txt_chat and str(_txt_chat).strip():
+                _p = (".\n\n[Modo contorno]: as ferramentas automaticas estao instantes nesta "
+                      "IA agora, mas eu continuo aqui. Se voce pediu uma ACAO no PC (abrir "
+                      "programa/site, otimizar, etc.), pode repetir com a frase direta (ex.: "
+                      "'abre o youtube', 'otimiza tudo') que eu faco pelo atalho instantaneo.")
+                return _txt_chat.strip().rstrip(".!?") + _p
+        except Exception:
+            pass
         raise RuntimeError(_TEXTO_TODAS_FALHARAM)
 
     try:
