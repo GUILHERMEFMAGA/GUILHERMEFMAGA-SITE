@@ -1298,32 +1298,13 @@ def _chave_ia(nome_env):
     return ""
 
 
-def _chave_eh_placeholder(valor: str) -> bool:
-    """True se a 'chave' e, na verdade, um exemplo que NAO foi preenchido
-    (ex.: 'cole_sua_chave_aqui', 'cole_a_chave_aqui', 'ghp_cole_o_token_aqui').
-    Assim, se o usuario copiar o arquivo de exemplo e so preencher algumas,
-    as que ficaram de exemplo sao ignoradas (em vez de gerar erro de chave
-    invalida que polui o rodizio)."""
-    v = (valor or "").strip().lower()
-    if not v:
-        return True
-    if " " in v:  # chave de API nao tem espaco; texto de exemplo tem
-        return True
-    return any(p in v for p in (
-        "cole", "aqui", "sua_chave", "sua chave", "token_aqui", "exemplo",
-        "xxxx", "your_", "paste", "chave_groq", "chave_cerebras", "chave_sambanova",
-    ))
-
-
 for _prov in PROVEDORES_IA_PADRAO:
     _chave = _chave_ia(_prov.get("chave_env") or "")
-    # Provedores "sem_chave" (ex.: Pollinations/LLM7) nao pedem chave: usamos
-    # um valor qualquer so para a biblioteca nao reclamar e eles ficam sempre
+    # Provedores "sem_chave" (ex.: Pollinations) nao pedem chave: usamos um
+    # valor qualquer so para a biblioteca nao reclamar e eles ficam sempre
     # ativos.
     if _prov.get("sem_chave"):
         _chave = _chave or "chave-nao-necessaria"
-    elif _chave_eh_placeholder(_chave):
-        continue  # chave de exemplo nao preenchida -> ignora este provedor
     if not _chave:
         continue  # sem chave configurada para este provedor -> ignora
     try:

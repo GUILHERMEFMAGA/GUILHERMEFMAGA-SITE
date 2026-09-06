@@ -1,50 +1,34 @@
 # ============================================================
-#  ARQUIVO DE CHAVES DO SUPER AGENTE
-#  Como usar (o jeito MAIS FACIL):
-#    1) Dê 2 cliques em  CONFIGURAR_CHAVES.bat
-#       (ele cria este arquivo como  chaves.txt  e abre no Bloco de Notas)
-#    2) Cole cada chave depois do sinal de igual (=), SEM aspas.
-#    3) Salve (Ctrl+S), feche o Bloco de Notas e o agente ja abre.
+#  EXEMPLO de arquivo de chaves do agente
+#  Como usar:
+#   1) Renomeie/copie este arquivo para:  chaves.txt
+#   2) Cole as suas chaves reais depois do sinal de igual (=)
+#   3) Nao use aspas. Uma chave por linha. Linhas com # sao ignoradas.
 #
-#  VOCE NAO PRECISA PREENCHER TUDO!
-#  - As linhas que comecam com # estao desligadas.
-#  - Se deixar uma chave como "cole_aqui" (de exemplo), o agente a ignora.
-#  - MESMO SEM NENHUMA CHAVE, o agente funciona (ele tem IAs gratuitas
-#    que nao pedem cadastro: LLM7 e Pollinations).
-#  - Quanto mais chaves voce colocar, mais "folego" diario o agente tem.
-#
-#  Todas as chaves abaixo sao GRATUITAS e NAO pedem cartao de credito.
-#  Este arquivo fica so no seu PC (esta no .gitignore) e NUNCA vai pro GitHub.
+#  Todas as chaves abaixo sao GRATUITAS e nao pedem cartao.
+#  Crie as suas nos sites indicados e cole aqui. O arquivo chaves.txt
+#  fica so no seu PC (esta no .gitignore) e nunca vai para o GitHub.
 # ============================================================
 
-# --- As 3 principais (ja vem ligadas; crie as suas e cole aqui) ---
-
-# Groq (a principal: muito rapida e com muita cota)
-# Crie em: https://console.groq.com/keys
+# Groq (a principal, muita cota): https://console.groq.com/keys
 GROQ_API_KEY=cole_sua_chave_groq_aqui
 
-# Cerebras (a mais generosa: 1 MILHAO de tokens por dia)
-# Crie em: https://cloud.cerebras.ai/
+# Cerebras (1 milhao de tokens por dia): https://cloud.cerebras.ai/
 CEREBRAS_API_KEY=cole_sua_chave_cerebras_aqui
 
-# Google Gemini (o cerebro da Google; muito bom e gratis)
-# Crie em: https://aistudio.google.com/apikey
-GEMINI_API_KEY=cole_sua_chave_gemini_aqui
-
-# --- As demais sao opcionais (so se quiser ainda mais IAs) ---
-
 # SambaNova (gratuita): https://cloud.sambanova.ai/
-# SAMBANOVA_API_KEY=cole_sua_chave_sambanova_aqui
+SAMBANOVA_API_KEY=cole_sua_chave_sambanova_aqui
 
-# OpenRouter (junta varios modelos gratis): https://openrouter.ai/keys
-# OPENROUTER_API_KEY=cole_sua_chave_openrouter_aqui
+# --- Chaves opcionais (so se quiser mais IAs no rodizio) ---
 
-# GitHub Models (usa um token do GitHub, sem marcar nenhuma permissao):
+# OpenRouter (modelos :free): https://openrouter.ai/keys
+# OPENROUTER_API_KEY=cole_aqui
+
+# GitHub Models (token do GitHub, sem permissao nenhuma):
 #   github.com > Settings > Developer settings > Personal access tokens
-#   > Tokens (classic) > Generate new token  (gere e cole o "ghp_...")
-# GITHUB_TOKEN=ghp_cole_o_token_aqui
+#   > Tokens (classic) > Generate new token (nao marque nada)
+# GITHUB_TOKEN=cole_aqui
 
-# ============================================================
-#  OBS: nao apague as linhas com # . Elas so ficam desligadas ate voce
-#  ter a chave; quando criar, e so tirar o # do inicio e colar a chave.
-# ============================================================
+# Google Gemini: https://aistudio.google.com/apikey
+# (so precisa se quiser a memoria semantica por embeddings e a IA da Google)
+# GEMINI_API_KEY=cole_aqui
