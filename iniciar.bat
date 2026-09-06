@@ -10,11 +10,17 @@ if errorlevel 1 (
     exit /b
 )
 
-REM Garante a biblioteca das IAs (instala se faltar)
+REM Garante as bibliotecas das IAs (instala se faltar)
 python -c "import langchain_openai" 2>nul
 if errorlevel 1 (
-    echo Instalando biblioteca das IAs, aguarde...
-    python -m pip install -q langchain-openai
+    echo Instalando bibliotecas das IAs, aguarde...
+    python -m pip install -q langchain-openai langchain-google-genai
+)
+REM Garante tambem a do Gemini (Google) - so instala se faltar
+python -c "import langchain_google_genai" 2>nul
+if errorlevel 1 (
+    echo Instalando biblioteca do Gemini, aguarde...
+    python -m pip install -q langchain-google-genai
 )
 
 REM Roda o agente que esta no arquivo agente.py (nesta mesma pasta)

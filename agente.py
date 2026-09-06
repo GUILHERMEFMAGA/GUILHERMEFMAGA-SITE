@@ -675,7 +675,10 @@ import pyautogui
 import pywhatkit as kit
 import pandas as pd
 from pypdf import PdfReader
-from langchain_google_genai import ChatGoogleGenerativeAI
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI as _ChatGoogleGenerativeAI
+except Exception:  # biblioteca do Google ausente: o Gemini so fica indisponivel
+    _ChatGoogleGenerativeAI = None
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 
@@ -1005,7 +1008,9 @@ threading.excepthook = excecao_thread_nao_tratada
 # acrescentar uma IA, e so editar esta lista. So entram as que tiverem a chave
 # de ambiente configurada; as demais sao ignoradas.
 PROVEDORES_IA_PADRAO = [
-    {"nome": "Gemini (Google)",        "tipo": "gemini", "modelo": "gemini-3.5-flash-lite",       "chave_env": "GEMINI_API_KEY"},
+    # Modelo confirmado no tier gratuito do AI Studio (gemini-2.5-flash-lite e
+    # rapido, barato em tokens e estavel; evita erro de "modelo nao encontrado").
+    {"nome": "Gemini (Google)",        "tipo": "gemini", "modelo": "gemini-2.5-flash-lite",       "chave_env": "GEMINI_API_KEY"},
     {"nome": "Groq (GPT-OSS 20B)",     "tipo": "openai", "modelo": "openai/gpt-oss-20b",          "chave_env": "GROQ_API_KEY",      "base_url": "https://api.groq.com/openai/v1"},
     {"nome": "Groq (GPT-OSS 120B)",    "tipo": "openai", "modelo": "openai/gpt-oss-120b",         "chave_env": "GROQ_API_KEY",      "base_url": "https://api.groq.com/openai/v1"},
     # Reserva (algumas contas/regioes ainda tem estes; se nao existirem, o
@@ -1089,7 +1094,16 @@ for _prov in PROVEDORES_IA_PADRAO:
         continue  # sem chave configurada para este provedor -> ignora
     try:
         if _prov.get("tipo") == "gemini":
-            _modelo = ChatGoogleGenerativeAI(model=_prov["modelo"], temperature=0)
+            if _ChatGoogleGenerativeAI is None:
+                # biblioteca do Google faltando: avisa e segue com as outras IAs
+                print("[Aviso]: 'langchain-google-genai' nao instalada (rode: pip install langchain-google-genai). Gemini desligado.")
+                continue
+            # Passa a chave EXPLICITAMENTE: assim funciona tanto por variavel de
+            # ambiente (setx) quanto lida do arquivo chaves.txt.
+            _modelo = _ChatGoogleGenerativeAI(
+                model=_prov["modelo"], temperature=0,
+                google_api_key=_chave,
+            )
         else:
             # Provedores OpenAI-compativeis (Groq, Cerebras, SambaNova,
             # OpenRouter, LLM7...): todos usam a MESMA biblioteca (ChatOpenAI),
