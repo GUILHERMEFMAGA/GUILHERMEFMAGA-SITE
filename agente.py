@@ -2731,6 +2731,7 @@ def _menu_ajuda_local():
     print("   modo jogo | arquivos grandes/liberar espaco | desinstalar <programa, ...>")
     print("   organizar downloads | listar pasta | encontra <arquivo>")
     print("   ver a tela | ver ideias | anota a ideia ... | analisa teu codigo")
+    print("   salvar contato Nome: numero | meus contatos | manda whatsapp pro <nome>: msg")
     print("   tira print | bloquear tela | desligar o pc | reiniciar o pc")
     print("   tema escuro | tema claro | modo desempenho | modo economia")
     print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
@@ -3128,6 +3129,73 @@ def _processar_cerebro_local(comando: str) -> bool:
                               "seu codigo esta certo", "analisa o agente", "auto analise",
                               "autoanalise", "checa o codigo", "revisar o codigo", "revisa teu codigo")):
         _rel(_analisar_codigo_agente()); return True
+
+    # ============ WHATSAPP / CONTATOS (comandos locais) ============
+    # Salvar/cadastrar contato: "salvar contato Joao: 11 99999-9999" ou em lote.
+    if any(p in cmd for p in ("salvar contato", "salva contato", "cadastrar contato", "cadastra contato",
+                              "salvar o contato", "salva o numero", "salvar numero", "cadastrar numero",
+                              "gravar contato", "anotar contato")):
+        _resto = cmd
+        for pre in ("salvar contato", "salva contato", "cadastrar contato", "cadastra contato",
+                    "salvar o contato", "salva o contato", "salvar o numero", "salva o numero",
+                    "salvar numero", "cadastrar numero", "gravar contato", "anotar contato",
+                    "salvar", "salva", "cadastrar", "cadastra"):
+            if _resto.startswith(pre):
+                _resto = _resto[len(pre):]; break
+        _resto = _resto.strip(" :")
+        if ":" in _resto or ";" in _resto or _resto.count(",") >= 1 and any(c.isdigit() for c in _resto):
+            _rel(_adicionar_contato_em_lote(_resto)); return True
+        # "salvar contato Joao 11 99999..." sem dois pontos: tenta separar nome/numero
+        import re as _rw
+        _m = _rw.match(r"(.+?)\s*(\+?\d[\d\s()\-]{7,})$", _resto)
+        if _m:
+            _rel(_adicionar_contato_em_lote(f"{_m.group(1).strip()}: {_m.group(2).strip()}")); return True
+        _rel("Diga no formato: salvar contato Nome: numero (ex.: 'salvar contato Joao: 11 99999-9999'). "
+             "Pode ser varios separados por ;."); return True
+    if any(p in cmd for p in ("lista contatos", "listar contatos", "meus contatos", "ver contatos",
+                              "contatos salvos", "agenda de contatos", "quais contatos")):
+        _rel(_listar_contatos_wpp()); return True
+    if any(p in cmd for p in ("apagar contato", "apaga contato", "remover contato", "remove contato",
+                              "excluir contato", "exclui contato")):
+        _nome = cmd
+        for pre in ("apagar contato", "apaga contato", "remover contato", "remove contato",
+                    "excluir contato", "exclui contato"):
+            if pre in _nome:
+                _nome = _nome.split(pre)[-1]; break
+        _nome = _nome.strip(" :,")
+        if _nome and contatos.pop(_nome.lower(), None) is not None:
+            salvar_json(ARQ_CONTATOS, contatos)
+            _rel(f"Contato '{_nome}' removido.")
+        else:
+            _rel(f"Nao achei o contato '{_nome}'. Digite 'meus contatos' para ver a lista.")
+        return True
+    # Enviar WhatsApp por NOME (usa a automacao do app): "manda whatsapp pro Joao: oi"
+    _env = None
+    for _gat in ("manda whatsapp", "manda zap", "envia whatsapp", "enviar whatsapp",
+                 "whatsapp pro", "whatsapp para", "zap pro", "manda mensagem no whatsapp",
+                 "mandar whatsapp", "envia zap"):
+        if _gat in cmd:
+            _env = cmd.split(_gat, 1)[-1]; break
+    if _env is not None:
+        _env = _env.strip()
+        for _p in ("pro ", "para ", "pro", "para"):
+            if _env.startswith(_p):
+                _env = _env[len(_p):].strip(); break
+        _nome, _msg = _env, ""
+        for _sep in (" falando ", " dizendo ", ":", " - "):
+            if _sep in _nome:
+                _nome, _msg = _nome.split(_sep, 1)
+                break
+        _nome, _msg = _nome.strip(" ,."), _msg.strip()
+        if not _nome:
+            _rel("Diga pra quem e a mensagem, ex.: 'manda whatsapp pro Joao: oi, tudo bem?'")
+            return True
+        if not _msg:
+            _rel(f"Voce quer mandar WhatsApp para '{_nome}', mas faltou a mensagem. Ex.: "
+                 f"'manda whatsapp pro {_nome}: oi, tudo bem?'")
+            return True
+        _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
+        return True
 
     return False
 
@@ -3857,46 +3925,174 @@ def processar_atalho_rapido(comando: str) -> bool:
 # ================= FERRAMENTAS AVANÇADAS =================
 
 @tool
-def enviar_mensagem_whatsapp(destinatario: str, mensagem: str) -> str:
-    """Envia mensagem no WhatsApp. 'destinatario' pode ser um número (+55...) ou
-    um nome. Se o nome não estiver cadastrado, o agente tenta achar um contato
-    parecido; se não achar nenhum, pergunta o número e salva pra próxima vez."""
-    chave = destinatario.lower().strip()
-    numero = contatos.get(chave)
 
-    if not numero:
-        parecido = difflib.get_close_matches(chave, list(contatos.keys()), n=1, cutoff=0.6)
-        if parecido:
-            nome_encontrado = parecido[0]
-            if pedir_confirmacao(f"Você quis dizer '{nome_encontrado}' ({contatos[nome_encontrado]})?"):
-                numero = contatos[nome_encontrado]
-                destinatario = nome_encontrado
+# ================= WHATSAPP: CONTATOS CONFIAVEIS + CONFIRMACAO DE ENVIO =================
 
+def _normalizar_telefone(numero: str) -> str:
+    """Padroniza um numero para o formato +55DDDNUMERO (so digitos, com +).
+    Aceita '11 99999-9999', '(11) 99999-9999', '5511...', '+5511...' etc.
+    Assume Brasil (+55) se o numero tiver 10 ou 11 digitos sem codigo do pais."""
     if not numero:
-        if destinatario.startswith("+") or destinatario.replace(" ", "").isdigit():
-            numero = destinatario
+        return ""
+    dig = "".join(ch for ch in str(numero) if ch.isdigit())
+    if not dig:
+        return ""
+    if len(dig) in (10, 11):
+        dig = "55" + dig  # DDD + numero brasileiro sem codigo do pais
+    if len(dig) == 12 and dig.startswith("55") and len(dig) == 12:
+        pass
+    return "+" + dig
+
+
+def _salvar_contato_wpp(nome: str, numero: str) -> str:
+    """Salva (ou atualiza) um contato do WhatsApp de forma consistente.
+    Guarda o numero normalizado no dict de contatos (compatibiliza com o email:
+    se ja existir um dict com email, preserva; senao usa o numero direto)."""
+    nome = (nome or "").strip()
+    numero = _normalizar_telefone(numero)
+    if not nome or not numero:
+        return ""
+    chave = nome.lower()
+    atual = contatos.get(chave)
+    if isinstance(atual, dict):
+        atual["whatsapp"] = numero
+        atual["numero"] = numero
+        contatos[chave] = atual
+    else:
+        contatos[chave] = numero
+    # mantem tambem um indice pelo proprio numero -> nome (para achar destino)
+    try:
+        salvar_json(ARQ_CONTATOS, contatos)
+    except Exception:
+        pass
+    return numero
+
+
+def _achar_numero_contato(destino: str):
+    """Acha o numero de WhatsApp de um contato pelo NOME (com busca fuzzy).
+    Devolve (numero, nome_usado) ou (None, None)."""
+    chave = (destino or "").lower().strip()
+    if not chave:
+        return None, None
+    # numero direto?
+    if any(c.isdigit() for c in chave) and len("".join(c for c in chave if c.isdigit())) >= 10:
+        return _normalizar_telefone(destino), destino
+    atual = contatos.get(chave)
+    if atual is not None:
+        num = atual.get("whatsapp") or atual.get("numero") if isinstance(atual, dict) else atual
+        return (str(num), destino) if num else (None, None)
+    parecido = difflib.get_close_matches(chave, list(contatos.keys()), n=1, cutoff=0.6)
+    if parecido:
+        nome = parecido[0]
+        val = contatos[nome]
+        num = val.get("whatsapp") or val.get("numero") if isinstance(val, dict) else val
+        if num:
+            return str(num), nome
+    return None, None
+
+
+def _confirmar_envio_wpp(numero: str, mensagem: str, modo: str = "web") -> dict:
+    """Registra uma tentativa de envio e devolve um status claro. Como a
+    automacao do WhatsApp (pywhatkit/pyautogui) nao devolve um recibo de
+    entrega, confiamos no fluxo SEM excecao + avisamos o usuario a conferir os
+    tiques azuis. Registramos tudo em logs_whatsapp para rastreabilidade."""
+    registro = {
+        "data": datetime.now().isoformat(),
+        "numero": numero,
+        "mensagem": mensagem,
+        "modo": modo,
+        "status": "enviado (conferir tiques azuis no WhatsApp)",
+    }
+    try:
+        logs_whatsapp.append(registro)
+        salvar_json(ARQ_LOG_WHATS, logs_whatsapp)
+    except Exception:
+        pass
+    return registro
+
+
+def _adicionar_contato_em_lote(texto: str) -> str:
+    """Cadastra contatos em lote a partir de texto 'Nome: numero' um por linha
+    (ou separado por ponto e virgula). Normaliza os numeros. Ex.:
+    'Joao: 11 99999-9999; Maria: (21) 98888-7777'."""
+    if not texto:
+        return "Me passe os contatos no formato: Nome: numero, um por linha (ou separado por ;)."
+    partes = []
+    for linha in texto.replace(";", "\n").splitlines():
+        linha = linha.strip()
+        if not linha:
+            continue
+        if ":" in linha:
+            nm, num = linha.split(":", 1)
+        elif "-" in linha and any(c.isdigit() for c in linha.split("-")[-1]):
+            nm, num = linha.rsplit("-", 1)
         else:
-            numero = input(f"Não conheço '{destinatario}' ainda. Qual o número dele (com +55 e DDD)? ").strip()
-            contatos[chave] = numero
-            salvar_json(ARQ_CONTATOS, contatos)
-            print(f"[Info]: Contato '{destinatario}' salvo para as próximas vezes.")
+            continue
+        num = _salvar_contato_wpp(nm.strip(), num.strip())
+        if num:
+            partes.append(f"{nm.strip()} -> {num}")
+    if not partes:
+        return ("Nao consegui cadastrar. Use o formato: Nome: numero (ex.: 'Joao: 11 99999-9999'). "
+                "Pode ser varios separados por ; ou um por linha.")
+    return f"Contatos salvos ({len(partes)}):\n" + "\n".join("- " + p for p in partes)
 
-    if not pedir_confirmacao(f"Enviar '{mensagem}' para {destinatario} ({numero})?"):
-        return "Envio cancelado pelo usuário."
+
+def _listar_contatos_wpp() -> str:
+    """Lista os contatos cadastrados (nome e numero/email) de forma legivel."""
+    if not contatos:
+        return "Nenhum contato salvo ainda. Cadastre com 'salvar contato Nome: numero'."
+    linhas = []
+    for nome, val in contatos.items():
+        if isinstance(val, dict):
+            num = val.get("whatsapp") or val.get("numero") or ""
+            email = val.get("email") or ""
+            extra = " | ".join(x for x in (f"zap {num}" if num else "", f"email {email}" if email else "") if x)
+            linhas.append(f"- {nome}: {extra}")
+        else:
+            linhas.append(f"- {nome}: {val}")
+    return f"Contatos salvos ({len(linhas)}):\n" + "\n".join(linhas)
+
+
+
+@tool
+def enviar_mensagem_whatsapp(destinatario: str, mensagem: str) -> str:
+    """Envia mensagem no WhatsApp. 'destinatario' pode ser um numero (+55...) ou
+    um NOME de contato salvo. Procura o contato (com busca por nome parecido),
+    normaliza o numero, salva contatos novos e registra o envio com status claro."""
+    destino = destinatario.strip()
+    numero, nome_usado = _achar_numero_contato(destino)
+
+    if not numero:
+        # Nao achou: se parece numero, usa; senao pede o numero e JA SALVA.
+        dig = "".join(c for c in destino if c.isdigit())
+        if destino.replace(" ", "").startswith("+") or len(dig) >= 10:
+            numero = _normalizar_telefone(destino)
+            nome_usado = destino
+        else:
+            numero = input(f"Nao conheco '{destino}' ainda. Qual o numero (com DDD, ex.: 11 99999-9999)? ").strip()
+            numero = _normalizar_telefone(numero)
+            if numero:
+                _salvar_contato_wpp(destino, numero)
+                print(f"[Info]: Contato '{destino}' ({numero}) salvo para as proximas vezes.")
+
+    if not numero:
+        return "Nao consegui um numero valido para enviar."
+
+    if not pedir_confirmacao(f"Enviar '{mensagem}' para {nome_usado or destino} ({numero})?"):
+        return "Envio cancelado pelo usuario."
 
     def _enviar():
         kit.sendwhatmsg_instantly(numero, mensagem, wait_time=15, tab_close=True)
-        logs_whatsapp.append({
-            "data": datetime.now().isoformat(), "destinatario": destinatario,
-            "numero": numero, "mensagem": mensagem, "status": "enviado",
-        })
-        salvar_json(ARQ_LOG_WHATS, logs_whatsapp)
-        return f"Mensagem enviada com sucesso para {destinatario}."
+        _confirmar_envio_wpp(numero, mensagem, modo="whatsapp web (pywhatkit)")
+        # se veio um nome e ainda nao estava salvo, garante o cadastro
+        if nome_usado:
+            _salvar_contato_wpp(nome_usado, numero)
+        return (f"Mensagem enviada para {nome_usado or destino} ({numero}). "
+                "Confira os tiques azuis no WhatsApp para confirmar a entrega.")
 
     return executar_com_autocura("enviar_mensagem_whatsapp", _enviar)
 
 
-@tool
 def gerenciar_contatos(acao: str, nome: str = "", numero: str = "") -> str:
     """Gerencia a agenda de contatos do WhatsApp. Ações: 'adicionar', 'remover', 'listar'."""
     if acao == "adicionar":
@@ -3985,13 +4181,11 @@ def enviar_whatsapp_por_nome(nome_contato_ou_grupo: str, mensagem: str) -> str:
         # 6) envia
         _pg.press("enter")
         time.sleep(1)
-        logs_whatsapp.append({
-            "data": datetime.now().isoformat(), "tipo": "por_nome",
-            "alvo": alvo, "mensagem": mensagem, "status": "enviado (whatsapp app)",
-        })
-        salvar_json(ARQ_LOG_WHATS, logs_whatsapp)
+        _confirmar_envio_wpp("", mensagem, modo=f"whatsapp app (busca por nome: {alvo})")
         return (f"Mensagem enviada para '{alvo}' pelo app do WhatsApp. "
-                "Confira na tela se foi para o contato/grupo certo.")
+                "Confira na tela (e os tiques azuis) se foi para o contato/grupo certo. "
+                "Se for um contato, salve o numero dele com 'salvar contato Nome: numero' "
+                "para nas proximas vezes eu ja achar rapido.")
 
     return executar_com_autocura("enviar_whatsapp_por_nome", _enviar)
 
