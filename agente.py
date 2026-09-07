@@ -2314,8 +2314,10 @@ def _achar_programa_local(alvo: str):
                         pts = 3
                     elif nome_norm.startswith(alvo_norm):
                         pts = 2
-                    elif alvo_norm in nome_norm:
-                        pts = 1
+                    elif len(alvo_norm) >= 5 and alvo_norm.startswith(nome_norm):
+                        # alvo mais longo que o nome do atalho e comeca por ele
+                        # (ex.: 'bambu studio' casa 'Bambu Studio')
+                        pts = 2
                     if pts:
                         achados.append((pts, len(nome_norm), os.path.join(raiz, arq)))
     if not achados:
@@ -2428,17 +2430,16 @@ def _processar_cerebro_local(comando: str) -> bool:
         print("        digite 'ligar ia' quando quiser voltar a usar a nuvem.")
         return True
     # IA NEURAL LOCAL (llama.cpp): prepara/liga/desliga/consulta.
-    if n in ("criaria", "criar i a", "baixaria", "instalaria", "ligariaoffline",
-             "i a local", "i alocal", "motorlocal", "preparari a", "prepararia",
-             "baixari a", "instalari a"):
+    if n in ("criaria", "baixaria", "instalaria", "ligariaoffline",
+             "ialocal", "motorlocal", "prepararia", "ligarialogo"):
         preparar_ia_local(); return True
-    if n in ("statusdalocal", "status da i a", "status i a", "statusial",
-             "i a pronta", "ialpronta", "comoestarial"):
+    if n in ("statusia", "statusial", "statusdalial", "ialpronta", "comoestaria",
+             "estadoial", "estadoia", "ialocalpronta", "prontaal", "comovaial", "iadepronta"):
         print("\n[IA Local]: " + ("PRONTA e respondendo offline (sem cota)."
               if ia_local_disponivel() else "ainda nao instalada. Digite 'criar ia' para baixar (uma vez)."))
         return True
-    if n in ("desligarialocal", "desliga i a local", "parari a", "pararia",
-             "matari a", "encerrari a"):
+    if n in ("desligarialocal", "pararia", "mataria", "encerraria",
+             "desligarial", "pararialogo"):
         global _proc_ia_local
         if _proc_ia_local is not None:
             try: _proc_ia_local.terminate()
@@ -2478,20 +2479,45 @@ def _processar_cerebro_local(comando: str) -> bool:
         return True
 
     # ---- ABRIR programa / site ----
-    if any(p in cmd for p in ("abre", "abra", "abrir", "iniciar", "inicie", "executa", "execute")):
-        alvo = cmd
-        for pre in ("abra o", "abra a", "abre o", "abre a", "abrir o", "abrir a",
-                    "inicie o", "inicie a", "iniciar o", "iniciar a", "execute o",
-                    "execute a", "executa o", "executa a", "abra", "abre",
-                    "abrir", "inicie", "iniciar", "execute", "executa"):
-            if pre in alvo:
-                alvo = alvo.split(pre, 1)[-1]
-                break
-        alvo = alvo.strip()
-        for art in ("o ", "a ", "os ", "as ", "um ", "uma "):
-            while alvo.startswith(art):
-                alvo = alvo[len(art):].strip()
+    _verbos_abrir = ("abre", "abra", "abrir", "abri", "inicie", "inicia",
+                     "iniciar", "execute", "executa", "executar", "liga", "ligar", "rode", "roda")
+    _vnorm = [_norm_pt(v) for v in _verbos_abrir]
+    _palavras = cmd.strip().split()
+    if _palavras and _norm_pt(_palavras[0]) in _vnorm:
+        _partes = _palavras[1:]
+        # tira educativos do inicio ("por favor", "pra mim", "la", "ai")
+        _enf2 = {_norm_pt(x) for x in ("por favor", "pra mim", "para mim")}
+        while len(_partes) >= 2 and _norm_pt(" ".join(_partes[:2])) in _enf2:
+            _partes = _partes[2:]
+        while _partes and _norm_pt(_partes[0]) in (_norm_pt("por"), ):
+            _partes = _partes[1:]
+        alvo = " ".join(_partes).strip()
+        # remove artigos do inicio
+        _arts = [_norm_pt(x) for x in ("o", "a", "os", "as", "um", "uma", "aquele", "aquela")]
+        while alvo and _norm_pt(alvo.split()[0]) in _arts:
+            alvo = " ".join(alvo.split()[1:]).strip()
         alvo = alvo.split(",")[0].split(" e ")[0].strip()
+        _an = _norm_pt(alvo)
+        # Alvos que sao o proprio Windows (Explorador / Configuracoes / Painel):
+        if _an in ("arquivo", "arquivos", "explorador", "exploradordearquivos",
+                   "meusarquivos", "pastas", "gerenciadordearquivos", "fileexplorer",
+                   "documentos", "meudocumento") or _an.startswith("exploradord"):
+            subprocess.Popen("explorer", shell=True)
+            _rel("Explorador de Arquivos aberto (modo local, instantaneo).")
+            return True
+        if _an in ("configuracao", "configuracoes", "config", "ajustes", "settings",
+                   "opcoes", "paineldeconfiguracoes"):
+            subprocess.Popen("start ms-settings:", shell=True)
+            _rel("Configuracoes do Windows abertas (modo local, instantaneo).")
+            return True
+        if _an in ("paineldecontrole", "painel", "controlpanel"):
+            subprocess.Popen("control", shell=True)
+            _rel("Painel de Controle aberto (modo local, instantaneo).")
+            return True
+        if _an in ("gerenciadordetarefas", "taskmanager", "gerenciador"):
+            subprocess.Popen("taskmgr", shell=True)
+            _rel("Gerenciador de Tarefas aberto (modo local, instantaneo).")
+            return True
         # 1o) tabela de atalhos EXATOS confiavel (calc, notepad, word, sites...).
         _ach_atalho = None
         for _frase in (f"abrir {alvo}", f"abre {alvo}", f"abra {alvo}", alvo, cmd):
@@ -2597,6 +2623,53 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel(_invocar_local("controle_de_energia", acao="reiniciar")); return True
     if any(p in cmd for p in ("suspende o pc", "suspender o pc", "modo dormir", "colocar pra dormir")):
         _rel(_invocar_local("controle_de_energia", acao="suspender")); return True
+
+    # ============ ANALISE / DIAGNOSTICO DO PC (so leitura, instantaneo) ============
+    if any(p in cmd for p in ("relatorio do pc", "relatorio de saude", "saude do pc", "analise completa do pc",
+                              "analisar o pc", "analisa o pc", "check-up", "checkup geral", "diagnostico completo",
+                              "como esta meu pc", "estado do pc", "pente fino")):
+        _rel(_invocar_local("relatorio_saude_pc")); return True
+    if any(p in cmd for p in ("programas abertos", "o que esta rodando", "o que ta rodando", "processos abertos",
+                              "processos rodando", "programas rodando", "o que esta aberto", "apps abertos")):
+        _rel(_invocar_local("listar_programas_abertos")); return True
+    if any(p in cmd for p in ("qual meu ip", "meu ip", "ip do pc", "ip publico", "meu ip publico", "numero do ip")):
+        _rel(_invocar_local("meu_ip")); return True
+    if any(p in cmd for p in ("programas instalados", "apps instalados", "o que tenho instalado", "lista de programas",
+                              "softwares instalados", "listar programas")):
+        _rel(_invocar_local("central_programas_janelas", acao="lista")); return True
+    if any(p in cmd for p in ("minhas redes wifi", "redes wifi salvas", "senha do wifi", "senhas wifi", "senha do wi-fi",
+                              "wifi salvos", "ver senha wifi")):
+        _rel(_invocar_local("central_rede", acao="senhas_wifi")); return True
+    if any(p in cmd for p in ("redes wifi disponiveis", "wifi disponiveis", "redes proximas", "wifis perto")):
+        _rel(_invocar_local("central_rede", acao="redes_disponiveis")); return True
+    if any(p in cmd for p in ("testar internet", "testa a internet", "diagnostico de rede", "problema na internet",
+                              "internet lenta", "por que nao navega", "testar a rede", "diagnostica a rede")):
+        _rel(_invocar_local("diagnostico_rede", acao="completo")); return True
+    if any(p in cmd for p in ("usuarios do pc", "contas de usuario", "quais usuarios", "usuarios do windows", "contas do pc")):
+        _rel(_invocar_local("listar_usuarios_windows")); return True
+    if any(p in cmd for p in ("atualizar antivirus", "atualizar o defender", "atualiza o defender", "vacina do windows",
+                              "atualizar definicoes", "atualizar o antivirus")):
+        _rel(_invocar_local("atualizar_defender")); return True
+    if any(p in cmd for p in ("atualizar o windows", "atualiza o windows", "atualizacao do windows", "atualizar windows",
+                              "buscar atualizacoes do sistema", "atualizacoes do windows")):
+        _rel(_invocar_local("atualizar_windows")); return True
+    if any(p in cmd for p in ("fechar programa", "fechar o programa", "encerrar programa", "matar processo",
+                              "finalizar programa", "fechar app", "fecha o programa")):
+        _alvo_p = cmd
+        for _pre in ("fechar programa", "fechar o programa", "fecha o programa", "encerrar programa",
+                     "encerrar o programa", "matar processo", "finalizar programa", "fechar app", "fechar o app"):
+            if _pre in _alvo_p:
+                _alvo_p = _alvo_p.split(_pre)[-1]; break
+        _alvo_p = _alvo_p.strip(" :,")
+        _rel(_invocar_local("central_programas_janelas", acao="fechar", valor=_alvo_p)); return True
+    if any(p in cmd for p in ("contar ferramentas", "quantas funcoes", "quantas ferramentas", "seu poder", "mostra teu poder",
+                              "o que voce sabe fazer", "quais ferramentas voce tem", "lista de funcoes")):
+        try:
+            _rel(estatisticas_poder.invoke({}))
+        except Exception:
+            _rel("Tenho centenas de ferramentas: abrir programas/sites, otimizar e limpar o PC, "
+                 "analisar saude/rede, organizar pastas, backup, arquivos, rede, energia e muito mais.")
+        return True
 
     return False
 
@@ -3156,11 +3229,30 @@ def processar_atalho_rapido(comando: str) -> bool:
     # NAO tenta API: avisa que e modo local e da caminhos (comando local ou
     # 'ligar ia'). Mantem o agente respondendo em vez de ficar mudo.
     if not config.get("usar_ia_nuvem", True):
+        _r = None
+        if ia_local_disponivel():
+            try:
+                _r = perguntar_ia_local(comando, historico_conversas)
+            except Exception:
+                _r = None
+        if _r:
+            historico_conversas.append({"role": "user", "content": comando})
+            historico_conversas.append({"role": "assistant", "content": _r})
+            try:
+                salvar_historico()
+            except Exception:
+                pass
+            print(f"\n[IA Local]: {_r}")
+            try:
+                falar(_r[:200])
+            except Exception:
+                pass
+            return True
         _msg = ("[Local]: esse comando eu nao faco por regra ainda, e a IA da nuvem "
-                "esta DESLIGADA (modo sem cota). Voce pode: 1) falar a acao de forma "
-                "direta (ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads', "
-                "'qual a versao do windows'); ou 2) digitar 'ligar ia' para ativar as "
-                "IAs da nuvem enquanto houver cota; depois 'desligar ia' volta ao local.")
+                "esta DESLIGADA. Para conversar offline, digite 'criar ia' (uma vez) que "
+                "eu passo a responder qualquer papo sem cota. Para acoes, fale direto "
+                "(ex.: 'abre o youtube', 'otimiza tudo', 'analise do pc'); ou 'ligar ia' "
+                "para usar as IAs da nuvem quando houver cota.")
         print("\n" + _msg)
         try:
             falar(_msg[:200])
