@@ -1341,6 +1341,57 @@ _TEXTO_TODAS_FALHARAM = (
 )
 
 
+def _checar_loop_do_agente(_e):
+    """Se o erro foi o agente entrando em LOOP (repetindo a mesma ferramenta ate
+    estourar o limite de passos), nao adianta trocar de IA: o problema e o
+    agente ter enroscado, nao o modelo. Grava a licao e relanca para virar
+    mensagem amigavel. Implementacao unica (era copiada nos dois rodizios)."""
+    if _eh_erro_de_recursao(_e):
+        registrar_licao(
+            "O agente entrou em loop e repetiu a mesma ferramenta muitas "
+            "vezes. Para tarefas grandes, fazer UMA etapa por vez; se uma "
+            "ferramenta falhar 2 vezes, parar e pedir orientacao, nao insistir."
+        )
+        raise _e
+
+
+def _penalizar_ia_e_avisar(_idx, _info, _e, total, ignorar_penalidades=False):
+    """Classifica a falha de UMA IA do rodizio, aplica a penalidade certa
+    (marcar morta / descanso do host / descanso por cota), avisa no console e
+    devolve o nome da proxima IA candidata (ou None).
+
+    IMPLEMENTACAO UNICA: antes essa mesma logica estava escrita duas vezes -
+    uma no rodizio normal e outra no rodizio com streaming - quase iguais. Toda
+    correcao precisava ser feita nos dois lugares, e um deles sempre ficava
+    para tras. Agora e um so."""
+    _prox = None
+    for _k in range(1, total + 1):
+        _cand = (_idx + _k) % total
+        if ignorar_penalidades or not _fora_do_jogo(_cand):
+            _prox = modelos_ia[_cand]["nome"]
+            break
+    _detalhe = _detalhe_erro(_e)
+    if _erro_permanente(_e):
+        if not ignorar_penalidades:
+            _marcar_morta(_idx)
+        print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
+    elif (not ignorar_penalidades) and _erro_de_rede(_e):
+        _h = _info.get("host", "")
+        _marcar_host_em_cooldown(_h)
+        print(f"[Rodizio]: '{_info['nome']}' sem conexao com o servidor"
+              + (f" ({_h})" if _h else "") + ". Servidor em descanso de "
+              + f"{_DURACAO_COOLDOWN_REDE_SEG}s (verifique antivirus/firewall/rede)."
+              + (f" Tentando '{_prox}'..." if _prox else ""))
+    elif (not ignorar_penalidades) and _erro_de_cota(_e):
+        _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
+        print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
+              + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento.") + f" ({_detalhe})")
+    else:
+        print(f"[Rodizio]: '{_info['nome']}' falhou: {_detalhe}"
+              + (f" -> tentando '{_prox}'..." if _prox else " -> sem outras IAs ativas."))
+    return _prox
+
+
 def _percorrer_rodizio(chamar, extrair, ignorar_penalidades=False):
     """Tenta cada IA ativa, comecando pela ultima que funcionou. Em erro
     permanente (modelo/chave), marca a IA como morta nesta sessao e pula;
@@ -1375,38 +1426,8 @@ def _percorrer_rodizio(chamar, extrair, ignorar_penalidades=False):
             # adianta trocar de IA (o problema e o agente ter enroscado, nao o
             # modelo). Relanca para ser tratado como mensagem amigavel, e grava
             # uma licao para nao repetir.
-            if _eh_erro_de_recursao(_e):
-                registrar_licao(
-                    "O agente entrou em loop e repetiu a mesma ferramenta muitas "
-                    "vezes. Para tarefas grandes, fazer UMA etapa por vez; se uma "
-                    "ferramenta falhar 2 vezes, parar e pedir orientacao, nao insistir."
-                )
-                raise
-            _prox = None
-            for _k in range(1, total + 1):
-                _cand = (_idx + _k) % total
-                if ignorar_penalidades or not _fora_do_jogo(_cand):
-                    _prox = modelos_ia[_cand]["nome"]
-                    break
-            _detalhe = _detalhe_erro(_e)
-            if _erro_permanente(_e):
-                if not ignorar_penalidades:
-                    _marcar_morta(_idx)
-                print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
-            elif (not ignorar_penalidades) and _erro_de_rede(_e):
-                _h = _info.get("host", "")
-                _marcar_host_em_cooldown(_h)
-                print(f"[Rodizio]: '{_info['nome']}' sem conexao com o servidor"
-                      + (f" ({_h})" if _h else "") + ". Servidor em descanso de "
-                      + f"{_DURACAO_COOLDOWN_REDE_SEG}s (verifique antivirus/firewall/rede)."
-                      + (f" Tentando '{_prox}'..." if _prox else ""))
-            elif (not ignorar_penalidades) and _erro_de_cota(_e):
-                _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
-                print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
-                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento.") + f" ({_detalhe})")
-            else:
-                print(f"[Rodizio]: '{_info['nome']}' falhou: {_detalhe}"
-                      + (f" -> tentando '{_prox}'..." if _prox else " -> sem outras IAs ativas."))
+            _checar_loop_do_agente(_e)
+            _penalizar_ia_e_avisar(_idx, _info, _e, total, ignorar_penalidades)
     return None
 
 if not modelos_ia:
@@ -3068,6 +3089,30 @@ def _caderno_ideias(acao: str, ideia: str = "") -> str:
     return "Acao invalida do caderno. Use: adicionar, listar ou abrir."
 
 
+def _aplicar_turbo_sistema(ligar: bool = True) -> list:
+    """Parte de SISTEMA do modo jogo: plano de energia, atualizacoes do Windows
+    e Modo de Jogo. IMPLEMENTACAO UNICA: usada tanto pela ferramenta 'modo_jogo'
+    (que a IA da nuvem enxerga) quanto pelo modo jogo do CEREBRO LOCAL, para a
+    mesma logica nao existir escrita em dois lugares. Nao pede confirmacao -
+    quem chama e que pergunta."""
+    passos = []
+    if ligar:
+        _rodar_cmd("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", 30)
+        passos.append("Plano de energia: ALTO DESEMPENHO ligado")
+        _rodar_cmd("net stop wuauserv & net stop bits", 90)
+        passos.append("Atualizacoes do Windows pausadas (nao baixam no meio do jogo)")
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 1 /f', 30)
+        passos.append("Modo de Jogo do Windows ligado")
+    else:
+        _rodar_cmd("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", 30)
+        passos.append("Plano de energia: de volta ao Equilibrado")
+        _rodar_cmd("sc config wuauserv start= demand & net start bits & net start wuauserv", 90)
+        passos.append("Atualizacoes do Windows religadas")
+        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 0 /f', 30)
+        passos.append("Modo de Jogo do Windows desligado")
+    return passos
+
+
 def _modo_jogo(fechar: bool = True) -> str:
     """MODO JOGO: libera memoria/RAM fechando programas de fundo que comem
     recursos (navegadores, Discord, Spotify, OneDrive etc.), mantendo o que for
@@ -3107,11 +3152,10 @@ def _modo_jogo(fechar: bool = True) -> str:
         rel.append(f"Encerrei ~{fechados} processo(s) de fundo que pesavam")
     else:
         rel.append("Nao havia programas de fundo pesados para fechar")
-    # Plano de alto desempenho
+    # Parte de sistema (plano de energia + updates + Modo de Jogo): usa o MESMO
+    # helper da ferramenta modo_jogo, em vez de repetir os comandos aqui.
     try:
-        subprocess.run("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
-                       shell=True, capture_output=True)
-        rel.append("Plano de energia: ALTO DESEMPENHO ligado")
+        rel.extend(_aplicar_turbo_sistema(True))
     except Exception:
         try:
             _invocar_local("otimizar_sistema", acao="plano_energia_desempenho")
@@ -14616,15 +14660,13 @@ def modo_jogo(acao: str = "ligar") -> str:
     if not _confirma_poderoso(("ATIVAR o MODO JOGO TURBO (Alto Desempenho + pausar updates + Modo de Jogo) para maximo de FPS?"
                                if ligar else "Sair do MODO JOGO TURBO e voltar ao normal?")):
         return "Cancelado."
+    passos = _aplicar_turbo_sistema(ligar)
     if ligar:
-        _rodar_cmd("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", 30)
-        _rodar_cmd("net stop wuauserv & net stop bits", 90)
-        _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 1 /f', 30)
-        return "MODO JOGO TURBO LIGADO! Alto Desempenho ativo, updates pausados e Modo de Jogo ligado. Bons frags!"
-    _rodar_cmd("powercfg /setactive 381b4222-f694-41f0-9685-ff5bb260df2e", 30)
-    _rodar_cmd("sc config wuauserv start= demand & net start bits & net start wuauserv", 90)
-    _rodar_cmd(r'reg add "HKCU\Software\Microsoft\GameBar" /v AutoGameModeEnabled /t REG_DWORD /d 0 /f', 30)
-    return "MODO JOGO desligado. Voltei ao plano balanceado e religuei as atualizacoes."
+        return ("MODO JOGO TURBO LIGADO! Bons frags!\n"
+                + "\n".join("- " + x for x in passos)
+                + "\n(Dica: no modo local, o comando 'modo jogo' faz isto E ainda "
+                  "fecha os programas de fundo que comem RAM.)")
+    return "MODO JOGO desligado.\n" + "\n".join("- " + x for x in passos)
 
 
 @tool
@@ -15315,43 +15357,14 @@ def _invocar_agente_stream(estado, ferramentas=None):
             indice_ia_atual = _idx
             return SimpleNamespace(content=_final)
         except Exception as _e:
-            if _eh_erro_de_recursao(_e):
-                registrar_licao(
-                    "O agente entrou em loop e repetiu a mesma ferramenta muitas "
-                    "vezes. Para tarefas grandes, fazer UMA etapa por vez; se uma "
-                    "ferramenta falhar 2 vezes, parar e pedir orientacao, nao insistir."
-                )
-                raise
+            _checar_loop_do_agente(_e)
             # falha desta IA: se ja tinha começado a imprimir, nao tenta outra
             # (seria confuso); senao segue o rodizio em silencio.
             if estado["impresso"]:
                 if _partes:
                     print()
                 return SimpleNamespace(content="".join(_partes).strip())
-            _prox = None
-            for _k in range(1, total + 1):
-                _cand = (_idx + _k) % total
-                if not _fora_do_jogo(_cand):
-                    _prox = modelos_ia[_cand]["nome"]
-                    break
-            _detalhe = _detalhe_erro(_e)
-            if _erro_permanente(_e):
-                print(f"[Rodizio]: '{_info['nome']}' indisponivel (modelo/chave). Motivo: {_detalhe}")
-                _marcar_morta(_idx)
-            elif _erro_de_rede(_e):
-                _h = _info.get("host", "")
-                _marcar_host_em_cooldown(_h)
-                print(f"[Rodizio]: '{_info['nome']}' sem conexao com o servidor"
-                      + (f" ({_h})" if _h else "") + ". Servidor em descanso de "
-                      + f"{_DURACAO_COOLDOWN_REDE_SEG}s (verifique antivirus/firewall/rede)."
-                      + (f" Tentando '{_prox}'..." if _prox else ""))
-            elif _erro_de_cota(_e):
-                _ias_cooldown[_idx] = time.time() + _DURACAO_COOLDOWN_SEG
-                print(f"[Rodizio]: '{_info['nome']}' estourou a cota. Descanso de {_DURACAO_COOLDOWN_SEG}s; "
-                      + (f"tentando '{_prox}'..." if _prox else "sem outras IAs no momento.") + f" ({_detalhe})")
-            else:
-                print(f"[Rodizio]: '{_info['nome']}' falhou: {_detalhe}"
-                      + (f" -> tentando '{_prox}'..." if _prox else " -> sem outras IAs ativas."))
+            _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
 print(f" Super Agente pronto! Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
