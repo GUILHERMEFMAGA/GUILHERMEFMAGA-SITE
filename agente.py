@@ -2326,6 +2326,104 @@ def _achar_programa_local(alvo: str):
     return achados[0][2]
 
 
+_cache_startapps = None
+
+
+def _listar_startapps():
+    """Lista TODOS os apps do Menu Iniciar (inclusive apps da Microsoft
+    Store/UWP como Spotify, Instagram, etc.) via Get-StartApps. Cacheado."""
+    global _cache_startapps
+    if _cache_startapps is not None:
+        return _cache_startapps
+    apps = []
+    try:
+        import csv as _csv
+        if os.name == "nt":
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Get-StartApps | Select-Object Name,AppID | ConvertTo-Csv -NoTypeInformation"],
+                capture_output=True, text=True, timeout=45,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            for row in _csv.reader([l for l in (r.stdout or "").splitlines() if l.strip()]):
+                if len(row) >= 2 and row[0].strip().lower() != "name":
+                    apps.append((row[0].strip(), row[1].strip()))
+    except Exception:
+        apps = []
+    _cache_startapps = apps
+    return apps
+
+
+def _abrir_app_startapps(alvo: str):
+    """Abre QUALQUER app que esteja no Menu Iniciar (cobre programas comuns e
+    apps da Loja/UWP como o Spotify) usando Get-StartApps. Devolve o nome
+    amigavel do app aberto, ou None se nao achar."""
+    if os.name != "nt":
+        return None
+    alvo_norm = _norm_pt(alvo)
+    if not alvo_norm:
+        return None
+    melhor = None  # (pts, -tam_nome, nome, appid)
+    for nome, appid in _listar_startapps():
+        nn = _norm_pt(nome)
+        if not nn:
+            continue
+        if nn == alvo_norm:
+            pts = 3
+        elif nn.startswith(alvo_norm) or alvo_norm.startswith(nn):
+            pts = 2
+        elif (alvo_norm in nn or nn in alvo_norm) and len(alvo_norm) >= 4 and abs(len(nn) - len(alvo_norm)) <= 12:
+            pts = 1
+        else:
+            continue
+        chave = (pts, -len(nn))
+        if melhor is None or chave > (melhor[0], -melhor[1]):
+            melhor = (pts, len(nn), nome, appid)
+    if not melhor:
+        return None
+    _pts, _t, nome, appid = melhor
+    try:
+        if "!" in appid and not appid.lower().endswith((".lnk", ".exe")):
+            subprocess.Popen(f'explorer.exe "shell:appsFolder\\{appid}"', shell=True)
+        else:
+            subprocess.Popen(f'start "" "{appid}"', shell=True)
+    except Exception:
+        return None
+    return nome
+
+
+def _ver_tela_local() -> str:
+    """Tira um print da tela (salva em arquivo) e lista as janelas/programas
+    abertos agora - da pro agente 'ver a tela' de forma estruturada, sem IA.
+    (A analise da IMAGEM em si so a nuvem faz; aqui damos os titulos das janelas
+    + o arquivo do print.)"""
+    saidas = []
+    try:
+        r = _invocar_local("capturar_tela_arquivo", nome="")
+        if r:
+            saidas.append(str(r))
+    except Exception:
+        pass
+    try:
+        if os.name == "nt":
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 "Get-Process | Where-Object {$_.MainWindowTitle -ne \"\"} | "
+                 "Select-Object -First 20 Name,MainWindowTitle | Format-Table -AutoSize"],
+                capture_output=True, text=True, timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            titulos = (res.stdout or "").strip()
+            if titulos:
+                saidas.append("Janelas/programas abertos na tela:\n" + titulos)
+    except Exception:
+        pass
+    if not saidas:
+        return "Nao consegui capturar a tela agora."
+    saidas.append("(Dica: para eu 'enxergar' a imagem em si e descrever o que aparece, "
+                  "ligue a nuvem com 'ligar ia' e peca 'olha a tela' - a analise de imagem "
+                  "precisa de um modelo de visao.)")
+    return "\n".join(saidas)
+
+
 def _abrir_app_ou_site(alvo: str) -> str:
     """Abre um PROGRAMA instalado (acha de verdade pelo Menu Iniciar) ou um SITE
     conhecido/URL. Deterministico: so abre quando acha algo real; senao devolve
@@ -2338,6 +2436,10 @@ def _abrir_app_ou_site(alvo: str) -> str:
         url = alvo_low if alvo_low.startswith("http") else "https://" + alvo_low
         subprocess.Popen(f'start "" "{url}"', shell=True)
         return f"Site aberto: {url}"
+    # 1o) Get-StartApps: cobre apps da Loja/UWP (Spotify etc.) e tudo do Menu Iniciar.
+    _app_nome = _abrir_app_startapps(alvo)
+    if _app_nome:
+        return f"PROGRAMA:{_app_nome}"
     prog = _achar_programa_local(alvo)
     if prog:
         try:
@@ -2653,6 +2755,10 @@ def _processar_cerebro_local(comando: str) -> bool:
     if any(p in cmd for p in ("tira print", "tirar print", "captura a tela", "capturar tela",
                               "print da tela", "screenshot", "tira uma foto da tela", "foto da tela")):
         _rel(_invocar_local("capturar_tela_arquivo", nome="")); return True
+    if any(p in cmd for p in ("ver a tela", "olha a tela", "ve a tela", "veja a tela",
+                              "o que esta na tela", "o que tem na tela", "enxergar a tela",
+                              "analisa a tela", "analise a tela", "olha minha tela", "ver tela")):
+        _rel(_ver_tela_local()); return True
 
     # ---- ENERGIA: bloquear / desligar / reiniciar / suspender ----
     if any(p in cmd for p in ("bloquear tela", "bloqueia a tela", "travar a tela", "tranca a tela")):
@@ -3129,7 +3235,7 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
     """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
     resposta em texto. Levanta excecao se algo falhar (o chamador trata)."""
     import urllib.request
-    msgs = [{"role": "system", "content": (
+    _sys = (
         "Voce e o Super Agente, um assistente pessoal brasileiro que roda 100% "
         "local no PC do usuario, COM PRIVILEGIOS DE ADMINISTRADOR e controle total "
         "do Windows (abrir/fechar programas, otimizar, limpar, configurar, etc.). "
@@ -3142,10 +3248,13 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
         "(ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads', 'atualiza o "
         "windows', 'abre configuracao'); e NUNCA afirme que nao tem admin ou que "
         "nao pode mexer no sistema - voce roda como administrador. Para conversa, "
-        "duvidas e explicacoes, responda normal e de forma util.") +
-        " DADOS DESTE PC: " + _contexto_pc() +
-        " Para perguntas como 'o que voce gostaria de ter/nova funcao/ferramenta', "
-        "de opiniao propria, direta e em portugues, com ideias uteis de verdade."}]
+        "duvidas e explicacoes, responda de forma util. Raciocine com calma e passo "
+        "a passo em assuntos tecnicos: analise, considere opcoes e de a melhor "
+        "resposta pratica. Para 'o que voce gostaria de ter / nova funcao', de "
+        "opiniao propria com ideias uteis de verdade. DADOS DESTE PC: "
+        + _contexto_pc()
+    )
+    msgs = [{"role": "system", "content": _sys}]
     for m in (historico or [])[-6:]:
         if m.get("role") in ("user", "assistant") and m.get("content"):
             msgs.append({"role": m["role"], "content": str(m["content"])[:1500]})
