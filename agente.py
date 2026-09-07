@@ -2750,6 +2750,7 @@ _PORTA_IA_LOCAL = 8765
 _url_ia_local = f"http://127.0.0.1:{_PORTA_IA_LOCAL}"
 _proc_ia_local = None          # subprocess do llama-server
 _modelo_ia_local = ""          # nome do arquivo GGUF em uso
+_lock_ia_local = threading.Lock()  # evita subir dois servidores juntos
 
 
 def _ram_livre_gb() -> float:
@@ -2901,23 +2902,24 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
     srv = _acha_llama_server()
     if not srv:
         return False
-    # Se ja existe um servidor respondendo, reaproveita.
-    try:
-        req = urllib.request.Request(_url_ia_local + "/health",
-                                     headers={"User-Agent": "SuperAgentePC"})
-        with urllib.request.urlopen(req, timeout=3):
-            return True
-    except Exception:
-        pass
-    cmd = [srv, "-m", caminho_modelo, "--port", str(_PORTA_IA_LOCAL),
-           "--host", "127.0.0.1", "-t", "4", "--ctx-size", "4096"]
-    try:
-        log = open(os.path.join(_PASTA_IA_LOCAL, "servidor.log"), "a", encoding="utf-8", errors="ignore")
-        _proc_ia_local = subprocess.Popen(cmd, stdout=log, stderr=log,
-                                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except Exception as e:
-        print(f"        Nao consegui iniciar o motor local: {type(e).__name__}")
-        return False
+    with _lock_ia_local:
+        # Se ja existe um servidor respondendo, reaproveita.
+        try:
+            req = urllib.request.Request(_url_ia_local + "/health",
+                                         headers={"User-Agent": "SuperAgentePC"})
+            with urllib.request.urlopen(req, timeout=3):
+                return True
+        except Exception:
+            pass
+        cmd = [srv, "-m", caminho_modelo, "--port", str(_PORTA_IA_LOCAL),
+               "--host", "127.0.0.1", "-t", "4", "--ctx-size", "4096"]
+        try:
+            log = open(os.path.join(_PASTA_IA_LOCAL, "servidor.log"), "a", encoding="utf-8", errors="ignore")
+            _proc_ia_local = subprocess.Popen(cmd, stdout=log, stderr=log,
+                                              creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except Exception as e:
+            print(f"        Nao consegui iniciar o motor local: {type(e).__name__}")
+            return False
     # Espera o servidor ficar de pe (ate ~90s; modelo 1.5B sobe rapido).
     import time as _t
     for _ in range(90):
@@ -2929,6 +2931,39 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
         except Exception:
             _t.sleep(1)
     return False
+
+
+def _acha_modelo_gguf() -> str:
+    """Devolve o caminho de um modelo .gguf ja baixado (qualquer tamanho) ou ''."""
+    try:
+        if os.path.isdir(_PASTA_IA_LOCAL):
+            for _raiz, _d, _arqs in os.walk(_PASTA_IA_LOCAL):
+                for _a in _arqs:
+                    if _a.lower().endswith(".gguf"):
+                        _cam = os.path.join(_raiz, _a)
+                        try:
+                            if os.path.getsize(_cam) > 100_000_000:
+                                return _cam
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+    return ""
+
+
+def _auto_subir_ia_local() -> None:
+    """Sobe o servidor da IA local (se motor+modelo ja existirem) SEM baixar
+    nada e sem travar a abertura - usado na inicializacao automatica."""
+    try:
+        if ia_local_disponivel():
+            return
+        gguf = _acha_modelo_gguf()
+        if not gguf or not _acha_llama_server():
+            return
+        if _iniciar_servidor_ia_local(gguf):
+            print(" IA neural local ligada (offline, sem cota nem limite).")
+    except Exception:
+        pass
 
 
 def preparar_ia_local() -> bool:
@@ -2952,11 +2987,17 @@ def preparar_ia_local() -> bool:
             print("[IA Local]: nao consegui baixar o motor (sem internet ou GitHub fora do ar).")
             print("           Tente de novo mais tarde com internet; as acoes locais continuam.")
             return False
-        arq_modelo, urls_modelo, rotulo = _escolher_modelo_local()
-        caminho_modelo = os.path.join(_PASTA_IA_LOCAL, arq_modelo)
+        _gguf_existente = _acha_modelo_gguf()
+        if _gguf_existente:
+            caminho_modelo = _gguf_existente
+            rotulo = os.path.basename(_gguf_existente)
+        else:
+            arq_modelo, urls_modelo, rotulo = _escolher_modelo_local()
+            caminho_modelo = os.path.join(_PASTA_IA_LOCAL, arq_modelo)
         if not os.path.exists(caminho_modelo) or os.path.getsize(caminho_modelo) < 100_000_000:
             print(f"[IA Local]: baixando o modelo {rotulo} (pode levar alguns minutos na 1a vez)...")
             _baixou = False
+            urls_modelo = urls_modelo if not _gguf_existente else []
             for _u in urls_modelo:
                 try:
                     _baixar_com_progresso(_u, caminho_modelo, "Modelo")
@@ -13418,6 +13459,31 @@ def _invocar_agente_stream(estado, ferramentas=None):
     return SimpleNamespace(content="")  # todas falharam / vazias
 
 print(f" Super Agente pronto! Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+
+# ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
+# Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
+# (modo 100% local, sem cota) e o servidor neural sobe em segundo plano.
+_tem_local = bool(_acha_modelo_gguf() and _acha_llama_server())
+if _tem_local:
+    config["usar_ia_nuvem"] = False
+    salvar_json(ARQ_CONFIG, config)
+    threading.Thread(target=_auto_subir_ia_local, daemon=True).start()
+else:
+    # Ainda nao baixou nada: deixa a nuvem como estiver (default ligado), so
+    # pra nao travar quem nunca criou a IA local.
+    pass
+
+print("")
+if _tem_local:
+    print(" MODO LOCAL ATIVO: as acoes e a conversa rodam no seu PC (sem cota/limite).")
+    print("   - Para USAR A NUVEM (Groq/GitHub) de novo, digite: ligar ia")
+    print("   - Para VOLTAR para a IA local depois, digite:   desligar ia")
+    print("   (a IA local esta ligando em segundo plano; digite 'status ia' para ver)")
+else:
+    print(" Para ter uma IA que roda 100% no PC (sem cota e sem limite), digite: criar ia")
+    print("   Depois ela liga sozinha. Para ver todos os comandos, digite: ajuda")
+print(" Digite 'ajuda' para ver o menu completo de comandos.")
+print("")
 falar("Agente pronto para uso.")
 
 while True:
