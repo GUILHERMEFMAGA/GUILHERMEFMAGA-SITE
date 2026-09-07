@@ -2671,6 +2671,211 @@ _INTRO_LOCAL = (
 
 
 
+# ============ PONTE LOCAL PARA AS 314 FERRAMENTAS (sem nuvem) ============
+# Ate aqui o modo local so fazia o que tinha REGRA escrita a mao; todo o resto
+# do arsenal (as ferramentas @tool) so era alcancavel pela IA da nuvem, que
+# escolhia a ferramenta. Esta ponte da ao modo local o MESMO alcance: indexa
+# nome + descricao de TODAS as ferramentas, acha a certa por semelhanca de
+# palavras (100% offline, instantaneo), pergunta antes de executar e pede os
+# parametros obrigatorios em portugues. Nada de cota, nada de API.
+
+_STOP_PT = {
+    "de", "da", "do", "das", "dos", "no", "na", "nos", "nas", "em", "um", "uma",
+    "uns", "umas", "para", "pra", "por", "com", "sem", "que", "qual", "quais",
+    "como", "onde", "quando", "the", "and", "for", "you", "your", "meu", "minha",
+    "meus", "minhas", "seu", "sua", "seus", "suas", "voce", "vc", "eu", "ele",
+    "ela", "isso", "esse", "essa", "este", "esta", "aqui", "agora", "favor",
+    "agente", "coisa", "algum", "alguma", "todo", "toda", "todos", "todas",
+    "ser", "tem", "ter", "faz", "fazer", "faca", "quero", "queria", "gostaria",
+    "pode", "poderia", "consegue", "vai", "estao", "sao", "mais", "menos",
+    "muito", "bem", "ainda", "ja", "nao", "sim", "retorna", "devolve", "usa",
+    "usando", "sobre", "entre", "cada", "outro", "outra", "tudo", "nada",
+    "bom", "boa", "dia", "noite", "tarde", "ola", "oi", "opa", "obrigado",
+    "valeu", "entao", "aquele", "aquela", "sera", "pois", "mesmo", "assim",
+}
+
+# Sinonimos do jeito que a gente FALA -> palavra que aparece no nome/descricao
+# da ferramenta. So os casos em que o radical nao resolve sozinho.
+_SINONIMOS_FERR = {
+    "encriptar": "criptografar", "encripta": "criptografar",
+    "deletar": "apagar", "deleta": "apagar", "excluir": "apagar", "exclui": "apagar",
+    "anotar": "nota", "anotacao": "nota", "anota": "nota",
+    "app": "programa", "aplicativo": "programa", "aplicativos": "programa",
+    "foto": "print", "screenshot": "print", "captura": "print",
+    "musica": "midia", "cancao": "midia",
+    "achar": "encontrar", "procurar": "encontrar", "procura": "encontrar",
+    "velocidade": "desempenho", "lento": "desempenho", "travando": "desempenho",
+    "espaco": "disco", "armazenamento": "disco",
+    "internet": "rede", "conexao": "rede",
+}
+
+
+def _radical(palavra: str) -> str:
+    """Radical simples do portugues: 'controlar'/'controla' -> 'contr';
+    'nota'/'notas' -> 'nota'. Faz 'anotar uma nota' casar com 'criar_notas'
+    sem inventar casamento errado ('conta' NAO vira 'controlar')."""
+    if len(palavra) >= 6:
+        return palavra[:5]
+    if len(palavra) >= 4 and palavra.endswith("s"):
+        return palavra[:-1]
+    return palavra
+
+
+def _sem_acento(txt: str) -> str:
+    t = (txt or "").lower()
+    for a, b in (("á","a"),("à","a"),("ã","a"),("â","a"),("ä","a"),("ç","c"),
+                 ("é","e"),("ê","e"),("ë","e"),("í","i"),("ï","i"),("ó","o"),
+                 ("ô","o"),("õ","o"),("ö","o"),("ú","u"),("ü","u"),("ñ","n")):
+        t = t.replace(a, b)
+    return t
+
+
+def _tokens_pt(txt: str) -> set:
+    """Radicais uteis do texto (sem acento, sem palavra-vazia, com sinonimos)."""
+    import re as _re
+    palavras = _re.findall(r"[a-z0-9]+", _sem_acento(txt))
+    saida = set()
+    for pal in palavras:
+        if len(pal) < 3 or pal in _STOP_PT:
+            continue
+        saida.add(_radical(pal))
+        sin = _SINONIMOS_FERR.get(pal)
+        if sin:
+            saida.add(_radical(sin))
+    return saida
+
+
+_indice_ferramentas_cache = None
+
+
+def _indice_ferramentas():
+    """Indexa TODAS as @tool: nome, descricao, palavras-chave e parametros."""
+    global _indice_ferramentas_cache
+    if _indice_ferramentas_cache is not None:
+        return _indice_ferramentas_cache
+    import inspect
+    indice = []
+    try:
+        registro = list(tools)
+    except Exception:
+        registro = []
+    for t in registro:
+        nome = getattr(t, "name", None) or getattr(t, "__name__", "")
+        if not nome:
+            continue
+        desc = (getattr(t, "description", "") or "").strip()
+        if not desc:
+            desc = (getattr(t, "__doc__", "") or "").strip()
+        primeira = desc.split("\n")[0].strip()[:200]
+        fn = getattr(t, "func", None) or globals().get(nome)
+        obrigatorios, opcionais = [], []
+        try:
+            for par in inspect.signature(fn).parameters.values():
+                if par.kind in (par.VAR_POSITIONAL, par.VAR_KEYWORD):
+                    continue
+                if par.default is inspect.Parameter.empty:
+                    obrigatorios.append(par.name)
+                else:
+                    opcionais.append(par.name)
+        except Exception:
+            pass
+        indice.append({
+            "nome": nome,
+            "desc": primeira,
+            "tokens_nome": _tokens_pt(nome.replace("_", " ")),
+            "tokens": _tokens_pt(nome.replace("_", " ") + " " + primeira),
+            "obrig": obrigatorios,
+            "opc": opcionais,
+        })
+    _indice_ferramentas_cache = indice
+    return indice
+
+
+def _buscar_ferramentas(texto: str, limite: int = 3):
+    """Ranqueia as ferramentas mais parecidas com o pedido. [(nota, item), ...]"""
+    alvo = _tokens_pt(texto)
+    if not alvo:
+        return []
+    achados = []
+    for item in _indice_ferramentas():
+        comuns = alvo & item["tokens"]
+        if not comuns:
+            continue
+        # casar palavra que esta no NOME da ferramenta vale mais que na descricao
+        nota = len(comuns) + 1.5 * len(alvo & item["tokens_nome"])
+        # normaliza pelo tamanho do pedido, senao frase longa infla tudo
+        nota = nota / (len(alvo) ** 0.5)
+        achados.append((nota, item))
+    achados.sort(key=lambda x: (-x[0], len(x[1]["nome"])))
+    return achados[:limite]
+
+
+def _pedir_parametros(item):
+    """Pergunta em portugues os parametros obrigatorios da ferramenta."""
+    params = {}
+    for nome_par in item["obrig"]:
+        try:
+            valor = input(f"   > {nome_par}: ").strip()
+        except Exception:
+            return None
+        if not valor:
+            print("   (vazio - cancelei)")
+            return None
+        params[nome_par] = valor
+    return params
+
+
+def _despachar_ferramenta_local(comando: str) -> bool:
+    """ULTIMA CARTADA do cerebro local: procura a ferramenta certa entre TODAS
+    e executa, sempre confirmando antes. True se tratou o comando."""
+    try:
+        achados = _buscar_ferramentas(comando, 3)
+    except Exception:
+        return False
+    if not achados:
+        return False
+    melhor, item = achados[0]
+    if melhor < 1.0:
+        return False  # semelhanca fraca demais: nao chuto
+    segunda = achados[1][0] if len(achados) > 1 else 0.0
+    escolhido = None
+    try:
+        if melhor >= 1.6 and melhor >= segunda * 1.4:
+            # um candidato claramente na frente: confirma direto
+            print(f"\n[Local]: achei a ferramenta '{item['nome']}' -> {item['desc']}")
+            resp = input("   Executar? (s/n): ").strip().lower()
+            if resp.startswith("s"):
+                escolhido = item
+        else:
+            print("\n[Local]: nao tenho regra pronta pra isso, mas tenho estas ferramentas:")
+            for i, (_nota, it) in enumerate(achados, 1):
+                print(f"   {i}. {it['nome']} - {it['desc'][:110]}")
+            resp = input("   Digite o numero pra executar (ou ENTER pra cancelar): ").strip()
+            if resp.isdigit() and 1 <= int(resp) <= len(achados):
+                escolhido = achados[int(resp) - 1][1]
+    except Exception:
+        return False
+    if not escolhido:
+        print("   (cancelado)")
+        return True
+    params = {}
+    if escolhido["obrig"]:
+        print(f"   A ferramenta precisa de: {', '.join(escolhido['obrig'])}")
+        params = _pedir_parametros(escolhido)
+        if params is None:
+            return True
+    print(f"   Executando {escolhido['nome']}...")
+    resultado = _invocar_local(escolhido["nome"], **params)
+    texto = str(resultado).strip()
+    print(f"\n[Local]: {texto}")
+    try:
+        historico_conversas.append({"role": "assistant", "content": texto[:2000]})
+        salvar_historico()
+    except Exception:
+        pass
+    return True
+
+
 # ================= FERRAMENTAS DE PODER (locais, sem cota) =================
 # Modo jogo (fecha o que pesa), arquivos grandes, desinstalar em lote,
 # caderno de ideias do agente e ANALISADOR DO PROPRIO CODIGO (sintaxe/duplic).
@@ -3188,6 +3393,11 @@ def _menu_ajuda_local():
     print("   tema escuro | tema claro | modo desempenho | modo economia")
     print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
     print("   status ............. mostra tudo (nuvem, IA local e dados do PC)")
+    print("ARSENAL COMPLETO (as 314 ferramentas, agora tambem no modo LOCAL):")
+    print("   qualquer pedido em portugues ... eu procuro a ferramenta certa entre as")
+    print("                        314 e pergunto antes de executar (sem nuvem)")
+    print("   ferramentas de <assunto> ....... lista o que existe sobre o tema")
+    print("                        (ex.: 'ferramentas de rede', 'ferramentas de disco')")
     print("   silenciar avisos ... desliga o aviso automatico de CPU/RAM alta")
     print("                        ('ligar avisos' volta ao normal)")
     print("   ajuda .............. mostra este menu de novo")
@@ -3737,6 +3947,35 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- BUSCADOR DE FERRAMENTAS: 'ferramentas de rede', 'o que voce tem pra disco' ----
+    for _pre in ("buscar ferramenta", "buscar ferramentas", "procurar ferramenta",
+                 "ferramentas de", "ferramentas pra", "ferramentas para",
+                 "o que voce tem pra", "o que voce tem para", "que ferramenta tem pra"):
+        if cmd.startswith(_pre) or (" " + _pre) in cmd:
+            _termo = cmd.split(_pre, 1)[-1].strip(" :,?")
+            if _termo:
+                _achados = _buscar_ferramentas(_termo, 8)
+                if not _achados:
+                    _rel(f"Nao achei ferramenta pra '{_termo}'. Tente outra palavra "
+                         f"(ex.: rede, disco, memoria, backup, arquivo, janela).")
+                    return True
+                print(f"\n[Local]: ferramentas que combinam com '{_termo}':")
+                for _i, (_nt, _it) in enumerate(_achados, 1):
+                    print(f"   {_i}. {_it['nome']} - {_it['desc'][:110]}")
+                print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
+                return True
+
+    # ---- PONTE PARA AS 314 FERRAMENTAS ----
+    # Nenhuma regra pegou: em vez de desistir (como antes, quando so a IA da
+    # NUVEM conseguia escolher ferramenta), procuro no arsenal inteiro e
+    # executo com sua confirmacao. E isso que da ao modo local o mesmo alcance
+    # da nuvem, so que offline e instantaneo.
+    try:
+        if _despachar_ferramenta_local(comando):
+            return True
+    except Exception:
+        pass
 
     return False
 
