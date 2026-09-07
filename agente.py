@@ -2623,9 +2623,14 @@ def _processar_cerebro_local(comando: str) -> bool:
 
     # ---- ORGANIZAR / LISTAR pastas e arquivos ----
     if any(p in cmd for p in ("organizar pasta", "organiza a pasta", "organize a pasta",
-                              "organizar downloads", "organiza downloads", "organizar imagens",
-                              "organiza as fotos", "organizar fotos", "organiza minhas fotos",
-                              "arrumar pasta", "arruma a pasta", "organiza minha pasta")):
+                              "organiza as pastas", "organize as pastas", "organizar pastas",
+                              "organizar downloads", "organiza downloads", "organize downloads",
+                              "organizar imagens", "organiza as imagens", "organize as imagens",
+                              "pastas de imagem", "pasta de imagens", "pasta de fotos",
+                              "organiza as fotos", "organize as fotos", "organizar fotos",
+                              "organiza minhas fotos", "arrumar pasta", "arruma a pasta",
+                              "arrume a pasta", "organiza minha pasta", "organize minha pasta",
+                              "organizar minha pasta", "organiza as fotos", "limpar bagunca", "limpar bagunça")):
         pasta = ""
         if "download" in cmd:
             pasta = os.path.join(os.path.expanduser("~"), "Downloads")
@@ -2713,6 +2718,11 @@ def _processar_cerebro_local(comando: str) -> bool:
     if any(p in cmd for p in ("atualizar o windows", "atualiza o windows", "atualizacao do windows", "atualizar windows",
                               "buscar atualizacoes do sistema", "atualizacoes do windows")):
         _rel(_invocar_local("atualizar_windows")); return True
+    if any(p in cmd for p in ("tem atualizacao", "tem atualizações", "ha atualizacao", "ha atualizações",
+                              "atualizacao pendente", "atualizacoes pendentes", "precisa atualizar",
+                              "verificar atualizacoes", "checar atualizacoes", "windows esta atualizado",
+                              "windows atualizado")):
+        _rel(_invocar_local("verificar_atualizacoes_sistema")); return True
     if any(p in cmd for p in ("fechar programa", "fechar o programa", "encerrar programa", "matar processo",
                               "finalizar programa", "fechar app", "fecha o programa")):
         _alvo_p = cmd
@@ -2729,6 +2739,26 @@ def _processar_cerebro_local(comando: str) -> bool:
         except Exception:
             _rel("Tenho centenas de ferramentas: abrir programas/sites, otimizar e limpar o PC, "
                  "analisar saude/rede, organizar pastas, backup, arquivos, rede, energia e muito mais.")
+        return True
+    # OPNIAO PROPRIA / SUGESTOES DE NOVAS FUNCOES: o que ele gostaria de ter,
+    # ideias de ferramentas, como melhorar. Usa a ferramenta de opinioes (ja
+    # existente) e, se a IA neural estiver pronta, pergunta a ela tambem.
+    if any(p in cmd for p in ("que funcao voce gostaria", "qual funcao voce gostaria",
+                              "o que voce gostaria de ter", "que ferramenta voce gostaria",
+                              "sugere uma funcao", "sugere uma ferramenta", "ideia de funcao",
+                              "ideia de ferramenta", "nova funcao", "nova ferramenta",
+                              "o que melhorar", "como melhorar voce", "sua opiniao sobre",
+                              "o que voce acha de ter", "que poder voce queria",
+                              "que mais voce queria fazer", "sonha em ter", "gostaria de ter")):
+        _r = None
+        if ia_local_disponivel():
+            try:
+                _r = perguntar_ia_local(comando, historico_conversas)
+            except Exception:
+                _r = None
+        if not _r:
+            _r = _invocar_local("agente_opinioes")
+        _rel(_r)
         return True
 
     return False
@@ -3033,23 +3063,97 @@ def ia_local_disponivel() -> bool:
         return False
 
 
+_cache_contexto_pc = None
+
+def _contexto_pc() -> str:
+    """Resumo enxuto do PC (so leitura) para a IA neural saber quem/como o
+    sistema e, sem precisar adivinhar. Cacheado (nao muda numa sessao)."""
+    global _cache_contexto_pc
+    if _cache_contexto_pc is not None:
+        return _cache_contexto_pc
+    import platform as _pl
+    fatos = []
+    try:
+        fatos.append(f"Sistema: {_pl.system()} {_pl.release()} (build {_pl.version()})")
+        fatos.append(f"PC: {_pl.node()}")
+        fatos.append(f"Nivel de permissao do agente: {config.get('nivel_permissao','admin')} (roda como administrador)")
+    except Exception:
+        pass
+    try:
+        import psutil
+        ram = psutil.virtual_memory()
+        fatos.append(f"RAM total: {ram.total//(1024**3)}GB ({100-ram.percent:.0f}% livre agora)")
+        fatos.append(f"CPU: {psutil.cpu_count(logical=True)} nucleos")
+    except Exception:
+        pass
+    _cache_contexto_pc = " | ".join(fatos)
+    return _cache_contexto_pc
+
+
+# Verbos de acao que, SEM terem sido tratados por uma regra, indicam que o
+# usuario pediu uma ACAO no PC (nao e conversa) - usamos para NAO mandar isso
+# para a IA neural (ela nao executa nada e inventaria uma resposta).
+_VERBOS_ACAO = ("abre", "abra", "abrir", "feche", "fecha", "fechar", "inicie", "inicia",
+                "iniciar", "execute", "executa", "executar", "otimize", "otimiza", "otimizar",
+                "limpe", "limpa", "limpar", "organize", "organiza", "organizar", "arrume",
+                "arruma", "arrumar", "instale", "instala", "instalar", "desinstale", "desinstala",
+                "desligue", "desliga", "desligar", "reinicie", "reinicia", "reiniciar",
+                "bloqueie", "bloqueia", "bloquear", "repar", "conserte", "conserta", "crie",
+                "cria", "criar", "apague", "apaga", "apagar", "mova", "move", "mover",
+                "copie", "copia", "copiar", "renomeie", "renomeia", "renomear", "envie",
+                "envia", "enviar", "mande", "manda", "mandar", "tire", "tira", "captura",
+                "configure", "configura", "configurar", "ative", "ativa", "ativar", "desative",
+                "desativa", "finalize", "finaliza", "matar", "mate", "encerre", "encerra",
+                "atualize", "atualiza", "atualizar", "baixe", "baixa", "baixar", "monitore")
+
+
+def _parece_pedido_de_acao(cmd: str) -> bool:
+    """True se o comando comeca (1a palavra) por um verbo de acao no PC, ou tem
+    padrões claros de pedido de acao. Serve para nao deixar a IA neural fingir
+    que executou algo."""
+    _p = cmd.strip().split()
+    if not _p:
+        return False
+    _norm0 = _norm_pt(_p[0])
+    if _norm0 in [_norm_pt(v) for v in _VERBOS_ACAO]:
+        return True
+    _c = cmd.lower()
+    if "pode" in _c and any(v in _c for v in ("abrir", "otimizar", "limpar", "organizar",
+                                              "instalar", "desligar", "reparar", "criar",
+                                              "configurar", "atualizar", "fechar")):
+        return True
+    return False
+
+
 def perguntar_ia_local(pergunta: str, historico=None) -> str:
     """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
     resposta em texto. Levanta excecao se algo falhar (o chamador trata)."""
     import urllib.request
     msgs = [{"role": "system", "content": (
         "Voce e o Super Agente, um assistente pessoal brasileiro que roda 100% "
-        "local no PC do usuario. Fale portugues do Brasil de forma clara, curta e "
-        "prestativa, sem emoji. Voce NAO executa acoes no PC (quem faz isso sao os "
-        "comandos por regra): quando o usuario pedir uma acao, diga para falar em "
-        "comando direto (ex.: 'abre o youtube', 'otimiza tudo').")}]
+        "local no PC do usuario, COM PRIVILEGIOS DE ADMINISTRADOR e controle total "
+        "do Windows (abrir/fechar programas, otimizar, limpar, configurar, etc.). "
+        "Fale portugues do Brasil de forma clara, segura, com personalidade e "
+        "opiniao propria (pode dar sugestoes do que melhorar no PC e de novas "
+        "ferramentas), sem emoji. IMPORTANTE: voce NAO executa a acao voce mesmo - "
+        "quem executa e o sistema de comandos. Por isso, NUNCA diga que executou, "
+        "que '[executa a acao]' ou que fez algo no PC. Se o usuario pedir uma ACAO, "
+        "responda curto dizendo que e so falar o comando direto que voce faz "
+        "(ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads', 'atualiza o "
+        "windows', 'abre configuracao'); e NUNCA afirme que nao tem admin ou que "
+        "nao pode mexer no sistema - voce roda como administrador. Para conversa, "
+        "duvidas e explicacoes, responda normal e de forma util.") +
+        " DADOS DESTE PC: " + _contexto_pc() +
+        " Para perguntas como 'o que voce gostaria de ter/nova funcao/ferramenta', "
+        "de opiniao propria, direta e em portugues, com ideias uteis de verdade."}]
     for m in (historico or [])[-6:]:
         if m.get("role") in ("user", "assistant") and m.get("content"):
             msgs.append({"role": m["role"], "content": str(m["content"])[:1500]})
     msgs.append({"role": "user", "content": pergunta})
     corpo = json.dumps({
-        "model": "local", "messages": msgs, "temperature": 0.6,
-        "max_tokens": 512, "stream": False,
+        "model": "local", "messages": msgs, "temperature": 0.5,
+        "max_tokens": 350, "stream": False,
+        "top_p": 0.9, "repeat_penalty": 1.05,
     }).encode("utf-8")
     req = urllib.request.Request(_url_ia_local + "/v1/chat/completions",
                                  data=corpo, method="POST",
@@ -3331,6 +3435,21 @@ def processar_atalho_rapido(comando: str) -> bool:
     # 'ligar ia'). Mantem o agente respondendo em vez de ficar mudo.
     if not config.get("usar_ia_nuvem", True):
         _r = None
+        # TRAVA ANTI-VAZAMENTO: se o comando e um pedido de ACAO que nenhuma
+        # regra tratou, NAO manda para a IA neural (ela nao executa nada e
+        # poderia fingir que fez). Orientamos a falar o comando direto.
+        _eh_acao = False
+        try:
+            _eh_acao = _parece_pedido_de_acao(comando)
+        except Exception:
+            _eh_acao = False
+        if _eh_acao:
+            print("\n[Local]: esse comando e uma ACAO que eu ainda nao faco por regra.")
+            print("        Tente falar direto (ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads',")
+            print("        'atualiza o windows'); digite 'ajuda' para ver tudo. Se quiser que eu adicione")
+            print("        essa acao, me diga o que voce quer que ela faca. (A IA de conversa nao executa")
+            print("        acoes no PC - quem controla o Windows sao os comandos, que rodam como admin.)")
+            return True
         if ia_local_disponivel():
             try:
                 _r = perguntar_ia_local(comando, historico_conversas)
