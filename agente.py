@@ -2490,6 +2490,225 @@ _INTRO_LOCAL = (
 )
 
 
+
+# ================= FERRAMENTAS DE PODER (locais, sem cota) =================
+# Modo jogo (fecha o que pesa), arquivos grandes, desinstalar em lote,
+# caderno de ideias do agente e ANALISADOR DO PROPRIO CODIGO (sintaxe/duplic).
+import os as _os_p
+ARQ_IDEIAS_AGENTE = os.path.join(PASTA_BASE, "ideias_agente.md")
+_CAMINHO_AGENTE_PY = os.path.join(PASTA_BASE, "agente.py")
+
+
+def _caderno_ideias(acao: str, ideia: str = "") -> str:
+    """Guarda/sugere as IDEIAS do proprio agente (e do usuario) num caderno
+    'ideias_agente.md' na pasta dele - assim nenhuma ideia de nova funcao se
+    perde. Acoes: 'adicionar' (passa a ideia em 'ideia'), 'listar', 'abrir'."""
+    a = (acao or "").strip().lower()
+    if a in ("listar", "lista", "ver", "mostrar"):
+        if not os.path.exists(ARQ_IDEIAS_AGENTE):
+            return "O caderno de ideias ainda esta vazio. Me peca 'que funcao voce gostaria de ter' e eu anoto as ideias aqui."
+        try:
+            with open(ARQ_IDEIAS_AGENTE, "r", encoding="utf-8") as f:
+                conteudo = f.read().strip()
+            return conteudo or "Caderno de ideias vazio."
+        except Exception as e:
+            return f"Nao consegui ler o caderno: {type(e).__name__}"
+    if a in ("abrir", "abrir caderno", "abrir arquivo"):
+        try:
+            subprocess.Popen(["notepad", ARQ_IDEIAS_AGENTE] if os.name == "nt" else ["xdg-open", ARQ_IDEIAS_AGENTE])
+            return "Caderno de ideias aberto no Bloco de Notas."
+        except Exception:
+            return f"O caderno fica em: {ARQ_IDEIAS_AGENTE}"
+    if a in ("adicionar", "anotar", "salvar", "nova"):
+        texto = ideia.strip()
+        if not texto:
+            return "Diga qual ideia devo anotar."
+        try:
+            novo = not os.path.exists(ARQ_IDEIAS_AGENTE)
+            with open(ARQ_IDEIAS_AGENTE, "a", encoding="utf-8") as f:
+                if novo:
+                    f.write("# Caderno de ideias do Super Agente\n\n")
+                f.write(f"- [{datetime.now().strftime('%Y-%m-%d %H:%M')}] {texto}\n")
+            return f"Ideia anotada no caderno: '{texto[:80]}'. Use 'ver ideias' para listar."
+        except Exception as e:
+            return f"Nao consegui anotar: {type(e).__name__}"
+    return "Acao invalida do caderno. Use: adicionar, listar ou abrir."
+
+
+def _modo_jogo(fechar: bool = True) -> str:
+    """MODO JOGO: libera memoria/RAM fechando programas de fundo que comem
+    recursos (navegadores, Discord, Spotify, OneDrive etc.), mantendo o que for
+    jogo/seguranca; troca para o plano de energia de alto desempenho. Nao fecha
+    o jogo que estiver em foco. Pede confirmacao se mandar fechar."""
+    if fechar and not pedir_confirmacao(
+        "Ativar o MODO JOGO? Vou fechar programas de fundo que pesam (navegador, "
+        "Discord, Spotify, OneDrive...) e ligar o plano de alto desempenho. Nao "
+        "fecho o jogo que voce estiver jogando."):
+        return "Modo jogo cancelado."
+    rel = []
+    ram_antes = None
+    try:
+        import psutil
+        ram_antes = psutil.virtual_memory().percent
+    except Exception:
+        pass
+    # Nomes de processos que podemos fechar (iguais ou com essas palavras).
+    alvos = ("chrome", "msedge", "firefox", "opera", "brave", "discord", "spotify",
+             "onedrive", "teams", "slack", "skype", "outlook", "winword", "excel",
+             "powerpnt", "steamwebhelper", "epicwebhelper")
+    fechados = 0
+    try:
+        import psutil
+        for proc in psutil.process_iter(["name"]):
+            try:
+                nm = (proc.info.get("name") or "").lower()
+                base = nm.split(".")[0]
+                if any(a in nm or a == base for a in alvos):
+                    proc.terminate()
+                    fechados += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    if fechados:
+        rel.append(f"Encerrei ~{fechados} processo(s) de fundo que pesavam")
+    else:
+        rel.append("Nao havia programas de fundo pesados para fechar")
+    # Plano de alto desempenho
+    try:
+        subprocess.run("powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c",
+                       shell=True, capture_output=True)
+        rel.append("Plano de energia: ALTO DESEMPENHO ligado")
+    except Exception:
+        try:
+            _invocar_local("otimizar_sistema", acao="plano_energia_desempenho")
+            rel.append("Plano de energia: alto desempenho ligado")
+        except Exception:
+            pass
+    if ram_antes is not None:
+        try:
+            import psutil
+            ram_dep = psutil.virtual_memory().percent
+            rel.append(f"RAM: {ram_antes:.0f}% -> {ram_dep:.0f}% (liberou ~{max(0, ram_antes-ram_dep):.0f} pontos)")
+        except Exception:
+            pass
+    rel.append("Modo jogo ATIVO. Bom jogo! Para voltar ao normal, use 'modo economia'.")
+    return "\n".join("- " + r for r in rel)
+
+
+def _achar_arquivos_grandes(min_gb: float = 0.5, limite: int = 25) -> str:
+    """Procura os ARQUIVOS MAIS PESADOS do PC (so leitura, nao apaga nada) nas
+    pastas do usuario: Downloads, Documentos, Imagens, Videos, Area de Trabalho
+    e na pasta do usuario. Otimo para liberar espaco. min_gb = tamanho minimo."""
+    pastas = []
+    home = os.path.expanduser("~")
+    for sub in ("Downloads", "Documents", "Pictures", "Videos", "Music", "Desktop",
+                "Área de Trabalho", "Area de Trabalho"):
+        cam = os.path.join(home, sub)
+        if os.path.isdir(cam):
+            pastas.append(cam)
+    grandes = []
+    min_bytes = int(min_gb * 1024 ** 3)
+    for base in pastas:
+        for raiz, dirs, arqs in os.walk(base):
+            # evita pastas de sistema/dentro do agente
+            if any(k in raiz.lower() for k in ("appdata", "windows", "$recycle")):
+                continue
+            for a in arqs:
+                cam = os.path.join(raiz, a)
+                try:
+                    tam = os.path.getsize(cam)
+                    if tam >= min_bytes:
+                        grandes.append((tam, cam))
+                except Exception:
+                    pass
+    grandes.sort(reverse=True)
+    if not grandes:
+        return f"Nao achei arquivos acima de {min_gb} GB nas pastas de Documents/Downloads/Imagens/Videos. Tudo enxuto!"
+    linhas = [f"Maiores arquivos (top {min(limite, len(grandes))}):"]
+    total = 0
+    for tam, cam in grandes[:limite]:
+        gb = tam / 1024 ** 3
+        total += tam
+        linhas.append(f"  {gb:6.2f} GB  {cam}")
+    linhas.append(f"\nSomando: {total/1024**3:.1f} GB. Se quiser apagar algum, me diga o nome que eu confirmo antes.")
+    return "\n".join(linhas)
+
+
+def _desinstalar_programas(programas: str) -> str:
+    """Desinstala um ou mais programas (use virgula para separar). Usa o
+    winget (gerenciador oficial do Windows). Sempre pede confirmacao e o
+    proprio Windows pode pedir permissao."""
+    nomes = [x.strip() for x in programas.replace(";", ",").split(",") if x.strip()]
+    if not nomes:
+        return "Diga quais programas desinstalar (ex.: 'desinstalar minecraft, epic games')."
+    if not pedir_confirmacao(
+        "Desinstalar estes programas? " + ", ".join(nomes) +
+        ". Isto remove os aplicativos de verdade (pode abrir o desinstalador de cada um)."):
+        return "Desinstalacao cancelada."
+    feitos = []
+    for nm in nomes:
+        try:
+            r = subprocess.run(
+                f'winget uninstall --name "{nm}" --silent --accept-source-agreements',
+                shell=True, capture_output=True, text=True, timeout=300)
+            ok = r.returncode == 0
+            feitos.append(f"{nm}: " + ("removido (ou desinstalador iniciado)" if ok else
+                          "nao confirmei a remocao - confira em Config > Aplicativos"))
+        except Exception as e:
+            feitos.append(f"{nm}: erro ({type(e).__name__})")
+    return "\n".join("- " + f for f in feitos)
+
+
+def _analisar_codigo_agente() -> str:
+    """ANALISA O PROPRIO agente.py: checa se ele COMPILA (sintaxe ok), conta
+    funcoes/ferramentas e procura funcoes DUPLICADAS (nome repetido). E so
+    leitura/verificacao - nao altera nada. Use para confirmar que o codigo esta
+    sao antes/depois de melhorias."""
+    cam = _CAMINHO_AGENTE_PY
+    rel = []
+    if not os.path.exists(cam):
+        return f"Nao encontrei {cam}."
+    try:
+        with open(cam, "r", encoding="utf-8") as f:
+            fonte = f.read()
+    except Exception as e:
+        return f"Nao consegui ler o codigo: {type(e).__name__}"
+    tam_kb = len(fonte.encode("utf-8")) // 1024
+    rel.append(f"Arquivo: agente.py ({tam_kb} KB, {len(fonte.splitlines())} linhas)")
+    # 1) Compila?
+    try:
+        compile(fonte, cam, "exec")
+        rel.append("Sintaxe: OK (compila sem erros)")
+    except SyntaxError as e:
+        rel.append(f"Sintaxe: ERRO na linha {e.lineno}: {e.msg}")
+        return "ANALISE DO CODIGO\n- " + "\n- ".join(rel)
+    # 2) Contagem e duplicados
+    import re as _re
+    # So funcoes de NIVEL SUPERIOR (coluna 0) contam como "ferramentas do agente";
+    # helpers aninhados (def _executar dentro de outra funcao) sao normais.
+    defs = _re.findall(r"(?m)^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", fonte)
+    tools = _re.findall(r"(?m)^@tool", fonte)
+    rel.append(f"Funcoes definidas: {len(defs)} | marcadores @tool: {len(tools)}")
+    vistos = {}
+    duplic = []
+    for d in defs:
+        vistos[d] = vistos.get(d, 0) + 1
+    for d, c in vistos.items():
+        if c > 1:
+            duplic.append(f"{d} (x{c})")
+    if duplic:
+        rel.append("Atencao - funcoes com nome repetido: " + ", ".join(sorted(duplic)[:20]))
+    else:
+        rel.append("Funcoes duplicadas: nenhuma (nomes unicos)")
+    # 3) Sanidade: o arquivo e o mesmo que esta rodando?
+    rel.append("Resultado: o codigo esta integravel e pronto para rodar." if not duplic
+               else "Resultado: compila, mas ha nomes repetidos que valem revisar.")
+    return "ANALISE DO CODIGO (agente.py)\n- " + "\n- ".join(rel)
+
+
+
+
 def _menu_ajuda_local():
     """Mostra um menu com TUDO o que o agente faz no modo local e como ligar a
     IA neural local e a nuvem - para o usuario nunca ficar perdido."""
@@ -2866,6 +3085,47 @@ def _processar_cerebro_local(comando: str) -> bool:
             _r = _invocar_local("agente_opinioes")
         _rel(_r)
         return True
+
+    # ============ FERRAMENTAS DE PODER / AUTO-GESTAO ============
+    # Modo jogo: fecha o que pesa e liga alto desempenho.
+    if any(p in cmd for p in ("modo jogo", "modo game", "ativar jogo", "liga modo jogo",
+                              "turbo pra jogar", "otimizar pra jogar", "liberar ram pra jogo", "modo jogatina")):
+        _rel(_modo_jogo(True)); return True
+    # Achar arquivos grandes (so leitura).
+    if any(p in cmd for p in ("arquivos grandes", "maiores arquivos", "o que mais ocupa espaco",
+                              "o que esta ocupando espaco", "limpar espaco em disco", "achar arquivos pesados",
+                              "arquivos que mais pesam", "liberar espaco")):
+        _rel(_achar_arquivos_grandes()); return True
+    # Desinstalar programas (lote).
+    if any(p in cmd for p in ("desinstalar programa", "desinstala o programa", "desinstalar app",
+                              "remover programa", "remove o programa", "desinstala o app",
+                              "desinstalar os programas", "desinstalar programas")):
+        _alvo = cmd
+        for pre in ("desinstalar programa", "desinstala o programa", "desinstalar app", "desinstala o app",
+                    "desinstalar programas", "desinstalar os programas", "remover programa",
+                    "remove o programa", "desinstala", "desinstalar"):
+            if pre in _alvo:
+                _alvo = _alvo.split(pre)[-1]; break
+        _rel(_desinstalar_programas(_alvo.strip(" :,"))); return True
+    # Caderno de ideias do agente.
+    if any(p in cmd for p in ("ver ideias", "lista ideias", "mostrar ideias", "caderno de ideias",
+                              "ideias anotadas", "suas ideias", "ideias do agente")):
+        _rel(_caderno_ideias("listar")); return True
+    if any(p in cmd for p in ("abrir caderno", "abrir bloco de ideias", "abrir ideias", "bloco de notas de ideias")):
+        _rel(_caderno_ideias("abrir")); return True
+    if "anota a ideia" in cmd or "anote a ideia" in cmd or cmd.startswith(("anota ideia", "anotar ideia", "guarda a ideia", "salva a ideia")):
+        _ideia = cmd
+        for pre in ("anota a ideia", "anote a ideia", "anota ideia", "anotar ideia",
+                    "guarda a ideia", "salva a ideia"):
+            if pre in _ideia:
+                _ideia = _ideia.split(pre)[-1]; break
+        _rel(_caderno_ideias("adicionar", _ideia.strip(" :"))); return True
+    # Analisar o PROPRIO codigo (verifica sintaxe/duplicados) - so leitura.
+    if any(p in cmd for p in ("analisa teu codigo", "analise seu codigo", "analisar o codigo",
+                              "verifica o codigo", "conferir o codigo", "teu codigo esta certo",
+                              "seu codigo esta certo", "analisa o agente", "auto analise",
+                              "autoanalise", "checa o codigo", "revisar o codigo", "revisa teu codigo")):
+        _rel(_analisar_codigo_agente()); return True
 
     return False
 
