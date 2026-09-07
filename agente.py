@@ -2936,6 +2936,10 @@ def _indice_ferramentas():
         if not desc:
             desc = (getattr(t, "__doc__", "") or "").strip()
         primeira = desc.split("\n")[0].strip()[:200]
+        # texto de BUSCA usa a descricao inteira (nao so a 1a linha): e nas
+        # linhas seguintes que costuma estar a palavra que a pessoa fala
+        # ("aniversario", "lentidao", "vazou"...).
+        texto_busca = " ".join(desc.split())[:400]
         fn = getattr(t, "func", None) or globals().get(nome)
         obrigatorios, opcionais = [], []
         try:
@@ -2952,7 +2956,7 @@ def _indice_ferramentas():
             "nome": nome,
             "desc": primeira,
             "tokens_nome": _tokens_pt(nome.replace("_", " ")),
-            "tokens": _tokens_pt(nome.replace("_", " ") + " " + primeira),
+            "tokens": _tokens_pt(nome.replace("_", " ") + " " + texto_busca),
             "obrig": obrigatorios,
             "opc": opcionais,
         })
@@ -2994,6 +2998,119 @@ def _pedir_parametros(item):
     return params
 
 
+# ============ CEREBRO AVANCADO DO MODO LOCAL ============
+# Quatro capacidades que faltavam pro local "pensar" em vez de so casar regra:
+#   1) PLANO DE VARIOS PASSOS   ("abre o spotify e depois toca beatles")
+#   2) SIMULACAO / RACIOCINIO   ("o que voce faria se eu pedisse X")
+#   3) MEMORIA DE CONTEXTO      ("de novo", "repete isso")
+#   4) ATALHOS APRENDIDOS       ("quando eu falar X, faca Y")
+ARQ_ATALHOS_APRENDIDOS = os.path.join(PASTA_BASE, "atalhos_aprendidos.json")
+_ULTIMO_COMANDO = {"texto": ""}
+_LIGACOES_PASSOS = (" e depois ", " e dpois ", " depois disso ", ", depois ", " e entao ",
+                    " e ai ", " e em seguida ", " em seguida ", " e por fim ", " e tambem ")
+
+
+def _quebrar_em_passos(comando: str):
+    """Divide um pedido com varias acoes em passos, so quando a ligacao e
+    clara ('e depois', 'em seguida'). Nao quebra em ' e ' solto, senao
+    'abre o bloco de notas e o excel' viraria bobagem."""
+    baixo = " " + comando.lower().strip() + " "
+    for lig in _LIGACOES_PASSOS:
+        if lig in baixo:
+            partes = []
+            resto = comando
+            while True:
+                achou = None
+                for l in _LIGACOES_PASSOS:
+                    pos = resto.lower().find(l)
+                    if pos != -1 and (achou is None or pos < achou[0]):
+                        achou = (pos, l)
+                if not achou:
+                    break
+                pos, l = achou
+                partes.append(resto[:pos].strip(" ,."))
+                resto = resto[pos + len(l):]
+            partes.append(resto.strip(" ,."))
+            return [x for x in partes if x]
+    return []
+
+
+def _explicar_raciocinio(comando: str) -> str:
+    """SIMULACAO: explica o que o agente FARIA, sem executar nada. Mostra o
+    caminho escolhido e por que - e o 'mostre seu raciocinio' do modo local."""
+    passos = _quebrar_em_passos(comando)
+    linhas = [f"RACIOCINIO para: \"{comando}\""]
+    if passos:
+        linhas.append(f"  1. Vejo {len(passos)} acoes ligadas, entao faria em ordem:")
+        for i, p in enumerate(passos, 1):
+            linhas.append(f"     passo {i}: {p}")
+        alvos = passos
+    else:
+        alvos = [comando]
+    try:
+        atalhos = carregar_json(ARQ_ATALHOS_APRENDIDOS, {})
+    except Exception:
+        atalhos = {}
+    for alvo in alvos:
+        n = _norm_pt(alvo)
+        if n in {_norm_pt(k) for k in atalhos}:
+            linhas.append(f"  - '{alvo}' e um atalho que VOCE me ensinou.")
+            continue
+        try:
+            if n in {_norm_pt(k) for k in _carregar_rotinas()}:
+                linhas.append(f"  - '{alvo}' e uma rotina sua (varios passos salvos).")
+                continue
+        except Exception:
+            pass
+        # regras diretas do cerebro (nao passam pela busca de ferramenta)
+        primeira_palavra = _norm_pt((alvo.split() or [""])[0])
+        if primeira_palavra in ("abre", "abrir", "abra"):
+            linhas.append(f"  - '{alvo}': regra direta de ABRIR - procuro o app instalado no "
+                          "Menu Iniciar (Get-StartApps), tento o protocolo do aplicativo e, "
+                          "se nao for programa, abro como site.")
+            continue
+        if any(x in _norm_pt(alvo) for x in ("temaescuro", "temaclaro", "otimizatudo",
+                                             "modojogo", "vertela", "limparlixo")):
+            linhas.append(f"  - '{alvo}': regra direta do cerebro local (instantanea, sem busca).")
+            continue
+        achados = _buscar_ferramentas(alvo, 3)
+        if not achados:
+            linhas.append(f"  - '{alvo}': nenhuma ferramenta parecida; eu trataria como conversa "
+                          "e responderia com a IA local.")
+            continue
+        nota, item = achados[0]
+        motivo = ", ".join(sorted(_tokens_pt(alvo) & item["tokens"])) or "semelhanca geral"
+        linhas.append(f"  - '{alvo}': usaria '{item['nome']}' (confianca {nota:.1f}; "
+                      f"casou por: {motivo})")
+        if item["obrig"]:
+            linhas.append(f"      e pediria: {', '.join(item['obrig'])}")
+        if len(achados) > 1:
+            linhas.append("      alternativas: " + ", ".join(i["nome"] for _n, i in achados[1:]))
+    linhas.append("  (Isto foi so uma simulacao - nao executei nada.)")
+    return "\n".join(linhas)
+
+
+def _atalhos_aprendidos_salvar(gatilho: str, acao: str) -> str:
+    gatilho = (gatilho or "").strip().strip(":,.").lower()
+    acao = (acao or "").strip()
+    if not gatilho or not acao:
+        return ("Formato: quando eu falar <gatilho> faca <acao>. Ex.: "
+                "quando eu falar 'tô saindo' faca bloquear tela")
+    atalhos = carregar_json(ARQ_ATALHOS_APRENDIDOS, {})
+    atalhos[gatilho] = acao
+    salvar_json(ARQ_ATALHOS_APRENDIDOS, atalhos)
+    return f"Aprendi: quando voce disser '{gatilho}', eu faco '{acao}'."
+
+
+def _atalhos_aprendidos_listar() -> str:
+    atalhos = carregar_json(ARQ_ATALHOS_APRENDIDOS, {})
+    if not atalhos:
+        return ("Voce ainda nao me ensinou nenhum atalho. Ex.: "
+                "quando eu falar 'tô saindo' faca bloquear tela")
+    return ("ATALHOS QUE VOCE ME ENSINOU:\n  "
+            + "\n  ".join(f"'{g}' -> {a}" for g, a in atalhos.items()))
+
+
 def _despachar_ferramenta_local(comando: str) -> bool:
     """ULTIMA CARTADA do cerebro local: procura a ferramenta certa entre TODAS
     e executa, sempre confirmando antes. True se tratou o comando."""
@@ -3010,8 +3127,11 @@ def _despachar_ferramenta_local(comando: str) -> bool:
     escolhido = None
     try:
         if melhor >= 1.6 and melhor >= segunda * 1.4:
-            # um candidato claramente na frente: confirma direto
+            # um candidato claramente na frente: mostra o PORQUE e confirma
+            motivo = ", ".join(sorted(_tokens_pt(comando) & item["tokens"]))
             print(f"\n[Local]: achei a ferramenta '{item['nome']}' -> {item['desc']}")
+            if motivo:
+                print(f"        (escolhi por: {motivo} | confianca {melhor:.1f})")
             resp = input("   Executar? (s/n): ").strip().lower()
             if resp.startswith("s"):
                 escolhido = item
@@ -3680,6 +3800,18 @@ def _menu_ajuda_local():
     print("                        314 e pergunto antes de executar (sem nuvem)")
     print("   ferramentas de <assunto> ....... lista o que existe sobre o tema")
     print("                        (ex.: 'ferramentas de rede', 'ferramentas de disco')")
+    print("CEREBRO AVANCADO (so no modo local):")
+    print("   <acao> e depois <acao> ... faco um PLANO e executo em ordem")
+    print("                        ex.: 'otimiza tudo e depois reinicia o explorer'")
+    print("   o que voce faria se ... eu EXPLICO o raciocinio sem executar nada")
+    print("   quando eu falar X faca Y ... voce me ensina um atalho novo")
+    print("   de novo ............ repete o ultimo comando")
+    print("NOVAS FAMILIAS DE FERRAMENTAS:")
+    print("   arquivos ... mapa de espaco | duplicados | pastas vazias | integridade")
+    print("   sistema .... tempo ligado | top cpu/memoria | gargalo | bateria | boot")
+    print("   rede ....... ping | rota | dns | latencia | sinal do wifi | site no ar")
+    print("   codigo ..... git status/log/diff/commit | venv | pip | segredos vazados")
+    print("   texto ...... resumir | extrair emails/links | cpf/cnpj | porcentagem")
     print("ROTINAS (seus atalhos: varios comandos com um nome so):")
     print("   criar rotina <nome>: passo1 > passo2 > passo3")
     print("                        ex.: criar rotina modo estudo: fecha o discord >")
@@ -3713,6 +3845,11 @@ def _processar_cerebro_local(comando: str) -> bool:
              "quaiscomandos", "mostramenu", "verajuda", "socorro"):
         _menu_ajuda_local()
         return True
+
+    # guarda o ultimo pedido pra permitir "de novo" (sem guardar o proprio
+    # "de novo", senao entraria em loop)
+    if n not in ("denovo", "repete", "repeteisso", "outravez", "repetir"):
+        _ULTIMO_COMANDO["texto"] = comando
 
     def _rel(r):
         r = str(r).strip()
@@ -4079,12 +4216,7 @@ def _processar_cerebro_local(comando: str) -> bool:
                               "o que melhorar", "como melhorar voce", "sua opiniao sobre",
                               "o que voce acha de ter", "que poder voce queria",
                               "que mais voce queria fazer", "sonha em ter", "gostaria de ter")):
-        _r = None
-        if ia_local_disponivel():
-            try:
-                _r = perguntar_ia_local(comando, historico_conversas)
-            except Exception:
-                _r = None
+        _r = _resposta_da_neural(comando)
         if not _r:
             _r = _invocar_local("agente_opinioes")
         _rel(_r)
@@ -4239,6 +4371,67 @@ def _processar_cerebro_local(comando: str) -> bool:
                  f"'manda whatsapp pro {_nome}: oi, tudo bem?'")
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
+        return True
+
+    # ---- REPETIR O ULTIMO COMANDO ("de novo", "repete isso") ----
+    if n in ("denovo", "denovopf", "repete", "repeteisso", "faznovamente", "denovopor favor",
+             "outravez", "manda denovo", "repetir", "repetirultimo", "denovoai"):
+        anterior = _ULTIMO_COMANDO.get("texto", "")
+        if not anterior:
+            _rel("Ainda nao tem nada pra repetir nesta sessao.")
+            return True
+        print(f"\n[Local]: repetindo -> {anterior}")
+        return _processar_cerebro_local(anterior)
+
+    # ---- SIMULACAO / RACIOCINIO: explica o que faria, sem executar ----
+    for _pre in ("o que voce faria se", "o que voce faria", "como voce faria",
+                 "explica como voce faria", "simula", "me explica seu raciocinio sobre",
+                 "qual seria seu plano para", "qual seu plano para"):
+        if cmd.startswith(_pre):
+            _alvo_sim = cmd[len(_pre):].strip(" :,?eu pedisse")
+            if _alvo_sim:
+                _rel(_explicar_raciocinio(_alvo_sim))
+                return True
+
+    # ---- ATALHOS APRENDIDOS: "quando eu falar X faca Y" ----
+    if n in ("meusatalhosaprendidos", "atalhosaprendidos", "oquevoceaprendeu",
+             "listaratalhos", "meusgatilhos"):
+        _rel(_atalhos_aprendidos_listar()); return True
+    for _pre in ("quando eu falar", "quando eu disser", "sempre que eu falar",
+                 "sempre que eu disser"):
+        if cmd.startswith(_pre):
+            _resto_al = cmd[len(_pre):].strip()
+            for _sep in (" faca ", " faz ", " voce faz ", " entao ", " -> ", " = "):
+                if _sep in _resto_al:
+                    _g, _a = _resto_al.split(_sep, 1)
+                    _rel(_atalhos_aprendidos_salvar(_g.strip(" '\""), _a.strip()))
+                    return True
+            _rel("Formato: quando eu falar <gatilho> faca <acao>.")
+            return True
+    try:
+        _aprendidos = carregar_json(ARQ_ATALHOS_APRENDIDOS, {})
+        for _g, _a in _aprendidos.items():
+            if _norm_pt(_g) == n:
+                print(f"\n[Local]: atalho seu -> {_a}")
+                return _processar_cerebro_local(_a)
+    except Exception:
+        pass
+
+    # ---- PLANO DE VARIOS PASSOS: "abre o spotify e depois toca beatles" ----
+    _passos_plano = _quebrar_em_passos(comando)
+    if len(_passos_plano) > 1:
+        print(f"\n[Plano]: {len(_passos_plano)} passos -> " + " > ".join(_passos_plano))
+        _feitos = 0
+        for _i, _passo in enumerate(_passos_plano, 1):
+            print(f"\n   --- passo {_i}/{len(_passos_plano)}: {_passo}")
+            try:
+                if _processar_cerebro_local(_passo):
+                    _feitos += 1
+                else:
+                    print(f"   (nao tenho acao local pra '{_passo}')")
+            except Exception as _e_p:
+                print(f"   (erro em '{_passo}': {type(_e_p).__name__})")
+        print(f"\n[Plano]: {_feitos} de {len(_passos_plano)} passo(s) executado(s).")
         return True
 
     # ---- ROTINAS ("atalhos dentro de si"): sequencias de comandos com nome ----
@@ -4862,6 +5055,27 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
     return resposta
 
 
+def _resposta_da_neural(comando: str, tentar_subir: bool = False):
+    """Pergunta para a IA neural local e devolve o texto (ou None se nao rolar).
+    UNICO lugar com essa logica - antes o mesmo bloco try/except estava
+    repetido em tres pontos do fluxo, e qualquer melhoria (como a trava
+    anti-recusa) precisava ser lembrada nos tres."""
+    if ia_local_disponivel():
+        try:
+            resposta = perguntar_ia_local(comando, historico_conversas)
+            if resposta:
+                return resposta
+        except Exception:
+            pass
+    if tentar_subir:
+        try:
+            if preparar_ia_local():
+                return perguntar_ia_local(comando, historico_conversas)
+        except Exception:
+            pass
+    return None
+
+
 def _chat_local_fallback(comando: str):
     """Resposta de conversa quando a NUVEM esta desligada e o comando e papo."""
     n = _norm_pt(comando)
@@ -5067,20 +5281,8 @@ def processar_atalho_rapido(comando: str) -> bool:
         # Se a nuvem (rodizio de IAs) estiver DESLIGADA, responde no papo com
         # texto local (sem API) - o agente nunca fica mudo e nao gasta cota.
         if not config.get("usar_ia_nuvem", True):
-            _r = None
-            if ia_local_disponivel():
-                try:
-                    _r = perguntar_ia_local(comando, historico_conversas)
-                except Exception:
-                    _r = None
-            if not _r:
-                # IA neural local fora do ar: tenta subir (se ja baixada) senao
-                # oferece instalar; por fim cai no texto de orientacao.
-                if preparar_ia_local():
-                    try:
-                        _r = perguntar_ia_local(comando, historico_conversas)
-                    except Exception:
-                        _r = None
+            # tenta a neural; se estiver fora do ar, tenta subir (se ja baixada)
+            _r = _resposta_da_neural(comando, tentar_subir=True)
             if not _r:
                 _r = _chat_local_fallback(comando)
             historico_conversas.append({"role": "user", "content": comando})
@@ -5146,11 +5348,7 @@ def processar_atalho_rapido(comando: str) -> bool:
             print("        essa acao, me diga o que voce quer que ela faca. (A IA de conversa nao executa")
             print("        acoes no PC - quem controla o Windows sao os comandos, que rodam como admin.)")
             return True
-        if ia_local_disponivel():
-            try:
-                _r = perguntar_ia_local(comando, historico_conversas)
-            except Exception:
-                _r = None
+        _r = _resposta_da_neural(comando)
         if _r:
             historico_conversas.append({"role": "user", "content": comando})
             historico_conversas.append({"role": "assistant", "content": _r})
@@ -14887,7 +15085,2936 @@ def estatisticas_poder() -> str:
 
 
 
+
+# ==================== LOTE NOVO 1: ARQUIVOS E DADOS ====================
+# Ferramentas que faltavam de verdade: mapa de espaco, duplicados por hash,
+# comparacao de pastas, CSV/JSON, faxina de nomes e integridade.
+
+def _tam_legivel(n: float) -> str:
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{n:.1f} {u}"
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
+def _pasta_padrao(caminho: str) -> str:
+    caminho = (caminho or "").strip().strip('"')
+    if not caminho:
+        return os.path.expanduser("~")
+    return os.path.expanduser(caminho)
+
+
+def _hash_arquivo(caminho: str, bloco: int = 1 << 20) -> str:
+    import hashlib
+    h = hashlib.md5()
+    with open(caminho, "rb") as f:
+        while True:
+            pedaco = f.read(bloco)
+            if not pedaco:
+                break
+            h.update(pedaco)
+    return h.hexdigest()
+
+
+@tool
+def mapa_espaco_pastas(caminho: str = "", limite: int = 15) -> str:
+    """Mostra QUAIS PASTAS mais ocupam espaco dentro de um caminho (mapa de
+    espaco em disco), da maior para a menor. So leitura."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    tamanhos = []
+    for nome in os.listdir(base):
+        cam = os.path.join(base, nome)
+        if not os.path.isdir(cam):
+            continue
+        total = 0
+        for raiz, _dirs, arqs in os.walk(cam):
+            for a in arqs:
+                try:
+                    total += os.path.getsize(os.path.join(raiz, a))
+                except Exception:
+                    pass
+        tamanhos.append((total, nome))
+    if not tamanhos:
+        return f"Nenhuma subpasta em {base}."
+    tamanhos.sort(reverse=True)
+    total_geral = sum(t for t, _ in tamanhos) or 1
+    linhas = [f"MAPA DE ESPACO em {base}:"]
+    for t, nome in tamanhos[:limite]:
+        pct = t * 100 / total_geral
+        barra = "#" * int(pct / 5)
+        linhas.append(f"  {_tam_legivel(t):>10} ({pct:4.1f}%) {barra:<20} {nome}")
+    linhas.append(f"  TOTAL: {_tam_legivel(total_geral)} em {len(tamanhos)} pasta(s)")
+    return "\n".join(linhas)
+
+
+@tool
+def achar_arquivos_duplicados(caminho: str = "", tamanho_minimo_mb: float = 1.0) -> str:
+    """Encontra ARQUIVOS DUPLICADOS de verdade (mesmo conteudo, por hash MD5),
+    mesmo com nomes diferentes. So lista - nao apaga nada."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    minimo = int(tamanho_minimo_mb * 1024 * 1024)
+    por_tamanho = {}
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            cam = os.path.join(raiz, a)
+            try:
+                t = os.path.getsize(cam)
+            except Exception:
+                continue
+            if t >= minimo:
+                por_tamanho.setdefault(t, []).append(cam)
+    grupos = []
+    for t, lista in por_tamanho.items():
+        if len(lista) < 2:
+            continue
+        por_hash = {}
+        for cam in lista:
+            try:
+                por_hash.setdefault(_hash_arquivo(cam), []).append(cam)
+            except Exception:
+                continue
+        for h, iguais in por_hash.items():
+            if len(iguais) > 1:
+                grupos.append((t, iguais))
+    if not grupos:
+        return f"Nenhum arquivo duplicado (acima de {tamanho_minimo_mb} MB) em {base}."
+    grupos.sort(key=lambda x: -x[0] * (len(x[1]) - 1))
+    desperdicio = sum(t * (len(g) - 1) for t, g in grupos)
+    linhas = [f"DUPLICADOS em {base} - da pra liberar ~{_tam_legivel(desperdicio)}:"]
+    for t, iguais in grupos[:15]:
+        linhas.append(f"  {_tam_legivel(t)} x{len(iguais)}:")
+        for cam in iguais[:4]:
+            linhas.append(f"     {cam}")
+    linhas.append("Confira antes de apagar: os arquivos sao identicos, mas voce escolhe qual fica.")
+    return "\n".join(linhas)
+
+
+@tool
+def comparar_pastas(pasta_a: str, pasta_b: str) -> str:
+    """Compara DUAS PASTAS e diz o que so existe em uma, o que so existe na
+    outra e o que esta nas duas mas com conteudo diferente."""
+    a, b = _pasta_padrao(pasta_a), _pasta_padrao(pasta_b)
+    if not os.path.isdir(a) or not os.path.isdir(b):
+        return "Preciso de duas pastas que existam."
+    def listar(base):
+        itens = {}
+        for raiz, _d, arqs in os.walk(base):
+            for x in arqs:
+                cam = os.path.join(raiz, x)
+                itens[os.path.relpath(cam, base)] = cam
+        return itens
+    ia, ib = listar(a), listar(b)
+    so_a = sorted(set(ia) - set(ib))
+    so_b = sorted(set(ib) - set(ia))
+    difs = []
+    for rel in sorted(set(ia) & set(ib)):
+        try:
+            if os.path.getsize(ia[rel]) != os.path.getsize(ib[rel]) or \
+               _hash_arquivo(ia[rel]) != _hash_arquivo(ib[rel]):
+                difs.append(rel)
+        except Exception:
+            continue
+    linhas = [f"COMPARANDO:\n  A = {a}\n  B = {b}",
+              f"Iguais: {len(set(ia) & set(ib)) - len(difs)} arquivo(s)"]
+    linhas.append(f"So em A ({len(so_a)}): " + (", ".join(so_a[:10]) or "nenhum"))
+    linhas.append(f"So em B ({len(so_b)}): " + (", ".join(so_b[:10]) or "nenhum"))
+    linhas.append(f"Diferentes ({len(difs)}): " + (", ".join(difs[:10]) or "nenhum"))
+    return "\n".join(linhas)
+
+
+@tool
+def arquivos_por_extensao(caminho: str = "") -> str:
+    """Resume uma pasta POR TIPO DE ARQUIVO: quantos arquivos e quanto espaco
+    cada extensao ocupa (.mp4, .jpg, .pdf...). So leitura."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    import collections
+    cont, tam = collections.Counter(), collections.Counter()
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            ext = (os.path.splitext(a)[1] or "(sem extensao)").lower()
+            cont[ext] += 1
+            try:
+                tam[ext] += os.path.getsize(os.path.join(raiz, a))
+            except Exception:
+                pass
+    if not cont:
+        return f"Nenhum arquivo em {base}."
+    linhas = [f"TIPOS DE ARQUIVO em {base}:"]
+    for ext, _n in tam.most_common(15):
+        linhas.append(f"  {ext:<16} {cont[ext]:>6} arquivo(s)  {_tam_legivel(tam[ext])}")
+    return "\n".join(linhas)
+
+
+@tool
+def arquivos_antigos(caminho: str = "", dias: int = 365) -> str:
+    """Lista arquivos que NAO SAO ABERTOS/MODIFICADOS ha muito tempo (candidatos
+    a arquivar ou apagar). So leitura."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    limite = time.time() - dias * 86400
+    achados = []
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            cam = os.path.join(raiz, a)
+            try:
+                m = os.path.getmtime(cam)
+                if m < limite:
+                    achados.append((m, os.path.getsize(cam), cam))
+            except Exception:
+                continue
+    if not achados:
+        return f"Nenhum arquivo com mais de {dias} dias em {base}."
+    achados.sort()
+    total = sum(t for _m, t, _c in achados)
+    linhas = [f"ARQUIVOS PARADOS ha mais de {dias} dias em {base} "
+              f"({len(achados)} arquivos, {_tam_legivel(total)}):"]
+    for m, t, cam in achados[:20]:
+        data = datetime.fromtimestamp(m).strftime("%d/%m/%Y")
+        linhas.append(f"  {data}  {_tam_legivel(t):>9}  {cam}")
+    return "\n".join(linhas)
+
+
+@tool
+def arquivos_recentes(caminho: str = "", horas: int = 24) -> str:
+    """Mostra o que foi CRIADO OU MODIFICADO recentemente numa pasta (util pra
+    achar 'onde foi parar aquele arquivo que eu acabei de salvar')."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    limite = time.time() - horas * 3600
+    achados = []
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            cam = os.path.join(raiz, a)
+            try:
+                m = os.path.getmtime(cam)
+                if m >= limite:
+                    achados.append((m, cam))
+            except Exception:
+                continue
+    if not achados:
+        return f"Nada modificado nas ultimas {horas}h em {base}."
+    achados.sort(reverse=True)
+    linhas = [f"MODIFICADOS nas ultimas {horas}h em {base}:"]
+    for m, cam in achados[:25]:
+        linhas.append(f"  {datetime.fromtimestamp(m).strftime('%d/%m %H:%M')}  {cam}")
+    return "\n".join(linhas)
+
+
+@tool
+def arvore_de_pastas(caminho: str = "", niveis: int = 2) -> str:
+    """Desenha a ARVORE de pastas (estrutura) a partir de um caminho, ate o
+    numero de niveis pedido. So leitura."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    linhas = [base]
+    def andar(atual, prefixo, nivel):
+        if nivel > niveis:
+            return
+        try:
+            itens = sorted(os.listdir(atual))
+        except Exception:
+            return
+        pastas = [i for i in itens if os.path.isdir(os.path.join(atual, i))][:20]
+        arqs = [i for i in itens if not os.path.isdir(os.path.join(atual, i))]
+        for i, d in enumerate(pastas):
+            ultimo = (i == len(pastas) - 1) and not arqs
+            linhas.append(f"{prefixo}{'└── ' if ultimo else '├── '}{d}/")
+            andar(os.path.join(atual, d), prefixo + ("    " if ultimo else "│   "), nivel + 1)
+        if arqs:
+            linhas.append(f"{prefixo}└── ({len(arqs)} arquivo(s))")
+    andar(base, "", 1)
+    return "\n".join(linhas[:120])
+
+
+@tool
+def tamanho_da_pasta(caminho: str = "") -> str:
+    """Diz o TAMANHO TOTAL de uma pasta (somando tudo dentro dela) e quantos
+    arquivos ela tem."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    total = n = 0
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            try:
+                total += os.path.getsize(os.path.join(raiz, a))
+                n += 1
+            except Exception:
+                pass
+    return f"{base}\n  Tamanho total: {_tam_legivel(total)} em {n} arquivo(s)"
+
+
+@tool
+def achar_pastas_vazias(caminho: str = "") -> str:
+    """Encontra PASTAS VAZIAS (lixo que sobra depois de mover/apagar coisas)."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    vazias = []
+    for raiz, dirs, arqs in os.walk(base, topdown=False):
+        if not dirs and not arqs:
+            vazias.append(raiz)
+    if not vazias:
+        return f"Nenhuma pasta vazia em {base}."
+    return (f"PASTAS VAZIAS ({len(vazias)}):\n  " + "\n  ".join(vazias[:30])
+            + "\nPara remover, use 'gerenciar_arquivos_e_pastas'.")
+
+
+@tool
+def achar_arquivos_zero_byte(caminho: str = "") -> str:
+    """Encontra arquivos de 0 byte (normalmente restos de download quebrado)."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    zerados = []
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            cam = os.path.join(raiz, a)
+            try:
+                if os.path.getsize(cam) == 0:
+                    zerados.append(cam)
+            except Exception:
+                pass
+    if not zerados:
+        return f"Nenhum arquivo vazio em {base}."
+    return f"ARQUIVOS DE 0 BYTE ({len(zerados)}):\n  " + "\n  ".join(zerados[:30])
+
+
+@tool
+def juntar_arquivos_divididos(prefixo_ou_pasta: str, saida: str = "") -> str:
+    """Junta de volta os pedacos criados por 'dividir_arquivo' (.part1, .part2...)
+    num arquivo unico."""
+    alvo = _pasta_padrao(prefixo_ou_pasta)
+    pasta = alvo if os.path.isdir(alvo) else os.path.dirname(alvo)
+    base = "" if os.path.isdir(alvo) else os.path.basename(alvo)
+    import re as _re
+    partes = []
+    for nome in os.listdir(pasta):
+        if base and not nome.startswith(base):
+            continue
+        m = _re.search(r"\.part0*(\d+)$", nome, _re.I)
+        if m:
+            partes.append((int(m.group(1)), os.path.join(pasta, nome)))
+    if not partes:
+        return "Nao achei pedacos .partN nessa pasta."
+    partes.sort()
+    destino = saida or _re.sub(r"\.part0*\d+$", "", partes[0][1], flags=_re.I)
+    try:
+        with open(destino, "wb") as final:
+            for _n, cam in partes:
+                with open(cam, "rb") as f:
+                    while True:
+                        b = f.read(1 << 20)
+                        if not b:
+                            break
+                        final.write(b)
+    except Exception as e:
+        return f"Falhei ao juntar: {type(e).__name__}"
+    return f"Juntei {len(partes)} pedaco(s) em: {destino} ({_tam_legivel(os.path.getsize(destino))})"
+
+
+@tool
+def converter_arquivo_para_utf8(caminho: str) -> str:
+    """Conserta arquivo de texto com ACENTO BUGADO convertendo a codificacao
+    para UTF-8 (tenta latin-1/cp1252). Faz backup .bak antes."""
+    cam = _pasta_padrao(caminho)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    dados = open(cam, "rb").read()
+    for cod in ("utf-8", "cp1252", "latin-1"):
+        try:
+            texto = dados.decode(cod)
+            if cod == "utf-8":
+                return "Este arquivo JA esta em UTF-8, nao precisa converter."
+            break
+        except Exception:
+            continue
+    else:
+        return "Nao consegui identificar a codificacao."
+    try:
+        open(cam + ".bak", "wb").write(dados)
+        open(cam, "w", encoding="utf-8").write(texto)
+    except Exception as e:
+        return f"Falhei ao gravar: {type(e).__name__}"
+    return f"Convertido de {cod} para UTF-8. Backup salvo em {cam}.bak"
+
+
+@tool
+def csv_para_json(caminho_csv: str, saida: str = "") -> str:
+    """Converte um arquivo CSV em JSON (lista de objetos)."""
+    import csv as _csv
+    cam = _pasta_padrao(caminho_csv)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    try:
+        with open(cam, newline="", encoding="utf-8", errors="ignore") as f:
+            linhas = list(_csv.DictReader(f))
+    except Exception as e:
+        return f"Nao consegui ler o CSV: {type(e).__name__}"
+    destino = saida or os.path.splitext(cam)[0] + ".json"
+    with open(destino, "w", encoding="utf-8") as f:
+        json.dump(linhas, f, ensure_ascii=False, indent=2)
+    return f"CSV convertido: {len(linhas)} linha(s) -> {destino}"
+
+
+@tool
+def json_para_csv(caminho_json: str, saida: str = "") -> str:
+    """Converte um JSON (lista de objetos) em planilha CSV."""
+    import csv as _csv
+    cam = _pasta_padrao(caminho_json)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    try:
+        dados = json.load(open(cam, encoding="utf-8"))
+    except Exception as e:
+        return f"JSON invalido: {type(e).__name__}"
+    if isinstance(dados, dict):
+        dados = [dados]
+    if not isinstance(dados, list) or not dados:
+        return "Preciso de um JSON com uma LISTA de objetos."
+    colunas = []
+    for item in dados:
+        if isinstance(item, dict):
+            for k in item:
+                if k not in colunas:
+                    colunas.append(k)
+    destino = saida or os.path.splitext(cam)[0] + ".csv"
+    with open(destino, "w", newline="", encoding="utf-8") as f:
+        w = _csv.DictWriter(f, fieldnames=colunas)
+        w.writeheader()
+        for item in dados:
+            if isinstance(item, dict):
+                w.writerow({k: item.get(k, "") for k in colunas})
+    return f"JSON convertido: {len(dados)} registro(s), {len(colunas)} coluna(s) -> {destino}"
+
+
+@tool
+def previa_csv(caminho_csv: str, linhas: int = 10) -> str:
+    """Espia as primeiras linhas de um CSV formatadas em tabela, sem abrir o
+    Excel (util pra arquivo gigante)."""
+    import csv as _csv
+    cam = _pasta_padrao(caminho_csv)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    try:
+        with open(cam, newline="", encoding="utf-8", errors="ignore") as f:
+            leitor = _csv.reader(f)
+            todas = []
+            for i, linha in enumerate(leitor):
+                if i >= linhas + 1:
+                    break
+                todas.append(linha)
+    except Exception as e:
+        return f"Nao consegui ler: {type(e).__name__}"
+    if not todas:
+        return "CSV vazio."
+    larguras = [max(len(str(l[i])) if i < len(l) else 0 for l in todas)
+                for i in range(max(len(l) for l in todas))]
+    larguras = [min(w, 22) for w in larguras]
+    saida = []
+    for l in todas:
+        saida.append(" | ".join(str(l[i])[:22].ljust(larguras[i])
+                                for i in range(len(larguras)) if i < len(l)))
+    total = sum(1 for _ in open(cam, encoding="utf-8", errors="ignore")) - 1
+    return f"PREVIA de {os.path.basename(cam)} ({total} linhas no total):\n" + "\n".join(saida)
+
+
+@tool
+def estatisticas_csv(caminho_csv: str, coluna: str = "") -> str:
+    """Estatisticas de uma coluna numerica de CSV: total, media, minimo,
+    maximo e quantidade. Sem coluna, lista as colunas disponiveis."""
+    import csv as _csv
+    cam = _pasta_padrao(caminho_csv)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    with open(cam, newline="", encoding="utf-8", errors="ignore") as f:
+        linhas = list(_csv.DictReader(f))
+    if not linhas:
+        return "CSV vazio."
+    if not coluna:
+        return "Colunas disponiveis: " + ", ".join(linhas[0].keys())
+    valores = []
+    for l in linhas:
+        bruto = (l.get(coluna) or "").replace(".", "").replace(",", ".").strip()
+        try:
+            valores.append(float(bruto))
+        except Exception:
+            continue
+    if not valores:
+        return f"A coluna '{coluna}' nao tem numeros que eu consiga ler."
+    return (f"COLUNA '{coluna}' ({len(valores)} valores numericos):\n"
+            f"  Soma: {sum(valores):,.2f}\n  Media: {sum(valores)/len(valores):,.2f}\n"
+            f"  Minimo: {min(valores):,.2f}\n  Maximo: {max(valores):,.2f}")
+
+
+@tool
+def mesclar_csvs(pasta: str, saida: str = "") -> str:
+    """Junta VARIOS CSVs de uma pasta num arquivo so (mantem o cabecalho uma
+    vez). Otimo pra relatorios mensais separados."""
+    import csv as _csv
+    base = _pasta_padrao(pasta)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    arquivos = [os.path.join(base, a) for a in sorted(os.listdir(base))
+                if a.lower().endswith(".csv")]
+    if len(arquivos) < 2:
+        return "Preciso de pelo menos 2 arquivos .csv na pasta."
+    destino = saida or os.path.join(base, "juntado.csv")
+    colunas, todas = [], []
+    for cam in arquivos:
+        try:
+            with open(cam, newline="", encoding="utf-8", errors="ignore") as f:
+                for linha in _csv.DictReader(f):
+                    for k in linha:
+                        if k not in colunas:
+                            colunas.append(k)
+                    todas.append(linha)
+        except Exception:
+            continue
+    with open(destino, "w", newline="", encoding="utf-8") as f:
+        w = _csv.DictWriter(f, fieldnames=colunas)
+        w.writeheader()
+        for l in todas:
+            w.writerow({k: l.get(k, "") for k in colunas})
+    return f"Juntei {len(arquivos)} CSV(s) = {len(todas)} linha(s) em {destino}"
+
+
+@tool
+def remover_linhas_duplicadas(caminho: str, saida: str = "") -> str:
+    """Remove linhas repetidas de um arquivo de texto/CSV, mantendo a ordem."""
+    cam = _pasta_padrao(caminho)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    vistas, saida_linhas, repetidas = set(), [], 0
+    for linha in open(cam, encoding="utf-8", errors="ignore"):
+        if linha in vistas:
+            repetidas += 1
+            continue
+        vistas.add(linha)
+        saida_linhas.append(linha)
+    destino = saida or cam
+    open(destino, "w", encoding="utf-8").writelines(saida_linhas)
+    return (f"Removi {repetidas} linha(s) repetida(s). Restaram {len(saida_linhas)}. "
+            f"Salvo em {destino}")
+
+
+@tool
+def dividir_csv(caminho_csv: str, linhas_por_arquivo: int = 1000) -> str:
+    """Quebra um CSV gigante em varios arquivos menores (cada um com o
+    cabecalho), pra abrir no Excel sem travar."""
+    import csv as _csv
+    cam = _pasta_padrao(caminho_csv)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    with open(cam, newline="", encoding="utf-8", errors="ignore") as f:
+        leitor = _csv.reader(f)
+        try:
+            cabecalho = next(leitor)
+        except StopIteration:
+            return "CSV vazio."
+        parte, n, criados = [], 1, []
+        def gravar(bloco, indice):
+            destino = f"{os.path.splitext(cam)[0]}_parte{indice}.csv"
+            with open(destino, "w", newline="", encoding="utf-8") as g:
+                w = _csv.writer(g)
+                w.writerow(cabecalho)
+                w.writerows(bloco)
+            criados.append(destino)
+        for linha in leitor:
+            parte.append(linha)
+            if len(parte) >= linhas_por_arquivo:
+                gravar(parte, n); parte = []; n += 1
+        if parte:
+            gravar(parte, n)
+    return f"Dividi em {len(criados)} arquivo(s):\n  " + "\n  ".join(criados[:10])
+
+
+@tool
+def exportar_lista_arquivos(caminho: str = "", saida: str = "") -> str:
+    """Gera um CSV com a LISTA de tudo que existe numa pasta (nome, tamanho,
+    data, caminho) - bom pra inventario e conferencia."""
+    import csv as _csv
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    destino = saida or os.path.join(base, "lista_arquivos.csv")
+    n = 0
+    with open(destino, "w", newline="", encoding="utf-8") as f:
+        w = _csv.writer(f)
+        w.writerow(["nome", "tamanho_bytes", "tamanho", "modificado", "caminho"])
+        for raiz, _d, arqs in os.walk(base):
+            for a in arqs:
+                cam = os.path.join(raiz, a)
+                try:
+                    t = os.path.getsize(cam)
+                    m = datetime.fromtimestamp(os.path.getmtime(cam)).strftime("%d/%m/%Y %H:%M")
+                except Exception:
+                    continue
+                w.writerow([a, t, _tam_legivel(t), m, cam])
+                n += 1
+    return f"Inventario com {n} arquivo(s) salvo em: {destino}"
+
+
+@tool
+def diff_arquivos_texto(arquivo_a: str, arquivo_b: str) -> str:
+    """Mostra as DIFERENCAS linha a linha entre dois arquivos de texto (o que
+    saiu, o que entrou), tipo um 'diff' de programador."""
+    import difflib
+    a, b = _pasta_padrao(arquivo_a), _pasta_padrao(arquivo_b)
+    if not os.path.isfile(a) or not os.path.isfile(b):
+        return "Preciso de dois arquivos que existam."
+    la = open(a, encoding="utf-8", errors="ignore").readlines()
+    lb = open(b, encoding="utf-8", errors="ignore").readlines()
+    d = list(difflib.unified_diff(la, lb, fromfile=os.path.basename(a),
+                                  tofile=os.path.basename(b), lineterm=""))
+    if not d:
+        return "Os dois arquivos sao IGUAIS."
+    return "DIFERENCAS:\n" + "\n".join(d[:60])
+
+
+@tool
+def limpar_nomes_arquivos(caminho: str = "", aplicar: str = "nao") -> str:
+    """Faxina nos NOMES dos arquivos: tira espacos duplicados, acentos e
+    caracteres estranhos. Por padrao so SIMULA; passe aplicar='sim' pra valer."""
+    import re as _re
+    import unicodedata
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    valendo = aplicar.strip().lower().startswith("s")
+    if valendo and not _confirma_poderoso(f"RENOMEAR arquivos em {base} (limpar nomes)?"):
+        return "Cancelado."
+    mudancas = []
+    for nome in os.listdir(base):
+        cam = os.path.join(base, nome)
+        if os.path.isdir(cam):
+            continue
+        novo = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+        novo = _re.sub(r"[^\w\s.\-]", "", novo)
+        novo = _re.sub(r"\s+", " ", novo).strip()
+        if novo and novo != nome:
+            mudancas.append((nome, novo))
+            if valendo:
+                try:
+                    os.rename(cam, os.path.join(base, novo))
+                except Exception:
+                    pass
+    if not mudancas:
+        return "Todos os nomes ja estao limpos."
+    linhas = [("RENOMEADOS" if valendo else "SIMULACAO (nada foi mudado ainda)") + ":"]
+    for velho, novo in mudancas[:20]:
+        linhas.append(f"  {velho}  ->  {novo}")
+    if not valendo:
+        linhas.append("Para aplicar de verdade, repita com aplicar='sim'.")
+    return "\n".join(linhas)
+
+
+@tool
+def renomear_com_data(caminho: str = "", aplicar: str = "nao") -> str:
+    """Poe a DATA na frente do nome dos arquivos (AAAA-MM-DD_nome), pra ficarem
+    em ordem cronologica. Por padrao so simula; aplicar='sim' executa."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    valendo = aplicar.strip().lower().startswith("s")
+    if valendo and not _confirma_poderoso(f"Renomear arquivos de {base} com a data na frente?"):
+        return "Cancelado."
+    feitos = []
+    for nome in sorted(os.listdir(base)):
+        cam = os.path.join(base, nome)
+        if os.path.isdir(cam) or nome[:4].isdigit():
+            continue
+        try:
+            data = datetime.fromtimestamp(os.path.getmtime(cam)).strftime("%Y-%m-%d")
+        except Exception:
+            continue
+        novo = f"{data}_{nome}"
+        feitos.append((nome, novo))
+        if valendo:
+            try:
+                os.rename(cam, os.path.join(base, novo))
+            except Exception:
+                pass
+    if not feitos:
+        return "Nada pra renomear (ou ja estao com data)."
+    linhas = [("RENOMEADOS" if valendo else "SIMULACAO") + f" ({len(feitos)}):"]
+    linhas += [f"  {v} -> {n}" for v, n in feitos[:15]]
+    if not valendo:
+        linhas.append("Para valer: repita com aplicar='sim'.")
+    return "\n".join(linhas)
+
+
+@tool
+def mover_arquivos_por_tipo(origem: str, destino: str, extensoes: str,
+                            aplicar: str = "nao") -> str:
+    """Move de uma pasta pra outra so os arquivos das extensoes indicadas
+    (ex.: 'jpg,png,mp4'). Por padrao simula; aplicar='sim' move de verdade."""
+    o, d = _pasta_padrao(origem), _pasta_padrao(destino)
+    if not os.path.isdir(o):
+        return f"Pasta de origem nao encontrada: {o}"
+    exts = tuple("." + e.strip().lstrip(".").lower() for e in extensoes.split(",") if e.strip())
+    if not exts:
+        return "Diga as extensoes, ex.: 'jpg,png,mp4'."
+    valendo = aplicar.strip().lower().startswith("s")
+    alvos = [a for a in os.listdir(o)
+             if os.path.isfile(os.path.join(o, a)) and a.lower().endswith(exts)]
+    if not alvos:
+        return f"Nenhum arquivo {', '.join(exts)} em {o}."
+    if valendo:
+        if not _confirma_poderoso(f"MOVER {len(alvos)} arquivo(s) de {o} para {d}?"):
+            return "Cancelado."
+        import shutil
+        os.makedirs(d, exist_ok=True)
+        movidos = 0
+        for a in alvos:
+            try:
+                shutil.move(os.path.join(o, a), os.path.join(d, a))
+                movidos += 1
+            except Exception:
+                pass
+        return f"Movi {movidos} arquivo(s) para {d}."
+    return (f"SIMULACAO: {len(alvos)} arquivo(s) seriam movidos para {d}:\n  "
+            + "\n  ".join(alvos[:15]) + "\nPara valer: aplicar='sim'.")
+
+
+@tool
+def verificar_integridade_pasta(caminho: str = "", acao: str = "criar") -> str:
+    """Cria um MANIFESTO de hashes da pasta (acao='criar') e depois confere se
+    algum arquivo mudou/sumiu (acao='conferir'). Detecta corrupcao e alteracao."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    manifesto = os.path.join(base, "_integridade.json")
+    if acao.strip().lower().startswith("cri"):
+        dados = {}
+        for raiz, _d, arqs in os.walk(base):
+            for a in arqs:
+                cam = os.path.join(raiz, a)
+                if cam == manifesto:
+                    continue
+                try:
+                    dados[os.path.relpath(cam, base)] = _hash_arquivo(cam)
+                except Exception:
+                    continue
+        json.dump(dados, open(manifesto, "w", encoding="utf-8"), indent=2)
+        return f"Manifesto criado com {len(dados)} arquivo(s): {manifesto}"
+    if not os.path.isfile(manifesto):
+        return "Nao existe manifesto ainda. Rode primeiro com acao='criar'."
+    antigo = json.load(open(manifesto, encoding="utf-8"))
+    mudados, sumidos, novos = [], [], []
+    atuais = {}
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            cam = os.path.join(raiz, a)
+            if cam == manifesto:
+                continue
+            rel = os.path.relpath(cam, base)
+            try:
+                atuais[rel] = _hash_arquivo(cam)
+            except Exception:
+                continue
+    for rel, h in antigo.items():
+        if rel not in atuais:
+            sumidos.append(rel)
+        elif atuais[rel] != h:
+            mudados.append(rel)
+    novos = [r for r in atuais if r not in antigo]
+    if not (mudados or sumidos or novos):
+        return f"INTEGRIDADE OK: os {len(antigo)} arquivos estao identicos."
+    return (f"MUDOU ALGUMA COISA:\n  Alterados ({len(mudados)}): "
+            + ", ".join(mudados[:8]) + f"\n  Sumiram ({len(sumidos)}): "
+            + ", ".join(sumidos[:8]) + f"\n  Novos ({len(novos)}): " + ", ".join(novos[:8]))
+
+
+@tool
+def listar_arquivos_ocultos(caminho: str = "") -> str:
+    """Mostra os arquivos e pastas OCULTOS de um caminho (os que o Explorer
+    esconde)."""
+    base = _pasta_padrao(caminho)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    ocultos = []
+    for nome in os.listdir(base):
+        cam = os.path.join(base, nome)
+        escondido = nome.startswith(".")
+        try:
+            if os.name == "nt":
+                import ctypes
+                attrs = ctypes.windll.kernel32.GetFileAttributesW(str(cam))
+                if attrs != -1 and attrs & 2:
+                    escondido = True
+        except Exception:
+            pass
+        if escondido:
+            ocultos.append(nome + ("/" if os.path.isdir(cam) else ""))
+    if not ocultos:
+        return f"Nada oculto em {base}."
+    return f"OCULTOS em {base} ({len(ocultos)}):\n  " + "\n  ".join(ocultos[:30])
+
+
+@tool
+def esvaziar_pastas_temporarias() -> str:
+    """Limpa as pastas TEMP do Windows e do usuario (arquivos temporarios que
+    so ocupam espaco). Pede confirmacao e pula o que estiver em uso."""
+    alvos = [os.environ.get("TEMP", ""), os.environ.get("TMP", ""),
+             r"C:\Windows\Temp"]
+    alvos = [a for a in dict.fromkeys(alvos) if a and os.path.isdir(a)]
+    if not alvos:
+        return "Nao achei pastas temporarias."
+    if not _confirma_poderoso("Apagar arquivos temporarios de: " + ", ".join(alvos) + "?"):
+        return "Cancelado."
+    import shutil
+    apagados = liberado = falhas = 0
+    for base in alvos:
+        for nome in os.listdir(base):
+            cam = os.path.join(base, nome)
+            try:
+                tam = os.path.getsize(cam) if os.path.isfile(cam) else 0
+                if os.path.isfile(cam):
+                    os.remove(cam)
+                else:
+                    shutil.rmtree(cam, ignore_errors=True)
+                apagados += 1
+                liberado += tam
+            except Exception:
+                falhas += 1
+    return (f"Limpei {apagados} item(ns) das pastas temporarias "
+            f"(~{_tam_legivel(liberado)} liberados). {falhas} estavam em uso e foram pulados.")
+
+
+@tool
+def buscar_substituir_em_pasta(pasta: str, procurar: str, substituir: str,
+                               extensoes: str = "txt,md,csv,json,py",
+                               aplicar: str = "nao") -> str:
+    """Procura um texto em TODOS os arquivos de uma pasta e troca por outro.
+    Por padrao so mostra onde apareceria; aplicar='sim' altera (com backup)."""
+    base = _pasta_padrao(pasta)
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    exts = tuple("." + e.strip().lstrip(".").lower() for e in extensoes.split(",") if e.strip())
+    valendo = aplicar.strip().lower().startswith("s")
+    if valendo and not _confirma_poderoso(
+            f"Trocar '{procurar}' por '{substituir}' nos arquivos de {base}?"):
+        return "Cancelado."
+    achados, alterados = [], 0
+    for raiz, _d, arqs in os.walk(base):
+        for a in arqs:
+            if not a.lower().endswith(exts):
+                continue
+            cam = os.path.join(raiz, a)
+            try:
+                texto = open(cam, encoding="utf-8", errors="ignore").read()
+            except Exception:
+                continue
+            if procurar not in texto:
+                continue
+            achados.append((cam, texto.count(procurar)))
+            if valendo:
+                try:
+                    open(cam + ".bak", "w", encoding="utf-8").write(texto)
+                    open(cam, "w", encoding="utf-8").write(texto.replace(procurar, substituir))
+                    alterados += 1
+                except Exception:
+                    pass
+    if not achados:
+        return f"'{procurar}' nao aparece em nenhum arquivo de {base}."
+    linhas = [(f"ALTERADOS {alterados} arquivo(s) (backup .bak criado)" if valendo
+               else f"SIMULACAO - aparece em {len(achados)} arquivo(s):")]
+    for cam, n in achados[:15]:
+        linhas.append(f"  {n}x  {cam}")
+    if not valendo:
+        linhas.append("Para trocar de verdade: aplicar='sim'.")
+    return "\n".join(linhas)
+
+
+@tool
+def ocupacao_de_disco_por_usuario() -> str:
+    """Mostra quanto cada pasta do seu perfil (Downloads, Documentos, Videos,
+    Imagens, Desktop, AppData) esta ocupando - o mapa do seu espaco pessoal."""
+    lar = os.path.expanduser("~")
+    pastas = ["Downloads", "Documents", "Documentos", "Videos", "Pictures",
+              "Imagens", "Desktop", "Area de Trabalho", "Music", "Musicas", "AppData"]
+    linhas, total = [], 0
+    for nome in pastas:
+        cam = os.path.join(lar, nome)
+        if not os.path.isdir(cam):
+            continue
+        soma = 0
+        for raiz, _d, arqs in os.walk(cam):
+            for a in arqs:
+                try:
+                    soma += os.path.getsize(os.path.join(raiz, a))
+                except Exception:
+                    pass
+        total += soma
+        linhas.append((soma, nome))
+    if not linhas:
+        return "Nao achei as pastas do perfil."
+    linhas.sort(reverse=True)
+    saida = [f"SEU ESPACO PESSOAL ({lar}) - total {_tam_legivel(total)}:"]
+    for soma, nome in linhas:
+        saida.append(f"  {_tam_legivel(soma):>10}  {nome}")
+    return "\n".join(saida)
+
+
+
+
+# ============ LOTE NOVO 2: SISTEMA, PROCESSOS E HARDWARE ============
+
+@tool
+def tempo_ligado() -> str:
+    """Ha quanto tempo o PC esta ligado (uptime), desde quando, e ha quanto
+    tempo voce nao reinicia. Reinicio semanal resolve MUITA lentidao."""
+    try:
+        import psutil
+        boot = psutil.boot_time()
+    except Exception:
+        return "Nao consegui ler o tempo de atividade."
+    seg = time.time() - boot
+    d, resto = divmod(int(seg), 86400)
+    h, resto = divmod(resto, 3600)
+    m = resto // 60
+    quando = datetime.fromtimestamp(boot).strftime("%d/%m/%Y as %H:%M")
+    aviso = ""
+    if d >= 7:
+        aviso = "\n  DICA: mais de uma semana sem reiniciar. Um reinicio costuma devolver RAM e velocidade."
+    elif d >= 3:
+        aviso = "\n  Ja da pra pensar em reiniciar em breve."
+    return f"PC ligado ha {d} dia(s), {h}h {m}min (desde {quando}).{aviso}"
+
+
+@tool
+def top_processos_cpu(quantidade: int = 10) -> str:
+    """Mostra os programas que mais consomem CPU AGORA, em ordem. Serve pra
+    descobrir quem esta deixando o PC lento."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    for pr in psutil.process_iter():
+        try:
+            pr.cpu_percent(None)
+        except Exception:
+            pass
+    time.sleep(1.0)
+    dados = []
+    for pr in psutil.process_iter(["name", "pid"]):
+        try:
+            uso = pr.cpu_percent(None)
+            if uso > 0:
+                dados.append((uso, pr.info.get("name") or "?", pr.info.get("pid")))
+        except Exception:
+            continue
+    if not dados:
+        return "Nenhum processo usando CPU de forma relevante."
+    dados.sort(reverse=True)
+    nucleos = psutil.cpu_count(logical=True) or 1
+    linhas = [f"TOP CPU (total da maquina: {psutil.cpu_percent():.0f}%, {nucleos} nucleos):"]
+    for uso, nome, pid in dados[:quantidade]:
+        linhas.append(f"  {uso/nucleos:5.1f}%  {nome:<28} (pid {pid})")
+    return "\n".join(linhas)
+
+
+@tool
+def top_processos_memoria(quantidade: int = 10) -> str:
+    """Mostra os programas que mais consomem MEMORIA (RAM) agora, somando as
+    janelas do mesmo programa. Ideal quando a RAM esta cheia."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    uso = {}
+    for pr in psutil.process_iter(["name", "memory_info"]):
+        try:
+            nome = (pr.info.get("name") or "?")
+            mem = getattr(pr.info.get("memory_info"), "rss", 0) or 0
+            uso[nome] = uso.get(nome, 0) + mem
+        except Exception:
+            continue
+    if not uso:
+        return "Nao consegui ler os processos."
+    ram = psutil.virtual_memory()
+    linhas = [f"TOP MEMORIA (RAM em {ram.percent:.0f}% de "
+              f"{ram.total // (1024**3)} GB):"]
+    for nome, mem in sorted(uso.items(), key=lambda x: -x[1])[:quantidade]:
+        linhas.append(f"  {mem/(1024*1024):7.0f} MB  {nome}")
+    return "\n".join(linhas)
+
+
+@tool
+def arvore_de_processos(filtro: str = "") -> str:
+    """Mostra os processos organizados em ARVORE (quem abriu quem). Otimo pra
+    entender de onde saiu um processo estranho."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    filhos = {}
+    nomes = {}
+    for pr in psutil.process_iter(["pid", "ppid", "name"]):
+        try:
+            i = pr.info
+            nomes[i["pid"]] = i.get("name") or "?"
+            filhos.setdefault(i.get("ppid") or 0, []).append(i["pid"])
+        except Exception:
+            continue
+    alvo = (filtro or "").lower().strip()
+    linhas = []
+    def desenhar(pid, nivel):
+        if nivel > 3 or len(linhas) > 60:
+            return
+        linhas.append("  " * nivel + f"- {nomes.get(pid, '?')} ({pid})")
+        for f in sorted(filhos.get(pid, []))[:8]:
+            desenhar(f, nivel + 1)
+    raizes = [p for p in nomes if not alvo or alvo in nomes[p].lower()]
+    if alvo:
+        for p in raizes[:6]:
+            desenhar(p, 0)
+    else:
+        for p in sorted(filhos.get(0, []))[:10]:
+            desenhar(p, 0)
+    return "ARVORE DE PROCESSOS:\n" + ("\n".join(linhas) if linhas else "nada encontrado")
+
+
+@tool
+def detalhes_do_processo(nome_ou_pid: str) -> str:
+    """Ficha completa de um programa em execucao: PID, memoria, CPU, tempo
+    aberto, caminho do executavel, usuario e quantos arquivos/conexoes tem."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    alvo = (nome_ou_pid or "").strip().lower()
+    achados = []
+    for pr in psutil.process_iter(["pid", "name"]):
+        try:
+            if alvo.isdigit():
+                if pr.info["pid"] == int(alvo):
+                    achados.append(pr)
+            elif alvo in (pr.info.get("name") or "").lower():
+                achados.append(pr)
+        except Exception:
+            continue
+    if not achados:
+        return f"Nao achei processo '{nome_ou_pid}'."
+    linhas = []
+    for pr in achados[:3]:
+        try:
+            with pr.oneshot():
+                inicio = datetime.fromtimestamp(pr.create_time()).strftime("%d/%m %H:%M")
+                mem = pr.memory_info().rss / (1024 * 1024)
+                linhas.append(f"{pr.name()} (pid {pr.pid})")
+                linhas.append(f"  Memoria: {mem:.0f} MB | CPU: {pr.cpu_percent(0.3):.1f}%")
+                linhas.append(f"  Aberto desde: {inicio} | Status: {pr.status()}")
+                try:
+                    linhas.append(f"  Executavel: {pr.exe()}")
+                except Exception:
+                    pass
+                try:
+                    linhas.append(f"  Usuario: {pr.username()} | Threads: {pr.num_threads()}")
+                except Exception:
+                    pass
+                try:
+                    linhas.append(f"  Conexoes de rede abertas: {len(pr.connections())}")
+                except Exception:
+                    pass
+        except Exception:
+            continue
+    return "\n".join(linhas) or "Nao consegui detalhar."
+
+
+@tool
+def matar_processo_na_porta(porta: int) -> str:
+    """Descobre QUEM esta ocupando uma porta de rede (ex.: 8080 travada) e
+    encerra esse processo. Pede confirmacao."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    donos = []
+    try:
+        for c in psutil.net_connections():
+            if c.laddr and c.laddr.port == int(porta) and c.pid:
+                donos.append(c.pid)
+    except Exception:
+        saida, _e, _c = _rodar_cmd(f"netstat -ano | findstr :{porta}", 20)
+        for linha in saida.splitlines():
+            partes = linha.split()
+            if partes and partes[-1].isdigit():
+                donos.append(int(partes[-1]))
+    donos = list(dict.fromkeys(donos))
+    if not donos:
+        return f"Ninguem esta usando a porta {porta}."
+    nomes = []
+    for pid in donos:
+        try:
+            nomes.append(f"{psutil.Process(pid).name()} (pid {pid})")
+        except Exception:
+            nomes.append(f"pid {pid}")
+    if not _confirma_poderoso(f"Encerrar {', '.join(nomes)} que esta(o) na porta {porta}?"):
+        return "Cancelado."
+    mortos = 0
+    for pid in donos:
+        try:
+            psutil.Process(pid).terminate()
+            mortos += 1
+        except Exception:
+            pass
+    return f"Liberei a porta {porta}: encerrei {mortos} processo(s) ({', '.join(nomes)})."
+
+
+@tool
+def uso_de_disco_por_processo(quantidade: int = 10) -> str:
+    """Mostra quais programas mais LEEM E ESCREVEM no disco (o que costuma
+    travar o PC mesmo com CPU baixa)."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    antes = {}
+    for pr in psutil.process_iter(["pid", "name"]):
+        try:
+            io_ = pr.io_counters()
+            antes[pr.info["pid"]] = (pr.info.get("name"), io_.read_bytes + io_.write_bytes)
+        except Exception:
+            continue
+    time.sleep(2)
+    deltas = []
+    for pr in psutil.process_iter(["pid"]):
+        try:
+            pid = pr.info["pid"]
+            if pid not in antes:
+                continue
+            io_ = pr.io_counters()
+            d = (io_.read_bytes + io_.write_bytes) - antes[pid][1]
+            if d > 0:
+                deltas.append((d, antes[pid][0], pid))
+        except Exception:
+            continue
+    if not deltas:
+        return "Nenhum programa mexendo no disco agora."
+    deltas.sort(reverse=True)
+    linhas = ["USO DE DISCO nos ultimos 2 segundos:"]
+    for d, nome, pid in deltas[:quantidade]:
+        linhas.append(f"  {_tam_legivel(d/2)}/s  {nome} (pid {pid})")
+    return "\n".join(linhas)
+
+
+@tool
+def monitor_tempo_real(segundos: int = 10) -> str:
+    """Acompanha CPU, RAM e disco durante alguns segundos e devolve o resumo
+    (medias e picos). Bom pra flagrar travada que aparece e some."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    segundos = max(3, min(60, int(segundos)))
+    cpus, rams = [], []
+    for _ in range(segundos):
+        cpus.append(psutil.cpu_percent(interval=1))
+        rams.append(psutil.virtual_memory().percent)
+    return (f"MONITOR ({segundos}s):\n"
+            f"  CPU  media {sum(cpus)/len(cpus):.0f}% | pico {max(cpus):.0f}% | minimo {min(cpus):.0f}%\n"
+            f"  RAM  media {sum(rams)/len(rams):.0f}% | pico {max(rams):.0f}%\n"
+            f"  Leituras: {', '.join(f'{c:.0f}' for c in cpus)}")
+
+
+@tool
+def detectar_gargalo() -> str:
+    """Diagnostico: mede CPU, RAM e disco e diz QUAL e o gargalo do PC agora,
+    com a recomendacao pratica pra cada caso."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    cpu = psutil.cpu_percent(interval=2)
+    ram = psutil.virtual_memory()
+    try:
+        disco = psutil.disk_usage("C:\\" if os.name == "nt" else "/")
+    except Exception:
+        disco = None
+    swap = psutil.swap_memory()
+    problemas = []
+    if ram.percent >= 90:
+        problemas.append((3, f"MEMORIA CHEIA ({ram.percent:.0f}%). Este e o gargalo principal. "
+                             "Rode 'modo jogo' ou 'top processos memoria' e feche o que pesa."))
+    if cpu >= 85:
+        problemas.append((2, f"CPU NO LIMITE ({cpu:.0f}%). Veja 'top processos cpu'."))
+    if disco and disco.percent >= 92:
+        problemas.append((2, f"DISCO QUASE CHEIO ({disco.percent:.0f}%). Rode 'mapa espaco pastas' "
+                             "e 'esvaziar pastas temporarias'."))
+    if swap.percent >= 60:
+        problemas.append((1, f"O Windows esta usando muito arquivo de paginacao ({swap.percent:.0f}%) - "
+                             "sinal claro de falta de RAM."))
+    if not problemas:
+        return (f"NENHUM GARGALO: CPU {cpu:.0f}%, RAM {ram.percent:.0f}%"
+                + (f", disco {disco.percent:.0f}%" if disco else "") + ". O PC esta folgado.")
+    problemas.sort(reverse=True)
+    return "DIAGNOSTICO DE GARGALO:\n" + "\n".join("  - " + t for _p, t in problemas)
+
+
+@tool
+def espaco_recuperavel() -> str:
+    """Calcula quanto espaco da pra recuperar AGORA somando lixeira, pastas
+    temporarias, cache de navegadores e logs. So calcula, nao apaga."""
+    def tamanho(caminho):
+        soma = 0
+        if not caminho or not os.path.isdir(caminho):
+            return 0
+        for raiz, _d, arqs in os.walk(caminho):
+            for a in arqs:
+                try:
+                    soma += os.path.getsize(os.path.join(raiz, a))
+                except Exception:
+                    pass
+        return soma
+    lar = os.path.expanduser("~")
+    alvos = {
+        "Pasta TEMP do usuario": os.environ.get("TEMP", ""),
+        "Windows Temp": r"C:\Windows\Temp",
+        "Prefetch": r"C:\Windows\Prefetch",
+        "Cache do Chrome": os.path.join(lar, r"AppData\Local\Google\Chrome\User Data\Default\Cache"),
+        "Cache do Edge": os.path.join(lar, r"AppData\Local\Microsoft\Edge\User Data\Default\Cache"),
+        "Logs do Windows": r"C:\Windows\Logs",
+        "Relatorios de erro": os.path.join(lar, r"AppData\Local\CrashDumps"),
+    }
+    linhas, total = [], 0
+    for nome, cam in alvos.items():
+        t = tamanho(cam)
+        if t:
+            total += t
+            linhas.append(f"  {_tam_legivel(t):>10}  {nome}")
+    try:
+        saida, _e, _c = _rodar_cmd(
+            "powershell -NoProfile -Command \"(New-Object -ComObject Shell.Application)"
+            ".NameSpace(0xA).Items() | Measure-Object -Property Size -Sum | "
+            "Select-Object -ExpandProperty Sum\"", 40)
+        if saida.strip().isdigit():
+            t = int(saida.strip())
+            total += t
+            linhas.append(f"  {_tam_legivel(t):>10}  Lixeira")
+    except Exception:
+        pass
+    if not linhas:
+        return "Nao achei nada recuperavel (ou sem permissao de leitura)."
+    return (f"ESPACO RECUPERAVEL: ~{_tam_legivel(total)}\n" + "\n".join(linhas)
+            + "\nPara limpar: 'esvaziar pastas temporarias', 'esvaziar lixeira', 'limpar cache navegadores'.")
+
+
+@tool
+def relatorio_bateria() -> str:
+    """Gera o relatorio oficial de BATERIA do Windows (capacidade original x
+    atual, ciclos, historico) em HTML e abre pra voce ver."""
+    destino = os.path.join(os.path.expanduser("~"), "relatorio_bateria.html")
+    saida, erro, cod = _rodar_cmd(f'powercfg /batteryreport /output "{destino}"', 90)
+    if cod != 0 and not os.path.exists(destino):
+        return f"Nao consegui gerar (este PC tem bateria?). {erro[:120]}"
+    try:
+        subprocess.Popen(f'start "" "{destino}"', shell=True)
+    except Exception:
+        pass
+    return f"Relatorio de bateria gerado e aberto: {destino}"
+
+
+@tool
+def saude_da_bateria() -> str:
+    """Resumo rapido da bateria: porcentagem, se esta carregando, tempo
+    restante estimado e desgaste (capacidade atual x de fabrica)."""
+    linhas = []
+    try:
+        import psutil
+        b = psutil.sensors_battery()
+        if b:
+            estado = "carregando" if b.power_plugged else "na bateria"
+            linhas.append(f"Carga atual: {b.percent:.0f}% ({estado})")
+            if b.secsleft and b.secsleft > 0 and not b.power_plugged:
+                linhas.append(f"Tempo restante estimado: {b.secsleft//3600}h {(b.secsleft%3600)//60}min")
+    except Exception:
+        pass
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance -ClassName BatteryStaticData '
+        '-Namespace ROOT/WMI | Select-Object -ExpandProperty DesignedCapacity"', 30)
+    saida2, _e2, _c2 = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance -ClassName BatteryFullChargedCapacity '
+        '-Namespace ROOT/WMI | Select-Object -ExpandProperty FullChargedCapacity"', 30)
+    try:
+        projeto = int(saida.strip().splitlines()[0])
+        atual = int(saida2.strip().splitlines()[0])
+        desgaste = 100 - (atual * 100 / projeto)
+        linhas.append(f"Capacidade de fabrica: {projeto} mWh | hoje: {atual} mWh")
+        linhas.append(f"Desgaste: {desgaste:.0f}%"
+                      + ("  (bateria ainda boa)" if desgaste < 20 else
+                         "  (considere trocar em breve)" if desgaste < 40 else
+                         "  (bateria bem gasta)"))
+    except Exception:
+        pass
+    return "SAUDE DA BATERIA:\n  " + "\n  ".join(linhas) if linhas else "Este PC parece nao ter bateria."
+
+
+@tool
+def historico_de_desligamentos(quantidade: int = 10) -> str:
+    """Mostra os ultimos desligamentos e reinicios do PC, marcando os que foram
+    INESPERADOS (queda de energia, tela azul, travamento)."""
+    cmd = ('powershell -NoProfile -Command "Get-WinEvent -FilterHashtable '
+           "@{LogName='System'; Id=41,1074,6006,6008} -MaxEvents " + str(int(quantidade) * 2) +
+           ' | Select-Object TimeCreated,Id,Message | Format-List"')
+    saida, _e, _c = _rodar_cmd(cmd, 90)
+    if not saida.strip():
+        return "Nao consegui ler o log de eventos (precisa ser administrador)."
+    eventos, atual = [], {}
+    for linha in saida.splitlines():
+        if linha.startswith("TimeCreated"):
+            if atual:
+                eventos.append(atual)
+            atual = {"quando": linha.split(":", 1)[-1].strip()}
+        elif linha.startswith("Id"):
+            atual["id"] = linha.split(":", 1)[-1].strip()
+    if atual:
+        eventos.append(atual)
+    tipos = {"41": "DESLIGAMENTO INESPERADO (queda de energia/travamento)",
+             "1074": "desligamento normal (pedido por programa ou usuario)",
+             "6006": "servico de log encerrado (desligamento limpo)",
+             "6008": "DESLIGAMENTO INESPERADO (nao foi limpo)"}
+    linhas = ["HISTORICO DE DESLIGAMENTOS:"]
+    for ev in eventos[:quantidade]:
+        linhas.append(f"  {ev.get('quando','?')} - {tipos.get(ev.get('id',''), 'evento ' + ev.get('id',''))}")
+    ruins = sum(1 for e in eventos if e.get("id") in ("41", "6008"))
+    if ruins:
+        linhas.append(f"  ATENCAO: {ruins} desligamento(s) inesperado(s). Pode ser fonte, "
+                      "superaquecimento, RAM ou driver.")
+    return "\n".join(linhas)
+
+
+@tool
+def programas_que_travaram(quantidade: int = 10) -> str:
+    """Lista os programas que deram ERRO/FECHARAM SOZINHOS recentemente,
+    segundo o log do Windows. Otimo pra achar o culpado de travamentos."""
+    cmd = ('powershell -NoProfile -Command "Get-WinEvent -FilterHashtable '
+           "@{LogName='Application'; Level=2} -MaxEvents " + str(int(quantidade) * 3) +
+           ' | Select-Object TimeCreated,ProviderName,Message | Format-List"')
+    saida, _e, _c = _rodar_cmd(cmd, 90)
+    if not saida.strip():
+        return "Nenhum erro recente de aplicativo (ou sem permissao)."
+    blocos, atual = [], {}
+    for linha in saida.splitlines():
+        if linha.startswith("TimeCreated"):
+            if atual:
+                blocos.append(atual)
+            atual = {"quando": linha.split(":", 1)[-1].strip()}
+        elif linha.startswith("ProviderName"):
+            atual["origem"] = linha.split(":", 1)[-1].strip()
+        elif linha.startswith("Message") and "msg" not in atual:
+            atual["msg"] = linha.split(":", 1)[-1].strip()[:90]
+    if atual:
+        blocos.append(atual)
+    linhas = ["PROGRAMAS QUE DERAM ERRO:"]
+    for b in blocos[:quantidade]:
+        linhas.append(f"  {b.get('quando','?')} [{b.get('origem','?')}] {b.get('msg','')}")
+    return "\n".join(linhas)
+
+
+@tool
+def tempo_de_boot_detalhado() -> str:
+    """Quanto tempo o Windows demorou pra ligar nas ultimas vezes e o que
+    atrasou (servicos e programas de inicializacao)."""
+    cmd = ('powershell -NoProfile -Command "Get-WinEvent -FilterHashtable '
+           "@{LogName='Microsoft-Windows-Diagnostics-Performance/Operational'; Id=100} "
+           '-MaxEvents 5 | Select-Object TimeCreated,Message | Format-List"')
+    saida, _e, _c = _rodar_cmd(cmd, 90)
+    if not saida.strip():
+        return ("Nao consegui ler os eventos de inicializacao (precisa de administrador). "
+                "Alternativa: 'listar programas inicializacao'.")
+    import re as _re
+    linhas = ["TEMPO DE INICIALIZACAO (ultimos boots):"]
+    tempos = _re.findall(r"(\d+)\s*ms", saida)
+    datas = _re.findall(r"TimeCreated\s*:\s*(.+)", saida)
+    for i, d in enumerate(datas[:5]):
+        t = int(tempos[i]) / 1000 if i < len(tempos) else 0
+        linhas.append(f"  {d.strip()} -> {t:.0f} segundos" if t else f"  {d.strip()}")
+    linhas.append("Se passar de 60s, veja 'listar programas inicializacao' e desative o que nao usa.")
+    return "\n".join(linhas)
+
+
+@tool
+def dispositivos_usb_conectados() -> str:
+    """Lista tudo que esta plugado via USB agora (pendrive, mouse, teclado,
+    celular, webcam) com nome e fabricante."""
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-PnpDevice -PresentOnly | '
+        "Where-Object { $_.InstanceId -like 'USB*' } | "
+        'Select-Object -ExpandProperty FriendlyName"', 60)
+    itens = [l.strip() for l in saida.splitlines() if l.strip()]
+    if not itens:
+        return "Nenhum dispositivo USB encontrado (ou sem permissao)."
+    return f"DISPOSITIVOS USB ({len(itens)}):\n  " + "\n  ".join(dict.fromkeys(itens))
+
+
+@tool
+def monitores_conectados() -> str:
+    """Informacoes das telas conectadas: quantas, resolucao e taxa de
+    atualizacao (Hz) de cada uma."""
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | '
+        'ForEach-Object { $_.Name + \" | \" + $_.CurrentHorizontalResolution + \"x\" + '
+        '$_.CurrentVerticalResolution + \" @ \" + $_.CurrentRefreshRate + \"Hz\" }"', 60)
+    linhas = [l.strip() for l in saida.splitlines() if l.strip()]
+    if not linhas:
+        return "Nao consegui ler as telas."
+    return "TELAS / PLACA DE VIDEO:\n  " + "\n  ".join(linhas)
+
+
+@tool
+def info_placa_mae_bios() -> str:
+    """Modelo da placa-mae, fabricante, versao da BIOS e numero de serie -
+    aquilo que voce precisa quando vai atualizar BIOS ou comprar peca."""
+    partes = []
+    for titulo, cmd in (
+        ("Placa-mae", 'Get-CimInstance Win32_BaseBoard | ForEach-Object { $_.Manufacturer + " " + $_.Product }'),
+        ("BIOS", 'Get-CimInstance Win32_BIOS | ForEach-Object { $_.Manufacturer + " " + $_.SMBIOSBIOSVersion + " (" + $_.ReleaseDate + ")" }'),
+        ("Modelo do PC", 'Get-CimInstance Win32_ComputerSystem | ForEach-Object { $_.Manufacturer + " " + $_.Model }'),
+        ("Processador", 'Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name'),
+    ):
+        saida, _e, _c = _rodar_cmd(f'powershell -NoProfile -Command "{cmd}"', 45)
+        if saida.strip():
+            partes.append(f"  {titulo}: {saida.strip().splitlines()[0]}")
+    return "FICHA DA MAQUINA:\n" + ("\n".join(partes) if partes else "  nao consegui ler")
+
+
+@tool
+def slots_memoria_ram() -> str:
+    """Detalha os pentes de RAM instalados: quantos slots, capacidade,
+    velocidade e quantos slots ainda estao livres pra upgrade."""
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance Win32_PhysicalMemory | '
+        'ForEach-Object { [string]([math]::Round($_.Capacity/1GB)) + \" GB | \" + '
+        '$_.Speed + \" MHz | \" + $_.Manufacturer + \" | slot \" + $_.DeviceLocator }"', 60)
+    pentes = [l.strip() for l in saida.splitlines() if l.strip()]
+    saida2, _e2, _c2 = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance Win32_PhysicalMemoryArray | '
+        'Select-Object -ExpandProperty MemoryDevices"', 45)
+    total_slots = saida2.strip().splitlines()[0] if saida2.strip() else "?"
+    if not pentes:
+        return "Nao consegui ler os pentes de memoria."
+    linhas = [f"MEMORIA RAM ({len(pentes)} pente(s) de {total_slots} slot(s)):"]
+    linhas += [f"  {p}" for p in pentes]
+    try:
+        if int(total_slots) > len(pentes):
+            linhas.append(f"  Voce tem {int(total_slots)-len(pentes)} slot(s) LIVRE(S) para upgrade.")
+    except Exception:
+        pass
+    return "\n".join(linhas)
+
+
+@tool
+def temperatura_do_sistema() -> str:
+    """Tenta ler a TEMPERATURA do PC pelos sensores do Windows (nem todo PC
+    expoe isso). Avisa se estiver quente demais."""
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-CimInstance -Namespace root/wmi '
+        '-ClassName MSAcpi_ThermalZoneTemperature | Select-Object -ExpandProperty CurrentTemperature"', 45)
+    valores = []
+    for l in saida.splitlines():
+        l = l.strip()
+        if l.isdigit():
+            valores.append(int(l) / 10 - 273.15)
+    if not valores:
+        return ("Este PC nao expoe temperatura pelo Windows (comum em desktop). "
+                "Para ver de verdade, use HWMonitor ou o app da placa-mae.")
+    linhas = ["TEMPERATURA:"]
+    for i, t in enumerate(valores, 1):
+        alerta = " QUENTE!" if t >= 80 else " (morno)" if t >= 70 else " (ok)"
+        linhas.append(f"  Zona {i}: {t:.0f} C{alerta}")
+    if max(valores) >= 80:
+        linhas.append("  Acima de 80C: limpe as saidas de ar e verifique as ventoinhas.")
+    return "\n".join(linhas)
+
+
+@tool
+def teste_velocidade_disco(caminho: str = "", tamanho_mb: int = 100) -> str:
+    """Mede a velocidade de ESCRITA e LEITURA do disco escrevendo um arquivo
+    temporario. Diz se o desempenho e de HD ou SSD."""
+    base = _pasta_padrao(caminho) if caminho else os.path.expanduser("~")
+    alvo = os.path.join(base, "_teste_velocidade.tmp")
+    dados = os.urandom(1024 * 1024)
+    tamanho_mb = max(10, min(500, int(tamanho_mb)))
+    try:
+        t0 = time.time()
+        with open(alvo, "wb") as f:
+            for _ in range(tamanho_mb):
+                f.write(dados)
+            f.flush()
+            os.fsync(f.fileno())
+        t_escrita = time.time() - t0
+        t0 = time.time()
+        with open(alvo, "rb") as f:
+            while f.read(1 << 20):
+                pass
+        t_leitura = time.time() - t0
+    except Exception as e:
+        return f"Nao consegui testar: {type(e).__name__}"
+    finally:
+        try:
+            os.remove(alvo)
+        except Exception:
+            pass
+    escrita = tamanho_mb / max(t_escrita, 0.001)
+    leitura = tamanho_mb / max(t_leitura, 0.001)
+    if leitura > 1500:
+        tipo = "SSD NVMe (muito rapido)"
+    elif leitura > 300:
+        tipo = "SSD SATA"
+    elif leitura > 80:
+        tipo = "HD rapido ou SSD lento"
+    else:
+        tipo = "HD mecanico (ou disco com problema)"
+    return (f"VELOCIDADE DO DISCO em {base} ({tamanho_mb} MB):\n"
+            f"  Escrita: {escrita:.0f} MB/s\n  Leitura: {leitura:.0f} MB/s\n"
+            f"  Perfil: {tipo}")
+
+
+@tool
+def servicos_essenciais_parados() -> str:
+    """Confere se algum servico IMPORTANTE do Windows esta parado (Windows
+    Update, Defender, audio, impressao, rede) - causa comum de 'bug do nada'."""
+    essenciais = {
+        "wuauserv": "Windows Update", "WinDefend": "Windows Defender",
+        "Audiosrv": "Audio", "Spooler": "Impressao", "Dhcp": "DHCP (rede)",
+        "Dnscache": "Cache de DNS", "LanmanWorkstation": "Rede/compartilhamento",
+        "BITS": "Transferencia em segundo plano", "EventLog": "Log de eventos",
+        "Themes": "Temas/visual",
+    }
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-Service | '
+        'ForEach-Object { $_.Name + \"=\" + $_.Status }"', 60)
+    estados = {}
+    for linha in saida.splitlines():
+        if "=" in linha:
+            nome, estado = linha.strip().split("=", 1)
+            estados[nome.strip()] = estado.strip()
+    parados, ok = [], 0
+    for chave, amigavel in essenciais.items():
+        est = estados.get(chave)
+        if est is None:
+            continue
+        if est.lower() != "running":
+            parados.append(f"  PARADO: {amigavel} ({chave}) - status {est}")
+        else:
+            ok += 1
+    if not parados:
+        return f"Todos os {ok} servicos essenciais estao rodando normalmente."
+    return ("SERVICOS ESSENCIAIS PARADOS:\n" + "\n".join(parados)
+            + "\nPara religar: 'gerenciar servicos windows' (ou me peca pelo nome).")
+
+
+@tool
+def tarefas_agendadas_suspeitas() -> str:
+    """Procura TAREFAS AGENDADAS estranhas (que rodam de pastas temporarias, do
+    usuario ou sem autor conhecido) - truque comum de programa indesejado."""
+    saida, _e, _c = _rodar_cmd(
+        'powershell -NoProfile -Command "Get-ScheduledTask | Where-Object '
+        "{ $_.State -ne 'Disabled' } | ForEach-Object { $_.TaskName + ' | ' + $_.TaskPath + ' | ' + "
+        '($_.Actions.Execute -join \",\") }"', 90)
+    linhas = [l.strip() for l in saida.splitlines() if l.strip()]
+    if not linhas:
+        return "Nao consegui listar as tarefas agendadas."
+    suspeitas = []
+    marcas = ("temp", "appdata", "roaming", "downloads", "public", "programdata")
+    for l in linhas:
+        baixo = l.lower()
+        if any(m in baixo for m in marcas) and "microsoft" not in baixo:
+            suspeitas.append(l)
+    if not suspeitas:
+        return f"Analisei {len(linhas)} tarefas agendadas: nada suspeito."
+    return (f"TAREFAS SUSPEITAS ({len(suspeitas)} de {len(linhas)}):\n  "
+            + "\n  ".join(suspeitas[:15])
+            + "\nNao apaguei nada. Confira o que voce reconhece antes de remover.")
+
+
+@tool
+def modo_apresentacao(acao: str = "ligar") -> str:
+    """Modo APRESENTACAO/REUNIAO: evita que a tela apague e silencia
+    notificacoes enquanto voce apresenta. Use 'desligar' pra voltar."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ"))
+    if ligar:
+        _rodar_cmd("powercfg /change monitor-timeout-ac 0", 30)
+        _rodar_cmd("powercfg /change standby-timeout-ac 0", 30)
+        _rodar_cmd(r'reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\PushNotifications" '
+                   r'/v ToastEnabled /t REG_DWORD /d 0 /f', 30)
+        return ("MODO APRESENTACAO LIGADO: a tela nao apaga e as notificacoes estao silenciadas. "
+                "Diga 'modo apresentacao desligar' quando terminar.")
+    _rodar_cmd("powercfg /change monitor-timeout-ac 10", 30)
+    _rodar_cmd("powercfg /change standby-timeout-ac 30", 30)
+    _rodar_cmd(r'reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\PushNotifications" '
+               r'/v ToastEnabled /t REG_DWORD /d 1 /f', 30)
+    return "Modo apresentacao desligado: tela e notificacoes voltaram ao normal."
+
+
+@tool
+def agendar_desligamento(minutos: int = 60) -> str:
+    """Agenda o desligamento do PC para daqui a X minutos (util pra dormir
+    ouvindo musica ou terminar um download)."""
+    minutos = max(1, int(minutos))
+    if not _confirma_poderoso(f"Programar o PC para DESLIGAR em {minutos} minuto(s)?"):
+        return "Cancelado."
+    _rodar_cmd("shutdown /a", 15)
+    saida, erro, cod = _rodar_cmd(f"shutdown /s /t {minutos * 60}", 20)
+    if cod != 0:
+        return f"Nao consegui agendar: {erro[:120]}"
+    quando = datetime.now() + timedelta(minutes=minutos)
+    return (f"Desligamento agendado para as {quando.strftime('%H:%M')} "
+            f"(em {minutos} min). Para cancelar, diga 'cancelar desligamento'.")
+
+
+@tool
+def cancelar_desligamento() -> str:
+    """Cancela um desligamento ou reinicio que estava agendado."""
+    saida, erro, cod = _rodar_cmd("shutdown /a", 20)
+    if cod == 0:
+        return "Desligamento agendado CANCELADO."
+    return "Nao havia nenhum desligamento agendado."
+
+
+@tool
+def reiniciar_explorer() -> str:
+    """Reinicia o Explorer do Windows - conserta barra de tarefas travada,
+    icones sumidos e menu iniciar que nao abre. Nao fecha seus programas."""
+    if not _confirma_poderoso("Reiniciar o Explorer (barra de tarefas vai piscar)?"):
+        return "Cancelado."
+    _rodar_cmd("taskkill /f /im explorer.exe", 30)
+    time.sleep(1.5)
+    try:
+        subprocess.Popen("start explorer.exe", shell=True)
+    except Exception:
+        _rodar_cmd("start explorer.exe", 20)
+    return "Explorer reiniciado. Barra de tarefas e icones devem voltar ao normal."
+
+
+@tool
+def limpar_area_transferencia() -> str:
+    """Apaga o que esta copiado na area de transferencia (Ctrl+C), inclusive o
+    historico do Windows - bom depois de copiar uma senha."""
+    _rodar_cmd("echo off | clip", 15)
+    _rodar_cmd('powershell -NoProfile -Command "Clear-Clipboard"', 20)
+    return "Area de transferencia limpa (o que estava copiado foi apagado)."
+
+
+@tool
+def processos_por_usuario() -> str:
+    """Agrupa os processos por USUARIO/conta (SISTEMA, seu usuario, servicos),
+    mostrando quantos e quanta memoria cada um usa."""
+    try:
+        import psutil
+    except Exception:
+        return "psutil indisponivel."
+    contas = {}
+    for pr in psutil.process_iter(["username", "memory_info"]):
+        try:
+            u = pr.info.get("username") or "(sistema)"
+            mem = getattr(pr.info.get("memory_info"), "rss", 0) or 0
+            n, t = contas.get(u, (0, 0))
+            contas[u] = (n + 1, t + mem)
+        except Exception:
+            continue
+    if not contas:
+        return "Nao consegui ler os processos."
+    linhas = ["PROCESSOS POR CONTA:"]
+    for u, (n, t) in sorted(contas.items(), key=lambda x: -x[1][1]):
+        linhas.append(f"  {u:<32} {n:>4} processo(s)  {_tam_legivel(t)}")
+    return "\n".join(linhas)
+
+
+@tool
+def limpar_cache_dns_arp() -> str:
+    """Limpa cache de DNS e tabela ARP - resolve 'site nao abre mas a internet
+    funciona' e problemas depois de trocar de rede."""
+    passos = []
+    for titulo, cmd in (("Cache de DNS", "ipconfig /flushdns"),
+                        ("Tabela ARP", "arp -d *"),
+                        ("Cache NetBIOS", "nbtstat -R")):
+        _s, _e, cod = _rodar_cmd(cmd, 30)
+        passos.append(f"  {titulo}: {'limpo' if cod == 0 else 'falhou (precisa admin)'}")
+    return "LIMPEZA DE CACHE DE REDE:\n" + "\n".join(passos)
+
+
+
+
+# ============ LOTE NOVO 3: REDE E DESENVOLVIMENTO/GIT ============
+
+def _git(caminho: str, args: str, timeout: int = 60):
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return None, f"Pasta nao encontrada: {base}"
+    saida, erro, cod = _rodar_cmd(f'git -C "{base}" {args}', timeout)
+    if cod != 0 and "not a git repository" in (erro or "").lower():
+        return None, f"'{base}' nao e um repositorio git."
+    if cod != 0 and not saida:
+        return None, (erro or "comando git falhou")[:200]
+    return saida, None
+
+
+@tool
+def ping_host(host: str = "8.8.8.8", vezes: int = 4) -> str:
+    """Faz PING num site/IP e mostra se responde, com o tempo de resposta e
+    perda de pacotes. O teste mais basico de 'a internet esta boa?'."""
+    host = (host or "8.8.8.8").strip()
+    saida, _e, _c = _rodar_cmd(f"ping -n {max(1, min(20, int(vezes)))} {host}", 60)
+    if not saida:
+        return f"Sem resposta de {host} (host errado ou sem internet)."
+    import re as _re
+    tempos = [int(x) for x in _re.findall(r"tempo[=<](\d+)ms", saida, _re.I)]
+    tempos += [int(x) for x in _re.findall(r"time[=<](\d+)ms", saida, _re.I)]
+    perda = _re.search(r"\((\d+)% de perda|\((\d+)% loss", saida)
+    linhas = [f"PING {host}:"]
+    if tempos:
+        media = sum(tempos) / len(tempos)
+        linhas.append(f"  Respondeu {len(tempos)}x | media {media:.0f} ms "
+                      f"(min {min(tempos)} / max {max(tempos)})")
+        linhas.append("  Qualidade: " + ("otima" if media < 30 else "boa" if media < 80
+                                         else "ruim (lag)" if media < 200 else "pessima"))
+    else:
+        linhas.append("  Nao respondeu (host fora do ar, bloqueado ou sem internet).")
+    if perda:
+        p = perda.group(1) or perda.group(2)
+        linhas.append(f"  Perda de pacotes: {p}%" + ("  <- instavel!" if p and int(p) > 0 else ""))
+    return "\n".join(linhas)
+
+
+@tool
+def traceroute_host(host: str = "8.8.8.8") -> str:
+    """Mostra o CAMINHO que seus dados percorrem ate um site (cada 'salto'),
+    revelando onde a lentidao acontece: no seu roteador, no provedor ou fora."""
+    saida, _e, _c = _rodar_cmd(f"tracert -d -h 15 -w 800 {host.strip()}", 120)
+    if not saida:
+        return f"Nao consegui tracar a rota ate {host}."
+    linhas = [l for l in saida.splitlines() if l.strip()]
+    return "ROTA ATE " + host + ":\n" + "\n".join(linhas[:20])
+
+
+@tool
+def consultar_dns(dominio: str, tipo: str = "A") -> str:
+    """Consulta o DNS de um dominio (A, AAAA, MX, TXT, NS): pra onde ele
+    aponta, quem cuida do email, etc."""
+    saida, _e, _c = _rodar_cmd(f"nslookup -type={tipo.strip().upper()} {dominio.strip()}", 45)
+    if not saida:
+        return f"Nao consegui consultar {dominio}."
+    return f"DNS ({tipo.upper()}) de {dominio}:\n" + saida[:1200]
+
+
+@tool
+def dns_reverso(ip: str) -> str:
+    """Descobre o NOME por tras de um IP (DNS reverso) - util pra saber de quem
+    e um IP que apareceu na sua rede ou num log."""
+    import socket as _s
+    ip = ip.strip()
+    try:
+        nome, _alias, _ips = _s.gethostbyaddr(ip)
+        return f"{ip} pertence a: {nome}"
+    except Exception:
+        saida, _e, _c = _rodar_cmd(f"nslookup {ip}", 30)
+        return f"Consulta de {ip}:\n{saida[:600]}" if saida else f"Nenhum nome encontrado para {ip}."
+
+
+@tool
+def testar_porta_aberta(host: str, porta: int, timeout_segundos: int = 3) -> str:
+    """Testa se uma PORTA de um servidor esta aberta (ex.: se um jogo, servidor
+    ou banco de dados esta acessivel)."""
+    import socket as _s
+    try:
+        with _s.create_connection((host.strip(), int(porta)), timeout=timeout_segundos):
+            return f"Porta {porta} de {host}: ABERTA (conectou normalmente)."
+    except _s.timeout:
+        return f"Porta {porta} de {host}: sem resposta (filtrada por firewall ou fechada)."
+    except Exception as e:
+        return f"Porta {porta} de {host}: FECHADA ({type(e).__name__})."
+
+
+@tool
+def latencia_varios_servidores() -> str:
+    """Testa a latencia para varios servidores conhecidos de uma vez e diz se o
+    problema e a SUA rede ou o site especifico."""
+    alvos = {"Google DNS": "8.8.8.8", "Cloudflare": "1.1.1.1",
+             "Google": "google.com", "YouTube": "youtube.com",
+             "Seu roteador": ""}
+    saida_g, _e, _c = _rodar_cmd("ipconfig", 30)
+    import re as _re
+    m = _re.search(r"Gateway[^:]*:\s*([\d.]+)", saida_g)
+    if m:
+        alvos["Seu roteador"] = m.group(1)
+    linhas, medias = ["TESTE DE LATENCIA:"], []
+    for nome, alvo in alvos.items():
+        if not alvo:
+            continue
+        s, _e2, _c2 = _rodar_cmd(f"ping -n 3 {alvo}", 30)
+        tempos = [int(x) for x in _re.findall(r"tempo[=<](\d+)ms|time[=<](\d+)ms", s)
+                  for x in [x[0] or x[1]] if x]
+        if tempos:
+            media = sum(tempos) / len(tempos)
+            medias.append((nome, media))
+            linhas.append(f"  {nome:<14} {media:5.0f} ms")
+        else:
+            linhas.append(f"  {nome:<14} sem resposta")
+    if medias:
+        roteador = dict(medias).get("Seu roteador")
+        externo = [m for n, m in medias if n != "Seu roteador"]
+        if roteador and roteador > 10:
+            linhas.append("  DIAGNOSTICO: ate o SEU roteador ja esta lento - problema no wi-fi/cabo daqui.")
+        elif externo and sum(externo) / len(externo) > 120:
+            linhas.append("  DIAGNOSTICO: rede local ok, mas a internet esta lenta - problema no provedor.")
+        else:
+            linhas.append("  DIAGNOSTICO: latencia normal.")
+    return "\n".join(linhas)
+
+
+@tool
+def testar_dns_mais_rapido() -> str:
+    """Compara a velocidade dos principais servidores DNS (Google, Cloudflare,
+    OpenDNS, Quad9) e diz qual deixaria sua navegacao mais rapida."""
+    servidores = {"Google (8.8.8.8)": "8.8.8.8", "Cloudflare (1.1.1.1)": "1.1.1.1",
+                  "OpenDNS (208.67.222.222)": "208.67.222.222", "Quad9 (9.9.9.9)": "9.9.9.9"}
+    resultados = []
+    for nome, ip in servidores.items():
+        t0 = time.time()
+        saida, _e, _c = _rodar_cmd(f"nslookup google.com {ip}", 20)
+        ms = (time.time() - t0) * 1000
+        resultados.append((ms if saida else 9999, nome))
+    resultados.sort()
+    linhas = ["VELOCIDADE DOS DNS:"]
+    for ms, nome in resultados:
+        linhas.append(f"  {nome:<26} " + (f"{ms:5.0f} ms" if ms < 9999 else "sem resposta"))
+    if resultados and resultados[0][0] < 9999:
+        linhas.append(f"  MAIS RAPIDO: {resultados[0][1]}. Para trocar, use 'gerenciar adaptador rede'.")
+    return "\n".join(linhas)
+
+
+@tool
+def verificar_site_no_ar(url: str) -> str:
+    """Verifica se um site esta NO AR, com o codigo de resposta e o tempo que
+    levou pra responder."""
+    import urllib.request
+    endereco = url.strip()
+    if not endereco.startswith("http"):
+        endereco = "https://" + endereco
+    t0 = time.time()
+    try:
+        req = urllib.request.Request(endereco, headers={"User-Agent": "SuperAgentePC"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            ms = (time.time() - t0) * 1000
+            return (f"{endereco} esta NO AR\n  Codigo: {r.status} | "
+                    f"Tempo de resposta: {ms:.0f} ms\n  Servidor: {r.headers.get('Server', '?')}")
+    except Exception as e:
+        return f"{endereco} NAO respondeu: {type(e).__name__} ({str(e)[:80]})"
+
+
+@tool
+def cabecalhos_http(url: str) -> str:
+    """Mostra os cabecalhos HTTP de um site (servidor, cache, seguranca,
+    redirecionamentos) - util pra diagnostico tecnico."""
+    import urllib.request
+    endereco = url.strip()
+    if not endereco.startswith("http"):
+        endereco = "https://" + endereco
+    try:
+        req = urllib.request.Request(endereco, headers={"User-Agent": "SuperAgentePC"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            linhas = [f"CABECALHOS de {r.url} (codigo {r.status}):"]
+            for k, v in r.headers.items():
+                linhas.append(f"  {k}: {str(v)[:90]}")
+            return "\n".join(linhas[:30])
+    except Exception as e:
+        return f"Nao consegui ler: {type(e).__name__}"
+
+
+@tool
+def certificado_ssl(dominio: str) -> str:
+    """Confere o certificado de seguranca (HTTPS) de um site: pra quem foi
+    emitido, por quem e QUANTOS DIAS FALTAM pra vencer."""
+    import socket as _s, ssl as _ssl
+    host = dominio.strip().replace("https://", "").replace("http://", "").split("/")[0]
+    try:
+        ctx = _ssl.create_default_context()
+        with _s.create_connection((host, 443), timeout=10) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ss:
+                cert = ss.getpeercert()
+    except Exception as e:
+        return f"Nao consegui checar o certificado de {host}: {type(e).__name__}"
+    def parte(campo):
+        for item in cert.get(campo, ()):
+            for k, v in item:
+                if k in ("commonName", "organizationName"):
+                    return v
+        return "?"
+    validade = cert.get("notAfter", "")
+    dias = "?"
+    try:
+        venc = datetime.strptime(validade, "%b %d %H:%M:%S %Y %Z")
+        dias = (venc - datetime.now()).days
+    except Exception:
+        pass
+    aviso = ""
+    if isinstance(dias, int):
+        aviso = "  ATENCAO: vence em breve!" if dias < 15 else ""
+    return (f"CERTIFICADO de {host}:\n  Emitido para: {parte('subject')}\n"
+            f"  Emitido por: {parte('issuer')}\n  Valido ate: {validade} "
+            f"({dias} dias){aviso}")
+
+
+@tool
+def forca_do_sinal_wifi() -> str:
+    """Mostra a FORCA do sinal do wi-fi atual, canal, velocidade e se vale a
+    pena mudar de lugar ou trocar de canal."""
+    saida, _e, _c = _rodar_cmd("netsh wlan show interfaces", 40)
+    if not saida.strip():
+        return "Sem wi-fi ativo (ou voce esta no cabo)."
+    dados = {}
+    for linha in saida.splitlines():
+        if ":" in linha:
+            k, v = linha.split(":", 1)
+            dados[k.strip().lower()] = v.strip()
+    sinal = dados.get("sinal") or dados.get("signal") or ""
+    linhas = ["WI-FI ATUAL:"]
+    for rotulo, chaves in (("Rede", ("ssid",)), ("Sinal", ("sinal", "signal")),
+                           ("Canal", ("canal", "channel")),
+                           ("Velocidade rec.", ("taxa de recebimento (mbps)", "receive rate (mbps)")),
+                           ("Velocidade env.", ("taxa de transmissao (mbps)", "transmit rate (mbps)")),
+                           ("Autenticacao", ("autenticacao", "authentication"))):
+        for c in chaves:
+            if c in dados:
+                linhas.append(f"  {rotulo}: {dados[c]}")
+                break
+    try:
+        pct = int(str(sinal).replace("%", "").strip())
+        linhas.append("  Qualidade: " + ("excelente" if pct >= 80 else "boa" if pct >= 60
+                      else "fraca - chegue mais perto do roteador" if pct >= 40
+                      else "muito fraca - quedas sao esperadas"))
+    except Exception:
+        pass
+    return "\n".join(linhas)
+
+
+@tool
+def dispositivos_novos_na_rede() -> str:
+    """Compara os aparelhos conectados na sua rede AGORA com a ultima vez que
+    voce checou e avisa se apareceu algum DESCONHECIDO."""
+    arquivo = os.path.join(PASTA_BASE, "rede_conhecida.json")
+    saida, _e, _c = _rodar_cmd("arp -a", 40)
+    import re as _re
+    atuais = {}
+    for linha in saida.splitlines():
+        m = _re.search(r"([\d.]+)\s+([0-9a-f-]{17})", linha, _re.I)
+        if m and not m.group(1).endswith(".255"):
+            atuais[m.group(2).lower()] = m.group(1)
+    if not atuais:
+        return "Nao consegui ler os dispositivos da rede."
+    conhecidos = carregar_json(arquivo, {})
+    novos = {mac: ip for mac, ip in atuais.items() if mac not in conhecidos}
+    sumiram = [mac for mac in conhecidos if mac not in atuais]
+    conhecidos.update(atuais)
+    salvar_json(arquivo, conhecidos)
+    linhas = [f"REDE: {len(atuais)} aparelho(s) conectado(s) agora."]
+    if novos:
+        linhas.append(f"  NOVOS desde a ultima checagem ({len(novos)}):")
+        for mac, ip in novos.items():
+            linhas.append(f"     {ip}  (MAC {mac})")
+        linhas.append("     Se voce nao reconhece, troque a senha do wi-fi.")
+    else:
+        linhas.append("  Nenhum aparelho novo.")
+    if sumiram:
+        linhas.append(f"  Sairam da rede: {len(sumiram)}")
+    return "\n".join(linhas)
+
+
+@tool
+def monitorar_latencia(host: str = "8.8.8.8", vezes: int = 10) -> str:
+    """Mede a latencia varias vezes seguidas e mostra se a conexao esta
+    ESTAVEL ou oscilando (a causa real de travar em jogo e chamada)."""
+    import re as _re
+    host = host.strip() or "8.8.8.8"
+    tempos = []
+    for _ in range(max(3, min(30, int(vezes)))):
+        s, _e, _c = _rodar_cmd(f"ping -n 1 {host}", 15)
+        m = _re.search(r"tempo[=<](\d+)ms|time[=<](\d+)ms", s)
+        tempos.append(int(m.group(1) or m.group(2)) if m else None)
+    ok = [t for t in tempos if t is not None]
+    perdidos = len(tempos) - len(ok)
+    if not ok:
+        return f"Nenhuma resposta de {host}."
+    media = sum(ok) / len(ok)
+    variacao = max(ok) - min(ok)
+    linhas = [f"ESTABILIDADE ate {host} ({len(tempos)} testes):",
+              f"  Media: {media:.0f} ms | minimo {min(ok)} | maximo {max(ok)}",
+              f"  Variacao (jitter): {variacao} ms | Perdidos: {perdidos}"]
+    if perdidos:
+        linhas.append("  CONEXAO INSTAVEL: esta perdendo pacotes.")
+    elif variacao > 80:
+        linhas.append("  OSCILANDO MUITO: e isso que trava jogo e videochamada.")
+    else:
+        linhas.append("  Conexao estavel.")
+    return "\n".join(linhas)
+
+
+@tool
+def git_status(caminho: str = "") -> str:
+    """Mostra o estado do repositorio Git: arquivos alterados, novos, em qual
+    branch voce esta e se tem coisa pra enviar."""
+    saida, erro = _git(caminho, "status -sb")
+    if erro:
+        return erro
+    if not saida.strip():
+        return "Repositorio limpo (nada alterado)."
+    linhas = saida.splitlines()
+    cabeca = linhas[0] if linhas else ""
+    mudancas = linhas[1:]
+    resumo = {"M": 0, "A": 0, "D": 0, "?": 0}
+    for l in mudancas:
+        marca = l.strip()[:1]
+        resumo[marca] = resumo.get(marca, 0) + 1
+    return (f"GIT - {cabeca}\n"
+            f"  Modificados: {resumo.get('M',0)} | Novos: {resumo.get('?',0)} | "
+            f"Adicionados: {resumo.get('A',0)} | Apagados: {resumo.get('D',0)}\n  "
+            + "\n  ".join(mudancas[:20]))
+
+
+@tool
+def git_log(caminho: str = "", quantidade: int = 10) -> str:
+    """Mostra os ultimos commits do repositorio (quem, quando e o que mudou)."""
+    saida, erro = _git(caminho, f'log --oneline --decorate -n {int(quantidade)} --date=short '
+                                '--pretty=format:"%h %ad %an: %s"')
+    if erro:
+        return erro
+    return "ULTIMOS COMMITS:\n  " + "\n  ".join(saida.splitlines()) if saida else "Sem commits ainda."
+
+
+@tool
+def git_diff(caminho: str = "", arquivo: str = "") -> str:
+    """Mostra exatamente O QUE MUDOU nos arquivos desde o ultimo commit."""
+    saida, erro = _git(caminho, f'diff --stat {arquivo}'.strip())
+    if erro:
+        return erro
+    if not saida.strip():
+        return "Nenhuma alteracao desde o ultimo commit."
+    detalhe, _erro2 = _git(caminho, f'diff -U2 {arquivo}'.strip(), 90)
+    corpo = (detalhe or "").splitlines()[:40]
+    return "RESUMO:\n  " + "\n  ".join(saida.splitlines()) + "\n\nDETALHE:\n" + "\n".join(corpo)
+
+
+@tool
+def git_branch(caminho: str = "", acao: str = "listar", nome: str = "") -> str:
+    """Lista as branches, cria uma nova (acao='criar') ou troca de branch
+    (acao='trocar'). Sempre diz em qual voce esta."""
+    a = acao.strip().lower()
+    if a.startswith("cri") and nome:
+        saida, erro = _git(caminho, f'checkout -b "{nome}"')
+        return erro or f"Branch '{nome}' criada e voce ja esta nela."
+    if a.startswith("tro") and nome:
+        saida, erro = _git(caminho, f'checkout "{nome}"')
+        return erro or f"Agora voce esta na branch '{nome}'."
+    saida, erro = _git(caminho, "branch -a")
+    if erro:
+        return erro
+    return "BRANCHES:\n  " + "\n  ".join(saida.splitlines()[:20])
+
+
+@tool
+def git_commit_rapido(caminho: str = "", mensagem: str = "") -> str:
+    """Adiciona TODAS as alteracoes e faz um commit com a mensagem informada.
+    Mostra o que sera commitado e pede confirmacao antes."""
+    if not mensagem.strip():
+        return "Preciso da mensagem do commit. Ex.: 'commit: conserta login'."
+    status, erro = _git(caminho, "status -s")
+    if erro:
+        return erro
+    if not status.strip():
+        return "Nao ha nada para commitar."
+    print("\nSera commitado:\n  " + "\n  ".join(status.splitlines()[:20]))
+    if not _confirma_poderoso(f"Fazer commit de {len(status.splitlines())} arquivo(s) "
+                              f"com a mensagem '{mensagem}'?"):
+        return "Cancelado."
+    _git(caminho, "add -A")
+    saida, erro = _git(caminho, f'commit -m "{mensagem}"', 90)
+    return erro or ("COMMIT FEITO:\n  " + "\n  ".join((saida or "").splitlines()[:6]))
+
+
+@tool
+def git_clonar(url: str, destino: str = "") -> str:
+    """Baixa (clona) um repositorio do GitHub/GitLab para uma pasta do seu PC."""
+    alvo = _pasta_padrao(destino) if destino else os.path.join(os.path.expanduser("~"), "repos")
+    os.makedirs(alvo, exist_ok=True)
+    saida, erro, cod = _rodar_cmd(f'git -C "{alvo}" clone {url.strip()}', 300)
+    if cod != 0:
+        return f"Nao consegui clonar: {(erro or saida)[:200]}"
+    return f"Repositorio clonado em {alvo}\n{(saida or erro)[:300]}"
+
+
+@tool
+def git_desfazer_alteracoes(caminho: str = "") -> str:
+    """DESFAZ todas as alteracoes nao commitadas, voltando os arquivos ao
+    ultimo commit. PERIGOSO: pede confirmacao e mostra o que sera perdido."""
+    status, erro = _git(caminho, "status -s")
+    if erro:
+        return erro
+    if not status.strip():
+        return "Nao ha alteracoes para desfazer."
+    print("\nSera PERDIDO:\n  " + "\n  ".join(status.splitlines()[:20]))
+    if not _confirma_poderoso("DESFAZER todas essas alteracoes? Nao tem como voltar atras."):
+        return "Cancelado (ainda bem)."
+    _git(caminho, "checkout -- .")
+    _git(caminho, "clean -fd")
+    return "Alteracoes desfeitas: os arquivos voltaram ao ultimo commit."
+
+
+@tool
+def criar_repositorio_git(caminho: str = "", com_gitignore: str = "sim") -> str:
+    """Inicia um repositorio Git novo numa pasta, ja com .gitignore de Python
+    e o primeiro commit feito."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    if os.path.isdir(os.path.join(base, ".git")):
+        return "Esta pasta JA e um repositorio git."
+    saida, erro, cod = _rodar_cmd(f'git -C "{base}" init', 45)
+    if cod != 0:
+        return f"Falhei: {erro[:150]} (o git esta instalado?)"
+    if com_gitignore.strip().lower().startswith("s"):
+        conteudo = ("__pycache__/\n*.pyc\n.env\nvenv/\n.venv/\nnode_modules/\n"
+                    "dist/\nbuild/\n*.log\n.DS_Store\nchaves.txt\n")
+        try:
+            open(os.path.join(base, ".gitignore"), "w", encoding="utf-8").write(conteudo)
+        except Exception:
+            pass
+    _rodar_cmd(f'git -C "{base}" add -A', 60)
+    _rodar_cmd(f'git -C "{base}" commit -m "primeiro commit"', 60)
+    return f"Repositorio git criado em {base} (com .gitignore e primeiro commit)."
+
+
+@tool
+def gerar_gitignore(caminho: str = "", tipo: str = "python") -> str:
+    """Cria um arquivo .gitignore pronto para o tipo de projeto (python, node,
+    web, unity, geral) - evita subir lixo e SENHAS pro GitHub."""
+    modelos = {
+        "python": "__pycache__/\n*.py[cod]\n.venv/\nvenv/\n.env\n*.egg-info/\ndist/\nbuild/\n.pytest_cache/\n",
+        "node": "node_modules/\ndist/\nbuild/\n.env\n.env.*\nnpm-debug.log*\n.cache/\ncoverage/\n",
+        "web": "node_modules/\ndist/\n.env\n*.log\n.parcel-cache/\n.vscode/\n",
+        "unity": "Library/\nTemp/\nObj/\nBuild/\nLogs/\n*.csproj\n*.sln\n",
+        "geral": "*.log\n*.tmp\n.env\nchaves.txt\nsenhas.txt\n.DS_Store\nThumbs.db\n",
+    }
+    escolha = tipo.strip().lower()
+    conteudo = modelos.get(escolha)
+    if not conteudo:
+        return "Tipos disponiveis: " + ", ".join(modelos)
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    destino = os.path.join(base, ".gitignore")
+    if os.path.exists(destino):
+        antigo = open(destino, encoding="utf-8", errors="ignore").read()
+        conteudo = antigo.rstrip() + "\n\n# adicionado pelo agente\n" + conteudo
+    open(destino, "w", encoding="utf-8").write(conteudo)
+    return f".gitignore ({escolha}) criado em {destino}"
+
+
+@tool
+def criar_ambiente_virtual(caminho: str = "", nome: str = "venv") -> str:
+    """Cria um ambiente virtual Python (venv) na pasta do projeto e mostra o
+    comando pra ativar - isolamento correto de dependencias."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    alvo = os.path.join(base, nome)
+    if os.path.isdir(alvo):
+        return f"Ja existe um ambiente em {alvo}."
+    saida, erro, cod = _rodar_cmd(f'python -m venv "{alvo}"', 180)
+    if cod != 0:
+        return f"Falhei ao criar: {erro[:150]}"
+    return (f"Ambiente virtual criado em {alvo}\n"
+            f"  Para ativar:  {os.path.join(alvo, 'Scripts', 'activate.bat')}\n"
+            f"  Para instalar pacotes depois de ativar:  pip install <pacote>")
+
+
+@tool
+def pip_desatualizados() -> str:
+    """Lista as bibliotecas Python instaladas que tem versao NOVA disponivel."""
+    saida, erro, cod = _rodar_cmd("python -m pip list --outdated --disable-pip-version-check", 180)
+    if not saida.strip():
+        return "Tudo atualizado (ou nao consegui consultar)."
+    linhas = saida.splitlines()
+    return (f"BIBLIOTECAS DESATUALIZADAS ({max(0, len(linhas)-2)}):\n  "
+            + "\n  ".join(linhas[:25])
+            + "\nPara atualizar uma: me peca 'pip instalar <nome>'.")
+
+
+@tool
+def pip_instalar_pacote(pacote: str) -> str:
+    """Instala ou atualiza uma biblioteca Python (pip install -U). Pede
+    confirmacao antes."""
+    nome = pacote.strip()
+    if not nome or any(c in nome for c in ";&|"):
+        return "Nome de pacote invalido."
+    if not _confirma_poderoso(f"Instalar/atualizar a biblioteca Python '{nome}'?"):
+        return "Cancelado."
+    saida, erro, cod = _rodar_cmd(f"python -m pip install -U {nome}", 300)
+    fim = (saida or erro).strip().splitlines()
+    return ("Instalado com sucesso:\n  " if cod == 0 else "Falhou:\n  ") + "\n  ".join(fim[-6:])
+
+
+@tool
+def rodar_testes_python(caminho: str = "") -> str:
+    """Roda os testes automatizados do projeto (pytest, ou unittest se nao
+    houver pytest) e resume o resultado."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    saida, erro, cod = _rodar_cmd(f'cd /d "{base}" && python -m pytest -q --no-header', 300)
+    if "No module named pytest" in (saida + erro):
+        saida, erro, cod = _rodar_cmd(f'cd /d "{base}" && python -m unittest discover -v', 300)
+    texto = (saida or erro).strip()
+    if not texto:
+        return "Nenhum teste encontrado nesta pasta."
+    ultimas = texto.splitlines()[-12:]
+    veredito = "TESTES PASSARAM" if cod == 0 else "TESTES FALHARAM"
+    return f"{veredito}:\n  " + "\n  ".join(ultimas)
+
+
+@tool
+def achar_todos_no_codigo(caminho: str = "", marcadores: str = "TODO,FIXME,HACK,XXX") -> str:
+    """Varre o projeto atras de anotacoes deixadas no codigo (TODO, FIXME,
+    HACK) - a lista de pendencias que voce esqueceu."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    marcas = [m.strip().upper() for m in marcadores.split(",") if m.strip()]
+    achados = []
+    exts = (".py", ".js", ".ts", ".java", ".c", ".cpp", ".cs", ".go", ".rb", ".php",
+            ".html", ".css", ".sql", ".sh", ".bat", ".md")
+    for raiz, dirs, arqs in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in
+                   ("node_modules", ".git", "venv", ".venv", "__pycache__", "dist", "build")]
+        for a in arqs:
+            if not a.lower().endswith(exts):
+                continue
+            cam = os.path.join(raiz, a)
+            try:
+                for i, linha in enumerate(open(cam, encoding="utf-8", errors="ignore"), 1):
+                    for m in marcas:
+                        if m in linha:
+                            achados.append(f"{os.path.relpath(cam, base)}:{i} [{m}] "
+                                           + linha.strip()[:70])
+                            break
+            except Exception:
+                continue
+    if not achados:
+        return f"Nenhuma pendencia ({', '.join(marcas)}) em {base}. Codigo limpo."
+    return f"PENDENCIAS NO CODIGO ({len(achados)}):\n  " + "\n  ".join(achados[:30])
+
+
+@tool
+def procurar_segredos_no_codigo(caminho: str = "") -> str:
+    """SEGURANCA: procura senhas, tokens e chaves de API esquecidas dentro dos
+    arquivos do projeto - o erro que vaza credencial no GitHub."""
+    import re as _re
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    padroes = [
+        ("Chave da OpenAI", r"sk-[A-Za-z0-9]{20,}"),
+        ("Token do GitHub", r"gh[pousr]_[A-Za-z0-9]{20,}"),
+        ("Chave da Groq", r"gsk_[A-Za-z0-9]{20,}"),
+        ("Chave do Google", r"AIza[0-9A-Za-z_\-]{30,}"),
+        ("Chave AWS", r"AKIA[0-9A-Z]{16}"),
+        ("Senha no codigo", r"(?i)(senha|password|passwd)\s*[=:]\s*[\"'][^\"']{4,}[\"']"),
+        ("Token generico", r"(?i)(api[_-]?key|token|secret)\s*[=:]\s*[\"'][^\"']{12,}[\"']"),
+    ]
+    achados = []
+    exts = (".py", ".js", ".ts", ".json", ".env", ".txt", ".yml", ".yaml", ".ini",
+            ".cfg", ".php", ".java", ".cs", ".sh", ".bat", ".md")
+    for raiz, dirs, arqs in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in
+                   ("node_modules", ".git", "venv", ".venv", "__pycache__")]
+        for a in arqs:
+            if not a.lower().endswith(exts):
+                continue
+            cam = os.path.join(raiz, a)
+            try:
+                for i, linha in enumerate(open(cam, encoding="utf-8", errors="ignore"), 1):
+                    for nome, padrao in padroes:
+                        if _re.search(padrao, linha):
+                            achados.append(f"{os.path.relpath(cam, base)}:{i} <- {nome}")
+                            break
+            except Exception:
+                continue
+    if not achados:
+        return f"VARREDURA OK: nenhum segredo exposto em {base}."
+    return ("SEGREDOS ENCONTRADOS (tire isso do codigo e troque as chaves!):\n  "
+            + "\n  ".join(dict.fromkeys(achados))[:1500]
+            + "\nDica: mova pra um arquivo .env e coloque no .gitignore.")
+
+
+@tool
+def abrir_terminal_na_pasta(caminho: str = "") -> str:
+    """Abre um terminal (cmd) ja dentro da pasta indicada - economiza o
+    'cd' toda vez."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return f"Pasta nao encontrada: {base}"
+    try:
+        subprocess.Popen(f'start "Terminal" cmd /K cd /d "{base}"', shell=True)
+    except Exception as e:
+        return f"Nao consegui abrir: {type(e).__name__}"
+    return f"Terminal aberto em {base}"
+
+
+@tool
+def verificar_sintaxe_python(caminho: str) -> str:
+    """Confere se um arquivo .py tem erro de sintaxe (sem executar nada) e
+    aponta a linha exata do problema."""
+    cam = _pasta_padrao(caminho)
+    if not os.path.isfile(cam):
+        return f"Arquivo nao encontrado: {cam}"
+    try:
+        fonte = open(cam, encoding="utf-8", errors="ignore").read()
+        compile(fonte, cam, "exec")
+    except SyntaxError as e:
+        linha = ""
+        try:
+            linha = open(cam, encoding="utf-8", errors="ignore").readlines()[e.lineno - 1].rstrip()
+        except Exception:
+            pass
+        return (f"ERRO DE SINTAXE em {os.path.basename(cam)}\n"
+                f"  Linha {e.lineno}: {e.msg}\n  {linha}")
+    except Exception as e:
+        return f"Nao consegui analisar: {type(e).__name__}"
+    return f"{os.path.basename(cam)}: sintaxe OK ({len(fonte.splitlines())} linhas)."
+
+
+
+
+# ============ LOTE NOVO 4: TEXTO, DADOS E PRODUTIVIDADE (tudo offline) ============
+
+@tool
+def base64_codificar(texto: str) -> str:
+    """Converte um texto para Base64 (usado em APIs, tokens e anexos)."""
+    import base64 as _b
+    return "Base64:\n" + _b.b64encode(texto.encode("utf-8")).decode()
+
+
+@tool
+def base64_decodificar(texto_base64: str) -> str:
+    """Volta um texto que esta em Base64 para o texto original."""
+    import base64 as _b
+    try:
+        return "Texto original:\n" + _b.b64decode(texto_base64.strip()).decode("utf-8", "ignore")
+    except Exception:
+        return "Isso nao parece um Base64 valido."
+
+
+@tool
+def hash_de_texto(texto: str, algoritmo: str = "sha256") -> str:
+    """Gera o hash (impressao digital) de um texto em MD5, SHA1 ou SHA256 -
+    usado pra conferir integridade e comparar sem revelar o conteudo."""
+    import hashlib
+    alg = algoritmo.strip().lower()
+    if alg not in ("md5", "sha1", "sha256", "sha512"):
+        return "Algoritmos: md5, sha1, sha256, sha512."
+    h = getattr(hashlib, alg)(texto.encode("utf-8")).hexdigest()
+    return f"{alg.upper()}: {h}"
+
+
+@tool
+def gerar_uuid(quantidade: int = 1) -> str:
+    """Gera identificadores unicos (UUID v4) - para banco de dados, arquivos e
+    codigos que nao podem repetir."""
+    import uuid as _u
+    n = max(1, min(20, int(quantidade)))
+    return "\n".join(str(_u.uuid4()) for _ in range(n))
+
+
+@tool
+def analisar_texto(texto: str) -> str:
+    """Analisa um texto: quantas palavras, caracteres, frases, paragrafos, o
+    tempo de leitura e as palavras mais repetidas."""
+    import re as _re, collections
+    if not texto.strip():
+        return "Me passe o texto."
+    palavras = _re.findall(r"[A-Za-zÀ-ÿ0-9']+", texto)
+    frases = [f for f in _re.split(r"[.!?]+", texto) if f.strip()]
+    paragrafos = [p for p in texto.split("\n\n") if p.strip()]
+    comuns = collections.Counter(
+        p.lower() for p in palavras if len(p) > 3
+    ).most_common(8)
+    minutos = len(palavras) / 200
+    return (f"ANALISE DO TEXTO:\n"
+            f"  Palavras: {len(palavras)} | Caracteres: {len(texto)} "
+            f"(sem espacos: {len(texto.replace(' ', ''))})\n"
+            f"  Frases: {len(frases)} | Paragrafos: {len(paragrafos)}\n"
+            f"  Tempo de leitura: {'menos de 1 min' if minutos < 1 else f'{minutos:.0f} min'}\n"
+            f"  Media de palavras por frase: {len(palavras)/max(1,len(frases)):.1f}\n"
+            f"  Mais repetidas: " + ", ".join(f"{p} ({n}x)" for p, n in comuns))
+
+
+@tool
+def resumir_texto_offline(texto: str, frases: int = 3) -> str:
+    """Resume um texto SEM INTERNET E SEM IA, escolhendo as frases mais
+    representativas (pontuadas pelas palavras mais frequentes)."""
+    import re as _re, collections
+    partes = [f.strip() for f in _re.split(r"(?<=[.!?])\s+", texto) if len(f.strip()) > 25]
+    if len(partes) <= frases:
+        return texto.strip() or "Texto curto demais pra resumir."
+    palavras = _re.findall(r"[a-zà-ÿ]+", texto.lower())
+    vazias = {"que", "para", "com", "uma", "dos", "das", "por", "mas", "como", "isso",
+              "esse", "essa", "seu", "sua", "mais", "nao", "sim", "ele", "ela", "foi",
+              "dele", "pelo", "pela", "the", "and", "aos", "nas", "nos", "num"}
+    freq = collections.Counter(p for p in palavras if len(p) > 3 and p not in vazias)
+    notas = []
+    for i, f in enumerate(partes):
+        pontos = sum(freq.get(p, 0) for p in _re.findall(r"[a-zà-ÿ]+", f.lower()))
+        notas.append((pontos / (len(f.split()) ** 0.5), i, f))
+    melhores = sorted(sorted(notas, reverse=True)[:max(1, int(frases))], key=lambda x: x[1])
+    return "RESUMO:\n  " + "\n  ".join(f for _n, _i, f in melhores)
+
+
+@tool
+def extrair_do_texto(texto: str, o_que: str = "emails") -> str:
+    """Extrai informacoes de um texto bagunçado: 'emails', 'links', 'telefones',
+    'numeros', 'cpf' ou 'datas'. Otimo pra limpar lista copiada."""
+    import re as _re
+    tipo = o_que.strip().lower()
+    padroes = {
+        "emails": r"[\w.+-]+@[\w-]+\.[\w.]+",
+        "links": r"https?://[^\s<>\"')]+",
+        "telefones": r"(?:\+?55\s?)?\(?\d{2}\)?\s?9?\d{4}[-.\s]?\d{4}",
+        "numeros": r"-?\d+(?:[.,]\d+)?",
+        "cpf": r"\d{3}\.?\d{3}\.?\d{3}-?\d{2}",
+        "datas": r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}",
+    }
+    if tipo not in padroes:
+        return "Posso extrair: " + ", ".join(padroes)
+    achados = list(dict.fromkeys(_re.findall(padroes[tipo], texto)))
+    if not achados:
+        return f"Nenhum(a) {tipo} encontrado no texto."
+    return f"{len(achados)} {tipo} encontrados:\n  " + "\n  ".join(achados[:60])
+
+
+@tool
+def transformar_texto(texto: str, formato: str = "maiusculas") -> str:
+    """Transforma o texto: 'maiusculas', 'minusculas', 'titulo', 'frase',
+    'sem_acento', 'inverter', 'sem_espacos_duplos' ou 'slug' (para URL)."""
+    import re as _re, unicodedata
+    f = formato.strip().lower()
+    if f.startswith("maius"):
+        r = texto.upper()
+    elif f.startswith("minus"):
+        r = texto.lower()
+    elif f.startswith("tit"):
+        r = texto.title()
+    elif f.startswith("fra"):
+        r = texto.capitalize()
+    elif "acento" in f:
+        r = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    elif f.startswith("inv"):
+        r = texto[::-1]
+    elif "espac" in f:
+        r = _re.sub(r"\s+", " ", texto).strip()
+    elif f.startswith("slug"):
+        base = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode().lower()
+        r = _re.sub(r"-+", "-", _re.sub(r"[^a-z0-9]+", "-", base)).strip("-")
+    else:
+        return ("Formatos: maiusculas, minusculas, titulo, frase, sem_acento, "
+                "inverter, sem_espacos_duplos, slug")
+    return r
+
+
+@tool
+def comparar_textos(texto_a: str, texto_b: str) -> str:
+    """Diz o quanto dois textos sao parecidos (em %) e mostra o que mudou -
+    util pra conferir se copiaram ou o que foi editado."""
+    import difflib
+    a, b = texto_a.strip(), texto_b.strip()
+    if not a or not b:
+        return "Preciso dos dois textos."
+    razao = difflib.SequenceMatcher(None, a, b).ratio() * 100
+    dif = list(difflib.unified_diff(a.splitlines(), b.splitlines(),
+                                    lineterm="", n=0))[2:12]
+    veredito = ("praticamente iguais" if razao > 95 else "muito parecidos" if razao > 80
+                else "parecidos" if razao > 50 else "bem diferentes")
+    return (f"SEMELHANCA: {razao:.1f}% ({veredito})\n"
+            + ("Diferencas:\n  " + "\n  ".join(dif) if dif else ""))
+
+
+@tool
+def validar_json_texto(texto_json: str) -> str:
+    """Confere se um JSON esta valido e, se estiver, devolve ele formatado e
+    legivel. Se tiver erro, aponta a linha e a coluna."""
+    try:
+        dados = json.loads(texto_json)
+    except json.JSONDecodeError as e:
+        return f"JSON INVALIDO: {e.msg} (linha {e.lineno}, coluna {e.colno})"
+    except Exception as e:
+        return f"Nao consegui ler: {type(e).__name__}"
+    formatado = json.dumps(dados, ensure_ascii=False, indent=2)
+    tipo = type(dados).__name__
+    tamanho = len(dados) if isinstance(dados, (list, dict)) else 1
+    return (f"JSON VALIDO ({tipo} com {tamanho} item(ns)):\n"
+            + formatado[:1500] + ("\n..." if len(formatado) > 1500 else ""))
+
+
+@tool
+def validar_cpf_cnpj(numero: str) -> str:
+    """Verifica se um CPF ou CNPJ e valido de verdade (calcula os digitos
+    verificadores) e mostra formatado."""
+    n = "".join(c for c in numero if c.isdigit())
+    if len(n) == 11:
+        if n == n[0] * 11:
+            return f"CPF {n} INVALIDO (todos os digitos iguais)."
+        for i in (9, 10):
+            soma = sum(int(n[j]) * ((i + 1) - j) for j in range(i))
+            dig = (soma * 10) % 11 % 10
+            if dig != int(n[i]):
+                return f"CPF {n} INVALIDO (digito verificador nao bate)."
+        return f"CPF VALIDO: {n[:3]}.{n[3:6]}.{n[6:9]}-{n[9:]}"
+    if len(n) == 14:
+        if n == n[0] * 14:
+            return f"CNPJ {n} INVALIDO."
+        pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        pesos2 = [6] + pesos1
+        for pesos, pos in ((pesos1, 12), (pesos2, 13)):
+            soma = sum(int(n[i]) * pesos[i] for i in range(pos))
+            resto = soma % 11
+            dig = 0 if resto < 2 else 11 - resto
+            if dig != int(n[pos]):
+                return f"CNPJ {n} INVALIDO (digito verificador nao bate)."
+        return f"CNPJ VALIDO: {n[:2]}.{n[2:5]}.{n[5:8]}/{n[8:12]}-{n[12:]}"
+    return "Informe 11 digitos (CPF) ou 14 (CNPJ)."
+
+
+@tool
+def validar_email_formato(email: str) -> str:
+    """Confere se um endereco de email esta bem escrito e avisa sobre erros
+    comuns de digitacao (gmail.con, hotmai.com...)."""
+    import re as _re
+    e = email.strip().lower()
+    if not _re.match(r"^[\w.+-]+@[\w-]+\.[\w.]{2,}$", e):
+        return f"'{email}' NAO e um email valido (formato errado)."
+    dominio = e.split("@")[1]
+    erros = {"gmail.con": "gmail.com", "gmail.co": "gmail.com", "gmial.com": "gmail.com",
+             "hotmai.com": "hotmail.com", "hotmail.con": "hotmail.com",
+             "outlook.con": "outlook.com", "yahoo.con": "yahoo.com"}
+    if dominio in erros:
+        return f"Formato ok, MAS o dominio parece errado: quis dizer @{erros[dominio]}?"
+    return f"Email valido: {e} (dominio: {dominio})"
+
+
+@tool
+def calcular_porcentagem(operacao: str) -> str:
+    """Resolve contas de porcentagem em portugues: '15% de 200', 'aumento de
+    50 para 80', 'desconto de 20% em 150', 'quanto 30 e de 120'."""
+    import re as _re
+    t = operacao.lower().strip().replace(",", ".")
+    m = _re.search(r"(\d+\.?\d*)\s*%?\s*(?:de|em)\s+(\d+\.?\d*)", t)
+    if "aumento" in t or "para" in t:
+        m2 = _re.search(r"(\d+\.?\d*)\s*(?:para|pra|a)\s*(\d+\.?\d*)", t)
+        if m2:
+            a, b = float(m2.group(1)), float(m2.group(2))
+            if a == 0:
+                return "Nao da pra calcular variacao a partir de zero."
+            var = (b - a) / a * 100
+            return (f"De {a:g} para {b:g} = {'AUMENTO' if var >= 0 else 'QUEDA'} de "
+                    f"{abs(var):.2f}%  (diferenca de {abs(b-a):g})")
+    if "desconto" in t and m:
+        pct, valor = float(m.group(1)), float(m.group(2))
+        desc = valor * pct / 100
+        return f"{pct:g}% de desconto em {valor:g} = -{desc:.2f}  ->  fica {valor-desc:.2f}"
+    if ("quanto" in t or "e de" in t) and m:
+        parte, total = float(m.group(1)), float(m.group(2))
+        if total:
+            return f"{parte:g} e {parte/total*100:.2f}% de {total:g}"
+    if m:
+        pct, valor = float(m.group(1)), float(m.group(2))
+        return f"{pct:g}% de {valor:g} = {valor*pct/100:.2f}"
+    return ("Nao entendi. Exemplos: '15% de 200', 'desconto de 20% em 150', "
+            "'aumento de 50 para 80', 'quanto 30 e de 120'.")
+
+
+@tool
+def regra_de_tres(a: str, b: str, c: str) -> str:
+    """Regra de tres simples: se A corresponde a B, entao C corresponde a
+    quanto? (ex.: 3 laranjas custam 12, quanto custam 7)."""
+    try:
+        va, vb, vc = float(str(a).replace(",", ".")), float(str(b).replace(",", ".")), float(str(c).replace(",", "."))
+    except Exception:
+        return "Preciso de tres numeros."
+    if va == 0:
+        return "O primeiro valor nao pode ser zero."
+    r = vb * vc / va
+    return f"Se {va:g} -> {vb:g}, entao {vc:g} -> {r:.4f}".rstrip("0").rstrip(".")
+
+
+@tool
+def dias_uteis_entre_datas(data_inicio: str, data_fim: str, feriados: str = "") -> str:
+    """Conta quantos DIAS UTEIS (sem sabado/domingo) existem entre duas datas.
+    Datas em DD/MM/AAAA. Feriados opcionais separados por virgula."""
+    def ler(d):
+        for f in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(d.strip(), f)
+            except Exception:
+                continue
+        return None
+    ini, fim = ler(data_inicio), ler(data_fim)
+    if not ini or not fim:
+        return "Use o formato DD/MM/AAAA."
+    if fim < ini:
+        ini, fim = fim, ini
+    fer = set()
+    for f in feriados.split(","):
+        d = ler(f) if f.strip() else None
+        if d:
+            fer.add(d.date())
+    uteis = total = 0
+    atual = ini
+    while atual <= fim:
+        total += 1
+        if atual.weekday() < 5 and atual.date() not in fer:
+            uteis += 1
+        atual += timedelta(days=1)
+    return (f"De {ini.strftime('%d/%m/%Y')} a {fim.strftime('%d/%m/%Y')}:\n"
+            f"  Dias corridos: {total}\n  DIAS UTEIS: {uteis}\n"
+            f"  Fins de semana/feriados: {total - uteis}")
+
+
+@tool
+def idade_exata(data_nascimento: str) -> str:
+    """Calcula a idade exata (anos, meses e dias), quantos dias de vida e
+    quanto falta pro proximo aniversario."""
+    for f in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
+        try:
+            nasc = datetime.strptime(data_nascimento.strip(), f)
+            break
+        except Exception:
+            continue
+    else:
+        return "Use o formato DD/MM/AAAA."
+    hoje = datetime.now()
+    anos = hoje.year - nasc.year - ((hoje.month, hoje.day) < (nasc.month, nasc.day))
+    meses = (hoje.month - nasc.month) % 12
+    if hoje.day < nasc.day:
+        meses = (meses - 1) % 12
+    dias_vida = (hoje - nasc).days
+    prox = nasc.replace(year=hoje.year)
+    if prox < hoje:
+        prox = nasc.replace(year=hoje.year + 1)
+    faltam = (prox - hoje).days
+    return (f"Nascimento: {nasc.strftime('%d/%m/%Y')}\n"
+            f"  Idade: {anos} anos e {meses} mes(es)\n"
+            f"  Dias de vida: {dias_vida:,}\n"
+            f"  Proximo aniversario em {faltam} dia(s)")
+
+
+@tool
+def numero_para_romano(numero: str) -> str:
+    """Converte numero para algarismo romano e vice-versa (ex.: 2026 -> MMXXVI)."""
+    tabela = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+              (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
+    t = numero.strip().upper()
+    if t.isdigit():
+        n = int(t)
+        if not 1 <= n <= 3999:
+            return "So converto de 1 a 3999."
+        saida = ""
+        for valor, letra in tabela:
+            while n >= valor:
+                saida += letra
+                n -= valor
+        return f"{t} = {saida}"
+    valores = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+    if not all(c in valores for c in t):
+        return "Informe um numero (2026) ou um romano (MMXXVI)."
+    total, anterior = 0, 0
+    for c in reversed(t):
+        v = valores[c]
+        total = total - v if v < anterior else total + v
+        anterior = max(anterior, v)
+    return f"{t} = {total}"
+
+
+@tool
+def senha_facil_de_lembrar(palavras: int = 4) -> str:
+    """Gera senhas FORTES mas faceis de lembrar, juntando palavras + numero +
+    simbolo (estilo 'cavalo-bateria-grampo'), com a forca estimada."""
+    import random
+    banco = ["cavalo", "janela", "bateria", "montanha", "cafe", "chuva", "tigre", "planeta",
+             "violao", "foguete", "abacaxi", "pedra", "nuvem", "trilho", "girassol", "peixe",
+             "martelo", "estrela", "bambu", "cachoeira", "vulcao", "sereia", "bussola",
+             "farol", "coruja", "deserto", "gelo", "lobo", "mel", "navio", "orquidea"]
+    n = max(3, min(8, int(palavras)))
+    saidas = []
+    for _ in range(3):
+        escolhidas = random.sample(banco, n)
+        senha = "-".join(escolhidas) + str(random.randint(10, 99)) + random.choice("!@#$%&*")
+        saidas.append(senha)
+    combinacoes = len(banco) ** n * 90 * 7
+    import math
+    bits = math.log2(combinacoes)
+    forca = ("praticamente inquebravel" if bits > 80 else "muito forte" if bits > 60 else "forte")
+    return ("SENHAS FACEIS DE LEMBRAR:\n  " + "\n  ".join(saidas)
+            + f"\n  Forca: ~{bits:.0f} bits ({forca}). Digite algumas vezes e voce decora.")
+
+
+@tool
+def diario_pessoal(acao: str = "ler", texto: str = "") -> str:
+    """Seu diario no PC: 'escrever' guarda uma anotacao com data e hora, 'ler'
+    mostra os ultimos dias, 'buscar' procura por uma palavra."""
+    arquivo = os.path.join(PASTA_BASE, "diario.md")
+    a = acao.strip().lower()
+    if a.startswith("escr") or a.startswith("anot") or a.startswith("grav"):
+        if not texto.strip():
+            return "Escreva o que voce quer registrar."
+        carimbo = datetime.now().strftime("%d/%m/%Y %H:%M")
+        with open(arquivo, "a", encoding="utf-8") as f:
+            f.write(f"\n## {carimbo}\n{texto.strip()}\n")
+        return f"Anotado no diario ({carimbo})."
+    if not os.path.exists(arquivo):
+        return "Seu diario ainda esta vazio. Use: diario escrever <o que aconteceu>."
+    conteudo = open(arquivo, encoding="utf-8").read()
+    if a.startswith("busc") or a.startswith("proc"):
+        alvo = texto.strip().lower()
+        if not alvo:
+            return "Diga o que procurar."
+        blocos = [b for b in conteudo.split("\n## ") if alvo in b.lower()]
+        if not blocos:
+            return f"Nao achei '{alvo}' no diario."
+        return f"{len(blocos)} registro(s) com '{alvo}':\n\n## " + "\n\n## ".join(blocos[-5:])
+    blocos = conteudo.split("\n## ")
+    return "ULTIMOS REGISTROS DO DIARIO:\n\n## " + "\n\n## ".join(blocos[-5:])
+
+
+@tool
+def converter_tempo(valor: str) -> str:
+    """Converte tempo de um jeito pro outro: '3600 segundos', '2.5 horas',
+    '90 minutos' - devolve em todas as unidades."""
+    import re as _re
+    m = _re.search(r"(\d+\.?\d*)\s*(seg|segundo|min|minuto|hora|h|dia|semana)", 
+                   valor.lower().replace(",", "."))
+    if not m:
+        return "Exemplos: '3600 segundos', '2.5 horas', '90 minutos', '3 dias'."
+    n, unidade = float(m.group(1)), m.group(2)
+    fator = {"seg": 1, "segundo": 1, "min": 60, "minuto": 60, "hora": 3600, "h": 3600,
+             "dia": 86400, "semana": 604800}[unidade]
+    seg = n * fator
+    return (f"{n:g} {unidade}(s) =\n"
+            f"  {seg:,.0f} segundos\n  {seg/60:,.2f} minutos\n  {seg/3600:,.2f} horas\n"
+            f"  {seg/86400:,.2f} dias\n  {seg/604800:,.2f} semanas")
+
+
+@tool
+def tabela_ascii(texto_csv: str, separador: str = ",") -> str:
+    """Transforma dados colados (CSV) numa TABELA bonita de texto, alinhada -
+    pra colar no WhatsApp, email ou documentacao."""
+    linhas = [l for l in texto_csv.strip().splitlines() if l.strip()]
+    if not linhas:
+        return "Cole os dados (uma linha por registro)."
+    grade = [[c.strip() for c in l.split(separador)] for l in linhas]
+    colunas = max(len(l) for l in grade)
+    larguras = [max(len(l[i]) if i < len(l) else 0 for l in grade) for i in range(colunas)]
+    def linha_de(l):
+        return "| " + " | ".join((l[i] if i < len(l) else "").ljust(larguras[i])
+                                 for i in range(colunas)) + " |"
+    borda = "+" + "+".join("-" * (w + 2) for w in larguras) + "+"
+    saida = [borda, linha_de(grade[0]), borda]
+    for l in grade[1:]:
+        saida.append(linha_de(l))
+    saida.append(borda)
+    return "\n".join(saida)
+
+
+@tool
+def gerar_texto_exemplo(paragrafos: int = 2) -> str:
+    """Gera texto de exemplo (lorem ipsum em portugues) pra testar layout,
+    documento ou site."""
+    import random
+    frases = [
+        "O agente organiza o computador enquanto voce cuida do que importa.",
+        "Cada ferramenta foi feita pra resolver um problema real do dia a dia.",
+        "A memoria local guarda o contexto sem depender de nuvem nenhuma.",
+        "Quando a maquina fica lenta, o diagnostico aponta o gargalo exato.",
+        "Automatizar o repetitivo devolve tempo pro que exige atencao humana.",
+        "Um sistema bem cuidado responde rapido e falha menos.",
+        "A rotina certa transforma dez cliques em uma frase simples.",
+        "Seguranca comeca por saber o que esta rodando na sua maquina.",
+    ]
+    n = max(1, min(10, int(paragrafos)))
+    return "\n\n".join(" ".join(random.sample(frases, min(4, len(frases)))) for _ in range(n))
+
+
+@tool
+def contar_para_redes_sociais(texto: str) -> str:
+    """Conta os caracteres do texto e diz se cabe em cada rede social
+    (X/Twitter, Instagram, LinkedIn, WhatsApp status, SMS)."""
+    n = len(texto)
+    limites = {"X (Twitter)": 280, "Instagram (legenda)": 2200, "LinkedIn": 3000,
+               "Status do WhatsApp": 700, "SMS": 160, "Bio do Instagram": 150}
+    linhas = [f"Seu texto tem {n} caractere(s) e {len(texto.split())} palavra(s).", ""]
+    for rede, limite in limites.items():
+        if n <= limite:
+            linhas.append(f"  CABE em {rede} (sobram {limite - n})")
+        else:
+            linhas.append(f"  NAO CABE em {rede} (passou {n - limite})")
+    return "\n".join(linhas)
+
+
+@tool
+def gerar_qr_texto_ascii(texto: str) -> str:
+    """Explica e prepara a criacao de QR Code a partir de um texto/link,
+    apontando a ferramenta certa e validando o conteudo."""
+    t = texto.strip()
+    if not t:
+        return "Me diga o texto ou link do QR."
+    tipo = ("link" if t.startswith(("http://", "https://", "www."))
+            else "wi-fi" if t.upper().startswith("WIFI:")
+            else "telefone" if t.replace("+", "").replace(" ", "").isdigit()
+            else "texto")
+    aviso = "" if len(t) < 300 else "\n  ATENCAO: texto longo gera QR denso e dificil de ler."
+    return (f"Conteudo validado ({tipo}, {len(t)} caracteres).{aviso}\n"
+            f"  Vou gerar a imagem com a ferramenta 'criar_qr_code'.\n  Conteudo: {t[:120]}")
+
+
+@tool
+def limpar_texto_colado(texto: str) -> str:
+    """Limpa texto copiado da internet ou PDF: tira quebras de linha no meio
+    das frases, espacos duplos, hifens de separacao e caracteres invisiveis."""
+    import re as _re
+    t = texto.replace("\u00ad", "").replace("\u200b", "").replace("\ufeff", "")
+    t = _re.sub(r"-\n\s*", "", t)
+    t = _re.sub(r"(?<![.!?:;])\n(?!\n)", " ", t)
+    t = _re.sub(r"[ \t]{2,}", " ", t)
+    t = _re.sub(r"\n{3,}", "\n\n", t)
+    linhas_antes = len(texto.splitlines())
+    t = t.strip()
+    return (f"TEXTO LIMPO ({linhas_antes} linhas -> {len(t.splitlines())}):\n\n{t[:2000]}"
+            + ("\n..." if len(t) > 2000 else ""))
+
+
 tools = [
+    # --- lote novo: texto, dados e produtividade ---
+    base64_codificar,
+    base64_decodificar,
+    hash_de_texto,
+    gerar_uuid,
+    analisar_texto,
+    resumir_texto_offline,
+    extrair_do_texto,
+    transformar_texto,
+    comparar_textos,
+    validar_json_texto,
+    validar_cpf_cnpj,
+    validar_email_formato,
+    calcular_porcentagem,
+    regra_de_tres,
+    dias_uteis_entre_datas,
+    idade_exata,
+    numero_para_romano,
+    senha_facil_de_lembrar,
+    diario_pessoal,
+    converter_tempo,
+    tabela_ascii,
+    gerar_texto_exemplo,
+    contar_para_redes_sociais,
+    gerar_qr_texto_ascii,
+    limpar_texto_colado,
+    # --- lote novo: rede e desenvolvimento/git ---
+    ping_host,
+    traceroute_host,
+    consultar_dns,
+    dns_reverso,
+    testar_porta_aberta,
+    latencia_varios_servidores,
+    testar_dns_mais_rapido,
+    verificar_site_no_ar,
+    cabecalhos_http,
+    certificado_ssl,
+    forca_do_sinal_wifi,
+    dispositivos_novos_na_rede,
+    monitorar_latencia,
+    git_status,
+    git_log,
+    git_diff,
+    git_branch,
+    git_commit_rapido,
+    git_clonar,
+    git_desfazer_alteracoes,
+    criar_repositorio_git,
+    gerar_gitignore,
+    criar_ambiente_virtual,
+    pip_desatualizados,
+    pip_instalar_pacote,
+    rodar_testes_python,
+    achar_todos_no_codigo,
+    procurar_segredos_no_codigo,
+    abrir_terminal_na_pasta,
+    verificar_sintaxe_python,
+    # --- lote novo: sistema, processos e hardware ---
+    tempo_ligado,
+    top_processos_cpu,
+    top_processos_memoria,
+    arvore_de_processos,
+    detalhes_do_processo,
+    matar_processo_na_porta,
+    uso_de_disco_por_processo,
+    monitor_tempo_real,
+    detectar_gargalo,
+    espaco_recuperavel,
+    relatorio_bateria,
+    saude_da_bateria,
+    historico_de_desligamentos,
+    programas_que_travaram,
+    tempo_de_boot_detalhado,
+    dispositivos_usb_conectados,
+    monitores_conectados,
+    info_placa_mae_bios,
+    slots_memoria_ram,
+    temperatura_do_sistema,
+    teste_velocidade_disco,
+    servicos_essenciais_parados,
+    tarefas_agendadas_suspeitas,
+    modo_apresentacao,
+    agendar_desligamento,
+    cancelar_desligamento,
+    reiniciar_explorer,
+    limpar_area_transferencia,
+    processos_por_usuario,
+    limpar_cache_dns_arp,
+    # --- lote novo: arquivos e dados ---
+    mapa_espaco_pastas,
+    achar_arquivos_duplicados,
+    comparar_pastas,
+    arquivos_por_extensao,
+    arquivos_antigos,
+    arquivos_recentes,
+    arvore_de_pastas,
+    tamanho_da_pasta,
+    achar_pastas_vazias,
+    achar_arquivos_zero_byte,
+    juntar_arquivos_divididos,
+    converter_arquivo_para_utf8,
+    csv_para_json,
+    json_para_csv,
+    previa_csv,
+    estatisticas_csv,
+    mesclar_csvs,
+    remover_linhas_duplicadas,
+    dividir_csv,
+    exportar_lista_arquivos,
+    diff_arquivos_texto,
+    limpar_nomes_arquivos,
+    renomear_com_data,
+    mover_arquivos_por_tipo,
+    verificar_integridade_pasta,
+    listar_arquivos_ocultos,
+    esvaziar_pastas_temporarias,
+    buscar_substituir_em_pasta,
+    ocupacao_de_disco_por_usuario,
     esvaziar_lixeira,
     espaco_em_disco,
     listar_programas_abertos,
