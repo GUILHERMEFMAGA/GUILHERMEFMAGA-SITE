@@ -2671,6 +2671,154 @@ _INTRO_LOCAL = (
 
 
 
+# ================= ROTINAS: OS "ATALHOS DENTRO DE SI" =================
+# Uma rotina e uma sequencia de comandos SEUS com um nome. Ex.:
+#   criar rotina modo estudo: fecha o discord > abre o spotify > tema escuro
+# Depois e so dizer "modo estudo" que ele faz tudo em ordem. Cada passo entra
+# pelo proprio cerebro local, entao uma rotina alcanca as 314 ferramentas.
+# (Os melhores agentes de 2026 chamam isso de "receitas"; aqui e local e de
+# graca.) Passos que mexem no sistema continuam pedindo sim/nao um por um.
+ARQ_ROTINAS = os.path.join(PASTA_BASE, "rotinas.json")
+_ROTINA_EM_EXECUCAO = {"profundidade": 0}
+
+
+def _carregar_rotinas() -> dict:
+    dados = carregar_json(ARQ_ROTINAS, {})
+    return dados if isinstance(dados, dict) else {}
+
+
+def _rotina_criar(nome: str, passos_txt: str) -> str:
+    nome = (nome or "").strip().strip(":,.").lower()
+    if not nome:
+        return "Faltou o nome. Ex.: criar rotina modo estudo: fecha o discord > abre o spotify"
+    passos = []
+    for parte in passos_txt.replace(" > ", ">").replace(";", ">").replace(" + ", ">").split(">"):
+        parte = parte.strip(" ,.")
+        if parte:
+            passos.append(parte)
+    if not passos:
+        return ("Faltaram os passos. Separe com > , ; ou + . Ex.: "
+                "criar rotina limpeza: limpar lixo > esvaziar lixeira > otimiza tudo")
+    rotinas = _carregar_rotinas()
+    rotinas[nome] = passos
+    salvar_json(ARQ_ROTINAS, rotinas)
+    lista = "\n   ".join(f"{i}. {p}" for i, p in enumerate(passos, 1))
+    return (f"Rotina '{nome}' salva com {len(passos)} passo(s):\n   {lista}\n"
+            f"Agora e so dizer '{nome}' (ou 'rodar rotina {nome}') que eu executo tudo.")
+
+
+def _rotina_listar() -> str:
+    rotinas = _carregar_rotinas()
+    if not rotinas:
+        return ("Voce ainda nao tem rotinas. Crie uma assim: "
+                "criar rotina modo estudo: fecha o discord > abre o spotify > tema escuro")
+    linhas = [f"Voce tem {len(rotinas)} rotina(s):"]
+    for nome, passos in rotinas.items():
+        linhas.append(f"   - {nome}: " + " > ".join(passos))
+    linhas.append("Diga o nome da rotina para executar, ou 'apagar rotina <nome>'.")
+    return "\n".join(linhas)
+
+
+def _rotina_apagar(nome: str) -> str:
+    nome = (nome or "").strip().lower()
+    rotinas = _carregar_rotinas()
+    if nome not in rotinas:
+        return f"Nao achei a rotina '{nome}'. Digite 'rotinas' para ver as que existem."
+    rotinas.pop(nome)
+    salvar_json(ARQ_ROTINAS, rotinas)
+    return f"Rotina '{nome}' apagada."
+
+
+def _rotina_rodar(nome: str) -> bool:
+    """Executa os passos da rotina pelo cerebro local. True se rodou."""
+    nome = (nome or "").strip().lower()
+    rotinas = _carregar_rotinas()
+    passos = rotinas.get(nome)
+    if not passos:
+        return False
+    if _ROTINA_EM_EXECUCAO["profundidade"] >= 3:
+        print("\n[Local]: rotina dentro de rotina demais - parei por seguranca.")
+        return True
+    _ROTINA_EM_EXECUCAO["profundidade"] += 1
+    try:
+        print(f"\n[Rotina '{nome}']: {len(passos)} passo(s) -> " + " > ".join(passos))
+        for i, passo in enumerate(passos, 1):
+            print(f"\n   --- passo {i}/{len(passos)}: {passo}")
+            try:
+                if not _processar_cerebro_local(passo):
+                    print(f"   (passo '{passo}' nao tem acao local; pulei)")
+            except Exception as e:
+                print(f"   (erro no passo '{passo}': {type(e).__name__} - segui pro proximo)")
+        print(f"\n[Rotina '{nome}']: terminada.")
+    finally:
+        _ROTINA_EM_EXECUCAO["profundidade"] -= 1
+    return True
+
+
+# ================= ESTUDAR O PC (o agente aprende a maquina) =================
+
+def _estudar_pc() -> str:
+    """Levanta um retrato completo do PC e GRAVA na memoria permanente, para o
+    agente (e a IA local) responderem sobre a maquina sem ficar adivinhando."""
+    import platform as _pl
+    fatos = []
+    try:
+        fatos.append(f"Sistema: {_pl.system()} {_pl.release()} ({_pl.version()})")
+        fatos.append(f"Nome do PC: {_pl.node()} | Arquitetura: {_pl.machine()}")
+        fatos.append(f"Usuario: {os.environ.get('USERNAME') or os.environ.get('USER') or '?'}")
+    except Exception:
+        pass
+    try:
+        import psutil
+        ram = psutil.virtual_memory()
+        fatos.append(f"RAM total: {ram.total // (1024**3)} GB")
+        fatos.append(f"CPU: {psutil.cpu_count(logical=False)} nucleos fisicos / "
+                     f"{psutil.cpu_count(logical=True)} logicos")
+        for part in psutil.disk_partitions():
+            try:
+                uso = psutil.disk_usage(part.mountpoint)
+                fatos.append(f"Disco {part.device} {uso.total // (1024**3)} GB "
+                             f"({uso.percent:.0f}% usado)")
+            except Exception:
+                continue
+    except Exception:
+        pass
+    try:
+        saida = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(Get-CimInstance Win32_VideoController).Name -join ', '"],
+            capture_output=True, text=True, timeout=20)
+        gpu = (saida.stdout or "").strip()
+        if gpu:
+            fatos.append(f"Placa de video: {gpu}")
+    except Exception:
+        pass
+    programas = []
+    try:
+        saida = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-StartApps | Select-Object -ExpandProperty Name"],
+            capture_output=True, text=True, timeout=30)
+        programas = [l.strip() for l in (saida.stdout or "").splitlines() if l.strip()]
+    except Exception:
+        pass
+    if programas:
+        fatos.append(f"Apps no menu iniciar: {len(programas)} (ex.: "
+                     + ", ".join(programas[:12]) + ")")
+    texto = "\n".join(f"- {f}" for f in fatos)
+    try:
+        for f in fatos:
+            gravar_memoria_core.invoke({"secao": "PC do usuario", "fato": f})
+    except Exception:
+        try:
+            with open(ARQ_MEMORIA_CORE, "a", encoding="utf-8") as arq:
+                arq.write("\n## PC do usuario\n" + texto + "\n")
+        except Exception:
+            pass
+    return ("ESTUDEI O SEU PC (guardei na memoria permanente, agora eu lembro "
+            "disso em qualquer conversa):\n" + texto)
+
+
 # ============ PONTE LOCAL PARA AS 314 FERRAMENTAS (sem nuvem) ============
 # Ate aqui o modo local so fazia o que tinha REGRA escrita a mao; todo o resto
 # do arsenal (as ferramentas @tool) so era alcancavel pela IA da nuvem, que
@@ -3046,12 +3194,15 @@ def _desinstalar_programas(programas: str) -> str:
 
 
 def _analisar_codigo_agente() -> str:
-    """ANALISA O PROPRIO agente.py: checa se ele COMPILA (sintaxe ok), conta
-    funcoes/ferramentas e procura funcoes DUPLICADAS (nome repetido). E so
-    leitura/verificacao - nao altera nada. Use para confirmar que o codigo esta
-    sao antes/depois de melhorias."""
+    """AUDITORIA PROFUNDA DO PROPRIO agente.py (so leitura, nao altera nada).
+    Usa a arvore sintatica (AST) para checar de verdade: se compila, se toda
+    @tool esta registrada na lista tools, se ha decorador orfao grudado no
+    ajudante errado, funcoes duplicadas, chamadas para funcoes que nao existem,
+    _invocar_local apontando pra ferramenta inexistente, e as funcoes mais
+    longas. E o mesmo tipo de checagem que um revisor humano faria."""
+    import ast as _ast
+    import builtins as _bi
     cam = _CAMINHO_AGENTE_PY
-    rel = []
     if not os.path.exists(cam):
         return f"Nao encontrei {cam}."
     try:
@@ -3059,40 +3210,127 @@ def _analisar_codigo_agente() -> str:
             fonte = f.read()
     except Exception as e:
         return f"Nao consegui ler o codigo: {type(e).__name__}"
-    tam_kb = len(fonte.encode("utf-8")) // 1024
-    rel.append(f"Arquivo: agente.py ({tam_kb} KB, {len(fonte.splitlines())} linhas)")
-    # 1) Compila?
+
+    rel = [f"Arquivo: agente.py ({len(fonte.encode('utf-8')) // 1024} KB, "
+           f"{len(fonte.splitlines())} linhas)"]
     try:
-        compile(fonte, cam, "exec")
-        rel.append("Sintaxe: OK (compila sem erros)")
+        arvore = _ast.parse(fonte)
+        rel.append("1) Sintaxe: OK (compila sem erros)")
     except SyntaxError as e:
-        rel.append(f"Sintaxe: ERRO na linha {e.lineno}: {e.msg}")
-        return "ANALISE DO CODIGO\n- " + "\n- ".join(rel)
-    # 2) Contagem e duplicados
-    import re as _re
-    # So funcoes de NIVEL SUPERIOR (coluna 0) contam como "ferramentas do agente";
-    # helpers aninhados (def _executar dentro de outra funcao) sao normais.
-    defs = _re.findall(r"(?m)^def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(", fonte)
-    tools = _re.findall(r"(?m)^@tool", fonte)
-    rel.append(f"Funcoes definidas: {len(defs)} | marcadores @tool: {len(tools)}")
-    vistos = {}
-    duplic = []
-    for d in defs:
-        vistos[d] = vistos.get(d, 0) + 1
-    for d, c in vistos.items():
-        if c > 1:
-            duplic.append(f"{d} (x{c})")
-    if duplic:
-        rel.append("Atencao - funcoes com nome repetido: " + ", ".join(sorted(duplic)[:20]))
+        return ("AUDITORIA DO CODIGO (agente.py)\n- " + "\n- ".join(rel)
+                + f"\n- 1) Sintaxe: ERRO na linha {e.lineno}: {e.msg} <<< CONSERTAR ISSO PRIMEIRO")
+
+    # --- inventario de nomes definidos (para achar chamada quebrada) ---
+    definidos = set()
+    for no in _ast.walk(arvore):
+        if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef, _ast.ClassDef)):
+            definidos.add(no.name)
+            args = getattr(no, "args", None)
+            if args:
+                for a in list(args.args) + list(args.kwonlyargs) + list(getattr(args, "posonlyargs", [])):
+                    definidos.add(a.arg)
+                if args.vararg:
+                    definidos.add(args.vararg.arg)
+                if args.kwarg:
+                    definidos.add(args.kwarg.arg)
+        elif isinstance(no, _ast.Assign):
+            for alvo in no.targets:
+                for x in _ast.walk(alvo):
+                    if isinstance(x, _ast.Name):
+                        definidos.add(x.id)
+        elif isinstance(no, (_ast.Import, _ast.ImportFrom)):
+            for a in no.names:
+                definidos.add((a.asname or a.name).split(".")[0])
+        elif isinstance(no, (_ast.For, _ast.comprehension)):
+            for x in _ast.walk(no.target):
+                if isinstance(x, _ast.Name):
+                    definidos.add(x.id)
+        elif isinstance(no, _ast.withitem) and isinstance(no.optional_vars, _ast.Name):
+            definidos.add(no.optional_vars.id)
+        elif isinstance(no, _ast.ExceptHandler) and no.name:
+            definidos.add(no.name)
+        elif isinstance(no, _ast.Global):
+            definidos.update(no.names)
+        elif isinstance(no, _ast.Lambda):
+            for a in no.args.args:
+                definidos.add(a.arg)
+    conhecidos = definidos | set(dir(_bi))
+
+    # --- 2) ferramentas: @tool x lista tools ---
+    decoradas = [n.name for n in _ast.walk(arvore)
+                 if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))
+                 for d in n.decorator_list
+                 if isinstance(d, _ast.Name) and d.id == "tool"]
+    registradas = []
+    for no in arvore.body:
+        if isinstance(no, _ast.Assign) and any(
+                isinstance(t, _ast.Name) and t.id == "tools" for t in no.targets):
+            if isinstance(no.value, (_ast.List, _ast.Tuple)):
+                registradas = [e.id for e in no.value.elts if isinstance(e, _ast.Name)]
+    so_decoradas = sorted(set(decoradas) - set(registradas))
+    so_registradas = sorted(set(registradas) - set(decoradas))
+    rel.append(f"2) Ferramentas: {len(decoradas)} com @tool | {len(registradas)} na lista tools")
+    if so_decoradas:
+        rel.append("   FALHA - tem @tool mas nao esta na lista tools: " + ", ".join(so_decoradas[:10]))
+    if so_registradas:
+        rel.append("   FALHA - esta na lista tools mas perdeu o @tool: " + ", ".join(so_registradas[:10]))
+    if not so_decoradas and not so_registradas:
+        rel.append("   OK - registro das ferramentas bate certinho")
+
+    # --- 3) decorador @tool orfao em ajudante interno (bug silencioso) ---
+    orfaos = [n for n in decoradas if n.startswith("_")]
+    if orfaos:
+        rel.append("   ATENCAO - ajudante interno decorado com @tool (vira ferramenta "
+                   "por engano e quebra quem o chama direto): " + ", ".join(orfaos[:8]))
+
+    # --- 4) funcoes duplicadas (nivel superior) ---
+    topo = [n.name for n in arvore.body if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+    duplic = sorted({n for n in topo if topo.count(n) > 1})
+    rel.append(f"3) Funcoes de nivel superior: {len(topo)} | duplicadas: "
+               + (", ".join(duplic[:10]) if duplic else "nenhuma"))
+
+    # --- 5) chamadas para funcao que nao existe ---
+    quebradas = {}
+    for no in _ast.walk(arvore):
+        if isinstance(no, _ast.Call) and isinstance(no.func, _ast.Name):
+            if no.func.id not in conhecidos:
+                quebradas.setdefault(no.func.id, no.lineno)
+    if quebradas:
+        rel.append("4) FALHA - chamadas para funcao inexistente: "
+                   + ", ".join(f"{k} (linha {v})" for k, v in list(quebradas.items())[:8]))
     else:
-        rel.append("Funcoes duplicadas: nenhuma (nomes unicos)")
-    # 3) Sanidade: o arquivo e o mesmo que esta rodando?
-    rel.append("Resultado: o codigo esta integravel e pronto para rodar." if not duplic
-               else "Resultado: compila, mas ha nomes repetidos que valem revisar.")
-    return "ANALISE DO CODIGO (agente.py)\n- " + "\n- ".join(rel)
+        rel.append("4) Chamadas de funcao: todas apontam para algo que existe")
 
+    # --- 6) _invocar_local apontando pra ferramenta que nao existe ---
+    ruins = []
+    todas_funcs = {n.name for n in _ast.walk(arvore)
+                   if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))}
+    for no in _ast.walk(arvore):
+        if (isinstance(no, _ast.Call) and isinstance(no.func, _ast.Name)
+                and no.func.id == "_invocar_local" and no.args
+                and isinstance(no.args[0], _ast.Constant)
+                and isinstance(no.args[0].value, str)
+                and no.args[0].value not in todas_funcs):
+            ruins.append(f"{no.args[0].value} (linha {no.lineno})")
+    rel.append("5) Atalhos internos (_invocar_local): "
+               + ("FALHA - " + ", ".join(ruins[:8]) if ruins else "todos validos"))
 
+    # --- 7) funcoes gigantes (candidatas a revisao) ---
+    tamanhos = []
+    for n in arvore.body:
+        if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and n.end_lineno:
+            tamanhos.append((n.end_lineno - n.lineno, n.name))
+    tamanhos.sort(reverse=True)
+    if tamanhos:
+        rel.append("6) Maiores funcoes: "
+                   + ", ".join(f"{nome} ({tam} linhas)" for tam, nome in tamanhos[:3]))
 
+    problemas = bool(so_decoradas or so_registradas or duplic or quebradas or ruins or orfaos)
+    rel.append("VEREDITO: " + ("achei pontos a corrigir (marcados como FALHA/ATENCAO acima)."
+                               if problemas else
+                               "codigo integro - compila, registro correto, sem duplicidade "
+                               "e sem chamada quebrada."))
+    return "AUDITORIA DO CODIGO (agente.py)\n- " + "\n- ".join(rel)
 
 
 # ================= CONTROLE DO SPOTIFY (local, sem API/login) =================
@@ -3398,6 +3636,17 @@ def _menu_ajuda_local():
     print("                        314 e pergunto antes de executar (sem nuvem)")
     print("   ferramentas de <assunto> ....... lista o que existe sobre o tema")
     print("                        (ex.: 'ferramentas de rede', 'ferramentas de disco')")
+    print("ROTINAS (seus atalhos: varios comandos com um nome so):")
+    print("   criar rotina <nome>: passo1 > passo2 > passo3")
+    print("                        ex.: criar rotina modo estudo: fecha o discord >")
+    print("                             abre o spotify > tema escuro")
+    print("   rotinas ............ lista as suas | apagar rotina <nome>")
+    print("   <nome da rotina> ... executa tudo em ordem")
+    print("AUTOCONHECIMENTO:")
+    print("   estudar o pc ....... levanta hardware/discos/apps e GRAVA na memoria")
+    print("   analisa teu codigo . auditoria do proprio agente.py (sintaxe, registro")
+    print("                        das ferramentas, duplicidade, chamada quebrada)")
+    print("   anota a ideia <x> .. caderno de ideias | ver ideias")
     print("   silenciar avisos ... desliga o aviso automatico de CPU/RAM alta")
     print("                        ('ligar avisos' volta ao normal)")
     print("   ajuda .............. mostra este menu de novo")
@@ -3947,6 +4196,43 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- ROTINAS ("atalhos dentro de si"): sequencias de comandos com nome ----
+    if n in ("rotinas", "minhasrotinas", "verrotinas", "listarrotinas", "meusatalhos"):
+        _rel(_rotina_listar()); return True
+    for _pre in ("criar rotina", "cria rotina", "nova rotina", "criar atalho", "cria atalho"):
+        if cmd.startswith(_pre):
+            _resto = cmd[len(_pre):].strip()
+            _nome_rot, _passos = (_resto.split(":", 1) + [""])[:2] if ":" in _resto else (_resto, "")
+            if not _passos.strip():
+                _rel("Formato: criar rotina <nome>: passo1 > passo2 > passo3. Ex.: "
+                     "criar rotina modo estudo: fecha o discord > abre o spotify > tema escuro")
+                return True
+            _rel(_rotina_criar(_nome_rot, _passos)); return True
+    for _pre in ("apagar rotina", "apaga rotina", "remover rotina", "excluir rotina",
+                 "apagar atalho", "apaga atalho"):
+        if cmd.startswith(_pre):
+            _rel(_rotina_apagar(cmd[len(_pre):].strip())); return True
+    for _pre in ("rodar rotina", "roda rotina", "executar rotina", "executa rotina", "rotina"):
+        if cmd.startswith(_pre + " "):
+            if _rotina_rodar(cmd[len(_pre):].strip()):
+                return True
+    # nome da rotina dito sozinho (ex.: so "modo estudo")
+    try:
+        if n and n in {_norm_pt(_k) for _k in _carregar_rotinas().keys()}:
+            for _k in _carregar_rotinas().keys():
+                if _norm_pt(_k) == n:
+                    _rotina_rodar(_k)
+                    return True
+    except Exception:
+        pass
+
+    # ---- ESTUDAR O PC: levanta tudo da maquina e guarda na memoria ----
+    if any(p in cmd for p in ("estudar o pc", "estuda o pc", "estudar meu pc", "estuda meu pc",
+                              "aprende sobre o pc", "aprender sobre o pc", "conhece meu pc",
+                              "conhecer meu pc", "estudar a maquina", "faz um raio x do pc",
+                              "raio x do pc", "perfil do pc")):
+        _rel(_estudar_pc()); return True
 
     # ---- BUSCADOR DE FERRAMENTAS: 'ferramentas de rede', 'o que voce tem pra disco' ----
     for _pre in ("buscar ferramenta", "buscar ferramentas", "procurar ferramenta",
