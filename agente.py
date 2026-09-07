@@ -2709,6 +2709,140 @@ def _analisar_codigo_agente() -> str:
 
 
 
+
+# ================= CONTROLE DO SPOTIFY (local, sem API/login) =================
+# Usa o app instalado + atalhos de teclado e teclas de midia. Play/pause,
+# proxima/anterior, aleatorio, repetir, abrir e TOCAR uma musica pela busca.
+# Foca a janela do Spotify antes do atalho so quando necessario.
+
+def _focar_janela(titulo: str) -> bool:
+    """Traz a janela cujo titulo contem 'titulo' para frente. Windows."""
+    try:
+        if os.name != "nt":
+            return False
+        import pygetwindow as _gw
+        for w in _gw.getAllWindows():
+            if w.title and titulo.lower() in w.title.lower():
+                try:
+                    if w.isMinimized:
+                        w.restore()
+                    w.activate()
+                    return True
+                except Exception:
+                    try:
+                        w.minimize(); time.sleep(0.3); w.restore(); return True
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return False
+
+
+def _spotify_aberto() -> bool:
+    try:
+        import pygetwindow as _gw
+        return any(w.title and "spotify" in w.title.lower() for w in _gw.getAllWindows())
+    except Exception:
+        return False
+
+
+def _abrir_spotify() -> bool:
+    """Abre o Spotify (app instalado) e espera carregar."""
+    try:
+        _abrir_app_startapps("spotify")
+        time.sleep(6)
+        return True
+    except Exception:
+        try:
+            subprocess.Popen('start "" "spotify://"', shell=True)
+            time.sleep(6)
+            return True
+        except Exception:
+            return False
+
+
+def _controle_spotify(acao: str) -> str:
+    """Controla a reproducao do Spotify por atalho/teclas de midia.
+    Acoes: tocar/pausar, proxima, anterior, aleatorio, repetir, aumentar/
+    diminuir volume, mutar, abrir, e 'tocar <musica/playlist>'."""
+    import pyautogui as _pg
+    a = (acao or "").strip().lower()
+
+    # Teclas de MIDIA (funcionam no player ativo; se so o Spotify toca, eh ele).
+    midia = {
+        "play": "playpause", "pausar": "playpause", "tocar": "playpause",
+        "pause": "playpause", "playpause": "playpause", "para": "playpause",
+        "proxima": "nexttrack", "proximo": "nexttrack", "pular": "nexttrack",
+        "avancar": "nexttrack", "anterior": "prevtrack", "voltar": "prevtrack",
+        "aumentar volume": "volumeup", "aumenta o volume": "volumeup",
+        "diminuir volume": "volumedown", "diminui o volume": "volumedown",
+        "mutar": "volumemute", "mudo": "volumemute",
+    }
+    if a in midia:
+        if _spotify_aberto():
+            _focar_janela("spotify")
+            time.sleep(0.4)
+        _pg.press(midia[a])
+        return f"Spotify: {a} (comando de midia enviado)."
+
+    # Atalhos DENTRO do Spotify (precisam da janela focada).
+    if a in ("aleatorio", "aleatório", "shuffle", "modo aleatorio"):
+        if not _spotify_aberto():
+            _abrir_spotify()
+        _focar_janela("spotify"); time.sleep(0.4)
+        _pg.hotkey("ctrl", "s")
+        return "Spotify: modo aleatorio (shuffle) alternado."
+    if a in ("repetir", "repeticao", "repetição", "loop", "repeat"):
+        if not _spotify_aberto():
+            _abrir_spotify()
+        _focar_janela("spotify"); time.sleep(0.4)
+        _pg.hotkey("ctrl", "r")
+        return "Spotify: repetir (repeat) alternado."
+    if a in ("curtir", "like", "salvar musica", "coracao"):
+        if not _spotify_aberto():
+            return "Abra o Spotify primeiro."
+        _focar_janela("spotify"); time.sleep(0.4)
+        _pg.hotkey("alt", "shift", "b")
+        return "Spotify: curti/descurti a musica atual."
+
+    # TOCAR uma musica/playlist/album pela busca (deep link spotify:search).
+    if a.startswith("tocar ") or a.startswith("toque ") or a.startswith("play "):
+        termo = a.split(" ", 1)[1].strip()
+        if not termo:
+            return "Diga o que tocar, ex.: 'tocar Beatles' ou 'tocar minha playlist'."
+        if not _spotify_aberto():
+            _abrir_spotify()
+        try:
+            termo_q = termo.replace(" ", "%20")
+            subprocess.Popen(f'start "" "spotify:search:{termo_q}"', shell=True)
+            time.sleep(4)
+            _focar_janela("spotify"); time.sleep(0.5)
+            # Enter seleciona o primeiro resultado; Shift+Enter toca a lista.
+            _pg.press("enter")
+            time.sleep(0.5)
+            _pg.press("enter")
+            return (f"Spotify: busquei '{termo}' e dei play no primeiro resultado. "
+                    "Confira se e a musica/playlist certa; me peca 'proxima' se nao for.")
+        except Exception as e:
+            return f"Nao consegui tocar '{termo}' no Spotify ({type(e).__name__})."
+
+    return ("Nao entendi o controle do Spotify. Tente: 'tocar', 'pausar', 'proxima musica', "
+            "'anterior', 'aleatorio', 'repetir', 'aumentar volume', 'tocar <nome da musica>'.")
+
+
+def _abrir_e_tocar_spotify(termo: str = "") -> str:
+    """Abre o Spotify (e, se informado 'termo', ja busca e toca)."""
+    if not _abrir_spotify():
+        return "Nao consegui abrir o Spotify. Confirme que o app esta instalado ('abre o spotify')."
+    if termo:
+        return _controle_spotify("tocar " + termo)
+    import pyautogui as _pg
+    _focar_janela("spotify"); time.sleep(0.4)
+    _pg.press("playpause")
+    return "Spotify aberto e tocando."
+
+
+
 def _menu_ajuda_local():
     """Mostra um menu com TUDO o que o agente faz no modo local e como ligar a
     IA neural local e a nuvem - para o usuario nunca ficar perdido."""
@@ -2732,6 +2866,7 @@ def _menu_ajuda_local():
     print("   organizar downloads | listar pasta | encontra <arquivo>")
     print("   ver a tela | ver ideias | anota a ideia ... | analisa teu codigo")
     print("   salvar contato Nome: numero | meus contatos | manda whatsapp pro <nome>: msg")
+    print("   Spotify: 'tocar <musica>', 'spotify pausar/proxima/aleatorio/repetir/curtir'")
     print("   tira print | bloquear tela | desligar o pc | reiniciar o pc")
     print("   tema escuro | tema claro | modo desempenho | modo economia")
     print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
@@ -3129,6 +3264,49 @@ def _processar_cerebro_local(comando: str) -> bool:
                               "seu codigo esta certo", "analisa o agente", "auto analise",
                               "autoanalise", "checa o codigo", "revisar o codigo", "revisa teu codigo")):
         _rel(_analisar_codigo_agente()); return True
+
+    # ============ SPOTIFY (controle local por atalhos) ============
+    # "tocar/colocar <musica> no spotify", "spotify toca <x>", etc.
+    if "spotify" in cmd and any(k in cmd for k in ("tocar", "toque", "toca", "coloca", "colocar", "play ", "busca")):
+        _termo = cmd
+        for _pre in ("no spotify", "spotify"):
+            _termo = _termo.replace(_pre, " ")
+        for _pre in ("tocar", "toque", "toca", "colocar", "coloca", "play", "musica", "música", "uma musica", "uma música"):
+            if _termo.strip().startswith(_pre):
+                _termo = _termo.strip()[len(_pre):]
+        _termo = _termo.strip(" :,.")
+        if _termo:
+            _rel(_controle_spotify("tocar " + _termo)); return True
+        # sem termo = so play/pausar
+        _rel(_controle_spotify("play")); return True
+    # Controles diretos do Spotify: "spotify pausar/proxima/aleatorio/repetir/..."
+    if cmd.startswith("spotify") or " no spotify" in cmd or "do spotify" in cmd:
+        _acao = cmd.replace("spotify", " ").replace("no spotify", " ").replace("do spotify", " ").strip(" :,.")
+        _mapa = {
+            "play": "play", "tocar": "play", "toca": "play", "pausar": "pausar", "pausa": "pausar",
+            "proxima": "proxima", "proxima musica": "proxima", "avancar": "proxima", "pular": "proxima",
+            "anterior": "anterior", "voltar musica": "anterior", "voltar": "anterior",
+            "aleatorio": "aleatorio", "shuffle": "aleatorio", "repetir": "repetir", "loop": "repetir",
+            "curtir": "curtir", "like": "curtir", "aumentar volume": "aumentar volume",
+            "diminuir volume": "diminuir volume", "mutar": "mutar", "mudo": "mutar",
+        }
+        _chave = _acao
+        _achou = _mapa.get(_chave)
+        if not _achou:
+            for k, v in _mapa.items():
+                if k in _chave:
+                    _achou = v; break
+        if _achou:
+            _rel(_controle_spotify(_achou)); return True
+    # "tocar <musica>" / "coloca <musica> pra tocar" generico -> usa o Spotify.
+    if cmd.startswith(("tocar ", "toque ", "toca ", "colocar ", "coloca ")) and "musica" not in cmd[:0]:
+        _termo = cmd
+        for _pre in ("tocar", "toque", "toca", "colocar", "coloca", "pra tocar", "para tocar"):
+            if _termo.strip().startswith(_pre):
+                _termo = _termo.strip()[len(_pre):]
+        _termo = _termo.strip(" :,.")
+        if _termo and _termo not in ("musica", "música"):
+            _rel(_abrir_e_tocar_spotify(_termo)); return True
 
     # ============ WHATSAPP / CONTATOS (comandos locais) ============
     # Salvar/cadastrar contato: "salvar contato Joao: 11 99999-9999" ou em lote.
