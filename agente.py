@@ -2219,6 +2219,11 @@ def mostrar_status():
     print(f"Modo voz           : {'ligado' if config.get('modo_voz') else 'desligado'}")
     _nv = "LIGADA (rodizio de IAs)" if config.get("usar_ia_nuvem", True) else "DESLIGADA (modo 100% local, sem cota)"
     print(f"IAs da nuvem       : {_nv}")
+    try:
+        _loc = "PRONTA (offline, sem cota)" if ia_local_disponivel() else "nao instalada (digite 'criar ia')"
+        print(f"IA neural local    : {_loc}")
+    except Exception:
+        pass
     _vivas = len(modelos_ia) - len([_i for _i in _ias_mortas if _i < len(modelos_ia)])
     print(f"IAs no rodizio     : {_vivas} ativa(s)")
     try:
@@ -2422,6 +2427,27 @@ def _processar_cerebro_local(comando: str) -> bool:
         print("        conheco por regra continuam funcionando; para conversa solta,")
         print("        digite 'ligar ia' quando quiser voltar a usar a nuvem.")
         return True
+    # IA NEURAL LOCAL (llama.cpp): prepara/liga/desliga/consulta.
+    if n in ("criaria", "criar i a", "baixaria", "instalaria", "ligariaoffline",
+             "i a local", "i alocal", "motorlocal", "preparari a", "prepararia",
+             "baixari a", "instalari a"):
+        preparar_ia_local(); return True
+    if n in ("statusdalocal", "status da i a", "status i a", "statusial",
+             "i a pronta", "ialpronta", "comoestarial"):
+        print("\n[IA Local]: " + ("PRONTA e respondendo offline (sem cota)."
+              if ia_local_disponivel() else "ainda nao instalada. Digite 'criar ia' para baixar (uma vez)."))
+        return True
+    if n in ("desligarialocal", "desliga i a local", "parari a", "pararia",
+             "matari a", "encerrari a"):
+        global _proc_ia_local
+        if _proc_ia_local is not None:
+            try: _proc_ia_local.terminate()
+            except Exception: pass
+            _proc_ia_local = None
+            print("\n[IA Local]: motor local encerrado (as acoes por regra continuam).")
+        else:
+            print("\n[IA Local]: o motor local nao estava rodando.")
+        return True
 
     # ---- Conversa / saudações (resposta local, sem nuvem) ----
     saud = ("ola", "oi", "oie", "ei", "iae", "eai", "eae", "eaew",
@@ -2573,6 +2599,257 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel(_invocar_local("controle_de_energia", acao="suspender")); return True
 
     return False
+
+
+
+
+# ================= IA NEURAL LOCAL (llama.cpp + GGUF, sem Ollama/API/cota) =================
+# Motor "dos gringos": baixamos o binario PRONTO do llama.cpp (GitHub, nem
+# instala) e um modelo GGUF (HuggingFace) UMA unica vez. Depois roda 100%
+# offline, de graca e sem limite, servindo numa porta local (OpenAI-compativel).
+# A escolha do modelo e automatica pela RAM (nao trava o PC). A nuvem continua
+# guardada no rodizio; isto so e usado para CONVERSA quando a nuvem esta off
+# (acoes do PC seguem com o cerebro por regras, que e deterministico).
+
+_PASTA_IA_LOCAL = os.path.join(PASTA_BASE, "ia_local")
+_LLAMA_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
+_PORTA_IA_LOCAL = 8765
+_url_ia_local = f"http://127.0.0.1:{_PORTA_IA_LOCAL}"
+_proc_ia_local = None          # subprocess do llama-server
+_modelo_ia_local = ""          # nome do arquivo GGUF em uso
+
+
+def _ram_livre_gb() -> float:
+    try:
+        import psutil
+        return psutil.virtual_memory().available / (1024 ** 3)
+    except Exception:
+        return 8.0  # se nao souber, assume medio
+
+
+def _escolher_modelo_local() -> tuple:
+    """Devolve (arquivo, url_huggingface, modelo_label) conforme a RAM livre.
+    Leve (Qwen2.5 1.5B) cabe em praticamente qualquer PC; medio (3B) so com RAM."""
+    ram = _ram_livre_gb()
+    if ram >= 8:
+        return (
+            "qwen2.5-3b-instruct-q4_k_m.gguf",
+            "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
+            "Qwen 3B (mais esperta)",
+        )
+    return (
+        "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        "Qwen 1.5B (leve e rapida)",
+    )
+
+
+def _baixar_com_progresso(url: str, destino: str, rotulo: str):
+    """Baixa um arquivo mostrando progresso no console (urllib puro, sem pip)."""
+    import urllib.request
+    os.makedirs(os.path.dirname(destino), exist_ok=True)
+    req = urllib.request.Request(url, headers={"User-Agent": "SuperAgentePC"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        total = 0
+        try:
+            total = int(r.headers.get("Content-Length") or 0)
+        except Exception:
+            total = 0
+        baixado = 0
+        tmp = destino + ".part"
+        with open(tmp, "wb") as f:
+            while True:
+                pedaco = r.read(1024 * 256)
+                if not pedaco:
+                    break
+                f.write(pedaco)
+                baixado += len(pedaco)
+                if total:
+                    pct = min(100, baixado * 100 // total)
+                    mb = baixado // (1024 * 1024)
+                    tmb = total // (1024 * 1024)
+                    print(f"\r        {rotulo}: {pct:3d}% ({mb}/{tmb} MB)", end="", flush=True)
+        print()
+    os.replace(tmp, destino)
+
+
+def _acha_llama_server() -> str:
+    """Procura llama-server.exe na pasta da IA local (apos extrair o zip)."""
+    for raiz, _dirs, arqs in os.walk(_PASTA_IA_LOCAL):
+        for a in arqs:
+            if a.lower() == "llama-server.exe":
+                return os.path.join(raiz, a)
+    return ""
+
+
+def _baixar_motor_llama() -> str:
+    """Baixa e extrai o binario do llama.cpp para Windows x64 (CPU). Devolve o
+    caminho do llama-server.exe. Tenta a ultima release via GitHub API; se nao
+    achar, usa uma release conhecida como reserva."""
+    import zipfile
+    import urllib.request
+    os.makedirs(_PASTA_IA_LOCAL, exist_ok=True)
+    ja = _acha_llama_server()
+    if ja:
+        return ja
+
+    def _tenta(url_api_ou_zip, e_api=True):
+        url_zip = None
+        if e_api:
+            req = urllib.request.Request(url_api_ou_zip, headers={"User-Agent": "SuperAgentePC"})
+            with urllib.request.urlopen(req, timeout=45) as r:
+                data = json.loads(r.read().decode("utf-8", "ignore"))
+            for ativo in data.get("assets", []):
+                nome = (ativo.get("name") or "").lower()
+                if "win" in nome and "x64" in nome and nome.endswith(".zip") and "cuda" not in nome and "vulkan" not in nome:
+                    url_zip = ativo.get("browser_download_url")
+                    break
+        else:
+            url_zip = url_api_ou_zip
+        if not url_zip:
+            return ""
+        destino_zip = os.path.join(_PASTA_IA_LOCAL, "llama_win.zip")
+        _baixar_com_progresso(url_zip, destino_zip, "Motor llama.cpp")
+        with zipfile.ZipFile(destino_zip) as z:
+            z.extractall(_PASTA_IA_LOCAL)
+        try:
+            os.remove(destino_zip)
+        except Exception:
+            pass
+        return _acha_llama_server()
+
+    try:
+        srv = _tenta(_LLAMA_API, e_api=True)
+        if srv:
+            return srv
+    except Exception as e:
+        print(f"        (GitHub API nao respondeu: {type(e).__name__}; tentando link reserva)")
+    # Reserva: release estavel conhecida do llama.cpp (build CPU win-x64).
+    for reserva in (
+        "https://github.com/ggml-org/llama.cpp/releases/download/b4406/llama-b4406-bin-win-x64.zip",
+    ):
+        try:
+            srv = _tenta(reserva, e_api=False)
+            if srv:
+                return srv
+        except Exception:
+            continue
+    return ""
+
+
+def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
+    """Sobe o llama-server em background e espera responder na porta local."""
+    import urllib.request
+    global _proc_ia_local
+    srv = _acha_llama_server()
+    if not srv:
+        return False
+    # Se ja existe um servidor respondendo, reaproveita.
+    try:
+        req = urllib.request.Request(_url_ia_local + "/health",
+                                     headers={"User-Agent": "SuperAgentePC"})
+        with urllib.request.urlopen(req, timeout=3):
+            return True
+    except Exception:
+        pass
+    cmd = [srv, "-m", caminho_modelo, "--port", str(_PORTA_IA_LOCAL),
+           "--host", "127.0.0.1", "-c", "4096", "-t", "4", "--ctx-size", "4096"]
+    try:
+        log = open(os.path.join(_PASTA_IA_LOCAL, "servidor.log"), "a", encoding="utf-8", errors="ignore")
+        _proc_ia_local = subprocess.Popen(cmd, stdout=log, stderr=log,
+                                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as e:
+        print(f"        Nao consegui iniciar o motor local: {type(e).__name__}")
+        return False
+    # Espera o servidor ficar de pe (ate ~90s; modelo 1.5B sobe rapido).
+    import time as _t
+    for _ in range(90):
+        try:
+            req = urllib.request.Request(_url_ia_local + "/health",
+                                         headers={"User-Agent": "SuperAgentePC"})
+            with urllib.request.urlopen(req, timeout=2):
+                return True
+        except Exception:
+            _t.sleep(1)
+    return False
+
+
+def preparar_ia_local() -> bool:
+    """Garante motor + modelo baixados e o servidor no ar. Mostra progresso.
+    Retorna True se a IA neural local esta pronta para conversar."""
+    global _modelo_ia_local
+    try:
+        import urllib.request
+        req = urllib.request.Request(_url_ia_local + "/health",
+                                     headers={"User-Agent": "SuperAgentePC"})
+        with urllib.request.urlopen(req, timeout=3):
+            return True  # ja no ar
+    except Exception:
+        pass
+    os.makedirs(_PASTA_IA_LOCAL, exist_ok=True)
+    print("\n[IA Local]: preparando a IA neural offline (motor llama.cpp + modelo).")
+    print("           Download UNICO - depois roda sem internet, de graca e sem limite.")
+    try:
+        srv = _baixar_motor_llama()
+        if not srv:
+            print("[IA Local]: nao consegui baixar o motor (sem internet ou GitHub fora do ar).")
+            print("           Tente de novo mais tarde com internet; as acoes locais continuam.")
+            return False
+        arq_modelo, url_modelo, rotulo = _escolher_modelo_local()
+        caminho_modelo = os.path.join(_PASTA_IA_LOCAL, arq_modelo)
+        if not os.path.exists(caminho_modelo) or os.path.getsize(caminho_modelo) < 100_000_000:
+            print(f"[IA Local]: baixando o modelo {rotulo} (pode levar alguns minutos na 1a vez)...")
+            _baixar_com_progresso(url_modelo, caminho_modelo, "Modelo")
+        print("[IA Local]: iniciando o motor local (na 1a vez leva alguns segundos)...")
+        if _iniciar_servidor_ia_local(caminho_modelo):
+            _modelo_ia_local = arq_modelo
+            print("[IA Local]: PRONTA! IA neural offline ativa - sem cota e sem limite.")
+            return True
+        print("[IA Local]: o motor baixou mas nao subiu. Veja ia_local/servidor.log.")
+        return False
+    except Exception as e:
+        print(f"[IA Local]: falha ao preparar ({type(e).__name__}: {e}). Acoes locais seguem funcionando.")
+        return False
+
+
+def ia_local_disponivel() -> bool:
+    try:
+        import urllib.request
+        req = urllib.request.Request(_url_ia_local + "/health",
+                                     headers={"User-Agent": "SuperAgentePC"})
+        with urllib.request.urlopen(req, timeout=2):
+            return True
+    except Exception:
+        return False
+
+
+def perguntar_ia_local(pergunta: str, historico=None) -> str:
+    """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
+    resposta em texto. Levanta excecao se algo falhar (o chamador trata)."""
+    import urllib.request
+    msgs = [{"role": "system", "content": (
+        "Voce e o Super Agente, um assistente pessoal brasileiro que roda 100% "
+        "local no PC do usuario. Fale portugues do Brasil de forma clara, curta e "
+        "prestativa, sem emoji. Voce NAO executa acoes no PC (quem faz isso sao os "
+        "comandos por regra): quando o usuario pedir uma acao, diga para falar em "
+        "comando direto (ex.: 'abre o youtube', 'otimiza tudo').")}]
+    for m in (historico or [])[-6:]:
+        if m.get("role") in ("user", "assistant") and m.get("content"):
+            msgs.append({"role": m["role"], "content": str(m["content"])[:1500]})
+    msgs.append({"role": "user", "content": pergunta})
+    corpo = json.dumps({
+        "model": "local", "messages": msgs, "temperature": 0.6,
+        "max_tokens": 512, "stream": False,
+    }).encode("utf-8")
+    req = urllib.request.Request(_url_ia_local + "/v1/chat/completions",
+                                 data=corpo, method="POST",
+                                 headers={"Content-Type": "application/json",
+                                          "User-Agent": "SuperAgentePC"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = json.loads(r.read().decode("utf-8", "ignore"))
+    return (data["choices"][0]["message"]["content"] or "").strip()
+
+
 
 
 def _chat_local_fallback(comando: str):
@@ -2780,11 +3057,26 @@ def processar_atalho_rapido(comando: str) -> bool:
         # Se a nuvem (rodizio de IAs) estiver DESLIGADA, responde no papo com
         # texto local (sem API) - o agente nunca fica mudo e nao gasta cota.
         if not config.get("usar_ia_nuvem", True):
-            _r = _chat_local_fallback(comando)
+            _r = None
+            if ia_local_disponivel():
+                try:
+                    _r = perguntar_ia_local(comando, historico_conversas)
+                except Exception:
+                    _r = None
+            if not _r:
+                # IA neural local fora do ar: tenta subir (se ja baixada) senao
+                # oferece instalar; por fim cai no texto de orientacao.
+                if preparar_ia_local():
+                    try:
+                        _r = perguntar_ia_local(comando, historico_conversas)
+                    except Exception:
+                        _r = None
+            if not _r:
+                _r = _chat_local_fallback(comando)
             historico_conversas.append({"role": "user", "content": comando})
             historico_conversas.append({"role": "assistant", "content": _r})
             salvar_historico()
-            print(f"\n[Local]: {_r}")
+            print(f"\n[IA Local]: {_r}")
             return True
         # Contexto inteligente tambem no chat rapido: memoria central (fatos
         # permanentes do usuario) + licoes + memorias relevantes, bem curto.
