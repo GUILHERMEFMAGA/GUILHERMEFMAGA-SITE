@@ -2628,18 +2628,26 @@ def _ram_livre_gb() -> float:
 
 
 def _escolher_modelo_local() -> tuple:
-    """Devolve (arquivo, url_huggingface, modelo_label) conforme a RAM livre.
-    Leve (Qwen2.5 1.5B) cabe em praticamente qualquer PC; medio (3B) so com RAM."""
+    """Devolve (arquivo, [urls candidatas], modelo_label) conforme a RAM livre.
+    Leve (Qwen2.5 1.5B) cabe em praticamente qualquer PC; medio (3B) so com RAM.
+    Traz mais de uma URL (oficial e espelho da comunidade) para o download nao
+    falhar se um dos caminhos mudar."""
     ram = _ram_livre_gb()
     if ram >= 8:
         return (
             "qwen2.5-3b-instruct-q4_k_m.gguf",
-            "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
+            [
+                "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
+                "https://huggingface.co/bartowski/Qwen2.5-3B-Instruct-GGUF/resolve/main/Qwen2.5-3B-Instruct-Q4_K_M.gguf",
+            ],
             "Qwen 3B (mais esperta)",
         )
     return (
         "qwen2.5-1.5b-instruct-q4_k_m.gguf",
-        "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+        [
+            "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            "https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+        ],
         "Qwen 1.5B (leve e rapida)",
     )
 
@@ -2684,8 +2692,9 @@ def _acha_llama_server() -> str:
 
 def _baixar_motor_llama() -> str:
     """Baixa e extrai o binario do llama.cpp para Windows x64 (CPU). Devolve o
-    caminho do llama-server.exe. Tenta a ultima release via GitHub API; se nao
-    achar, usa uma release conhecida como reserva."""
+    caminho do llama-server.exe. Procura o build 'win-cpu-x64' nas releases
+    recentes (a 'latest' hoje so aponta para nightly e nao traz os binarios);
+    se nao achar, usa uma build conhecida como reserva."""
     import zipfile
     import urllib.request
     os.makedirs(_PASTA_IA_LOCAL, exist_ok=True)
@@ -2693,19 +2702,7 @@ def _baixar_motor_llama() -> str:
     if ja:
         return ja
 
-    def _tenta(url_api_ou_zip, e_api=True):
-        url_zip = None
-        if e_api:
-            req = urllib.request.Request(url_api_ou_zip, headers={"User-Agent": "SuperAgentePC"})
-            with urllib.request.urlopen(req, timeout=45) as r:
-                data = json.loads(r.read().decode("utf-8", "ignore"))
-            for ativo in data.get("assets", []):
-                nome = (ativo.get("name") or "").lower()
-                if "win" in nome and "x64" in nome and nome.endswith(".zip") and "cuda" not in nome and "vulkan" not in nome:
-                    url_zip = ativo.get("browser_download_url")
-                    break
-        else:
-            url_zip = url_api_ou_zip
+    def _baixar_e_extrair(url_zip):
         if not url_zip:
             return ""
         destino_zip = os.path.join(_PASTA_IA_LOCAL, "llama_win.zip")
@@ -2718,18 +2715,45 @@ def _baixar_motor_llama() -> str:
             pass
         return _acha_llama_server()
 
+    def _escolhe_asset(assets):
+        # Procura EXATAMENTE o build de CPU x64 (ex.: llama-b10830-bin-win-cpu-x64.zip).
+        for ativo in assets:
+            nome = (ativo.get("name") or "").lower()
+            if nome.endswith("win-cpu-x64.zip"):
+                return ativo.get("browser_download_url")
+        # Reforco: win + x64 + .zip sem gpu/arm.
+        for ativo in assets:
+            nome = (ativo.get("name") or "").lower()
+            if ("win" in nome and "x64" in nome and nome.endswith(".zip")
+                    and not any(k in nome for k in
+                                ("cuda", "vulkan", "rocm", "sycl", "hip", "opencl",
+                                 "openvino", "arm64", "cudart"))):
+                return ativo.get("browser_download_url")
+        return None
+
+    # 1) Varre as releases recentes procurando o build de CPU x64.
     try:
-        srv = _tenta(_LLAMA_API, e_api=True)
-        if srv:
-            return srv
+        req = urllib.request.Request(
+            "https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=30",
+            headers={"User-Agent": "SuperAgentePC", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=45) as r:
+            releases = json.loads(r.read().decode("utf-8", "ignore"))
+        for rel in releases:
+            url_zip = _escolhe_asset(rel.get("assets", []))
+            if url_zip:
+                srv = _baixar_e_extrair(url_zip)
+                if srv:
+                    return srv
+                break
     except Exception as e:
         print(f"        (GitHub API nao respondeu: {type(e).__name__}; tentando link reserva)")
-    # Reserva: release estavel conhecida do llama.cpp (build CPU win-x64).
+
+    # 2) Reserva: build estavel conhecido do llama.cpp (CPU win-x64).
     for reserva in (
-        "https://github.com/ggml-org/llama.cpp/releases/download/b4406/llama-b4406-bin-win-x64.zip",
+        "https://github.com/ggml-org/llama.cpp/releases/download/b10830/llama-b10830-bin-win-cpu-x64.zip",
     ):
         try:
-            srv = _tenta(reserva, e_api=False)
+            srv = _baixar_e_extrair(reserva)
             if srv:
                 return srv
         except Exception:
@@ -2753,7 +2777,7 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
     except Exception:
         pass
     cmd = [srv, "-m", caminho_modelo, "--port", str(_PORTA_IA_LOCAL),
-           "--host", "127.0.0.1", "-c", "4096", "-t", "4", "--ctx-size", "4096"]
+           "--host", "127.0.0.1", "-t", "4", "--ctx-size", "4096"]
     try:
         log = open(os.path.join(_PASTA_IA_LOCAL, "servidor.log"), "a", encoding="utf-8", errors="ignore")
         _proc_ia_local = subprocess.Popen(cmd, stdout=log, stderr=log,
@@ -2795,11 +2819,23 @@ def preparar_ia_local() -> bool:
             print("[IA Local]: nao consegui baixar o motor (sem internet ou GitHub fora do ar).")
             print("           Tente de novo mais tarde com internet; as acoes locais continuam.")
             return False
-        arq_modelo, url_modelo, rotulo = _escolher_modelo_local()
+        arq_modelo, urls_modelo, rotulo = _escolher_modelo_local()
         caminho_modelo = os.path.join(_PASTA_IA_LOCAL, arq_modelo)
         if not os.path.exists(caminho_modelo) or os.path.getsize(caminho_modelo) < 100_000_000:
             print(f"[IA Local]: baixando o modelo {rotulo} (pode levar alguns minutos na 1a vez)...")
-            _baixar_com_progresso(url_modelo, caminho_modelo, "Modelo")
+            _baixou = False
+            for _u in urls_modelo:
+                try:
+                    _baixar_com_progresso(_u, caminho_modelo, "Modelo")
+                    if os.path.exists(caminho_modelo) and os.path.getsize(caminho_modelo) > 100_000_000:
+                        _baixou = True
+                        break
+                except Exception as _em:
+                    print(f"        (esse link falhou: {type(_em).__name__}; tentando outro espelho)")
+            if not _baixou:
+                print("[IA Local]: nao consegui baixar o modelo (sem internet ou links fora do ar).")
+                print("           Tente de novo mais tarde; as acoes por regra continuam funcionando.")
+                return False
         print("[IA Local]: iniciando o motor local (na 1a vez leva alguns segundos)...")
         if _iniciar_servidor_ia_local(caminho_modelo):
             _modelo_ia_local = arq_modelo
