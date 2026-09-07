@@ -2024,6 +2024,66 @@ def worker_agendador():
 threading.Thread(target=worker_agendador, daemon=True).start()
 
 
+# ============ CHECAGEM DO INICIAR.BAT (auto-atualizacao apontando certo) ============
+# O iniciar.bat baixa a versao nova do agente.py, mas ele NAO atualiza a si
+# mesmo. Se o endereco de dentro dele ficar velho (repositorio renomeado, branch
+# trocada), o agente "atualiza" pra sempre para a MESMA versao antiga e o
+# usuario nao entende por que as correcoes nao chegam. Entao: conferimos (so
+# leitura) e, se estiver errado, avisamos e deixamos um ATUALIZAR_INICIAR.bat
+# pronto na pasta - dois cliques e resolve, sem digitar comando nenhum.
+URL_AGENTE_OFICIAL = ("https://raw.githubusercontent.com/GUILHERMEFMAGA/"
+                      "GUILHERMEFMAGA-SITE/arena/01a07ce2-guilhermefmaga-site/agente.py")
+URL_INICIAR_OFICIAL = URL_AGENTE_OFICIAL.replace("/agente.py", "/iniciar.bat")
+
+
+def _checar_iniciar_bat() -> None:
+    """Avisa se o iniciar.bat aponta para um endereco antigo de atualizacao."""
+    try:
+        if os.name != "nt":
+            return
+        import re as _re
+        pasta = os.path.dirname(os.path.abspath(__file__))
+        caminho = os.path.join(pasta, "iniciar.bat")
+        if not os.path.exists(caminho):
+            return
+        with open(caminho, "r", encoding="utf-8", errors="ignore") as f:
+            conteudo = f.read()
+        achadas = _re.findall(r"https://raw\.githubusercontent\.com/\S+?agente\.py", conteudo)
+        if not achadas or achadas[0] == URL_AGENTE_OFICIAL:
+            return  # esta certo, nao enche o saco
+        # Endereco velho: monta o corretor de dois cliques.
+        corretor = os.path.join(pasta, "ATUALIZAR_INICIAR.bat")
+        try:
+            with open(corretor, "w", encoding="utf-8") as f:
+                f.write(
+                    "@echo off\r\n"
+                    "cd /d \"%~dp0\"\r\n"
+                    "title Corrigir atualizacao do Super Agente\r\n"
+                    "echo Baixando o iniciar.bat correto...\r\n"
+                    "powershell -NoProfile -Command \""
+                    "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; "
+                    "try { Invoke-WebRequest -Uri '" + URL_INICIAR_OFICIAL + "' "
+                    "-OutFile 'iniciar.bat' -UseBasicParsing -TimeoutSec 20; "
+                    "Write-Host 'Pronto! Agora abra o iniciar.bat normalmente.' } "
+                    "catch { Write-Host 'Falhou (sem internet?). Tente de novo.' }\"\r\n"
+                    "echo.\r\n"
+                    "pause\r\n")
+        except Exception:
+            corretor = ""
+        print("\n" + "=" * 66)
+        print(" ATENCAO: seu iniciar.bat esta baixando o agente de um endereco ANTIGO.")
+        print(" Por isso as correcoes novas nao chegam (ele se 'atualiza' pra mesma")
+        print(" versao velha toda vez).")
+        print("   Endereco que ele usa hoje: " + achadas[0][:88])
+        print("   Endereco correto ........: " + URL_AGENTE_OFICIAL[:88])
+        if corretor:
+            print(" SOLUCAO (uma vez so): feche o agente e de DOIS CLIQUES no arquivo")
+            print("   ATUALIZAR_INICIAR.bat que acabei de deixar na pasta " + pasta)
+        print("=" * 66)
+    except Exception:
+        pass
+
+
 # ================= AUTODIAGNÓSTICO PROATIVO (IDEIA #9) =================
 # Regras deste monitor: avisar POUCO, avisar UTIL e NUNCA repetir o mesmo
 # aviso. A versao antiga imprimia (e FALAVA) "uso critico" a cada 15 minutos;
@@ -14794,6 +14854,7 @@ else:
     print(" Para ter uma IA que roda 100% no PC (sem cota e sem limite), digite: criar ia")
     print("   Depois ela liga sozinha. Para ver todos os comandos, digite: ajuda")
 print(" Digite 'ajuda' para ver o menu completo de comandos.")
+_checar_iniciar_bat()
 print("")
 falar("Agente pronto para uso.")
 
