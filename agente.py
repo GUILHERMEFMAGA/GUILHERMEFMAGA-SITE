@@ -2388,6 +2388,34 @@ _INTRO_LOCAL = (
 )
 
 
+def _menu_ajuda_local():
+    """Mostra um menu com TUDO o que o agente faz no modo local e como ligar a
+    IA neural local e a nuvem - para o usuario nunca ficar perdido."""
+    _pronta = ia_local_disponivel()
+    print("")
+    print("================= MENU DO AGENTE =================")
+    print("IA NEURAL LOCAL (roda no PC, sem internet/cota/limite):")
+    print("   criar ia ........... baixa e liga a IA que conversa offline (so na 1a vez)")
+    print("   status ia .......... diz se a IA local esta pronta" + ("  [AGORA: PRONTA]" if _pronta else "  [AGORA: nao instalada]"))
+    print("   desligar ia local .. encerra o motor da IA local")
+    print("IA DA NUVEM (rodizio Groq/GitHub; so quando ha cota):")
+    print("   ligar ia ........... liga as IAs da nuvem (conversa mais forte)")
+    print("   desligar ia ........ volta ao modo 100% local (sem cota)")
+    print("ACOES NO PC (instantaneas, deterministas, nao usam IA):")
+    print("   abre o <programa/site> ... ex.: 'abre o youtube', 'abre o Bambu Studio'")
+    print("   abre configuracao / abre arquivo / abre gerenciador de tarefas")
+    print("   analise do pc | relatorio de saude | programas abertos | programas instalados")
+    print("   meu ip | senha do wifi | redes wifi disponiveis | testar internet")
+    print("   otimiza tudo | medico do pc | reparar internet | limpar lixo | esvaziar lixeira")
+    print("   organizar downloads | listar pasta | encontra <arquivo>")
+    print("   tira print | bloquear tela | desligar o pc | reiniciar o pc")
+    print("   tema escuro | tema claro | modo desempenho | modo economia")
+    print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
+    print("   status ............. mostra tudo (nuvem, IA local e dados do PC)")
+    print("   ajuda .............. mostra este menu de novo")
+    print("=================================================")
+
+
 def _processar_cerebro_local(comando: str) -> bool:
     """CEREBRO LOCAL: tenta resolver o comando por REGRA (sem nuvem). Retorna
     True se tratou (imprimiu a saida); False se nao entendeu."""
@@ -2395,6 +2423,15 @@ def _processar_cerebro_local(comando: str) -> bool:
     n = _norm_pt(cmd)
     if not n:
         return False
+
+    # MENU DE AJUDA: mostra tudo (como ligar IA local/nuvem e exemplos).
+    if n in ("ajuda", "menu", "comandos", "help", "opcoes", "oqueeufaco",
+             "comouso", "comoeuuso", "comousoagente", "comousar", "comoeuvouso",
+             "ajudame", "meajuda", "precisodeajuda", "ialocal", "oquesabe",
+             "ial", "opcoesdoagente", "listadecomandos", "manual", "oquepossofazer",
+             "quaiscomandos", "mostramenu", "verajuda", "socorro"):
+        _menu_ajuda_local()
+        return True
 
     def _rel(r):
         r = str(r).strip()
@@ -2430,8 +2467,9 @@ def _processar_cerebro_local(comando: str) -> bool:
         print("        digite 'ligar ia' quando quiser voltar a usar a nuvem.")
         return True
     # IA NEURAL LOCAL (llama.cpp): prepara/liga/desliga/consulta.
-    if n in ("criaria", "baixaria", "instalaria", "ligariaoffline",
-             "ialocal", "motorlocal", "prepararia", "ligarialogo"):
+    if n in ("criaria", "criai", "fazeria", "iniciaria", "iniciaria",
+             "baixaria", "instalaria", "ligariaoffline", "ativarialogo",
+             "motorlocal", "prepararia", "ligarialogo", "ligariadepc"):
         preparar_ia_local(); return True
     if n in ("statusia", "statusial", "statusdalial", "ialpronta", "comoestaria",
              "estadoial", "estadoia", "ialocalpronta", "prontaal", "comovaial", "iadepronta"):
@@ -2623,6 +2661,28 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel(_invocar_local("controle_de_energia", acao="reiniciar")); return True
     if any(p in cmd for p in ("suspende o pc", "suspender o pc", "modo dormir", "colocar pra dormir")):
         _rel(_invocar_local("controle_de_energia", acao="suspender")); return True
+
+    # ============ AJUSTES / CONFIGURACAO DO PC (aplicam de verdade) ============
+    if any(p in cmd for p in ("tema escuro", "modo escuro", "deixa escuro", "dark mode", "tema preto")):
+        _rel(_invocar_local("configurar_aparencia_e_energia", acao="tema_escuro")); return True
+    if any(p in cmd for p in ("tema claro", "modo claro", "deixa claro", "light mode", "tema branco")):
+        _rel(_invocar_local("configurar_aparencia_e_energia", acao="tema_claro")); return True
+    if any(p in cmd for p in ("modo desempenho", "plano de desempenho", "alta performance", "alto desempenho",
+                              "turbo de energia", "plano energia desempenho")):
+        _rel(_invocar_local("otimizar_sistema", acao="plano_energia_desempenho")); return True
+    if any(p in cmd for p in ("modo economia", "plano de economia", "economia de energia", "economizar energia",
+                              "plano energia economia")):
+        _rel(_invocar_local("otimizar_sistema", acao="plano_energia_economia")); return True
+    if any(p in cmd for p in ("programas que iniciam", "inicializacao do windows", "o que abre ligando",
+                              "programas de inicializacao", "inicializacao do pc")):
+        _rel(_invocar_local("otimizar_sistema", acao="listar_inicializacao")); return True
+    if any(p in cmd for p in ("limpar dns", "limpa o dns", "flush dns", "limpar cache de dns")):
+        _rel(_invocar_local("otimizar_sistema", acao="limpar_dns")); return True
+    if "tela apaga" in cmd or "desligar a tela em" in cmd or "tempo de tela" in cmd:
+        import re as _re3
+        _num = (_re3.findall(r"(\d+)", cmd) or [""])[0]
+        if _num:
+            _rel(_invocar_local("configurar_aparencia_e_energia", acao="tempo_espera_tela", valor=_num)); return True
 
     # ============ ANALISE / DIAGNOSTICO DO PC (so leitura, instantaneo) ============
     if any(p in cmd for p in ("relatorio do pc", "relatorio de saude", "saude do pc", "analise completa do pc",
