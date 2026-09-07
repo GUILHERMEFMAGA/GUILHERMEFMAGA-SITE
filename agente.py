@@ -811,6 +811,10 @@ DEFAULT_CONFIG = {
     "usar_ia_nuvem": True,  # interruptor do rodizio de IAs na nuvem: False = 100% local (sem API/cota/limite)
     "idioma_voz": "portuguese",
     "intervalo_autodiagnostico_minutos": 15,
+    "avisar_uso_critico": True,     # avisos de CPU/RAM alta ('silenciar avisos' desliga)
+    "limite_cpu_aviso": 92,         # so avisa acima disso, e se persistir
+    "limite_ram_aviso": 95,
+    "minutos_entre_avisos": 60,     # silencio minimo entre dois avisos
     "tom_bem_humorado": True,  # deixa mensagens específicas com um toque de humor
 }
 
@@ -2021,18 +2025,114 @@ threading.Thread(target=worker_agendador, daemon=True).start()
 
 
 # ================= AUTODIAGNÓSTICO PROATIVO (IDEIA #9) =================
-def worker_autodiagnostico():
-    intervalo = config.get("intervalo_autodiagnostico_minutos", 15) * 60
-    while True:
-        time.sleep(intervalo)
+# Regras deste monitor: avisar POUCO, avisar UTIL e NUNCA repetir o mesmo
+# aviso. A versao antiga imprimia (e FALAVA) "uso critico" a cada 15 minutos;
+# num PC que vive com a RAM alta isso virava spam no meio da digitacao e nao
+# dizia o que fazer. Agora:
+#   - so avisa se o uso alto se SUSTENTAR (3 leituras seguidas, ~3 min);
+#   - depois de avisar, fica em silencio por 1 hora (configuravel);
+#   - so repete se PIORAR de verdade (>= 3 pontos) ou se tiver voltado ao
+#     normal antes;
+#   - mostra QUEM esta comendo a memoria e o comando pra resolver;
+#   - fala em voz alta so no primeiro aviso da sessao.
+# Para desligar: comando 'silenciar avisos' (ou 'ligar avisos' pra voltar).
+_diag_estado = {"seguidas": 0, "ultimo_aviso": 0.0, "pico_avisado": 0.0,
+                "normalizou": True, "ja_falou": False}
+
+
+def _top_consumidores_ram(qtd=3):
+    """Nome + MB dos processos que mais consomem RAM agora (agrupado por nome)."""
+    try:
+        import psutil
+    except Exception:
+        return []
+    uso = {}
+    for pr in psutil.process_iter(["name", "memory_info"]):
         try:
+            info = pr.info
+            nome = (info.get("name") or "?").replace(".exe", "")
+            mem = getattr(info.get("memory_info"), "rss", 0) or 0
+            if mem:
+                uso[nome] = uso.get(nome, 0) + mem
+        except Exception:
+            continue
+    ordenado = sorted(uso.items(), key=lambda x: x[1], reverse=True)[:qtd]
+    return [(n, m / (1024 * 1024)) for n, m in ordenado]
+
+
+def worker_autodiagnostico():
+    espera = 60  # checa de minuto em minuto (barato); o AVISO e que e raro
+    while True:
+        time.sleep(espera)
+        try:
+            if not config.get("avisar_uso_critico", True):
+                _diag_estado["seguidas"] = 0
+                continue
             import psutil
+            lim_cpu = float(config.get("limite_cpu_aviso", 92))
+            lim_ram = float(config.get("limite_ram_aviso", 95))
+            folga = float(config.get("minutos_entre_avisos", 60)) * 60
+
             cpu = psutil.cpu_percent(interval=1)
             ram = psutil.virtual_memory().percent
-            if cpu > 90 or ram > 90:
-                aviso = f"[Autodiagnóstico]: uso crítico detectado -> CPU {cpu}% | RAM {ram}%"
-                print(f"\n{aviso}")
-                falar("Atenção, uso de CPU ou memória está crítico no seu PC.")
+            pior = max(cpu / lim_cpu, ram / lim_ram)
+
+            # voltou ao normal? (com margem, pra nao ficar oscilando na borda)
+            if cpu < lim_cpu - 8 and ram < lim_ram - 8:
+                _diag_estado["seguidas"] = 0
+                _diag_estado["normalizou"] = True
+                continue
+            if pior < 1.0:
+                _diag_estado["seguidas"] = 0
+                continue
+
+            # uso alto: so conta como problema se PERSISTIR
+            _diag_estado["seguidas"] += 1
+            if _diag_estado["seguidas"] < 3:
+                continue
+
+            agora = time.time()
+            nivel = max(cpu, ram)
+            desde_ultimo = agora - _diag_estado["ultimo_aviso"]
+            piorou = nivel >= _diag_estado["pico_avisado"] + 3
+            primeira_vez = _diag_estado["ultimo_aviso"] == 0.0
+            if not (primeira_vez or _diag_estado["normalizou"] or
+                    (desde_ultimo >= folga and piorou)):
+                continue  # ja avisei, nao mudou nada: fico quieto
+
+            quais = []
+            if cpu > lim_cpu:
+                quais.append(f"CPU {cpu:.0f}%")
+            if ram > lim_ram:
+                quais.append(f"RAM {ram:.0f}%")
+            linhas = ["", f"[Autodiagnostico]: {' e '.join(quais)} ha alguns minutos."]
+            if ram > lim_ram:
+                topo = _top_consumidores_ram(3)
+                if topo:
+                    linhas.append("   Quem mais come memoria agora: "
+                                  + ", ".join(f"{n} ({m:.0f} MB)" for n, m in topo))
+                linhas.append("   Resolve rapido: 'modo jogo' (fecha o que pesa) | "
+                              "'otimiza tudo' | 'arquivos grandes'")
+            else:
+                linhas.append("   Resolve rapido: 'programas abertos' | 'modo jogo' | 'otimiza tudo'")
+            linhas.append("   (nao aviso de novo tao cedo; para desligar: 'silenciar avisos')")
+            print("\n".join(linhas))
+            try:
+                print("\nO que o agente deve fazer no PC? ", end="", flush=True)
+            except Exception:
+                pass
+
+            if not _diag_estado["ja_falou"]:
+                try:
+                    falar("Atencao, o uso de memoria do PC esta alto.")
+                except Exception:
+                    pass
+                _diag_estado["ja_falou"] = True
+
+            _diag_estado["ultimo_aviso"] = agora
+            _diag_estado["pico_avisado"] = nivel
+            _diag_estado["normalizou"] = False
+            _diag_estado["seguidas"] = 0
         except ImportError:
             pass
         except Exception:
@@ -3028,6 +3128,8 @@ def _menu_ajuda_local():
     print("   tema escuro | tema claro | modo desempenho | modo economia")
     print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
     print("   status ............. mostra tudo (nuvem, IA local e dados do PC)")
+    print("   silenciar avisos ... desliga o aviso automatico de CPU/RAM alta")
+    print("                        ('ligar avisos' volta ao normal)")
     print("   ajuda .............. mostra este menu de novo")
     print("=================================================")
 
@@ -3375,6 +3477,25 @@ def _processar_cerebro_local(comando: str) -> bool:
             _rel("Tenho centenas de ferramentas: abrir programas/sites, otimizar e limpar o PC, "
                  "analisar saude/rede, organizar pastas, backup, arquivos, rede, energia e muito mais.")
         return True
+    # AVISOS DE USO CRITICO (CPU/RAM): liga/desliga o monitor de fundo.
+    if any(p in n for p in ("silenciaravisos", "desligaravisos", "desligaaviso",
+                            "pararavisos", "semavisos", "calaboca", "silenciaralertas",
+                            "desligaralertas", "chegadeavisos")):
+        config["avisar_uso_critico"] = False
+        salvar_json(ARQ_CONFIG, config)
+        _rel("Avisos de CPU/RAM alta DESLIGADOS. Nao te interrompo mais no meio da "
+             "digitacao. Para voltar: 'ligar avisos'. (Voce continua podendo checar "
+             "na hora com 'analise do pc' ou 'uso de cpu e ram'.)")
+        return True
+    if any(p in n for p in ("ligaravisos", "ativaravisos", "ligaaviso", "voltaravisos",
+                            "ligaralertas", "ativaralertas")):
+        config["avisar_uso_critico"] = True
+        salvar_json(ARQ_CONFIG, config)
+        _rel("Avisos de CPU/RAM alta LIGADOS de novo. So aviso se o uso passar do "
+             "limite e SE PERSISTIR por alguns minutos, e com no minimo 1 hora de "
+             "silencio entre um aviso e outro.")
+        return True
+
     # IDENTIDADE / ADMIN / PODERES: responde por REGRA (a IA neural mentia
     # dizendo que era "assistente de voz sem acesso ao sistema").
     try:
