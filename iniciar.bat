@@ -10,6 +10,16 @@ if errorlevel 1 (
     exit /b
 )
 
+REM ===== ATUALIZACAO AUTOMATICA DO AGENTE =====
+REM Baixa a versao mais nova do agente.py e do iniciar.bat direto do GitHub,
+REM assim voce NAO precisa mais copiar/colar arquivo nenhum. Se nao tiver
+REM internet (ou o download falhar), usa o arquivo que ja esta na pasta.
+REM Para pular a atualizacao uma vez, crie um arquivo chamado SEM_ATUALIZAR.txt
+if not exist "SEM_ATUALIZAR.txt" (
+    echo Verificando atualizacoes do agente...
+    powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/GUILHERMEFMAGA/SITE/arena/01a06a25-site/agente.py' -OutFile 'agente_novo.py' -UseBasicParsing -TimeoutSec 20; if ((Get-Item 'agente_novo.py').Length -gt 50000) { if (Test-Path 'agente.py') { Copy-Item 'agente.py' 'agente_backup.py' -Force }; Move-Item 'agente_novo.py' 'agente.py' -Force; Write-Host 'Agente atualizado para a versao mais nova.' } else { Remove-Item 'agente_novo.py' -ErrorAction SilentlyContinue; Write-Host 'Download incompleto; usando a versao atual.' } } catch { Write-Host 'Sem internet/falha ao baixar; usando a versao que ja esta aqui.' }"
+)
+
 REM Garante as bibliotecas das IAs (instala se faltar)
 python -c "import langchain_openai" 2>nul
 if errorlevel 1 (

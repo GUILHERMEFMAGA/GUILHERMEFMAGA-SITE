@@ -808,6 +808,7 @@ DEFAULT_CONFIG = {
     # a correcao vale na hora, sem o usuario precisar apagar nada.
     "nivel_permissao": "padrao",  # "basico" | "padrao" | "admin"
     "modo_voz": False,
+    "usar_ia_nuvem": True,  # interruptor do rodizio de IAs na nuvem: False = 100% local (sem API/cota/limite)
     "idioma_voz": "portuguese",
     "intervalo_autodiagnostico_minutos": 15,
     "tom_bem_humorado": True,  # deixa mensagens específicas com um toque de humor
@@ -2216,6 +2217,8 @@ def mostrar_status():
     print("=" * 50)
     print(f"Nível de permissão : {config.get('nivel_permissao')}")
     print(f"Modo voz           : {'ligado' if config.get('modo_voz') else 'desligado'}")
+    _nv = "LIGADA (rodizio de IAs)" if config.get("usar_ia_nuvem", True) else "DESLIGADA (modo 100% local, sem cota)"
+    print(f"IAs da nuvem       : {_nv}")
     _vivas = len(modelos_ia) - len([_i for _i in _ias_mortas if _i < len(modelos_ia)])
     print(f"IAs no rodizio     : {_vivas} ativa(s)")
     try:
@@ -2233,6 +2236,355 @@ def mostrar_status():
     print(f"Lembranças na memória de longo prazo: {len(memoria_longa)}")
     print(f"Tarefas agendadas  : {len(tarefas_agendadas)}")
     print("=" * 50)
+
+
+# ================= CEREBRO LOCAL (sem API, sem cota, sem limite) =================
+# Este e o "modo engenho": um roteador DETERMINISTICO (programado em regra) que
+# reconhece os comandos em portugues e chama as ferramentas DIRETO, sem nenhuma
+# chamada de IA na nuvem. Funciona SEM internet, sem chave e sem limite, e e
+# instantaneo. A nuvem (o rodizio de IAs) vira um INTERRUPTOR: voce liga quando
+# as cotas renovaram ('ligar ia') e desliga quando quiser ('desligar ia'). Com a
+# nuvem desligada, tudo o que o cerebro local entende roda 100% offline.
+
+def _norm_pt(s: str) -> str:
+    """Normaliza texto PT para casamento de regra: minusculo, sem acento, sem
+    pontuacao/espacos (fica tudo grudado, ex.: 'o que voce faz' -> 'oquevocefaz')."""
+    import re as _re
+    s = (s or "").lower()
+    for a, b in (("á", "a"), ("à", "a"), ("ã", "a"), ("â", "a"), ("ä", "a"),
+                 ("ç", "c"), ("é", "e"), ("ê", "e"), ("ë", "e"), ("í", "i"),
+                 ("ó", "o"), ("ô", "o"), ("õ", "o"), ("ö", "o"), ("ú", "u"), ("ü", "u")):
+        s = s.replace(a, b)
+    return _re.sub(r"[^a-z0-9]", "", s)
+
+
+# Sites que abrimos por nome (chute controlado so para nomes conhecidos).
+_SITES_LOCAIS = {
+    "youtube": "https://youtube.com", "yt": "https://youtube.com",
+    "google": "https://google.com", "gmail": "https://mail.google.com",
+    "whatsapp": "https://web.whatsapp.com", "whats": "https://web.whatsapp.com",
+    "zap": "https://web.whatsapp.com", "github": "https://github.com",
+    "instagram": "https://instagram.com", "insta": "https://instagram.com",
+    "facebook": "https://facebook.com", "face": "https://facebook.com",
+    "twitter": "https://x.com", "tiktok": "https://tiktok.com",
+    "twitch": "https://twitch.tv", "netflix": "https://netflix.com",
+    "amazon": "https://amazon.com", "mercado livre": "https://mercadolivre.com.br",
+    "mercadolivre": "https://mercadolivre.com.br", "google maps": "https://maps.google.com",
+    "maps": "https://maps.google.com", "chatgpt": "https://chat.openai.com",
+}
+
+
+def _achar_programa_local(alvo: str):
+    """Procura um PROGRAMA instalado de verdade (atalho no Menu Iniciar / .exe).
+    Devolve o caminho do executavel/atalho ou None. Nao chuta nada: se nao
+    achar, devolve None (e avisa o usuario em vez de abrir o programa errado)."""
+    alvo = alvo.strip().lower()
+    alvo_norm = _norm_pt(alvo)
+    if not alvo_norm:
+        return None
+    fontes = []
+    try:
+        fontes.append(os.path.join(os.environ.get("APPDATA", ""),
+                                   r"Microsoft\Windows\Start Menu\Programs"))
+    except Exception:
+        pass
+    try:
+        fontes.append(os.path.join(os.environ.get("ProgramData", r"C:\ProgramData"),
+                                   r"Microsoft\Windows\Start Menu\Programs"))
+    except Exception:
+        pass
+    achados = []
+    for base in fontes:
+        if not base or not os.path.isdir(base):
+            continue
+        for raiz, _dirs, arqs in os.walk(base):
+            for arq in arqs:
+                if arq.lower().endswith((".lnk", ".exe", ".appref-ms", ".url")):
+                    nome = os.path.splitext(arq)[0]
+                    nome_norm = _norm_pt(nome)
+                    if not nome_norm:
+                        continue
+                    pts = 0
+                    if nome_norm == alvo_norm:
+                        pts = 3
+                    elif nome_norm.startswith(alvo_norm):
+                        pts = 2
+                    elif alvo_norm in nome_norm:
+                        pts = 1
+                    if pts:
+                        achados.append((pts, len(nome_norm), os.path.join(raiz, arq)))
+    if not achados:
+        return None
+    achados.sort(key=lambda t: (-t[0], t[1]))
+    return achados[0][2]
+
+
+def _abrir_app_ou_site(alvo: str) -> str:
+    """Abre um PROGRAMA instalado (acha de verdade pelo Menu Iniciar) ou um SITE
+    conhecido/URL. Deterministico: so abre quando acha algo real; senao devolve
+    um aviso claro (nunca mais abre o programa errado por 'chute')."""
+    alvo = (alvo or "").strip().strip('"').strip("'").strip()
+    if not alvo:
+        return "NAO_ACHADO"
+    alvo_low = alvo.lower()
+    if alvo_low.startswith(("http://", "https://", "www.")):
+        url = alvo_low if alvo_low.startswith("http") else "https://" + alvo_low
+        subprocess.Popen(f'start "" "{url}"', shell=True)
+        return f"Site aberto: {url}"
+    prog = _achar_programa_local(alvo)
+    if prog:
+        try:
+            if os.name == "nt":
+                os.startfile(prog)
+            else:
+                subprocess.Popen(["xdg-open", prog])
+        except Exception:
+            subprocess.Popen(f'start "" "{prog}"', shell=True)
+        return f"PROGRAMA:{os.path.splitext(os.path.basename(prog))[0]}"
+    site = _SITES_LOCAIS.get(alvo_low)
+    if site:
+        subprocess.Popen(f'start "" "{site}"', shell=True)
+        return f"Site aberto: {site}"
+    if "." in alvo and " " not in alvo:
+        url = "https://" + alvo_low
+        subprocess.Popen(f'start "" "{url}"', shell=True)
+        return f"Site aberto: {url}"
+    return "NAO_ACHADO"
+
+
+def _invocar_local(nome_fn, **params):
+    """Chama uma ferramenta @tool do proprio agente DIRETO (sem IA/nuvem). Tenta
+    o wrapper LangChain (.invoke) e, se nao houver, chama a funcao crua."""
+    fn = globals().get(nome_fn)
+    if fn is None:
+        return f"(ferramenta '{nome_fn}' indisponivel)"
+    try:
+        inv = getattr(fn, "invoke", None)
+        if callable(inv):
+            return inv(params)
+    except Exception:
+        pass
+    try:
+        return fn(**params)
+    except Exception as e:
+        return f"(nao consegui executar '{nome_fn}': {type(e).__name__})"
+
+
+_INTRO_LOCAL = (
+    "Sou o Super Agente e rodo 100% no seu PC. Sem internet, sem cota e sem "
+    "limite eu faco: abrir programas e sites, otimizar e limpar o PC, ver "
+    "versao/uso de CPU e RAM, organizar pastas, esvaziar a lixeira, tirar print, "
+    "bloquear/desligar/reiniciar, controlar musica e volume, calcular, ver "
+    "cotacao/clima e muito mais. E so falar a acao. Para conversa solta ou "
+    "tarefas que eu ainda nao faco por regra, digite 'ligar ia' para usar as "
+    "IAs da nuvem enquanto as cotas estiverem disponiveis."
+)
+
+
+def _processar_cerebro_local(comando: str) -> bool:
+    """CEREBRO LOCAL: tenta resolver o comando por REGRA (sem nuvem). Retorna
+    True se tratou (imprimiu a saida); False se nao entendeu."""
+    cmd = comando.lower().strip()
+    n = _norm_pt(cmd)
+    if not n:
+        return False
+
+    def _rel(r):
+        r = str(r).strip()
+        print(f"\n[Local]: {r}")
+        try:
+            falar(r[:200])
+        except Exception:
+            pass
+        historico_conversas.append({"role": "assistant", "content": r})
+        try:
+            salvar_historico()
+        except Exception:
+            pass
+
+    # ---- Interruptor da nuvem (funciona sempre, ate com a nuvem desligada) ----
+    if n in ("ligaria", "ligarai", "ligarias", "ligarais", "ligarnuvem",
+             "nuvemligada", "usaria", "ligaia", "ligaias", "ligarmodoia"):
+        config["usar_ia_nuvem"] = True
+        salvar_json(ARQ_CONFIG, config)
+        print("\n[Nuvem]: IAs da nuvem LIGADAS. Agora eu uso o rodizio (Groq, GitHub etc.)")
+        print("        para conversa e tarefas que o cerebro local nao faz por regra.")
+        print("        Quando as cotas apertarem, digite 'desligar ia' para voltar ao")
+        print("        modo 100% local (sem limite).")
+        return True
+    if n in ("desligaria", "desligarai", "desligarias", "desligarais",
+             "desligarnuvem", "nuvemdesligada", "somentelocal",
+             "desligaia", "desligaias", "modolocal"):
+        config["usar_ia_nuvem"] = False
+        salvar_json(ARQ_CONFIG, config)
+        print("\n[Nuvem]: IAs da nuvem DESLIGADAS. Agora eu rodo 100% LOCAL: sem API,")
+        print("        sem cota e sem limite, instantaneo e offline. As acoes que eu")
+        print("        conheco por regra continuam funcionando; para conversa solta,")
+        print("        digite 'ligar ia' quando quiser voltar a usar a nuvem.")
+        return True
+
+    # ---- Conversa / saudações (resposta local, sem nuvem) ----
+    saud = ("ola", "oi", "oie", "ei", "iae", "eai", "eae", "eaew",
+            "salve", "falae", "fala", "hey", "hello", "hola", "bomdia", "boatarde",
+            "boanoite", "tudobem", "tudobom", "comovai", "deboa",
+            "blz", "beleza", "tranquilo", "firmeza")
+    if n in saud or n.startswith(("ola", "oie", "bomdia", "boatarde", "boanoite", "eai", "iae")):
+        _nome = ""
+        try:
+            _c = ler_memoria_core() if "ler_memoria_core" in globals() else ""
+            if _c and "Guilherme" in (_c or ""):
+                _nome = ", Guilherme"
+        except Exception:
+            _nome = ""
+        _rel(f"Oi{_nome}! Estou no modo local (sem limite). Mande uma acao, por "
+             "exemplo 'abre o youtube', 'otimiza tudo', 'qual a versao do windows' "
+             "ou 'organiza minha pasta de downloads'.")
+        return True
+    if ("oquevocefaz" in n or "quevocefaz" in n or "oquevoce" in n
+            or n in ("oquesuasfuncoes", "funcoes", "oquepossofazer", "quervoce")):
+        _rel(_INTRO_LOCAL)
+        return True
+    if n.startswith(("obrigad", "valeu", "vlw")) or n in ("obrigado", "obrigada", "valeu"):
+        _rel("De nada! Estou aqui no modo local. Precisa de mais alguma coisa?")
+        return True
+    if n.startswith(("tchau", "atelogo", "flw")) or n in ("tchau", "flw"):
+        _rel("Falou! Vou ficar por aqui. E so chamar quando precisar.")
+        return True
+
+    # ---- ABRIR programa / site ----
+    if any(p in cmd for p in ("abre", "abra", "abrir", "iniciar", "inicie", "executa", "execute")):
+        alvo = cmd
+        for pre in ("abra o", "abra a", "abre o", "abre a", "abrir o", "abrir a",
+                    "inicie o", "inicie a", "iniciar o", "iniciar a", "execute o",
+                    "execute a", "executa o", "executa a", "abra", "abre",
+                    "abrir", "inicie", "iniciar", "execute", "executa"):
+            if pre in alvo:
+                alvo = alvo.split(pre, 1)[-1]
+                break
+        alvo = alvo.strip()
+        for art in ("o ", "a ", "os ", "as ", "um ", "uma "):
+            while alvo.startswith(art):
+                alvo = alvo[len(art):].strip()
+        alvo = alvo.split(",")[0].split(" e ")[0].strip()
+        # 1o) tabela de atalhos EXATOS confiavel (calc, notepad, word, sites...).
+        _ach_atalho = None
+        for _frase in (f"abrir {alvo}", f"abre {alvo}", f"abra {alvo}", alvo, cmd):
+            if _frase in ATALHOS_PROGRAMAS:
+                _ach_atalho = ATALHOS_PROGRAMAS[_frase]
+                break
+        if _ach_atalho:
+            _exec, _nome = _ach_atalho
+            subprocess.Popen(_exec, shell=True)
+            _rel(f"{_nome} aberto (modo local, instantaneo).")
+            return True
+        # 2o) procura o programa REAL no Menu Iniciar ou o site conhecido.
+        res = _abrir_app_ou_site(alvo)
+        if res == "NAO_ACHADO":
+            print(f"\n[Local]: nao encontrei '{alvo}' instalado nem como site conhecido.")
+            print("        Se for um PROGRAMA, confira o nome exato (ex.: 'abre o Bambu")
+            print("        Studio'); se for um SITE, me passa o endereco que eu abro")
+            print("        (ex.: 'abre https://...'). (Com a nuvem ligada eu interpreto")
+            print("        melhor, mas nunca mais chuto um programa errado.)")
+            return True
+        if res.startswith("PROGRAMA:"):
+            _rel(f"{res.split(':', 1)[1]} aberto (modo local, instantaneo).")
+        else:
+            _rel(res)
+        return True
+
+    # ---- INFORMACOES do PC / versao / recursos ----
+    if any(p in cmd for p in ("qual e a versao", "qual a versao", "versao do windows",
+                              "versao do meu pc", "versão do windows", "minha versao",
+                              "versao do sistema", "qual windows", "vercao do")):
+        _rel(_invocar_local("central_sistema", acao="versao")); return True
+    if any(p in cmd for p in ("configuracao do pc", "configuracao do meu pc",
+                              "ficha tecnica", "especificacao", "especificacoes do pc",
+                              "info do pc", "informacoes do pc", "dados do pc", "meu pc tem")):
+        _rel(_invocar_local("central_sistema", acao="info_pc")); return True
+    if any(p in cmd for p in ("uso de cpu", "uso da cpu", "uso de ram", "uso de memoria",
+                              "como esta o pc", "como está o pc", "desempenho do pc",
+                              "cpu e ram", "temperatura", "recursos do pc",
+                              "consumo de memoria", "uso do sistema", "monitorar sistema")):
+        _rel(_invocar_local("monitorar_sistema")); return True
+    if any(p in cmd for p in ("espaco em disco", "espaco no disco", "quanto espaco",
+                              "disco cheio", "uso do disco", "armazenamento")):
+        _rel(_invocar_local("espaco_em_disco")); return True
+    if "bateria" in cmd or "carga do notebook" in cmd:
+        _rel(_invocar_local("central_sistema", acao="bateria")); return True
+
+    # ---- OTIMIZACAO / LIMPEZA / MEDICO / REDE ----
+    if any(p in cmd for p in ("otimiza tudo", "otimizar tudo", "otimizacao relampago",
+                              "otimização relâmpago", "turbinar o pc", "deixa o pc rapido",
+                              "deixa o pc mais rapido", "acelera o pc", "otimiza o pc")):
+        _rel(_invocar_local("otimizar_tudo")); return True
+    if any(p in cmd for p in ("medico do pc", "medica do pc", "check up do pc", "checkup do pc",
+                              "consertar o pc", "conserta o pc", "repara o pc", "diagnostico do pc")):
+        _rel(_invocar_local("medico_do_pc")); return True
+    if any(p in cmd for p in ("reparar internet", "consertar internet", "conserte a internet",
+                              "internet caiu", "sem internet", "rede caiu", "nao navega",
+                              "repara a internet", "arruma a internet")):
+        _rel(_invocar_local("reparar_internet")); return True
+    if any(p in cmd for p in ("limpar temp", "limpa temp", "limpar lixo", "limpa o lixo",
+                              "limpar arquivos temporarios", "limpeza rapida", "limpar temporarios")):
+        _rel(_invocar_local("central_sistema", acao="limpar_temp")); return True
+    if any(p in cmd for p in ("esvaziar lixeira", "esvazia a lixeira", "limpar lixeira",
+                              "esvazia lixeira")):
+        _rel(_invocar_local("esvaziar_lixeira")); return True
+
+    # ---- ORGANIZAR / LISTAR pastas e arquivos ----
+    if any(p in cmd for p in ("organizar pasta", "organiza a pasta", "organize a pasta",
+                              "organizar downloads", "organiza downloads", "organizar imagens",
+                              "organiza as fotos", "organizar fotos", "organiza minhas fotos",
+                              "arrumar pasta", "arruma a pasta", "organiza minha pasta")):
+        pasta = ""
+        if "download" in cmd:
+            pasta = os.path.join(os.path.expanduser("~"), "Downloads")
+        elif any(p in cmd for p in ("imagem", "imagens", "foto", "fotos", "pictures")):
+            pasta = os.path.join(os.path.expanduser("~"), "Pictures")
+        elif any(p in cmd for p in ("documento", "documentos")):
+            pasta = os.path.join(os.path.expanduser("~"), "Documents")
+        _rel(_invocar_local("organizar_pasta", caminho_pasta=pasta)); return True
+    if any(p in cmd for p in ("listar pasta", "lista a pasta", "lista os arquivos",
+                              "o que tem na pasta", "conteudo da pasta")):
+        _rel(_invocar_local("listar_pasta")); return True
+    if cmd.startswith(("encontra ", "encontrar ", "procura ", "procurar ", "localizar ")):
+        termo = cmd
+        for pre in ("encontra ", "encontrar ", "procura ", "procurar ", "localizar "):
+            if termo.startswith(pre):
+                termo = termo[len(pre):]; break
+        _rel(_invocar_local("encontrar_arquivo", nome_ou_parte=termo.strip())); return True
+
+    # ---- PRINT / CAPTURA de tela ----
+    if any(p in cmd for p in ("tira print", "tirar print", "captura a tela", "capturar tela",
+                              "print da tela", "screenshot", "tira uma foto da tela", "foto da tela")):
+        _rel(_invocar_local("capturar_tela_arquivo", nome="")); return True
+
+    # ---- ENERGIA: bloquear / desligar / reiniciar / suspender ----
+    if any(p in cmd for p in ("bloquear tela", "bloqueia a tela", "travar a tela", "tranca a tela")):
+        _rel(_invocar_local("controle_de_energia", acao="bloquear")); return True
+    if "cancela desligamento" in cmd or "cancelar desligamento" in cmd:
+        _rel(_invocar_local("controle_de_energia", acao="cancelar_desligamento")); return True
+    if any(p in cmd for p in ("desliga o pc", "desligar o pc", "desliga o computador",
+                              "desligar computador", "desliga essa maquina")):
+        _rel(_invocar_local("controle_de_energia", acao="desligar")); return True
+    if any(p in cmd for p in ("reinicia o pc", "reiniciar o pc", "reinicia o computador", "reiniciar computador")):
+        _rel(_invocar_local("controle_de_energia", acao="reiniciar")); return True
+    if any(p in cmd for p in ("suspende o pc", "suspender o pc", "modo dormir", "colocar pra dormir")):
+        _rel(_invocar_local("controle_de_energia", acao="suspender")); return True
+
+    return False
+
+
+def _chat_local_fallback(comando: str):
+    """Resposta de conversa quando a NUVEM esta desligada e o comando e papo."""
+    n = _norm_pt(comando)
+    if any(p in n for p in ("quevocefaz", "quevoce", "suasfuncoes", "oquepodefazer")):
+        return _INTRO_LOCAL
+    return ("Estou no modo LOCAL (sem nuvem, sem limite). Para ACOES eu faco na hora "
+            "(abrir programas/sites, otimizar, limpar, organizar pasta, ver versao/uso "
+            "do PC, print, bloquear/desligar, calculos, cotacao/clima). Para uma "
+            "conversa mais solta ou duvidas gerais, digite 'ligar ia' para ativar as "
+            "IAs da nuvem; quando as cotas renovarem, elas respondem isso tambem.")
 
 
 def processar_atalho_rapido(comando: str) -> bool:
@@ -2262,6 +2614,11 @@ def processar_atalho_rapido(comando: str) -> bool:
 
     if cmd == "status":
         mostrar_status()
+        return True
+
+    # CEREBRO LOCAL (sem API/cota/limite): tenta resolver por regra antes de
+    # qualquer chamada de nuvem. Funciona 100% offline e instantaneo.
+    if _processar_cerebro_local(comando):
         return True
 
     # --- Atalhos INSTANTANEOS (sem IA, resposta na hora) ---
@@ -2336,7 +2693,12 @@ def processar_atalho_rapido(comando: str) -> bool:
         falar("Feito.")
         return True
 
-    chave = cmd if cmd in ATALHOS_PROGRAMAS else resolver_atalho_por_similaridade(cmd)
+    # ABERTURA SEGURA: so usa atalho EXATO conhecido. NAO chuta por
+    # similaridade (isso abria o programa errado, ex.: 'Bambu Studio'->VS Code,
+    # 'Instagram'->Paint). Quem pede "abre <X>" ja foi tratado pelo cerebro local
+    # (que procura o programa REAL no Menu Iniciar ou o site). Aqui ficam so os
+    # atalhos exatos da tabela, que sao confiaveis.
+    chave = cmd if cmd in ATALHOS_PROGRAMAS else None
     if chave:
         executavel, nome_amigavel = ATALHOS_PROGRAMAS[chave]
         subprocess.Popen(executavel, shell=True)
@@ -2415,6 +2777,15 @@ def processar_atalho_rapido(comando: str) -> bool:
     _eh_tarefa = (any(p in _cmd_low for p in PALAVRAS_TAREFA_COMPLEXA)
                   or any(p and p in _cmd_norm for p in _tarefa_norm if len(p) >= 3))
     if _eh_conversa and not _eh_tarefa:
+        # Se a nuvem (rodizio de IAs) estiver DESLIGADA, responde no papo com
+        # texto local (sem API) - o agente nunca fica mudo e nao gasta cota.
+        if not config.get("usar_ia_nuvem", True):
+            _r = _chat_local_fallback(comando)
+            historico_conversas.append({"role": "user", "content": comando})
+            historico_conversas.append({"role": "assistant", "content": _r})
+            salvar_historico()
+            print(f"\n[Local]: {_r}")
+            return True
         # Contexto inteligente tambem no chat rapido: memoria central (fatos
         # permanentes do usuario) + licoes + memorias relevantes, bem curto.
         _blocos = []
@@ -2450,6 +2821,23 @@ def processar_atalho_rapido(comando: str) -> bool:
         registrar_memoria_longa(f"P: {comando} R: {resposta_texto}")
         print(f"\n[IA Direta]: {resposta_texto}")
         falar(resposta_texto)
+        return True
+
+    # Caiu aqui = nao foi atalho/conversa nem regra local: e uma TAREFA que
+    # dependeria do agente com ferramentas via IA. Se a nuvem estiver desligada,
+    # NAO tenta API: avisa que e modo local e da caminhos (comando local ou
+    # 'ligar ia'). Mantem o agente respondendo em vez de ficar mudo.
+    if not config.get("usar_ia_nuvem", True):
+        _msg = ("[Local]: esse comando eu nao faco por regra ainda, e a IA da nuvem "
+                "esta DESLIGADA (modo sem cota). Voce pode: 1) falar a acao de forma "
+                "direta (ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads', "
+                "'qual a versao do windows'); ou 2) digitar 'ligar ia' para ativar as "
+                "IAs da nuvem enquanto houver cota; depois 'desligar ia' volta ao local.")
+        print("\n" + _msg)
+        try:
+            falar(_msg[:200])
+        except Exception:
+            pass
         return True
 
     return False
