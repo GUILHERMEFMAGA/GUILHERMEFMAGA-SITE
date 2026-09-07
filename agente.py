@@ -2450,6 +2450,15 @@ def _abrir_app_ou_site(alvo: str) -> str:
         except Exception:
             subprocess.Popen(f'start "" "{prog}"', shell=True)
         return f"PROGRAMA:{os.path.splitext(os.path.basename(prog))[0]}"
+    # Apps com protocolo proprio (abre o APP instalado, nunca o navegador).
+    _an = _norm_pt(alvo)
+    _protocolos = {
+        "whatsapp": "whatsapp://", "zap": "whatsapp://", "whats": "whatsapp://",
+        "spotify": "spotify://", "telegram": "tg://", "discord": "discord://",
+    }
+    if _an in _protocolos:
+        subprocess.Popen(f'start "" "{_protocolos[_an]}"', shell=True)
+        return f"PROGRAMA:{alvo} (aplicativo instalado)"
     site = _SITES_LOCAIS.get(alvo_low)
     if site:
         subprocess.Popen(f'start "" "{site}"', shell=True)
@@ -2843,6 +2852,141 @@ def _abrir_e_tocar_spotify(termo: str = "") -> str:
 
 
 
+
+# ================= CONTROLE DE CONFIGURACOES / SISTEMA (com SIM/NAO) =================
+
+def _abrir_painel_config(uri: str, nome: str) -> str:
+    """Abre um painel das Configuracoes do Windows (ms-settings:)."""
+    try:
+        subprocess.Popen(f'start ms-settings:{uri}', shell=True)
+        return f"Painel '{nome}' das Configuracoes do Windows aberto."
+    except Exception as e:
+        return f"Nao consegui abrir '{nome}' ({type(e).__name__})."
+
+
+def _ajustar_pc(acao: str, valor: str = "") -> str:
+    """Altera uma CONFIGURACAO do PC ou RESOLVE um problema do sistema.
+    Sempre pergunta SIM/NAO antes de aplicar (acoes que mudam o sistema);
+    apenas ABRIR um painel nao precisa de confirmacao. Reaproveita as
+    ferramentas de sistema que ja existem (que tambem confirmam por seguranca).
+    'acao' ja vem normalizada (chave canonica)."""
+    a = (acao or "").strip().lower()
+    v = (valor or "").strip()
+
+    # ---- 1) ABRIR Paineis (so abre, nao altera) ----
+    paineis = {
+        "abre_wifi": ("network-wifi", "Wi-Fi/Internet"),
+        "abre_bluetooth": ("bluetooth", "Bluetooth"),
+        "abre_som": ("sound", "Som"),
+        "abre_tela": ("display", "Tela/Vídeo"),
+        "abre_notificacoes": ("notifications", "Notificações"),
+        "abre_apps": ("appsfeatures", "Aplicativos"),
+        "abre_atualizacoes": ("windowsupdate", "Windows Update"),
+        "abre_armazenamento": ("storagesense", "Armazenamento"),
+        "abre_privacidade": ("privacy", "Privacidade"),
+        "abre_energia": ("powersleep", "Energia/Suspensão"),
+        "abre_inicializacao": ("startupapps", "Inicialização"),
+        "abre_sobre": ("about", "Sobre o PC"),
+        "abre_hora": ("dateandtime", "Data e hora"),
+        "abre_idioma": ("regionlanguage", "Idioma/Região"),
+    }
+    if a in paineis:
+        uri, nome = paineis[a]
+        return _abrir_painel_config(uri, nome)
+
+    # ---- 2) ALTERAR / RESOLVER ----
+    # Despacha para as ferramentas de sistema, que JA pedem SIM/NAO sozinhas
+    # (_confirma_poderoso / pedir_confirmacao) - assim nao perguntamos 2 vezes.
+    try:
+        if a == "wifi_liga":
+            return _invocar_local("gerenciar_adaptador_rede", acao="ligar", nome="Wi-Fi")
+        if a == "wifi_desliga":
+            return _invocar_local("gerenciar_adaptador_rede", acao="desligar", nome="Wi-Fi")
+        if a == "hibernacao_desliga":
+            return _invocar_local("desligar_hibernacao", acao="desligar")
+        if a == "inicio_rapido_desliga":
+            return _invocar_local("desligar_inicio_rapido", acao="desligar")
+        if a == "firewall_liga":
+            return _invocar_local("desligar_ligar_firewall", ligar=True)
+        if a == "firewall_desliga":
+            return _invocar_local("desligar_ligar_firewall", ligar=False)
+        if a == "reparar_internet":
+            return _invocar_local("reparar_internet")
+        if a == "medico_pc":
+            return _invocar_local("medico_do_pc")
+        if a == "reparar_windows":
+            return _invocar_local("reparar_windows")
+        if a == "otimizar_tudo":
+            return _invocar_local("otimizar_tudo")
+        if a in ("limpar_temp", "liberar_espaco"):
+            return _invocar_local("central_sistema", acao="limpar_temp")
+        if a == "atualizar_windows":
+            return _invocar_local("atualizar_windows")
+        if a == "atualizar_defender":
+            return _invocar_local("atualizar_defender")
+        if a == "plano_desempenho":
+            return _invocar_local("otimizar_sistema", acao="plano_energia_desempenho")
+        if a == "plano_economia":
+            return _invocar_local("otimizar_sistema", acao="plano_energia_economia")
+    except Exception as e:
+        return f"Tentei aplicar, mas houve um problema: {type(e).__name__}."
+    return ("Nao reconheci essa configuracao. Tente: 'liga/desliga wifi', 'abre bluetooth', "
+            "'desliga hibernacao', 'liga/desliga firewall', 'repara internet', 'medico do pc', "
+            "'reparar windows', 'atualiza o windows', 'plano desempenho'/'plano economia', ou 'ajuda'.")
+
+
+def _interpretar_ajuste_pc(cmd: str):
+    """Traduz o comando em texto do usuario para a chave canonica de _ajustar_pc.
+    Devolve (chave, valor) ou None se nao for um ajuste de configuracao/sistema."""
+    c = cmd.lower()
+    # ---- ABRIR paineis ----
+    abre = [
+        (("abre o wifi", "abre wifi", "abrir wifi", "configuracao de wifi", "config de rede", "abre a rede"), "abre_wifi"),
+        (("abre o bluetooth", "abre bluetooth", "abrir bluetooth", "configuracao de bluetooth"), "abre_bluetooth"),
+        (("abre o som", "configuracao de som", "abre som", "ajustes de som"), "abre_som"),
+        (("abre as configuracoes", "abre configuracoes", "abre a configuracao", "abre o painel de configuracao"), None),
+        (("configuracao de tela", "abre a tela", "ajuste de tela", "config de video", "abre video"), "abre_tela"),
+        (("configuracao de notificacao", "abre notificacoes", "ajuste de notificacao"), "abre_notificacoes"),
+        (("configuracao de apps", "abre aplicativos", "abre apps", "gerenciar apps"), "abre_apps"),
+        (("abre o windows update", "configuracao de atualizacao", "abre atualizacoes do windows"), "abre_atualizacoes"),
+        (("configuracao de armazenamento", "abre armazenamento"), "abre_armazenamento"),
+        (("configuracao de privacidade", "abre privacidade"), "abre_privacidade"),
+        (("configuracao de energia", "opcoes de energia", "abre energia"), "abre_energia"),
+        (("inicializacao do windows", "abre inicializacao", "programas de inicializacao"), "abre_inicializacao"),
+        (("sobre o pc", "informacoes do sistema nas configuracoes"), "abre_sobre"),
+        (("configuracao de data", "abre data e hora"), "abre_hora"),
+        (("configuracao de idioma", "abre idioma"), "abre_idioma"),
+    ]
+    for frases, chave in abre:
+        if any(f in c for f in frases):
+            return (chave if chave else "_abre_settings_", "")
+
+    # ---- LIGAR/DESLIGAR wi-fi (checa DESLIGAR primeiro: "desligar" contem "ligar") ----
+    if any(x in c for x in ("desliga o wifi", "desligar wifi", "desligar o wifi", "desliga wifi",
+                            "desativa o wifi", "desconecta o wifi", "desligar wi-fi", "desliga o wi-fi",
+                            "desligue o wifi", "desligue o wi-fi")):
+        return ("wifi_desliga", "")
+    if any(x in c for x in ("liga o wifi", "ligar wifi", "ligar o wifi", "ativa o wifi", "liga wifi",
+                            "ligar wi-fi", "liga o wi-fi", "ligue o wifi", "ligue o wi-fi", "conecta o wifi")):
+        return ("wifi_liga", "")
+    # ---- Hibernacao / inicio rapido / firewall (toggles reais) ----
+    if "hibernac" in c and ("desliga" in c or "desative" in c or "desligar" in c):
+        return ("hibernacao_desliga", "")
+    if ("inicio rapido" in c or "inicializacao rapida" in c) and ("desliga" in c or "desative" in c):
+        return ("inicio_rapido_desliga", "")
+    if "firewall" in c or "fire wall" in c:
+        if any(x in c for x in ("liga", "ative", "ligar", "religa")):
+            return ("firewall_liga", "")
+        if any(x in c for x in ("desliga", "desative", "desligar")):
+            return ("firewall_desliga", "")
+    # ---- Bluetooth liga/desliga (abre o painel; o toggle fica a 1 clique) ----
+    if "bluetooth" in c and ("liga" in c or "ativa" in c or "ligar" in c or "desliga" in c or "desativa" in c):
+        return ("abre_bluetooth", "")
+
+    return None
+
+
+
 def _menu_ajuda_local():
     """Mostra um menu com TUDO o que o agente faz no modo local e como ligar a
     IA neural local e a nuvem - para o usuario nunca ficar perdido."""
@@ -2867,6 +3011,8 @@ def _menu_ajuda_local():
     print("   ver a tela | ver ideias | anota a ideia ... | analisa teu codigo")
     print("   salvar contato Nome: numero | meus contatos | manda whatsapp pro <nome>: msg")
     print("   Spotify: 'tocar <musica>', 'spotify pausar/proxima/aleatorio/repetir/curtir'")
+    print("   Config/PC: 'abre bluetooth/som/wifi/tela/atualizacoes', 'liga/desliga wifi',")
+    print("             'desliga hibernacao', 'liga/desliga firewall', 'repara internet'")
     print("   tira print | bloquear tela | desligar o pc | reiniciar o pc")
     print("   tema escuro | tema claro | modo desempenho | modo economia")
     print("   qual a versao do windows | ficha tecnica do pc | uso de cpu e ram")
@@ -2974,6 +3120,21 @@ def _processar_cerebro_local(comando: str) -> bool:
     if n.startswith(("tchau", "atelogo", "flw")) or n in ("tchau", "flw"):
         _rel("Falou! Vou ficar por aqui. E so chamar quando precisar.")
         return True
+
+    # ---- CONFIGURACOES DO PC / RESOLVER SISTEMA (local, com sim/nao) ----
+    # Traduz o comando e despacha: paineis abrem direto; mudancas/ligar-desligar
+    # passam pelas ferramentas de sistema, que ja pedem SIM/NAO. Tudo local.
+    try:
+        _aj = _interpretar_ajuste_pc(comando)
+    except Exception:
+        _aj = None
+    if _aj:
+        _chave, _valor = _aj
+        if _chave == "_abre_settings_":
+            subprocess.Popen("start ms-settings:", shell=True)
+            _rel("Configuracoes do Windows abertas.")
+            return True
+        _rel(_ajustar_pc(_chave, _valor)); return True
 
     # ---- ABRIR programa / site ----
     _verbos_abrir = ("abre", "abra", "abrir", "abri", "inicie", "inicia",
