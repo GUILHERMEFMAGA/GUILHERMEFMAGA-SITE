@@ -1443,7 +1443,12 @@ except Exception:
     _tem_proxy_sistema = False
 _tem_proxy_env = bool(os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY")
                       or os.environ.get("http_proxy") or os.environ.get("https_proxy"))
-if not (_tem_proxy_env or _tem_proxy_sistema):
+_nuvem_ligada_no_boot = True
+try:
+    _nuvem_ligada_no_boot = bool(config.get("usar_ia_nuvem", True))
+except Exception:
+    _nuvem_ligada_no_boot = True
+if _nuvem_ligada_no_boot and not (_tem_proxy_env or _tem_proxy_sistema):
     import socket as _socket
     _hosts_unicos = []
     for _mm in modelos_ia:
@@ -1462,17 +1467,23 @@ if not (_tem_proxy_env or _tem_proxy_sistema):
             print(f"       servidor falha (e outros, como o Groq, funcionam), libere esse")
             print(f"       endereco no seu antivirus/firewall ou teste outra rede.")
 
-print(" IAs ativas no rodizio:")
-_num = 0
-for _i, _mm in enumerate(modelos_ia):
-    if _i in _ias_mortas:
-        continue  # morta persistida de outra sessao: nao lista como ativa
-    _num += 1
-    _aviso = "   [servidor sem conexao agora]" if _host_em_cooldown(_i) else ""
-    print(f"   {_num}. {_mm['nome']}{_aviso}")
-_puladas = [_mm["nome"] for _i, _mm in enumerate(modelos_ia) if _i in _ias_mortas]
-if _puladas:
-    print(f"   ({len(_puladas)} IA(s) ja marcada(s) como indisponivel antes - digite 'revalidar' para testa-las de novo)")
+if not _nuvem_ligada_no_boot:
+    # MODO LOCAL: nao testa servidor de nuvem nenhum (abre mais rapido e sem
+    # erro de rede na tela). O rodizio so e checado quando voce 'ligar ia'.
+    print(" Nuvem DESLIGADA: pulei o teste dos servidores (abertura mais rapida).")
+    print("   Tudo roda no seu PC. Para usar o rodizio de IAs, digite: ligar ia")
+else:
+    print(" IAs ativas no rodizio:")
+    _num = 0
+    for _i, _mm in enumerate(modelos_ia):
+        if _i in _ias_mortas:
+            continue  # morta persistida de outra sessao: nao lista como ativa
+        _num += 1
+        _aviso = "   [servidor sem conexao agora]" if _host_em_cooldown(_i) else ""
+        print(f"   {_num}. {_mm['nome']}{_aviso}")
+    _puladas = [_mm["nome"] for _i, _mm in enumerate(modelos_ia) if _i in _ias_mortas]
+    if _puladas:
+        print(f"   ({len(_puladas)} IA(s) ja marcada(s) como indisponivel antes - digite 'revalidar' para testa-las de novo)")
 
 # Memória semântica de verdade: usa embeddings do Gemini pra comparar
 # SIGNIFICADO, não só texto parecido. Se a API de embeddings falhar por
@@ -3364,6 +3375,16 @@ def _processar_cerebro_local(comando: str) -> bool:
             _rel("Tenho centenas de ferramentas: abrir programas/sites, otimizar e limpar o PC, "
                  "analisar saude/rede, organizar pastas, backup, arquivos, rede, energia e muito mais.")
         return True
+    # IDENTIDADE / ADMIN / PODERES: responde por REGRA (a IA neural mentia
+    # dizendo que era "assistente de voz sem acesso ao sistema").
+    try:
+        _eh_ident = _pergunta_de_identidade(comando)
+    except Exception:
+        _eh_ident = False
+    if _eh_ident:
+        _rel(_resposta_identidade())
+        return True
+
     # OPNIAO PROPRIA / SUGESTOES DE NOVAS FUNCOES: o que ele gostaria de ter,
     # ideias de ferramentas, como melhorar. Usa a ferramenta de opinioes (ja
     # existente) e, se a IA neural estiver pronta, pergunta a ela tambem.
@@ -3865,6 +3886,109 @@ def _contexto_pc() -> str:
     return _cache_contexto_pc
 
 
+# ================= IDENTIDADE / PODERES (resposta por REGRA, nunca inventada) =================
+# A IA neural e pequena e, por treino, costuma dizer que e "assistente de voz"
+# e que "nao tem acesso ao sistema". Isso e MENTIRA neste agente: ele roda como
+# ADMINISTRADOR e executa de verdade. Entao perguntas sobre admin/poderes/quem
+# e voce sao respondidas por REGRA (determinista), sem passar pela neural.
+
+def _resposta_identidade() -> str:
+    """Resposta factual sobre quem o agente e e que poderes ele tem."""
+    try:
+        _n_tools = len(tools)
+    except Exception:
+        _n_tools = 0
+    nivel = "admin"
+    try:
+        nivel = config.get("nivel_permissao", "admin")
+    except Exception:
+        pass
+    partes = [
+        "SIM, eu tenho acesso de ADMINISTRADOR neste PC (nivel de permissao: "
+        f"'{nivel}'). O iniciar.bat me abre elevado, entao eu executo de verdade.",
+        "Eu nao sou 'assistente de voz' nem um chat sem maos: eu sou o Super Agente PC, "
+        f"um programa que roda 100% no seu computador com {_n_tools} ferramentas reais.",
+        "O que eu faco de fato: abrir/fechar qualquer programa (inclusive apps da Loja, "
+        "Brave, Spotify, WhatsApp), mexer nas configuracoes do Windows (Wi-Fi, firewall, "
+        "hibernacao, inicio rapido, energia, tema), reparar internet, otimizar/limpar, "
+        "atualizar o Windows, organizar pastas, achar arquivos grandes, desinstalar em "
+        "lote, modo jogo, ver a tela, mandar WhatsApp e controlar o Spotify.",
+        "Toda mudanca no sistema pede sua permissao (sim/nao) antes de rodar.",
+    ]
+    try:
+        partes.append("Dados deste PC: " + _contexto_pc())
+    except Exception:
+        pass
+    return " ".join(partes)
+
+
+# Trechos (ja normalizados, sem espaco/acento) que denunciam pergunta sobre
+# identidade/poderes/permissao do agente.
+_IDENTIDADE_TRECHOS = (
+    "acessoaoadmin", "acessoadmin", "acessoaoadministrador", "acessoadministrador",
+    "acessodeadmin", "temadmin", "temoadmin", "eadmin", "voceeadmin", "vceadmin",
+    "voceeadministrador", "vceadministrador", "rodacomoadmin", "estacomoadmin",
+    "permissaodeadmin", "permissaodeadministrador", "privilegiodeadmin",
+    "nivelpermissao", "niveldepermissao", "temacessoaosistema", "temacessoaomeupc",
+    "temacessoaomeucomputador", "temacessoaopc", "temcontroledopc", "temcontroletotal",
+    "controlameupc", "controlaomeupc", "vocecontrolameupc", "podecontrolarmeupc",
+    "podemexernomeupc", "podemexernosistema", "conseguemexernomeupc",
+    "quemevoce", "voceequem", "oqueevoce", "voceeumaia", "voceeumassistentedevoz",
+    "vocetempoder", "quaisseuspoderes", "voceconsegueexecutar", "vocepodeexecutar",
+    "vceumaia", "voceeumaia", "vceumia", "tueumaia", "voceeumrobo", "vceumrobo",
+    "voceeumprograma", "vceumprograma", "vcequem", "vceoque",
+)
+
+
+def _pergunta_de_identidade(cmd: str) -> bool:
+    """True se o usuario perguntou sobre admin/permissao/poderes/quem e voce."""
+    n = _norm_pt(cmd)
+    if not n:
+        return False
+    try:
+        if _parece_pedido_de_acao(cmd):
+            return False   # 'abre o painel de controle' e ACAO, nao pergunta
+    except Exception:
+        pass
+    if any(t in n for t in _IDENTIDADE_TRECHOS):
+        return True
+    # Rede de seguranca: fala de admin/permissao referindo-se a VOCE (o agente).
+    if ("admin" in n or "permissao" in n or "privilegio" in n):
+        if any(x in n for x in ("voce", "vc", "tu", "teu", "seu", "tem", "pode", "consegue")):
+            return True
+    return False
+
+
+# Frases de RECUSA que a IA neural as vezes solta (treino generico). Se
+# aparecerem, a resposta e descartada: ela esta mentindo sobre o proprio agente.
+_FRASES_RECUSA = (
+    "assistente de voz", "assistente virtual de voz", "nao tenho acesso",
+    "nao tenho permissao", "nao posso executar", "nao consigo executar",
+    "nao tenho controle", "nao consigo acessar", "nao tenho a capacidade",
+    "nao sou capaz de", "nao posso confirmar", "nao posso realizar",
+    "nao posso interagir", "nao tenho acesso direto", "sou apenas um",
+    "sou apenas uma", "como modelo de linguagem", "modelo de linguagem",
+    "como uma inteligencia artificial, nao", "nao tenho acesso ao sistema",
+    "nao posso acessar", "nao tenho como acessar", "nao tenho maos",
+    "sou um assistente de texto", "nao tenho permissoes administrativas",
+    "nao consigo confirmar", "nao consigo verificar", "nao consigo saber",
+    "nao tenho como verificar", "nao tenho como saber", "nao posso verificar",
+    "nao consigo abrir", "nao posso abrir programas", "nao consigo controlar",
+    "nao tenho acesso a informacoes", "nao estou conectado ao seu",
+)
+
+
+def _eh_recusa_neural(txt: str) -> bool:
+    """True se a resposta da neural nega ter admin/controle (mentira aqui)."""
+    if not txt:
+        return False
+    t = (txt or "").lower()
+    for a, b in (("á","a"),("à","a"),("ã","a"),("â","a"),("ç","c"),("é","e"),
+                 ("ê","e"),("í","i"),("ó","o"),("ô","o"),("õ","o"),("ú","u")):
+        t = t.replace(a, b)
+    return any(f in t for f in _FRASES_RECUSA)
+
+
 # Verbos de acao que, SEM terem sido tratados por uma regra, indicam que o
 # usuario pediu uma ACAO no PC (nao e conversa) - usamos para NAO mandar isso
 # para a IA neural (ela nao executa nada e inventaria uma resposta).
@@ -3900,37 +4024,36 @@ def _parece_pedido_de_acao(cmd: str) -> bool:
     return False
 
 
-def perguntar_ia_local(pergunta: str, historico=None) -> str:
-    """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
-    resposta em texto. Levanta excecao se algo falhar (o chamador trata)."""
-    import urllib.request
-    _sys = (
-        "Voce e o Super Agente, um assistente pessoal brasileiro que roda 100% "
-        "local no PC do usuario, COM PRIVILEGIOS DE ADMINISTRADOR e controle total "
-        "do Windows (abrir/fechar programas, otimizar, limpar, configurar, etc.). "
-        "Fale portugues do Brasil de forma clara, segura, com personalidade e "
-        "opiniao propria (pode dar sugestoes do que melhorar no PC e de novas "
-        "ferramentas), sem emoji. IMPORTANTE: voce NAO executa a acao voce mesmo - "
-        "quem executa e o sistema de comandos. Por isso, NUNCA diga que executou, "
-        "que '[executa a acao]' ou que fez algo no PC. Se o usuario pedir uma ACAO, "
-        "responda curto dizendo que e so falar o comando direto que voce faz "
-        "(ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads', 'atualiza o "
-        "windows', 'abre configuracao'); e NUNCA afirme que nao tem admin ou que "
-        "nao pode mexer no sistema - voce roda como administrador. Para conversa, "
-        "duvidas e explicacoes, responda de forma util. Raciocine com calma e passo "
-        "a passo em assuntos tecnicos: analise, considere opcoes e de a melhor "
-        "resposta pratica. Para 'o que voce gostaria de ter / nova funcao', de "
-        "opiniao propria com ideias uteis de verdade. DADOS DESTE PC: "
-        + _contexto_pc()
+def _sys_ia_local() -> str:
+    """Prompt de sistema da IA neural local (curto = mais rapido)."""
+    return (
+        "Voce e o Super Agente PC: um PROGRAMA que roda 100% local no PC do "
+        "usuario (Guilherme), no Windows, COM PRIVILEGIOS DE ADMINISTRADOR e "
+        "controle total da maquina. Voce NAO e um 'assistente de voz', NAO e um "
+        "chatbot generico e NAO e um modelo sem acesso: o sistema em que voce "
+        "esta embutido executa comandos reais no Windows como admin (abrir e "
+        "fechar programas, configuracoes, Wi-Fi, firewall, energia, limpeza, "
+        "reparos, WhatsApp, Spotify, print da tela). "
+        "REGRA 1: NUNCA diga que nao tem acesso, permissao, admin ou controle do "
+        "PC - isso e falso aqui; se perguntarem, confirme que voce roda como "
+        "administrador. "
+        "REGRA 2: quem aperta os botoes e o motor de comandos, nao voce; entao "
+        "NUNCA diga que ja executou algo nem escreva '[executa a acao]'. Se "
+        "pedirem uma ACAO, responda curto: e so falar o comando (ex.: 'abre o "
+        "spotify', 'otimiza tudo', 'desliga o wifi', 'ver a tela'). "
+        "REGRA 3: toda mudanca no sistema pede sim/nao ao usuario antes. "
+        "Fale portugues do Brasil, direto, sem emoji, com personalidade e "
+        "opiniao propria. Raciocine passo a passo em assunto tecnico e de a "
+        "resposta pratica. DADOS DESTE PC: " + _contexto_pc()
     )
-    msgs = [{"role": "system", "content": _sys}]
-    for m in (historico or [])[-6:]:
-        if m.get("role") in ("user", "assistant") and m.get("content"):
-            msgs.append({"role": m["role"], "content": str(m["content"])[:1500]})
-    msgs.append({"role": "user", "content": pergunta})
+
+
+def _chamar_neural(msgs, max_tokens=350, temperatura=0.5) -> str:
+    """POST cru no servidor local (llama.cpp/OpenAI-compativel)."""
+    import urllib.request
     corpo = json.dumps({
-        "model": "local", "messages": msgs, "temperature": 0.5,
-        "max_tokens": 350, "stream": False,
+        "model": "local", "messages": msgs, "temperature": temperatura,
+        "max_tokens": max_tokens, "stream": False,
         "top_p": 0.9, "repeat_penalty": 1.05,
     }).encode("utf-8")
     req = urllib.request.Request(_url_ia_local + "/v1/chat/completions",
@@ -3942,6 +4065,51 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
     return (data["choices"][0]["message"]["content"] or "").strip()
 
 
+def perguntar_ia_local(pergunta: str, historico=None) -> str:
+    """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
+    resposta em texto. Levanta excecao se algo falhar (o chamador trata).
+
+    Duas travas importantes:
+      1) LIMPEZA DO HISTORICO: respostas antigas em que a IA negou ter admin
+         ('sou um assistente de voz...') sao DESCARTADAS do contexto, senao ela
+         le o proprio erro e repete a mentira pra sempre.
+      2) FILTRO ANTI-RECUSA: se mesmo assim ela negar ter acesso/admin, a
+         resposta e refeita com uma correcao dura; persistindo, devolvemos a
+         resposta factual por regra (_resposta_identidade)."""
+    msgs = [{"role": "system", "content": _sys_ia_local()}]
+    for m in (historico or [])[-6:]:
+        if m.get("role") not in ("user", "assistant"):
+            continue
+        conteudo = str(m.get("content") or "")
+        if not conteudo:
+            continue
+        # trava 1: nao realimenta a neural com a propria recusa
+        if m.get("role") == "assistant" and _eh_recusa_neural(conteudo):
+            continue
+        msgs.append({"role": m["role"], "content": conteudo[:1500]})
+    msgs.append({"role": "user", "content": pergunta})
+
+    resposta = _chamar_neural(msgs)
+
+    # trava 2: recusou? corrige e tenta de novo (uma vez).
+    if _eh_recusa_neural(resposta):
+        msgs2 = list(msgs)
+        msgs2.append({"role": "assistant", "content": resposta})
+        msgs2.append({"role": "user", "content":
+                      "Isso esta ERRADO. Voce roda neste PC como ADMINISTRADOR e o "
+                      "sistema executa comandos reais no Windows. Responda de novo, "
+                      "curto, confirmando que tem acesso de administrador e dizendo o "
+                      "que da pra fazer. Nao repita que e assistente de voz nem que "
+                      "nao tem acesso."})
+        try:
+            resposta2 = _chamar_neural(msgs2, max_tokens=250, temperatura=0.3)
+        except Exception:
+            resposta2 = ""
+        if resposta2 and not _eh_recusa_neural(resposta2):
+            return resposta2
+        # insistiu na mentira: entrega o fato por regra.
+        return _resposta_identidade()
+    return resposta
 
 
 def _chat_local_fallback(comando: str):
