@@ -2054,7 +2054,7 @@ threading.Thread(target=worker_agendador, daemon=True).start()
 # leitura) e, se estiver errado, avisamos e deixamos um ATUALIZAR_INICIAR.bat
 # pronto na pasta - dois cliques e resolve, sem digitar comando nenhum.
 URL_AGENTE_OFICIAL = ("https://raw.githubusercontent.com/GUILHERMEFMAGA/"
-                      "GUILHERMEFMAGA-SITE/arena/01a07ce2-guilhermefmaga-site/agente.py")
+                      "GUILHERMEFMAGA-SITE/arena/01a082fd-guilhermefmaga-site/agente.py")
 URL_INICIAR_OFICIAL = URL_AGENTE_OFICIAL.replace("/agente.py", "/iniciar.bat")
 
 
@@ -2210,10 +2210,7 @@ def worker_autodiagnostico():
                 linhas.append("   Resolve rapido: 'programas abertos' | 'modo jogo' | 'otimiza tudo'")
             linhas.append("   (nao aviso de novo tao cedo; para desligar: 'silenciar avisos')")
             print("\n".join(linhas))
-            try:
-                print("\nO que o agente deve fazer no PC? ", end="", flush=True)
-            except Exception:
-                pass
+            print("   (aviso em segundo plano; a pergunta anterior continua aguardando resposta)")
 
             if not _diag_estado["ja_falou"]:
                 try:
@@ -6902,9 +6899,25 @@ def _executar_objetivo(objetivo: str) -> bool:
     return True
 
 
+def _eh_pergunta_de_conversa(comando: str) -> bool:
+    """Perguntas explicativas nao autorizam a busca/execucao de ferramentas."""
+    import re
+    import unicodedata
+    texto = "".join(c for c in unicodedata.normalize("NFD", comando.lower())
+                    if unicodedata.category(c) != "Mn")
+    texto = re.sub(r"[^a-z0-9 ]", " ", texto)
+    texto = " ".join(texto.split())
+    return bool(re.match(
+        r"^(?:o ?que|oq|como|por ?que|qual|quais|quem|quando|onde|quanto|quantas|quantos)\b",
+        texto)) or texto.startswith(("me explica", "me explique", "explique", "explica"))
+
+
 def _despachar_ferramenta_local(comando: str) -> bool:
     """ULTIMA CARTADA do cerebro local: procura a ferramenta certa entre TODAS
     e executa, sempre confirmando antes. True se tratou o comando."""
+    # Sem intencao de acao, uma coincidencia de palavras nao basta.
+    if _eh_pergunta_de_conversa(comando) or not _parece_pedido_de_acao(comando):
+        return False
     try:
         achados = _buscar_ferramentas(comando, 3)
     except Exception:
@@ -7668,7 +7681,7 @@ def _processar_cerebro_local(comando: str) -> bool:
     # MENU DE AJUDA: mostra tudo (como ligar IA local/nuvem e exemplos).
     if n in ("ajuda", "menu", "comandos", "help", "opcoes", "oqueeufaco",
              "comouso", "comoeuuso", "comousoagente", "comousar", "comoeuvouso",
-             "ajudame", "meajuda", "precisodeajuda", "ialocal", "oquesabe",
+             "ajudame", "meajuda", "precisodeajuda", "oquesabe",
              "ial", "opcoesdoagente", "listadecomandos", "manual", "oquepossofazer",
              "quaiscomandos", "mostramenu", "verajuda", "socorro"):
         _menu_ajuda_local()
@@ -7732,6 +7745,19 @@ def _processar_cerebro_local(comando: str) -> bool:
             print("\n[IA Local]: motor local encerrado (as acoes por regra continuam).")
         else:
             print("\n[IA Local]: o motor local nao estava rodando.")
+        return True
+
+    # Ajuda dos modos nao deve abrir o seletor de ferramentas nem mudar
+    # configuracoes implicitamente: uma pergunta nao e uma autorizacao.
+    if n in ("ianuvem", "ialocal") or (
+            _eh_pergunta_de_conversa(comando)
+            and any(x in n for x in ("ialocal", "ianuvem", "iadanuvem"))):
+        _rel("A IA local conversa no seu PC usando o modelo instalado, sem chave "
+             "de API externa nem cobranca por chamada. A nuvem usa provedores "
+             "online e suas cotas. Para VOLTAR ao modo local, digite: desligar ia. "
+             "Para USAR a nuvem, digite: ligar ia. Para conferir o motor local, "
+             "digite: status ia. 'desligar ia local' encerra o motor local; "
+             "nao e o comando para voltar ao modo local.")
         return True
 
     # ---- Conversa / saudações (resposta local, sem nuvem) ----
@@ -9366,11 +9392,12 @@ def processar_atalho_rapido(comando: str) -> bool:
     _conversa_norm = {_norm(p) for p in PALAVRAS_CONVERSA if _norm(p)}
     _tarefa_norm = {_norm(p) for p in PALAVRAS_TAREFA_COMPLEXA if _norm(p)}
     _cmd_low = cmd.lower()
-    _eh_conversa = (any(p in _cmd_low for p in PALAVRAS_CONVERSA)
+    _eh_conversa = (_eh_pergunta_de_conversa(comando)
+                    or any(p in _cmd_low for p in PALAVRAS_CONVERSA)
                     or any(p and p in _cmd_norm for p in _conversa_norm if len(p) >= 3))
     _eh_tarefa = (any(p in _cmd_low for p in PALAVRAS_TAREFA_COMPLEXA)
                   or any(p and p in _cmd_norm for p in _tarefa_norm if len(p) >= 3))
-    if _eh_conversa and not _eh_tarefa:
+    if _eh_conversa and (not _eh_tarefa or _eh_pergunta_de_conversa(comando)):
         # Se a nuvem (rodizio de IAs) estiver DESLIGADA, responde no papo com
         # texto local (sem API) - o agente nunca fica mudo e nao gasta cota.
         if not config.get("usar_ia_nuvem", True):
@@ -22626,7 +22653,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Roteamento conversa 2026-09-08-r1] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
