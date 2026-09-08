@@ -2693,6 +2693,69 @@ _INTRO_LOCAL = (
 
 
 
+# --- Rodar o site criado: fecha o ciclo criar -> ver funcionando no navegador ---
+_SITES_RODANDO = {}
+
+
+@tool
+def rodar_site_local(pasta: str = "", porta: int = 5500) -> str:
+    """Coloca NO AR um site que esta numa pasta (HTML/CSS/JS) e abre no
+    navegador, com endereco http://localhost:PORTA. E assim que voce ve o site
+    que o agente criou funcionando de verdade. Para parar: 'parar site'."""
+    from functools import partial
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+    base = _pasta_padrao(pasta) if pasta else os.getcwd()
+    if not os.path.isdir(base):
+        return "Pasta nao encontrada: " + base
+    tem_index = os.path.exists(os.path.join(base, "index.html"))
+    porta = int(porta)
+    if porta in _SITES_RODANDO:
+        return ("Ja tem um site rodando na porta " + str(porta) +
+                " (" + _SITES_RODANDO[porta]["pasta"] + "). Use outra porta ou 'parar site'.")
+    try:
+        handler = partial(SimpleHTTPRequestHandler, directory=base)
+        servidor = ThreadingHTTPServer(("127.0.0.1", porta), handler)
+    except OSError:
+        return "A porta " + str(porta) + " ja esta ocupada. Tente outra, ex.: 'rodar site 5501'."
+    except Exception as e:
+        return "Nao consegui subir: " + type(e).__name__
+    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+    _SITES_RODANDO[porta] = {"servidor": servidor, "pasta": base}
+    url = "http://localhost:" + str(porta)
+    try:
+        subprocess.Popen('start "" "' + url + '"', shell=True)
+    except Exception:
+        pass
+    return ("SITE NO AR: " + url + "\n  Pasta: " + base +
+            ("\n  (abri no seu navegador)" if tem_index else
+             "\n  ATENCAO: nao achei index.html aqui - o navegador vai mostrar a lista de arquivos.") +
+            "\n  Edite os arquivos e aperte F5 no navegador para ver a mudanca.\n"
+            "  Para desligar: 'parar site'.")
+
+
+@tool
+def parar_site_local(porta: int = 0) -> str:
+    """Desliga o site local que o agente colocou no ar (todos, ou o de uma
+    porta especifica)."""
+    if not _SITES_RODANDO:
+        return "Nenhum site local rodando."
+    alvos = [int(porta)] if porta else list(_SITES_RODANDO)
+    parados = []
+    for p in alvos:
+        info = _SITES_RODANDO.pop(p, None)
+        if not info:
+            continue
+        try:
+            info["servidor"].shutdown()
+            info["servidor"].server_close()
+        except Exception:
+            pass
+        parados.append(str(p))
+    if not parados:
+        return "Nao havia site na porta " + str(porta) + "."
+    return "Site(s) desligado(s) na(s) porta(s): " + ", ".join(parados)
+
+
 # ============ AUTOPROGRAMACAO LOCAL (o agente editando a si mesmo, offline) ============
 # O 'evoluir_agente' que ja existia depende da NUVEM para escrever o codigo.
 # Este aqui funciona 100% local. A jogada e nao pedir para um modelo pequeno
@@ -6485,6 +6548,19 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- RODAR O SITE CRIADO ----
+    for _pre in ("rodar site", "roda o site", "rodar o site", "poe o site no ar",
+                 "ver o site", "abrir o site local", "testa o site", "sobe o site"):
+        if cmd.startswith(_pre):
+            _resto_s = comando[len(_pre):].strip(" :,.")
+            _porta_s = "".join(ch for ch in _resto_s if ch.isdigit())
+            _pasta_s = _resto_s if not _porta_s else _resto_s.replace(_porta_s, "").strip()
+            _rel(_invocar_local("rodar_site_local", pasta=_pasta_s,
+                                porta=int(_porta_s or 5500)))
+            return True
+    if n in ("pararsite", "desligarsite", "fecharsite", "pararsitelocal"):
+        _rel(_invocar_local("parar_site_local")); return True
 
     # ---- AUTOPROGRAMACAO: o agente mexendo no proprio codigo ----
     if n in ("abremeucodigo", "abreseucodigo", "abraseucodigo", "mostreseucodigo",
@@ -20136,6 +20212,8 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    rodar_site_local,
+    parar_site_local,
     painel_ao_iniciar,
     # --- autoprogramacao local (o agente editando a si mesmo) ---
     criar_ferramenta_nova,
