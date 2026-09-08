@@ -2506,6 +2506,55 @@ _SITES_LOCAIS = {
 }
 
 
+def _sugerir_site_por_nome(alvo: str, sites):
+    """Sugere somente destinos cadastrados; nao corrige URLs, caminhos ou comandos."""
+    import re
+    from difflib import SequenceMatcher
+    if not re.fullmatch(r"[A-Za-zÀ-ÿ ]{4,40}", alvo.strip()):
+        return None
+    normalizado = _norm_pt(alvo)
+    if len(normalizado) < 4:
+        return None
+    por_url = {}
+    for nome, url in sites.items():
+        if not url.startswith("https://"):
+            continue
+        candidato = _norm_pt(nome)
+        if len(candidato) < 4:
+            continue
+        nota = SequenceMatcher(None, normalizado, candidato).ratio()
+        if url not in por_url or nota > por_url[url][0]:
+            por_url[url] = (nota, nome, url)
+    melhores = sorted(por_url.values(), reverse=True)
+    if not melhores or melhores[0][0] < 0.84:
+        return None
+    if len(melhores) > 1 and melhores[0][0] - melhores[1][0] < 0.10:
+        return None
+    return melhores[0][1], melhores[0][2]
+
+
+def _confirmar_site_sugerido(alvo: str) -> bool:
+    """True se tratou uma sugestao (aceita ou recusada). Nunca abre sem sim."""
+    sugestao = _sugerir_site_por_nome(alvo, _SITES_LOCAIS)
+    if sugestao is None:
+        return False
+    nome, url = sugestao
+    print(f"\n[Correcao sugerida]: '{alvo}' parece ser '{nome}' ({url}).")
+    resposta = input("Voce quis dizer esse site? Abrir? (sim/nao): ").strip().lower()
+    if resposta not in ("sim", "s"):
+        print("[Local]: cancelado; nenhum site foi aberto pela sugestao.")
+        return True
+    import webbrowser
+    try:
+        if webbrowser.open(url):
+            print(f"[Local]: pedido de abertura enviado ao navegador: {url}")
+        else:
+            print("[Local]: o navegador nao confirmou o pedido de abertura.")
+    except Exception as erro:
+        print(f"[Local]: nao consegui solicitar a abertura ({type(erro).__name__}).")
+    return True
+
+
 def _achar_programa_local(alvo: str):
     """Procura um PROGRAMA instalado de verdade (atalho no Menu Iniciar / .exe).
     Devolve o caminho do executavel/atalho ou None. Nao chuta nada: se nao
@@ -7916,6 +7965,8 @@ def _processar_cerebro_local(comando: str) -> bool:
         # 2o) procura o programa REAL no Menu Iniciar ou o site conhecido.
         res = _abrir_app_ou_site(alvo)
         if res == "NAO_ACHADO":
+            if _confirmar_site_sugerido(alvo):
+                return True
             print(f"\n[Local]: nao encontrei '{alvo}' instalado nem como site conhecido.")
             print("        Se for um PROGRAMA, confira o nome exato (ex.: 'abre o Bambu")
             print("        Studio'); se for um SITE, me passa o endereco que eu abro")
@@ -22976,7 +23027,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Ferramentas mais confiaveis 2026-09-08-r7] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Sugestoes de sites 2026-09-08-r8] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

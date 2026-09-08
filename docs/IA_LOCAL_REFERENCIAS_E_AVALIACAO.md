@@ -120,3 +120,15 @@ Nenhuma foi removida porque têm interfaces e escopos diferentes.
 Próximos lotes ainda NÃO implementados: classificação de efeitos e retries,
 validação uniforme dos resultados de comandos Windows, revisão de permissões,
 segurança do painel e comparação funcional aprofundada das 463 ferramentas.
+
+## r8 — Sugestão de correção para sites conhecidos
+
+Exemplo: `abre o yotube` sugere youtube e pede `sim/nao` antes de abrir.
+Só ocorre depois que o caminho existente de programa/site retorna NAO_ACHADO.
+Usa difflib da biblioteca padrão sobre nomes cadastrados, nota mínima 0,84 e
+margem mínima 0,10 entre destinos diferentes. Aliases da mesma URL são agrupados.
+Não aproxima URLs digitadas, caminhos, nomes curtos, programas ou comandos de
+sistema. Cancelar/Enter não abre nada pela sugestão. Não há aprendizado automático,
+chamada de nuvem ou garantia de compreensão de toda frase incompleta.
+40 testes isolados passaram, incluindo a frase completa no roteador e confirmação
+com navegador simulado. Abertura real no Windows ainda precisa ser conferida.
