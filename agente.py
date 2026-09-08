@@ -2917,11 +2917,12 @@ def _biblioteca_agente_js(com_janela: bool) -> str:
 @tool
 def integrar_agente_no_site(pasta: str, arquivo_html: str = "",
                             janela_flutuante: str = "nao") -> str:
-    """CONECTA um site que JA EXISTE (seu, feito do jeito que voce quis) ao
-    agente, sem mexer no visual: cria o arquivo agente.js e adiciona UMA linha
-    de <script> antes do </body>. Nada mais e alterado. Depois voce chama
-    agente.rodar('comando') nos SEUS botoes. Com janela_flutuante='sim' ele
-    ainda coloca uma bolinha de chat no canto."""
+    """INTEGRAR o agente num SITE PRONTO que ja existe: conecta a sua pagina
+    HTML (feita por voce, no VS Code ou onde for) ao agente, sem mexer no
+    visual. Cria o arquivo agente.js e adiciona UMA linha de script antes do
+    </body> - nenhum estilo, texto ou imagem e alterado. Depois voce chama
+    agente.rodar('comando') nos SEUS botoes. Com janela_flutuante='sim' vem
+    tambem uma bolinha de chat no canto da pagina."""
     base = _pasta_padrao(pasta)
     if not os.path.isdir(base):
         return "Pasta nao encontrada: " + base
@@ -8232,6 +8233,28 @@ def _processar_cerebro_local(comando: str) -> bool:
     # Isto e PERGUNTA, nao pedido de acao: antes caia na busca de ferramenta e
     # ele sugeria bobagem ('dispositivos conectados' por causa de 'conectado').
     _n_cap = _norm_pt(_expandir_apelidos(comando))
+    # "voce consegue se integrar num site que ja existe?" - e PERGUNTA. Exige uma
+    # palavra de duvida (voce/consegue/pode/sabe) para nao roubar o COMANDO
+    # 'integra o agente no site <pasta>', que e tratado la em cima.
+    if (("integr" in _n_cap or "conect" in _n_cap)
+            and any(x in _n_cap for x in ("site", "pagina", "html", "arquiv"))
+            and any(x in _n_cap for x in ("voce", "consegue", "pode", "sabe", "daparaa",
+                                          "dapra", "tem como"))):
+        _rel("SIM. Eu me conecto a um site que JA existe - o seu, feito do jeito que voce "
+             "quis - sem mexer no visual dele.\n"
+             "  Comando:  integra o agente no site <pasta do site>\n"
+             "  (para vir com uma bolinha de chat no canto: acrescente 'com bolinha')\n"
+             "\nSO isso muda no seu projeto:\n"
+             "  1) crio o arquivo agente.js na pasta\n"
+             "  2) adiciono UMA linha antes do </body>:  <script src=\"agente.js\"></script>\n"
+             "  Nenhum estilo, texto, imagem ou outro arquivo e tocado.\n"
+             "\nDepois, nos SEUS botoes:\n"
+             "  onclick=\"agente.rodar('abre o spotify')\"\n"
+             "  agente.rodar('detectar gargalo').then(t => minhaDiv.textContent = t)\n"
+             "  agente.status().then(s => console.log(s.ram))\n"
+             "\nPara funcionar preciso estar no ar: digite 'abrir painel' uma vez.\n"
+             "Se preferir um site novo ja pronto e conectado: 'cria um site conectado <nome>'.")
+        return True
     if any(x in _n_cap for x in ("voceestaconectado", "vcestaconectado", "voceconectado",
                                  "voceestaligado", "vocetemacessoao", "voceconsegueusar",
                                  "vocemexeno", "vocecontrolao", "voceusao", "vocetrabalhacom",
