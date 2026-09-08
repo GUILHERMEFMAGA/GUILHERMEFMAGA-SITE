@@ -6398,10 +6398,40 @@ def _sem_acento(txt: str) -> str:
     return t
 
 
+# Apelidos de VARIAS palavras. Tem que ser resolvido antes de picar o texto em
+# pedacos, senao "visual studio" vira 'visua'+'studi' e nao casa com nada -
+# foi exatamente o que aconteceu com "voce esta conectado ao visual studio".
+_APELIDOS_FRASE = (
+    ("vc ", "voce "), ("vcs ", "voces "), ("pq ", "porque "), ("tbm ", "tambem "),
+    ("visual studio code", "vscode editor codigo"),
+    ("visual studio", "vscode editor codigo"),
+    ("vs code", "vscode editor codigo"),
+    ("vscode", "vscode editor codigo"),
+    ("bloco de notas", "notepad texto"),
+    ("prompt de comando", "cmd terminal"),
+    ("area de trabalho", "desktop"),
+    ("gerenciador de tarefas", "processos"),
+    ("painel de controle", "configuracao"),
+    ("placa de video", "gpu video"),
+    ("disco rigido", "disco"),
+    ("memoria ram", "memoria"),
+    ("pen drive", "pendrive usb"),
+    ("codigo fonte", "codigo"),
+)
+
+
+def _expandir_apelidos(txt: str) -> str:
+    baixo = _sem_acento(txt)
+    for frase, troca in _APELIDOS_FRASE:
+        if frase in baixo:
+            baixo = baixo.replace(frase, troca)
+    return baixo
+
+
 def _tokens_pt(txt: str) -> set:
     """Radicais uteis do texto (sem acento, sem palavra-vazia, com sinonimos)."""
     import re as _re
-    palavras = _re.findall(r"[a-z0-9]+", _sem_acento(txt))
+    palavras = _re.findall(r"[a-z0-9]+", _expandir_apelidos(txt))
     saida = set()
     for pal in palavras:
         if len(pal) < 3 or pal in _STOP_PT:
@@ -8197,6 +8227,38 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
     if n in ("pararsite", "desligarsite", "fecharsite", "pararsitelocal"):
         _rel(_invocar_local("parar_site_local")); return True
+
+    # ---- PERGUNTAS DE CAPACIDADE ("voce esta conectado ao visual studio?") ----
+    # Isto e PERGUNTA, nao pedido de acao: antes caia na busca de ferramenta e
+    # ele sugeria bobagem ('dispositivos conectados' por causa de 'conectado').
+    _n_cap = _norm_pt(_expandir_apelidos(comando))
+    if any(x in _n_cap for x in ("voceestaconectado", "vcestaconectado", "voceconectado",
+                                 "voceestaligado", "vocetemacessoao", "voceconsegueusar",
+                                 "vocemexeno", "vocecontrolao", "voceusao", "vocetrabalhacom",
+                                 "vocesabeusar", "vocefunciona")):
+        if "vscode" in _n_cap or "editor" in _n_cap:
+            _resp_cap = _invocar_local("vscode_status")
+            _rel("SIM, eu trabalho com o VS Code. O que eu faco nele:\n"
+                 "  - abrir pasta ou arquivo (e ate na LINHA exata de um erro)\n"
+                 "  - instalar e remover extensao, ou um pacote inteiro de uma vez\n"
+                 "  - criar projeto pronto (site, landing, jogo, python, api, node)\n"
+                 "  - comparar dois arquivos lado a lado\n"
+                 "  - configurar o projeto (.vscode) e criar tarefa do Ctrl+Shift+B\n"
+                 "  - editar arquivos com backup, validacao e desfazer\n"
+                 "Importante: eu NAO rodo dentro do editor como extensao - eu comando ele "
+                 "por fora. O efeito e o mesmo, mas os comandos voce da aqui, no painel ou "
+                 "no terminal do proprio VS Code.\n\nSituacao agora:\n" + str(_resp_cap))
+            return True
+        if "internet" in _n_cap or "nuvem" in _n_cap or "online" in _n_cap:
+            _rel("Estou no modo LOCAL: rodo 100% no seu PC, sem depender de internet. "
+                 "Uso a rede so nas ferramentas que precisam (ping, clima, baixar arquivo). "
+                 "Para ligar o rodizio de IAs da nuvem: 'ligar ia'.")
+            return True
+        if "site" in _n_cap or "painel" in _n_cap:
+            _rel("Sim: eu tenho um painel web proprio ('abrir painel'), sei criar um site ja "
+                 "conectado a mim ('cria um site conectado <nome>') e sei me integrar num site "
+                 "que voce ja fez ('integra o agente no site <pasta>').")
+            return True
 
     # ---- AUTOPROGRAMACAO: o agente mexendo no proprio codigo ----
     if n in ("abremeucodigo", "abreseucodigo", "abraseucodigo", "mostreseucodigo",
