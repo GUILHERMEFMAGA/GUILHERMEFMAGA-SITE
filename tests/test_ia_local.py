@@ -6,7 +6,8 @@ from test_roteamento_conversa import carregar
 
 class IALocal(unittest.TestCase):
     def ambiente(self, **extras):
-        return carregar('_montar_contexto_local', 'perguntar_ia_local',
+        return carregar('_quantidade_lista_local', '_contar_itens_lista_local',
+                        '_montar_contexto_local', 'perguntar_ia_local',
                         '_resposta_da_neural',
                         _sys_ia_local=lambda: 'Sistema', **extras)
 
@@ -31,6 +32,31 @@ class IALocal(unittest.TestCase):
         env = self.ambiente(_chamar_neural=chamada)
         self.assertIn('Nao consigo', env['perguntar_ia_local']('Tenho admin?'))
         chamada.assert_called_once()
+
+    def test_lista_completa_tem_orcamento_maior(self):
+        texto = '\n'.join(f'{i}. Ideia {i}' for i in range(1, 51))
+        chamada = Mock(return_value=texto)
+        env = self.ambiente(_chamar_neural=chamada)
+        resposta = env['perguntar_ia_local']('me de 50 ideias que vc queria ter dentro de vc?')
+        self.assertNotIn('[Aviso', resposta)
+        self.assertGreater(chamada.call_args.kwargs['max_tokens'], 350)
+        self.assertLessEqual(chamada.call_args.kwargs['max_tokens'], 1800)
+        chamada.assert_called_once()
+
+    def test_lista_incompleta_avisa_sem_repetir_geracao(self):
+        chamada = Mock(return_value='1. Uma ideia\n2. Outra ideia')
+        env = self.ambiente(_chamar_neural=chamada)
+        resposta = env['perguntar_ia_local']('liste 50 ideias')
+        self.assertIn('identifiquei 2 itens', resposta)
+        self.assertIn('voce pediu 50', resposta)
+        chamada.assert_called_once()
+
+    def test_limite_e_contagem(self):
+        env = self.ambiente(_chamar_neural=Mock(return_value='Sem lista'))
+        self.assertEqual(env['_quantidade_lista_local']('arquivo 50.py'), 0)
+        self.assertEqual(env['_contar_itens_lista_local']('1. a\n1. b\n3. c'), 1)
+        self.assertIn('limite por resposta e 50',
+                      env['perguntar_ia_local']('liste 1000 ideias'))
 
     def test_vazio_nao_vira_sucesso(self):
         env = self.ambiente(_chamar_neural=Mock(return_value='  '))

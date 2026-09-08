@@ -87,6 +87,7 @@ class RoteamentoConversa(unittest.TestCase):
                 'Me explica como desligar o firewall',
                 'Por favor explique o que é limpar lixo',
                 'Como funciona o modo jogo?',
+                'me de 50 ideias que vc queria ter dentro de vc?',
             ]:
                 with self.subTest(nuvem=nuvem, texto=texto):
                     invocar = Mock(side_effect=AssertionError('Nao executar ferramenta'))

@@ -6911,7 +6911,8 @@ def _pedido_explicativo(comando: str) -> bool:
     texto = " ".join(re.sub(r"[^a-z0-9 ]", " ", texto).split())
     texto = re.sub(r"^por favor\s+", "", texto)
     return bool(re.match(
-        r"^(?:(?:me )?(?:explique|explica|explique-me|ensine|ensina|conte|fale)\b"
+        r"^(?:(?:me )?(?:de|da|liste|lista|sugira)\s+\d+\s+(?:ideias|sugestoes|exemplos|dicas|itens|melhorias)\b"
+        r"|(?:me )?(?:explique|explica|explique-me|ensine|ensina|conte|fale)\b"
         r"|(?:o ?que|oq) (?:e|eh|significa|sao)\b"
         r"|(?:qual|quais) (?:e |eh |sao )?(?:a |as )?diferenca"
         r"|como (?:funciona|funcionam|faco para|faco pra|posso)\b"
@@ -9172,15 +9173,60 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5) -> str:
     return (data["choices"][0]["message"]["content"] or "").strip()
 
 
+def _quantidade_lista_local(pergunta: str) -> int:
+    """Reconhece quantidades explicitas, sem confundir numeros de arquivos/IPs."""
+    import re
+    import unicodedata
+    texto = "".join(c for c in unicodedata.normalize("NFD", pergunta.lower())
+                    if unicodedata.category(c) != "Mn")
+    achado = re.search(r"\b(\d{1,4})\s+(?:ideias|sugestoes|exemplos|dicas|itens|melhorias)\b", texto)
+    return int(achado.group(1)) if achado else 0
+
+
+def _contar_itens_lista_local(resposta: str) -> int:
+    """Conta itens numerados sequenciais, nao paragrafos ou numeros repetidos."""
+    import re
+    numeros = re.findall(r"(?m)^\s*(?:\*\*)?(\d+)[.)](?:\*\*)?\s+", resposta)
+    esperado = 1
+    for numero in numeros:
+        if int(numero) == esperado:
+            esperado += 1
+    return esperado - 1
+
+
 def perguntar_ia_local(pergunta: str, historico=None) -> str:
     """Uma geracao por pedido, sem forcar o modelo a alegar acesso/admin."""
     if not isinstance(pergunta, str) or not pergunta.strip():
         raise ValueError("A pergunta nao pode estar vazia.")
     msgs = _montar_contexto_local(pergunta, historico)
-    resposta = _chamar_neural(msgs, temperatura=0.3)
+    quantidade = _quantidade_lista_local(pergunta)
+    tokens = 350
+    if quantidade:
+        alvo = min(quantidade, 50)
+        tokens = min(1800, max(350, alvo * 32 + 120))
+        msgs[0]["content"] += (
+            f" Neste pedido entregue {alvo} itens, numerados de 1 a {alvo}, "
+            "um por linha, sem introducao longa. Cada item deve ser distinto "
+            "e ter uma frase curta e concreta. Se pedirem ideias para voce/o "
+            "agente, proponha funcionalidades de software do Super Agente PC, "
+            "nao conselhos para melhorar o usuario. Distinga proposta de "
+            "funcionalidade ja implementada. Nao prometa sentidos fisicos "
+            "como olfato ou paladar sem sensores."
+        )
+        # Reserva espaco da janela de contexto para a lista mais longa.
+        msgs = [msgs[0], msgs[-1]]
+    resposta = _chamar_neural(msgs, max_tokens=tokens, temperatura=0.3)
     if not isinstance(resposta, str) or not resposta.strip():
         raise ValueError("O motor local devolveu uma resposta vazia.")
-    return resposta.strip()
+    resposta = resposta.strip()
+    if quantidade:
+        recebidos = _contar_itens_lista_local(resposta)
+        if recebidos != quantidade:
+            resposta += (f"\n\n[Aviso de completude]: identifiquei {recebidos} itens "
+                         f"numerados em sequencia; voce pediu {quantidade}. "
+                         "A quantidade solicitada nao foi confirmada. "
+                         "O limite por resposta e 50 itens; voce pode pedir os restantes em partes.")
+    return resposta
 
 
 def _resposta_da_neural(comando: str, tentar_subir: bool = False):
@@ -22668,7 +22714,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Conversa antes de ferramentas 2026-09-08-r3] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Comunicacao local 2026-09-08-r4] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
