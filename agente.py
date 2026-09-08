@@ -2693,6 +2693,168 @@ _INTRO_LOCAL = (
 
 
 
+@tool
+def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> str:
+    """Cria um SITE SEU que ja vem CONECTADO ao agente: a pagina fala com a API
+    do painel local, entao ela mostra o PC em tempo real e executa comandos de
+    verdade. Voce edita esse site no VS Code do jeito que quiser - e a sua
+    interface pessoal do agente, separada do painel padrao."""
+    if not nome.strip():
+        nome = "meu-painel"
+    base = _pasta_padrao(onde) if onde else os.path.join(os.path.expanduser("~"), "projetos")
+    destino = os.path.join(base, nome.strip().replace(" ", "-"))
+    if os.path.exists(destino):
+        return "Ja existe uma pasta em " + destino + ". Escolha outro nome."
+    os.makedirs(destino, exist_ok=True)
+
+    html = ("<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+            "<title>" + nome + "</title>\n<link rel=\"stylesheet\" href=\"estilo.css\">\n"
+            "</head>\n<body>\n"
+            "<header><h1>" + nome + "</h1>\n"
+            "  <span id=\"ligado\" class=\"pill\">conectando ao agente...</span></header>\n"
+            "<main>\n"
+            "  <section class=\"cartoes\">\n"
+            "    <div class=\"c\"><span>CPU</span><b id=\"cpu\">--</b></div>\n"
+            "    <div class=\"c\"><span>RAM</span><b id=\"ram\">--</b></div>\n"
+            "    <div class=\"c\"><span>Disco</span><b id=\"disco\">--</b></div>\n"
+            "    <div class=\"c\"><span>Ferramentas</span><b id=\"tools\">--</b></div>\n"
+            "  </section>\n"
+            "  <section class=\"linha\">\n"
+            "    <input id=\"cmd\" placeholder=\"Digite um comando do agente e aperte Enter\">\n"
+            "    <button onclick=\"mandar()\">Executar</button>\n"
+            "  </section>\n"
+            "  <pre id=\"saida\">Escreva um comando acima. Exemplos: ajuda | detectar gargalo | "
+            "tempo ligado</pre>\n"
+            "  <section class=\"atalhos\">\n"
+            "    <button onclick=\"rodar('detectar gargalo')\">Gargalo</button>\n"
+            "    <button onclick=\"rodar('tempo ligado')\">Uptime</button>\n"
+            "    <button onclick=\"rodar('espaco recuperavel')\">Espaco</button>\n"
+            "  </section>\n</main>\n"
+            "<div id=\"fundo\"><div class=\"modal\"><h3>Precisa da sua confirmacao</h3>"
+            "<p id=\"pergunta\"></p><div class=\"bts\">"
+            "<button onclick=\"responder('nao')\">Nao</button>"
+            "<button class=\"ok\" onclick=\"responder('sim')\">Sim</button></div></div></div>\n"
+            "<script src=\"agente.js\"></script>\n</body>\n</html>\n")
+
+    css = (":root{--bg:#0b0e14;--card:#161c28;--linha:#242c3d;--txt:#e6ebf5;--fraco:#8792a8;"
+           "--azul:#4f8cff;--verde:#3ddc97}\n"
+           "*{box-sizing:border-box;margin:0;padding:0}\n"
+           "body{font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--txt);"
+           "min-height:100vh}\n"
+           "header{padding:18px 26px;border-bottom:1px solid var(--linha);display:flex;"
+           "align-items:center;gap:14px}\n"
+           "h1{font-size:1.15rem}\n"
+           ".pill{margin-left:auto;font-size:.78rem;color:var(--fraco);border:1px solid "
+           "var(--linha);padding:5px 11px;border-radius:20px}\n"
+           "main{padding:26px;max-width:900px;margin:0 auto;display:flex;flex-direction:column;"
+           "gap:16px}\n"
+           ".cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}\n"
+           ".c{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:15px}\n"
+           ".c span{font-size:.74rem;color:var(--fraco);text-transform:uppercase;"
+           "letter-spacing:.6px}\n"
+           ".c b{display:block;font-size:1.6rem;margin-top:5px}\n"
+           ".linha{display:flex;gap:9px}\n"
+           "input{flex:1;background:#0d1220;border:1px solid var(--linha);color:var(--txt);"
+           "border-radius:9px;padding:12px 14px;font-size:.95rem}\n"
+           "input:focus{outline:0;border-color:var(--azul)}\n"
+           "button{background:var(--azul);color:#fff;border:0;border-radius:9px;padding:12px 18px;"
+           "cursor:pointer;font-size:.92rem}\n"
+           "button:hover{filter:brightness(1.15)}\n"
+           ".atalhos{display:flex;gap:9px;flex-wrap:wrap}\n"
+           ".atalhos button{background:#28304a}\n"
+           "pre{background:#060910;border:1px solid var(--linha);border-radius:12px;padding:16px;"
+           "font-family:ui-monospace,Consolas,monospace;font-size:.85rem;white-space:pre-wrap;"
+           "min-height:230px;max-height:430px;overflow:auto;line-height:1.55;color:#c8d3e6}\n"
+           "#fundo{position:fixed;inset:0;background:rgba(3,6,12,.8);display:none;place-items:center}\n"
+           "#fundo.on{display:grid}\n"
+           ".modal{background:var(--card);border:1px solid var(--linha);border-radius:14px;"
+           "padding:24px;max-width:520px;width:92%}\n"
+           ".modal h3{color:#ffcc66;margin-bottom:10px}\n"
+           ".modal p{margin-bottom:18px;line-height:1.6;white-space:pre-wrap}\n"
+           ".bts{display:flex;gap:10px;justify-content:flex-end}\n"
+           ".bts button{background:#28304a}.bts .ok{background:var(--azul)}\n")
+
+    js = ("// Este site conversa com o SEU agente, que precisa estar com o painel ligado.\n"
+          "// Na janela do agente digite: abrir painel\n"
+          "const AGENTE = 'http://127.0.0.1:8777';\n"
+          "let jobAtual = null;\n\n"
+          "async function status(){\n"
+          "  try{\n"
+          "    const d = await (await fetch(AGENTE + '/api/status')).json();\n"
+          "    cpu.textContent = d.cpu.toFixed(0) + '%';\n"
+          "    ram.textContent = d.ram.toFixed(0) + '%';\n"
+          "    disco.textContent = d.disco.toFixed(0) + '%';\n"
+          "    tools.textContent = d.ferramentas;\n"
+          "    ligado.textContent = 'conectado a ' + d.pc;\n"
+          "  }catch(e){ ligado.textContent = 'agente offline - digite \"abrir painel\" nele'; }\n"
+          "}\n"
+          "setInterval(status, 3000); status();\n\n"
+          "function mostrarPergunta(id, texto){\n"
+          "  jobAtual = id; pergunta.textContent = texto; fundo.classList.add('on');\n"
+          "}\n"
+          "async function responder(r){\n"
+          "  fundo.classList.remove('on');\n"
+          "  if(!jobAtual) return;\n"
+          "  await fetch(AGENTE + '/api/responder', {method:'POST',\n"
+          "    headers:{'Content-Type':'application/json'},\n"
+          "    body: JSON.stringify({id: jobAtual, resposta: r})});\n"
+          "  jobAtual = null;\n"
+          "}\n"
+          "async function rodar(texto){\n"
+          "  saida.textContent += '\\n\\n> ' + texto + '\\n';\n"
+          "  const r = await fetch(AGENTE + '/api/comando', {method:'POST',\n"
+          "    headers:{'Content-Type':'application/json'},\n"
+          "    body: JSON.stringify({texto})});\n"
+          "  const {id} = await r.json();\n"
+          "  const t = setInterval(async () => {\n"
+          "    const s = await (await fetch(AGENTE + '/api/job?id=' + id)).json();\n"
+          "    if(s.pergunta && jobAtual !== id) mostrarPergunta(id, s.pergunta);\n"
+          "    if(s.pronto){ clearInterval(t); saida.textContent += s.saida + '\\n';\n"
+          "                  saida.scrollTop = 1e6; }\n"
+          "  }, 600);\n"
+          "}\n"
+          "function mandar(){ const t = cmd.value.trim(); if(!t) return; cmd.value=''; rodar(t); }\n"
+          "cmd.addEventListener('keydown', e => { if(e.key === 'Enter') mandar(); });\n")
+
+    leiame = ("# " + nome + "\n\nSite conectado ao Super Agente PC.\n\n"
+              "## Como usar\n\n"
+              "1. Na janela do agente, digite: `abrir painel` (isso liga a API na porta 8777)\n"
+              "2. Na janela do agente, digite: `rodar site " + destino + "`\n"
+              "3. Abra http://localhost:5500\n\n"
+              "## O que ja funciona\n\n"
+              "- CPU, RAM, disco e numero de ferramentas em tempo real\n"
+              "- Caixa de comando: roda qualquer comando do agente\n"
+              "- Confirmacao (sim/nao) aparece na propria pagina\n\n"
+              "## Personalize\n\n"
+              "Mexa em `estilo.css` para a aparencia e em `agente.js` para adicionar botoes.\n"
+              "Cada botao novo e so chamar `rodar('seu comando aqui')`.\n")
+
+    arquivos = {"index.html": html, "estilo.css": css, "agente.js": js, "README.md": leiame}
+    for rel, conteudo in arquivos.items():
+        with open(os.path.join(destino, rel), "w", encoding="utf-8") as f:
+            f.write(conteudo)
+    try:
+        _invocar_local("vscode_configurar_projeto", caminho=destino, tipo="web")
+    except Exception:
+        pass
+    cli = _code_cli()
+    if cli:
+        try:
+            subprocess.Popen(cli + ' -r "' + destino + '"', shell=True)
+        except Exception:
+            pass
+    return ("SITE CONECTADO AO AGENTE CRIADO\n  Pasta: " + destino +
+            "\n  Arquivos: " + ", ".join(arquivos) +
+            "\n\n  Para ver funcionando, em ordem:\n"
+            "    1) abrir painel          (liga a API do agente)\n"
+            "    2) rodar site " + destino + "\n"
+            "    3) abre http://localhost:5500\n"
+            "\n  Esse site e SEU: edite o estilo.css e o agente.js no VS Code. "
+            "Cada botao novo e uma linha: rodar('comando do agente')." +
+            ("\n  Ja abri a pasta no VS Code." if cli else ""))
+
+
 # --- Rodar o site criado: fecha o ciclo criar -> ver funcionando no navegador ---
 _SITES_RODANDO = {}
 
@@ -3538,6 +3700,14 @@ def _criar_handler_painel():
             self.send_header("Content-Type", tipo)
             self.send_header("Content-Length", str(len(corpo)))
             self.send_header("Cache-Control", "no-store")
+            # Libera o acesso a partir de um site local seu (ex.: o site que o
+            # agente cria na porta 5500 chamando a API dele na 8777). Sem isto
+            # o navegador BLOQUEIA a chamada por ser de outra origem. Como o
+            # servidor so escuta em 127.0.0.1, quem alcanca isto ja esta na
+            # sua maquina.
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.end_headers()
             try:
                 self.wfile.write(corpo)
@@ -3680,6 +3850,10 @@ def _criar_handler_painel():
                 ok, msg = _escrever_com_rede(cam, conteudo, "edicao pelo painel web")
                 return self._json({"msg": ("SALVO. " if ok else "") + msg})
             return self._json({"erro": "rota desconhecida"}, 404)
+
+        def do_OPTIONS(self):
+            # resposta ao "preflight" que o navegador manda antes de um POST
+            self._envia(204, b"", "text/plain")
 
         def log_message(self, *args):
             return
@@ -6548,6 +6722,14 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- SITE PROPRIO CONECTADO AO AGENTE ----
+    for _pre in ("cria um site conectado", "criar site conectado", "cria meu painel",
+                 "site do agente", "cria um site do agente", "meu painel proprio",
+                 "cria um site seu", "criar site do agente"):
+        if cmd.startswith(_pre):
+            _nome_sc = comando[len(_pre):].strip(" :,.") or "meu-painel"
+            _rel(_invocar_local("criar_site_conectado_ao_agente", nome=_nome_sc)); return True
 
     # ---- RODAR O SITE CRIADO ----
     for _pre in ("rodar site", "roda o site", "rodar o site", "poe o site no ar",
@@ -20212,6 +20394,7 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    criar_site_conectado_ao_agente,
     rodar_site_local,
     parar_site_local,
     painel_ao_iniciar,
