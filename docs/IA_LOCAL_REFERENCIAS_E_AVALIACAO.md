@@ -45,3 +45,39 @@ Respostas mais longas podem ser mais lentas e esgotar a janela do modelo.
 Cache de prefixo pode não ajudar quando outro cliente altera o contexto do servidor.
 Não há aceleração medida no PC do usuário nesta etapa. A fala por áudio existente
 não foi trocada: este aprimoramento é do texto gerado e das preferências de conversa.
+
+## r6 — Ideias fundamentadas no próprio fonte
+
+Comandos no console:
+- `ideias para o agente`
+- `me de 3 ideias para melhorar seu codigo`
+- `quais melhorias para o agente na conversa local?`
+
+Fluxo: lê `agente.py` sem executá-lo, cataloga funções de nível superior,
+docstrings e nomes de chamadas via AST. Mantém em RAM um inventário, invalidado
+quando o tamanho ou a data de modificação em nanossegundos muda. Seleciona até
+6 funções por relevância textual e prioridades predefinidas para um pedido.
+Faz uma única geração no modelo LOCAL e exige saída estruturada em JSON.
+Cada proposta precisa de título, justificativa, benefício, risco, teste e uma
+ou mais referências presentes no recorte. A apresentação acrescenta linhas do
+fonte e um identificador de hash; descarta referências inventadas, campos
+incompletos e títulos iguais após normalização.
+
+Limites importantes:
+- Até 5 propostas por pedido, 3 por padrão. Não é uma auditoria integral.
+- AST prova presença de funções; docstrings não comprovam funcionamento.
+- Referências existentes não comprovam que a recomendação seja correta ou
+  que a funcionalidade esteja ausente. Similaridade semântica não é validada.
+- O modelo pequeno pode falhar em gerar JSON válido. Nesse caso há aviso,
+  não uma falsa análise bem-sucedida nem repetição automática de inferências.
+- Não há execução de testes propostos nem edição de código neste fluxo.
+- Não consulta chaves.txt, documentos pessoais ou nuvem. Persiste a conversa
+  no histórico local usando o mecanismo existente do agente.
+- Não inicia o motor silenciosamente se estiver indisponível: orienta `criar ia`.
+- Os perfis/humor da conversa comum são preservados. Este modo usa instruções
+  próprias de revisão técnica e temperatura menor, sem promessa de acerto.
+
+Testes isolados incluem cache/invalidação, fonte que causaria erro se executado,
+referências falsas, títulos duplicados, JSON inválido, motor ausente, roteamento
+nos dois modos e ausência de escrita no fonte. Ainda é necessário avaliar a
+saída do GGUF e o tempo de geração no Windows real.
