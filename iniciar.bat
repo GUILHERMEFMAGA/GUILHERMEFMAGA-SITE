@@ -2,6 +2,28 @@
 cd /d "%~dp0"
 title Super Agente PC
 
+REM ===== PROTECAO: este arquivo so deve ser aberto como "iniciar.bat" =====
+REM Se voce clicou numa COPIA (iniciar_novo.bat, iniciar - copia.bat etc.),
+REM eu nao rodo por aqui: aviso e abro o iniciar.bat certo. Rodar por uma
+REM copia deixava dois agentes abertos e bagunçava a atualizacao.
+if /i not "%~nx0"=="iniciar.bat" (
+    echo.
+    echo   Este arquivo e uma COPIA ^(%~nx0^), nao o inicializador oficial.
+    echo   O certo e sempre abrir:  iniciar.bat
+    echo   Abrindo o iniciar.bat pra voce...
+    echo.
+    if exist "%~dp0iniciar.bat" (
+        start "" "%~dp0iniciar.bat"
+    ) else (
+        echo   Nao achei o iniciar.bat nesta pasta. Renomeie este arquivo para iniciar.bat
+        pause
+    )
+    exit /b
+)
+
+REM Limpa restos de atualizacoes antigas que ficaram clicaveis por engano
+if exist "iniciar_novo.bat" del /q "iniciar_novo.bat" >nul 2>&1
+
 REM Pede privilegio de Administrador se nao estiver elevado
 net session >nul 2>&1
 if errorlevel 1 (
@@ -21,9 +43,10 @@ if not exist "SEM_ATUALIZAR.txt" (
 
     REM ===== AUTO-ATUALIZACAO DESTE PROPRIO ARQUIVO =====
     REM Um .bat nao pode se sobrescrever enquanto roda (corromperia a execucao).
-    REM Entao baixamos para iniciar_novo.bat e trocamos na ULTIMA linha, junto
-    REM com o exit - depois disso o cmd nao le mais nada do arquivo.
-    powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/arena/01a07ce2-guilhermefmaga-site/iniciar.bat' -OutFile 'iniciar_novo.bat' -UseBasicParsing -TimeoutSec 20; if ((Get-Item 'iniciar_novo.bat').Length -lt 800) { Remove-Item 'iniciar_novo.bat' -Force } elseif ((Get-FileHash 'iniciar_novo.bat').Hash -eq (Get-FileHash 'iniciar.bat').Hash) { Remove-Item 'iniciar_novo.bat' -Force } else { Write-Host 'Ha uma versao nova do iniciar.bat: aplico automaticamente ao fechar.' } } catch { Remove-Item 'iniciar_novo.bat' -ErrorAction SilentlyContinue }"
+    REM Entao baixamos para um arquivo .tmp - de proposito SEM extensao .bat,
+    REM pra ninguem clicar nele por engano - e trocamos na ULTIMA linha, junto
+    REM com o exit; depois disso o cmd nao le mais nada do arquivo.
+    powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/arena/01a07ce2-guilhermefmaga-site/iniciar.bat' -OutFile '_atualizacao_iniciar.tmp' -UseBasicParsing -TimeoutSec 20; if ((Get-Item '_atualizacao_iniciar.tmp').Length -lt 800) { Remove-Item '_atualizacao_iniciar.tmp' -Force } elseif ((Get-FileHash '_atualizacao_iniciar.tmp').Hash -eq (Get-FileHash 'iniciar.bat').Hash) { Remove-Item '_atualizacao_iniciar.tmp' -Force } else { Write-Host 'Ha uma versao nova do iniciar.bat: aplico sozinho quando voce fechar (voce nao precisa fazer nada).' } } catch { Remove-Item '_atualizacao_iniciar.tmp' -ErrorAction SilentlyContinue }"
 )
 
 REM Garante as bibliotecas das IAs (instala se faltar)
@@ -48,4 +71,4 @@ pause
 
 REM ULTIMA LINHA: troca este arquivo pela versao nova (se houver) e sai na
 REM mesma linha, para o cmd nao tentar ler mais nada de um arquivo trocado.
-if exist "iniciar_novo.bat" (move /y "iniciar_novo.bat" "iniciar.bat" >nul & exit)
+if exist "_atualizacao_iniciar.tmp" (move /y "_atualizacao_iniciar.tmp" "iniciar.bat" >nul & exit)

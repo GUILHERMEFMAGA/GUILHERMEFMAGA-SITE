@@ -2070,6 +2070,17 @@ def _checar_iniciar_bat() -> None:
             return
         with open(caminho, "r", encoding="utf-8", errors="ignore") as f:
             conteudo = f.read()
+        # Sobra da atualizacao antiga: arquivo clicavel que confundia o usuario
+        sobra = os.path.join(pasta, "iniciar_novo.bat")
+        if os.path.exists(sobra):
+            try:
+                os.remove(sobra)
+                print("\n[Limpeza]: removi o 'iniciar_novo.bat' da pasta - era so o "
+                      "arquivo temporario da atualizacao e nao devia ficar clicavel.")
+                print("           Abra sempre o 'iniciar.bat'.")
+            except Exception:
+                print("\n[Aviso]: existe um 'iniciar_novo.bat' na pasta. NAO abra ele - "
+                      "use sempre o 'iniciar.bat'. Pode apagar aquele arquivo.")
         achadas = _re.findall(r"https://raw\.githubusercontent\.com/\S+?agente\.py", conteudo)
         if not achadas or achadas[0] == URL_AGENTE_OFICIAL:
             return  # esta certo, nao enche o saco
@@ -8244,6 +8255,36 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
     if n in ("pararsite", "desligarsite", "fecharsite", "pararsitelocal"):
         _rel(_invocar_local("parar_site_local")); return True
+
+    # ---- "QUAL EU ABRO?": duvidas sobre iniciar.bat / arquivos da pasta ----
+    _n_ini = _norm_pt(_expandir_apelidos(comando))
+    if any(x in _n_ini for x in ("iniciarbat", "iniciarnovo", "atualizacaoiniciar",
+                                 "qualeuuso", "qualeuabro", "qualeuclico", "qualdosdois",
+                                 "agentebackup", "agentenovo")):
+        _resto_ini = []
+        try:
+            for _nome_ini, _oque in (
+                ("iniciar.bat", "E ESTE que voce abre, sempre."),
+                ("iniciar_novo.bat", "sobra de atualizacao antiga - pode apagar."),
+                ("_atualizacao_iniciar.tmp", "atualizacao baixada; aplico sozinho ao fechar."),
+                ("agente.py", "meu codigo (o cerebro). O iniciar.bat cuida dele."),
+                ("agente_backup.py", "copia da versao anterior, rede de seguranca."),
+                ("agente_novo.py", "download incompleto; pode apagar."),
+            ):
+                if os.path.exists(os.path.join(PASTA_BASE, _nome_ini)):
+                    _resto_ini.append("  - " + _nome_ini + ": " + _oque)
+        except Exception:
+            pass
+        _rel("ABRA SEMPRE O 'iniciar.bat'. E so ele.\n"
+             "\nO 'iniciar_novo.bat' NAO era pra estar clicavel - era o arquivo temporario "
+             "da minha atualizacao. Foi um erro meu: agora eu baixo com outro nome "
+             "(_atualizacao_iniciar.tmp), que ninguem clica sem querer, e se alguem abrir uma "
+             "copia por engano eu aviso e chamo o iniciar.bat certo.\n"
+             "\nO que tem na sua pasta agora:\n" + ("\n".join(_resto_ini) if _resto_ini
+             else "  (nao consegui listar)") +
+             "\n\nPode apagar o iniciar_novo.bat sem medo. Se ficaram dois agentes abertos, "
+             "feche os dois e abra so o iniciar.bat.")
+        return True
 
     # ---- PERGUNTAS DE CAPACIDADE ("voce esta conectado ao visual studio?") ----
     # Isto e PERGUNTA, nao pedido de acao: antes caia na busca de ferramenta e
