@@ -2692,6 +2692,275 @@ _INTRO_LOCAL = (
 
 
 
+# ============ AUTOPROGRAMACAO LOCAL (o agente editando a si mesmo, offline) ============
+# O 'evoluir_agente' que ja existia depende da NUVEM para escrever o codigo.
+# Este aqui funciona 100% local. A jogada e nao pedir para um modelo pequeno
+# inventar a estrutura (e ai que ele erra): a ESTRUTURA vem de um molde
+# garantido (decorador, assinatura, docstring, registro na lista tools) e so o
+# MIOLO vem de voce ou da IA neural. Depois de inserir, o arquivo inteiro e
+# revalidado - sintaxe, contagem de @tool x lista, nomes duplicados - e se
+# qualquer coisa estiver errada ele RESTAURA O BACKUP sozinho.
+
+def _minha_fonte() -> str:
+    return _CAMINHO_AGENTE_PY if os.path.exists(_CAMINHO_AGENTE_PY) else os.path.abspath(__file__)
+
+
+def _auditar_fonte(texto: str):
+    """Valida o codigo-fonte inteiro do agente. Devolve (ok, problemas)."""
+    import ast as _ast
+    problemas = []
+    try:
+        arvore = _ast.parse(texto)
+    except SyntaxError as e:
+        return False, ["sintaxe quebrada na linha %s: %s" % (e.lineno, e.msg)]
+    decoradas = [n.name for n in _ast.walk(arvore)
+                 if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))
+                 for d in n.decorator_list if isinstance(d, _ast.Name) and d.id == "tool"]
+    registradas = []
+    for no in arvore.body:
+        if isinstance(no, _ast.Assign) and any(
+                getattr(t, "id", "") == "tools" for t in no.targets):
+            if isinstance(no.value, (_ast.List, _ast.Tuple)):
+                registradas = [e.id for e in no.value.elts if isinstance(e, _ast.Name)]
+    faltando = sorted(set(decoradas) - set(registradas))
+    sobrando = sorted(set(registradas) - set(decoradas))
+    if faltando:
+        problemas.append("com @tool mas fora da lista tools: " + ", ".join(faltando[:5]))
+    if sobrando:
+        problemas.append("na lista tools mas sem @tool: " + ", ".join(sobrando[:5]))
+    topo = [n.name for n in arvore.body
+            if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]
+    dup = sorted({n for n in topo if topo.count(n) > 1})
+    if dup:
+        problemas.append("funcoes duplicadas: " + ", ".join(dup[:5]))
+    return (not problemas), problemas
+
+
+def _nome_de_ferramenta_valido(nome: str):
+    limpo = _sem_acento(nome.strip().lower()).replace(" ", "_").replace("-", "_")
+    limpo = "".join(c for c in limpo if c.isalnum() or c == "_").strip("_")
+    if not limpo:
+        return None, "nome vazio"
+    if limpo[0].isdigit():
+        return None, "o nome nao pode comecar com numero"
+    import keyword
+    if keyword.iskeyword(limpo):
+        return None, "esse nome e palavra reservada do Python"
+    return limpo, ""
+
+
+def _molde_ferramenta(nome: str, descricao: str, corpo: str = "") -> str:
+    """Monta o codigo de uma ferramenta nova com a estrutura ja correta."""
+    aspas = _ASPAS3
+    doc = " ".join((descricao or "Ferramenta criada pelo proprio agente.").split())
+    linhas_doc = []
+    atual = "    "
+    for palavra in doc.split():
+        if len(atual) + len(palavra) > 74:
+            linhas_doc.append(atual)
+            atual = "    "
+        atual += palavra + " "
+    linhas_doc.append(atual.rstrip())
+    corpo_limpo = (corpo or "").strip("\n")
+    if not corpo_limpo:
+        corpo_limpo = ('    return ("Ferramenta \'' + nome + '\' criada pelo agente. '
+                       'Ainda sem logica: peca para preencher o miolo.")')
+    else:
+        arrumado = []
+        for linha in corpo_limpo.splitlines():
+            arrumado.append(linha if (linha.startswith("    ") or not linha.strip())
+                            else "    " + linha)
+        corpo_limpo = "\n".join(arrumado)
+    return ("\n\n@tool\ndef " + nome + "() -> str:\n    " + aspas + "\n"
+            + "\n".join(linhas_doc) + "\n    " + aspas + "\n" + corpo_limpo + "\n")
+
+
+@tool
+def criar_ferramenta_nova(nome: str, descricao: str, corpo_python: str = "") -> str:
+    """AUTOPROGRAMACAO OFFLINE: o agente adiciona uma FERRAMENTA NOVA ao proprio
+    codigo, sem depender de nuvem. A estrutura vem de um molde garantido; o
+    miolo vem de voce (corpo_python) ou da IA local. Faz backup, insere,
+    registra na lista, revalida o arquivo inteiro e DESFAZ SOZINHO se algo
+    ficar errado. Depois e so reiniciar o agente."""
+    limpo, erro = _nome_de_ferramenta_valido(nome)
+    if not limpo:
+        return "Nome invalido: " + erro
+    fonte_cam = _minha_fonte()
+    try:
+        atual = open(fonte_cam, encoding="utf-8").read()
+    except Exception as e:
+        return "Nao consegui ler o meu proprio codigo: " + type(e).__name__
+    if ("\ndef " + limpo + "(") in atual or ("\n    " + limpo + ",\n") in atual:
+        return ("Ja existe algo chamado '" + limpo + "' no meu codigo. "
+                "Escolha outro nome (nao repito ferramenta).")
+    corpo = corpo_python or ""
+    if not corpo.strip():
+        try:
+            if ia_local_disponivel():
+                pedido = ("Escreva SOMENTE o corpo (as linhas de dentro) de uma funcao "
+                          "Python que faca isto: " + descricao + ". Sem def, sem docstring, "
+                          "sem markdown, sem explicacao. Use apenas a biblioteca padrao. "
+                          "Termine com um return de uma string em portugues.")
+                bruto = _resposta_da_neural(pedido)
+                if bruto:
+                    bruto = bruto.replace("```python", "").replace("```", "")
+                    if "def " not in bruto:
+                        corpo = bruto
+        except Exception:
+            corpo = ""
+    novo_codigo = _molde_ferramenta(limpo, descricao, corpo)
+    try:
+        compile(novo_codigo.strip(), "<nova ferramenta>", "exec")
+    except SyntaxError as e:
+        return ("O miolo proposto tem erro de sintaxe (linha " + str(e.lineno) + ": " +
+                str(e.msg) + "). NAO toquei no meu codigo. Corrija e tente de novo.")
+    if not _confirma_poderoso("Adicionar a ferramenta '" + limpo +
+                              "' ao MEU proprio codigo-fonte?"):
+        return "Cancelado."
+    marca = "\ntools = ["
+    if marca not in atual:
+        return "Nao achei a lista 'tools' no meu codigo - abortei por seguranca."
+    pos = atual.index(marca)
+    candidato = (atual[:pos] + novo_codigo + atual[pos:]).replace(
+        marca + "\n", marca + "\n    " + limpo + ",\n", 1)
+    ok, problemas = _auditar_fonte(candidato)
+    if not ok:
+        return ("NAO GRAVEI: a alteracao deixaria o codigo inconsistente -> " +
+                "; ".join(problemas) + ". Meu arquivo continua intacto.")
+    backup = _registrar_edicao(fonte_cam, atual, "autoprogramacao: nova ferramenta " + limpo)
+    try:
+        with open(fonte_cam, "w", encoding="utf-8") as f:
+            f.write(candidato)
+    except Exception as e:
+        return "Nao consegui gravar: " + type(e).__name__
+    conferido = open(fonte_cam, encoding="utf-8").read()
+    ok2, problemas2 = _auditar_fonte(conferido)
+    if not ok2:
+        try:
+            with open(fonte_cam, "w", encoding="utf-8") as f:
+                f.write(atual)
+        except Exception:
+            pass
+        return ("DESFIZ SOZINHO: depois de gravar a validacao acusou " +
+                "; ".join(problemas2) + ". Restaurei o arquivo anterior.")
+    linha_nova = candidato[:candidato.index(novo_codigo)].count("\n") + 3
+    cli = _code_cli()
+    if cli:
+        try:
+            subprocess.Popen(cli + ' -r --goto "' + fonte_cam + ":" + str(linha_nova) + '"',
+                             shell=True)
+        except Exception:
+            pass
+    return ("FERRAMENTA '" + limpo + "' ADICIONADA AO MEU CODIGO\n"
+            "  Arquivo: " + fonte_cam + " (linha " + str(linha_nova) + ")\n"
+            "  Backup antes da mudanca: " + os.path.basename(backup) + "\n"
+            "  Validado: sintaxe ok, registro na lista ok, sem nome duplicado\n"
+            + ("  Abri no VS Code no ponto exato.\n" if cli else "") +
+            "  Para passar a usar: feche e abra o agente (reiniciar).\n"
+            "  Se nao gostar: 'desfazer edicao'.")
+
+
+@tool
+def remover_ferramenta_minha(nome: str) -> str:
+    """Remove do proprio codigo uma ferramenta que o agente criou. Faz backup,
+    tira a funcao e o registro na lista, revalida tudo e desfaz se quebrar."""
+    import ast as _ast
+    limpo, erro = _nome_de_ferramenta_valido(nome)
+    if not limpo:
+        return "Nome invalido: " + erro
+    fonte_cam = _minha_fonte()
+    atual = open(fonte_cam, encoding="utf-8").read()
+    arvore = _ast.parse(atual)
+    alvo = None
+    for no in arvore.body:
+        if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and no.name == limpo:
+            alvo = no
+    if alvo is None:
+        return "Nao achei a ferramenta '" + limpo + "' no meu codigo."
+    if not _confirma_poderoso("REMOVER a ferramenta '" + limpo + "' do meu codigo-fonte?"):
+        return "Cancelado."
+    linhas = atual.splitlines(True)
+    inicio = alvo.lineno - 1
+    for d in alvo.decorator_list:
+        inicio = min(inicio, d.lineno - 1)
+    candidato = "".join(linhas[:inicio] + linhas[alvo.end_lineno:])
+    candidato = candidato.replace("\n    " + limpo + ",\n", "\n", 1)
+    ok, problemas = _auditar_fonte(candidato)
+    if not ok:
+        return "NAO REMOVI: ficaria inconsistente -> " + "; ".join(problemas)
+    backup = _registrar_edicao(fonte_cam, atual, "autoprogramacao: removi " + limpo)
+    with open(fonte_cam, "w", encoding="utf-8") as f:
+        f.write(candidato)
+    return ("Ferramenta '" + limpo + "' removida do meu codigo.\n  Backup: " +
+            os.path.basename(backup) + "\n  Reinicie o agente para valer.")
+
+
+@tool
+def abrir_meu_codigo(funcao: str = "") -> str:
+    """Abre o MEU proprio codigo-fonte (agente.py) no VS Code. Se voce disser o
+    nome de uma funcao, abro exatamente na linha dela."""
+    import ast as _ast
+    fonte_cam = _minha_fonte()
+    if not os.path.exists(fonte_cam):
+        return "Nao encontrei meu proprio arquivo."
+    linha = 0
+    if funcao.strip():
+        alvo = _sem_acento(funcao.strip().lower()).replace(" ", "_")
+        try:
+            arvore = _ast.parse(open(fonte_cam, encoding="utf-8").read())
+            for no in _ast.walk(arvore):
+                if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and no.name == alvo:
+                    linha = no.lineno
+                    break
+            if not linha:
+                parecidos = [no.name for no in _ast.walk(arvore)
+                             if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef))
+                             and alvo in no.name]
+                if parecidos:
+                    return ("Nao achei '" + alvo + "'. Voce quis dizer: " +
+                            ", ".join(parecidos[:8]) + "?")
+        except Exception:
+            pass
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado. Meu codigo esta em: " + fonte_cam
+    try:
+        if linha:
+            subprocess.Popen(cli + ' -r --goto "' + fonte_cam + ":" + str(linha) + '"', shell=True)
+            return ("Abri meu codigo no VS Code na funcao '" + funcao.strip() +
+                    "' (linha " + str(linha) + ").")
+        subprocess.Popen(cli + ' -r "' + fonte_cam + '"', shell=True)
+    except Exception as e:
+        return "Falhei ao abrir: " + type(e).__name__
+    return "Abri meu proprio codigo no VS Code: " + fonte_cam
+
+
+@tool
+def ver_minha_funcao(nome: str) -> str:
+    """Mostra aqui no console o codigo-fonte de UMA funcao minha - eu lendo a
+    mim mesmo. Util para entender ou revisar antes de mandar mudar algo."""
+    import ast as _ast
+    alvo = _sem_acento(nome.strip().lower()).replace(" ", "_")
+    fonte_cam = _minha_fonte()
+    try:
+        texto = open(fonte_cam, encoding="utf-8").read()
+        arvore = _ast.parse(texto)
+    except Exception as e:
+        return "Nao consegui ler meu codigo: " + type(e).__name__
+    for no in _ast.walk(arvore):
+        if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and no.name == alvo:
+            trecho = _ast.get_source_segment(texto, no) or ""
+            corte = trecho.splitlines()[:60]
+            return ("MINHA FUNCAO '" + alvo + "' (linha " + str(no.lineno) + " de " +
+                    os.path.basename(fonte_cam) + "):\n" + "\n".join(corte) +
+                    ("\n... (cortei aqui)" if len(trecho.splitlines()) > 60 else ""))
+    parecidos = [no.name for no in _ast.walk(arvore)
+                 if isinstance(no, (_ast.FunctionDef, _ast.AsyncFunctionDef)) and alvo in no.name]
+    if parecidos:
+        return "Nao tenho '" + alvo + "'. Talvez: " + ", ".join(parecidos[:10])
+    return "Nao tenho nenhuma funcao com esse nome."
+
+
 # ==================== PAINEL WEB LOCAL (a "mesa de trabalho" do agente) ====================
 # Um site que roda DENTRO do seu PC (127.0.0.1) servido pelo proprio agente,
 # sem internet e sem instalar nada: da pra ver o estado da maquina em tempo
@@ -5397,6 +5666,12 @@ def _menu_ajuda_local():
     print("                        314 e pergunto antes de executar (sem nuvem)")
     print("   ferramentas de <assunto> ....... lista o que existe sobre o tema")
     print("                        (ex.: 'ferramentas de rede', 'ferramentas de disco')")
+    print("AUTOPROGRAMACAO (o agente mexendo no proprio codigo, offline):")
+    print("   abre seu codigo [na funcao X] .. abre o agente.py no VS Code")
+    print("   mostra sua funcao <nome> ....... ele le o proprio codigo pra voce")
+    print("   cria uma ferramenta <nome>: <o que faz>")
+    print("                        cria em si mesmo, valida e desfaz se quebrar")
+    print("   remove a ferramenta <nome> | desfazer edicao")
     print("PAINEL WEB (uma central visual rodando no seu PC):")
     print("   abrir painel ....... abre no navegador: estado em tempo real, busca e")
     print("                        executa ferramentas, edita arquivos, chat e rotinas")
@@ -5991,6 +6266,35 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- AUTOPROGRAMACAO: o agente mexendo no proprio codigo ----
+    if n in ("abremeucodigo", "abreseucodigo", "abraseucodigo", "mostreseucodigo",
+             "abrircodigofonte", "abremeufonte", "abreoagentepy", "editeseucodigo"):
+        _rel(_invocar_local("abrir_meu_codigo")); return True
+    for _pre in ("abre seu codigo na funcao", "abre meu codigo na funcao",
+                 "abre o codigo na funcao", "vai na funcao"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("abrir_meu_codigo", funcao=comando[len(_pre):].strip(" :,."))); return True
+    for _pre in ("mostra sua funcao", "mostre sua funcao", "ver sua funcao",
+                 "mostra o codigo da funcao", "como e sua funcao"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("ver_minha_funcao", nome=comando[len(_pre):].strip(" :,."))); return True
+    for _pre in ("cria uma ferramenta", "criar ferramenta", "cria a ferramenta",
+                 "adiciona uma ferramenta", "nova ferramenta chamada",
+                 "se programa para", "programe em voce"):
+        if cmd.startswith(_pre):
+            _resto_f = comando[len(_pre):].strip(" :,.")
+            _nome_f, _desc_f = (_resto_f.split(":", 1) + [""])[:2] if ":" in _resto_f else (_resto_f, "")
+            if not _desc_f.strip():
+                _rel("Formato: cria uma ferramenta <nome>: <o que ela faz>. Ex.: "
+                     "'cria uma ferramenta contar_janelas: diz quantas janelas estao abertas'")
+                return True
+            _rel(_invocar_local("criar_ferramenta_nova", nome=_nome_f.strip(),
+                                descricao=_desc_f.strip()))
+            return True
+    for _pre in ("remove a ferramenta", "remover ferramenta", "apaga a ferramenta"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("remover_ferramenta_minha", nome=comando[len(_pre):].strip(" :,."))); return True
 
     # ---- PAINEL WEB LOCAL ----
     if n in ("abrirpainel", "painel", "painelweb", "abrirpainelweb", "abrepainel",
@@ -19608,6 +19912,11 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    # --- autoprogramacao local (o agente editando a si mesmo) ---
+    criar_ferramenta_nova,
+    remover_ferramenta_minha,
+    abrir_meu_codigo,
+    ver_minha_funcao,
     # --- painel web local ---
     abrir_painel_web,
     fechar_painel_web,
