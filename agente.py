@@ -6429,13 +6429,21 @@ def _expandir_apelidos(txt: str) -> str:
     return baixo
 
 
+# Palavras tecnicas de 2 letras que NAO podem ser descartadas pelo filtro de
+# tamanho - sem isto, "meu ip" ficava sem nenhum token e a busca nao achava
+# nada (a unica ferramenta invisivel do arsenal era justamente meu_ip).
+_TERMOS_CURTOS = {"ip", "pc", "hd", "tv", "js", "py", "so", "id", "cd", "dc"}
+
+
 def _tokens_pt(txt: str) -> set:
     """Radicais uteis do texto (sem acento, sem palavra-vazia, com sinonimos)."""
     import re as _re
     palavras = _re.findall(r"[a-z0-9]+", _expandir_apelidos(txt))
     saida = set()
     for pal in palavras:
-        if len(pal) < 3 or pal in _STOP_PT:
+        if pal in _STOP_PT:
+            continue
+        if len(pal) < 3 and pal not in _TERMOS_CURTOS:
             continue
         saida.add(_radical(pal))
         sin = _SINONIMOS_FERR.get(pal)
@@ -8018,7 +8026,15 @@ def _processar_cerebro_local(comando: str) -> bool:
     # OPNIAO PROPRIA / SUGESTOES DE NOVAS FUNCOES: o que ele gostaria de ter,
     # ideias de ferramentas, como melhorar. Usa a ferramenta de opinioes (ja
     # existente) e, se a IA neural estiver pronta, pergunta a ela tambem.
-    if any(p in cmd for p in ("que funcao voce gostaria", "qual funcao voce gostaria",
+    # Guarda: "cria uma ferramenta X: faz tal coisa" e PEDIDO DE CRIAR, nao
+    # pedido de opiniao. Sem isto, a regra de opiniao abaixo engolia o comando
+    # (porque "nova ferramenta" aparece no meio da frase) e a autoprogramacao
+    # nunca era alcancada.
+    _quer_criar_ferramenta = (":" in cmd and any(cmd.startswith(x) for x in (
+        "cria uma ferramenta", "criar ferramenta", "cria a ferramenta",
+        "adiciona uma ferramenta", "nova ferramenta chamada", "nova ferramenta",
+        "se programa para", "programe em voce")))
+    if not _quer_criar_ferramenta and any(p in cmd for p in ("que funcao voce gostaria", "qual funcao voce gostaria",
                               "o que voce gostaria de ter", "que ferramenta voce gostaria",
                               "sugere uma funcao", "sugere uma ferramenta", "ideia de funcao",
                               "ideia de ferramenta", "nova funcao", "nova ferramenta",
