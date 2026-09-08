@@ -2694,6 +2694,109 @@ _INTRO_LOCAL = (
 
 
 @tool
+def salvar_versao_do_projeto(pasta: str = "", apelido: str = "") -> str:
+    """Guarda uma COPIA COMPLETA da pasta do seu projeto/site antes de mexer.
+    E o 'ponto de restauracao' do seu trabalho: se qualquer edicao bagunçar
+    alguma coisa, 'restaurar versao do projeto' devolve tudo como estava."""
+    import shutil
+    base = _pasta_padrao(pasta) if pasta else os.getcwd()
+    if not os.path.isdir(base):
+        return "Pasta nao encontrada: " + base
+    carimbo = datetime.now().strftime("%Y%m%d_%H%M%S")
+    etiqueta = "".join(c for c in (apelido or "").strip().replace(" ", "-")
+                       if c.isalnum() or c in "-_")
+    nome = os.path.basename(base.rstrip("\\/")) + "__" + carimbo + (("__" + etiqueta) if etiqueta else "")
+    destino = os.path.join(PASTA_BACKUPS_EDICAO, "versoes", nome)
+    ignorar = shutil.ignore_patterns("node_modules", ".git", "__pycache__", "venv",
+                                     ".venv", "dist", "build", "*.log")
+    try:
+        os.makedirs(os.path.dirname(destino), exist_ok=True)
+        shutil.copytree(base, destino, ignore=ignorar)
+    except Exception as e:
+        return "Nao consegui copiar: " + type(e).__name__
+    total = soma = 0
+    for raiz, _d, arqs in os.walk(destino):
+        for a in arqs:
+            total += 1
+            try:
+                soma += os.path.getsize(os.path.join(raiz, a))
+            except Exception:
+                pass
+    return ("VERSAO SALVA do projeto\n  De: " + base + "\n  Copia: " + destino +
+            "\n  " + str(total) + " arquivo(s), " + _tam_legivel(soma) +
+            "\n  Para voltar a este ponto: 'restaurar versao do projeto'.")
+
+
+@tool
+def listar_versoes_do_projeto(pasta: str = "") -> str:
+    """Lista os pontos de restauracao (versoes salvas) dos seus projetos."""
+    raiz = os.path.join(PASTA_BACKUPS_EDICAO, "versoes")
+    if not os.path.isdir(raiz):
+        return "Nenhuma versao salva ainda. Use 'salvar versao do projeto' antes de mexer."
+    alvo = os.path.basename(_pasta_padrao(pasta).rstrip("\\/")) if pasta else ""
+    itens = sorted(os.listdir(raiz), reverse=True)
+    if alvo:
+        itens = [i for i in itens if i.startswith(alvo + "__")]
+    if not itens:
+        return "Nenhuma versao salva" + ((" de '" + alvo + "'") if alvo else "") + "."
+    linhas = ["VERSOES SALVAS (" + str(len(itens)) + "):"]
+    for i in itens[:20]:
+        partes = i.split("__")
+        quando = partes[1] if len(partes) > 1 else "?"
+        try:
+            quando = datetime.strptime(quando, "%Y%m%d_%H%M%S").strftime("%d/%m/%Y %H:%M:%S")
+        except Exception:
+            pass
+        linhas.append("  " + partes[0] + "  |  " + quando +
+                      (("  |  " + partes[2]) if len(partes) > 2 else ""))
+    linhas.append("Para voltar: 'restaurar versao do projeto <nome da pasta>'.")
+    return "\n".join(linhas)
+
+
+@tool
+def restaurar_versao_do_projeto(pasta: str = "", qual: str = "") -> str:
+    """Devolve o projeto/site ao estado de uma versao salva. Antes de
+    sobrescrever, guarda o estado ATUAL como uma nova versao (entao da pra
+    voltar atras da volta). Pede confirmacao."""
+    import shutil
+    base = _pasta_padrao(pasta) if pasta else os.getcwd()
+    if not os.path.isdir(base):
+        return "Pasta nao encontrada: " + base
+    raiz = os.path.join(PASTA_BACKUPS_EDICAO, "versoes")
+    if not os.path.isdir(raiz):
+        return "Nao ha nenhuma versao salva."
+    alvo = os.path.basename(base.rstrip("\\/"))
+    candidatas = sorted([i for i in os.listdir(raiz) if i.startswith(alvo + "__")], reverse=True)
+    if qual.strip():
+        candidatas = [i for i in candidatas if qual.strip() in i] or candidatas
+    if not candidatas:
+        return "Nao achei versao salva de '" + alvo + "'. Use 'listar versoes do projeto'."
+    escolhida = os.path.join(raiz, candidatas[0])
+    if not _confirma_poderoso("Devolver " + base + " ao estado de " + candidatas[0] +
+                              "? (guardo o estado atual antes)"):
+        return "Cancelado."
+    try:
+        _invocar_local("salvar_versao_do_projeto", pasta=base, apelido="antes-de-restaurar")
+    except Exception:
+        pass
+    trocados = 0
+    try:
+        for raiz_c, _d, arqs in os.walk(escolhida):
+            for a in arqs:
+                origem = os.path.join(raiz_c, a)
+                rel = os.path.relpath(origem, escolhida)
+                destino = os.path.join(base, rel)
+                os.makedirs(os.path.dirname(destino) or base, exist_ok=True)
+                shutil.copy2(origem, destino)
+                trocados += 1
+    except Exception as e:
+        return "Falhei no meio da restauracao: " + type(e).__name__
+    return ("PROJETO RESTAURADO: " + str(trocados) + " arquivo(s) voltaram ao estado de " +
+            candidatas[0] + "\n  O estado de antes da restauracao tambem foi guardado, "
+            "entao da pra desfazer isto tambem.")
+
+
+@tool
 def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> str:
     """Cria um SITE SEU no estilo loja de aplicativos: mostra TODAS as
     ferramentas do agente em cartoes, separadas por categoria, com busca - e
@@ -4101,9 +4204,110 @@ def _registrar_edicao(caminho: str, conteudo_antigo: str, descricao: str) -> str
         return ""
 
 
+def _linha_do_ponto(texto: str, pos: int) -> int:
+    return texto.count("\n", 0, max(0, pos)) + 1
+
+
+def _checar_pares(texto: str, tipo: str):
+    """Confere se chaves, parenteses e colchetes fecham certo, ignorando o que
+    esta dentro de texto entre aspas e de comentario. E o erro numero 1 de quem
+    edita CSS e JavaScript: esquecer de fechar uma chave."""
+    pares = {"}": "{", ")": "(", "]": "["}
+    abre = set(pares.values())
+    pilha = []
+    i, n = 0, len(texto)
+    aspas = None
+    while i < n:
+        c = texto[i]
+        prox = texto[i + 1] if i + 1 < n else ""
+        if aspas:
+            if c == "\\":
+                i += 2
+                continue
+            if c == aspas:
+                aspas = None
+            elif c == "\n" and aspas in ("'", '"'):
+                aspas = None  # string nao fechada na linha: nao vira bagunca
+            i += 1
+            continue
+        if c in ("'", '"', "`"):
+            aspas = c
+            i += 1
+            continue
+        if c == "/" and prox == "/" and tipo != "css":
+            quebra = texto.find("\n", i)
+            i = n if quebra == -1 else quebra
+            continue
+        if c == "/" and prox == "*":
+            fim = texto.find("*/", i)
+            i = n if fim == -1 else fim + 2
+            continue
+        if c in abre:
+            pilha.append((c, i))
+        elif c in pares:
+            if not pilha:
+                return False, "fechou um '%s' que nunca foi aberto (linha %s)" % (
+                    c, _linha_do_ponto(texto, i))
+            aberto, onde = pilha.pop()
+            if aberto != pares[c]:
+                return False, "fechou '%s' na linha %s mas o aberto era '%s' (linha %s)" % (
+                    c, _linha_do_ponto(texto, i), aberto, _linha_do_ponto(texto, onde))
+        i += 1
+    if pilha:
+        aberto, onde = pilha[-1]
+        return False, "faltou fechar '%s' aberto na linha %s" % (
+            aberto, _linha_do_ponto(texto, onde))
+    return True, "ok"
+
+
+def _checar_html(texto: str):
+    """Confere as tags do HTML: procura tag aberta que nunca fecha e fechamento
+    de tag errada. Ignora as que nao precisam fechar (br, img, meta...)."""
+    import re as _re
+    sozinhas = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
+                "meta", "param", "source", "track", "wbr", "!doctype", "!--"}
+
+    def _apagar_mantendo_linhas(m):
+        # troca o miolo por espacos e preserva as quebras de linha, para o
+        # numero da linha continuar certo no aviso de erro
+        return "".join(ch if ch == "\n" else " " for ch in m.group(0))
+
+    # O que esta DENTRO de <script> e <style> nao e HTML: um regex de
+    # JavaScript como /</g parece uma tag e daria erro falso. Comentario
+    # <!-- --> tambem sai da conta.
+    texto = _re.sub(r"<script\b[^>]*>.*?</script\s*>", _apagar_mantendo_linhas,
+                    texto, flags=_re.S | _re.I)
+    texto = _re.sub(r"<style\b[^>]*>.*?</style\s*>", _apagar_mantendo_linhas,
+                    texto, flags=_re.S | _re.I)
+    texto = _re.sub(r"<!--.*?-->", _apagar_mantendo_linhas, texto, flags=_re.S)
+    pilha = []
+    for m in _re.finditer(r"<\s*(/?)\s*([a-zA-Z0-9!-]+)[^>]*?(/?)\s*>", texto):
+        fecha, tag, autofecha = m.group(1), m.group(2).lower(), m.group(3)
+        if tag in sozinhas or autofecha == "/" or tag.startswith("!"):
+            continue
+        if not fecha:
+            pilha.append((tag, m.start()))
+        else:
+            if not pilha:
+                return False, "</%s> na linha %s fecha uma tag que nunca abriu" % (
+                    tag, _linha_do_ponto(texto, m.start()))
+            esperado, onde = pilha.pop()
+            if esperado != tag:
+                return False, ("</%s> na linha %s, mas a tag aberta era <%s> (linha %s)" % (
+                    tag, _linha_do_ponto(texto, m.start()), esperado,
+                    _linha_do_ponto(texto, onde)))
+    if pilha:
+        tag, onde = pilha[-1]
+        return False, "a tag <%s> aberta na linha %s nunca foi fechada" % (
+            tag, _linha_do_ponto(texto, onde))
+    return True, "ok"
+
+
 def _validar_arquivo(caminho: str, conteudo: str):
-    """Confere se o conteudo novo continua valido para o tipo do arquivo.
-    Devolve (ok, mensagem). Valida Python e JSON de verdade."""
+    """Confere se o conteudo novo continua valido para o TIPO do arquivo, antes
+    de gravar. Cobre Python, JSON, HTML (tags), CSS e JavaScript (chaves,
+    parenteses e colchetes). E isto que impede uma edicao de quebrar o seu
+    site sem ninguem perceber."""
     baixo = caminho.lower()
     if baixo.endswith(".py"):
         try:
@@ -4115,7 +4319,21 @@ def _validar_arquivo(caminho: str, conteudo: str):
             json.loads(conteudo)
         except Exception as e:
             return False, "JSON invalido: " + str(e)[:90]
+    elif baixo.endswith((".html", ".htm", ".xhtml")):
+        ok, motivo = _checar_html(conteudo)
+        if not ok:
+            return False, "HTML quebrado: " + motivo
+    elif baixo.endswith(".css"):
+        ok, motivo = _checar_pares(conteudo, "css")
+        if not ok:
+            return False, "CSS quebrado: " + motivo
+    elif baixo.endswith((".js", ".mjs", ".ts", ".jsx", ".tsx")):
+        ok, motivo = _checar_pares(conteudo, "js")
+        if not ok:
+            return False, "JavaScript quebrado: " + motivo
     return True, "ok"
+
+
 
 
 def _escrever_com_rede(caminho: str, conteudo_novo: str, descricao: str):
@@ -6846,6 +7064,20 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- VERSOES DO PROJETO (ponto de restauracao do seu site) ----
+    for _pre in ("salva versao do projeto", "salvar versao do projeto", "salva uma versao",
+                 "ponto de restauracao do projeto", "guarda o projeto"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("salvar_versao_do_projeto",
+                                pasta=comando[len(_pre):].strip(" :,."))); return True
+    if n in ("versoesdoprojeto", "listarversoes", "listarversoesdoprojeto", "minhasversoes"):
+        _rel(_invocar_local("listar_versoes_do_projeto")); return True
+    for _pre in ("restaura versao do projeto", "restaurar versao do projeto",
+                 "volta o projeto", "desfaz tudo no projeto"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("restaurar_versao_do_projeto",
+                                pasta=comando[len(_pre):].strip(" :,."))); return True
 
     # ---- SITE PROPRIO CONECTADO AO AGENTE ----
     for _pre in ("cria um site conectado", "criar site conectado", "cria meu painel",
@@ -20518,6 +20750,9 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    salvar_versao_do_projeto,
+    listar_versoes_do_projeto,
+    restaurar_versao_do_projeto,
     criar_site_conectado_ao_agente,
     rodar_site_local,
     parar_site_local,
