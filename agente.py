@@ -811,6 +811,7 @@ DEFAULT_CONFIG = {
     "usar_ia_nuvem": True,  # interruptor do rodizio de IAs na nuvem: False = 100% local (sem API/cota/limite)
     "idioma_voz": "portuguese",
     "intervalo_autodiagnostico_minutos": 15,
+    "abrir_painel_no_inicio": False,  # True = ao abrir o agente, ja sobe o painel web
     "avisar_uso_critico": True,     # avisos de CPU/RAM alta ('silenciar avisos' desliga)
     "limite_cpu_aviso": 92,         # so avisa acima disso, e se persistir
     "limite_ram_aviso": 95,
@@ -2966,7 +2967,7 @@ def ver_minha_funcao(nome: str) -> str:
 # sem internet e sem instalar nada: da pra ver o estado da maquina em tempo
 # real, buscar e executar qualquer uma das ferramentas, navegar e EDITAR
 # arquivos (com backup e validacao), rodar rotinas e conversar com a IA local.
-_PAINEL = {"servidor": None, "porta": 0, "jobs": {}, "seq": 0}
+_PAINEL = {"servidor": None, "porta": 0, "jobs": {}, "seq": 0, "saida": None}
 
 HTML_PAINEL = r"""<!DOCTYPE html>
 <html lang="pt-BR">
@@ -3036,6 +3037,17 @@ textarea.editor{min-height:430px;font-family:ui-monospace,Consolas,monospace;fon
 .tag{font-size:.7rem;background:#0e1626;border:1px solid var(--linha);color:var(--fraco);
      padding:2px 8px;border-radius:12px}
 h2.t{font-size:1rem;margin-bottom:13px;color:var(--fraco);font-weight:600}
+.fundo{position:fixed;inset:0;background:rgba(3,6,12,.78);display:none;place-items:center;z-index:99}
+.fundo.on{display:grid}
+.modal{background:var(--card);border:1px solid var(--linha);border-radius:15px;padding:24px;
+       max-width:540px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.modal h3{font-size:1.05rem;margin-bottom:10px;color:var(--amarelo)}
+.modal p{font-size:.93rem;line-height:1.6;color:var(--txt);white-space:pre-wrap;margin-bottom:18px}
+.modal .bts{display:flex;gap:10px;justify-content:flex-end}
+.term{background:#050810;border:1px solid var(--linha);border-radius:11px;padding:15px;
+      font-family:ui-monospace,Consolas,monospace;font-size:.83rem;white-space:pre-wrap;
+      height:430px;overflow:auto;color:#c8d3e6;line-height:1.55}
+.term .cmd{color:var(--verde)}
 </style>
 </head>
 <body>
@@ -3046,6 +3058,7 @@ h2.t{font-size:1rem;margin-bottom:13px;color:var(--fraco);font-weight:600}
 </header>
 <nav>
   <button class="on" data-aba="painel">Painel</button>
+  <button data-aba="terminal">Terminal</button>
   <button data-aba="ferramentas">Ferramentas</button>
   <button data-aba="arquivos">Arquivos</button>
   <button data-aba="chat">Conversar</button>
@@ -3081,9 +3094,26 @@ h2.t{font-size:1rem;margin-bottom:13px;color:var(--fraco);font-weight:600}
   <pre class="saida" id="saida">Clique numa acao rapida ou execute uma ferramenta na aba "Ferramentas".</pre>
 </section>
 
+<section class="aba" id="aba-terminal">
+  <div class="aviso">Aqui funciona <b>tudo</b> o que voce digitaria na janela preta do agente:
+    comandos, rotinas, planos com varios passos, objetivos. E quando ele precisar de um
+    sim/nao, a pergunta aparece <b>aqui mesmo</b>, nao no cmd.</div>
+  <div class="term" id="term">Digite um comando abaixo. Exemplos:
+  ajuda
+  detectar gargalo
+  objetivo: deixa meu pc rapido
+  abre o spotify e depois ver a tela
+  nos meus arquivos, o que eu escrevi sobre o contrato</div>
+  <div class="busca" style="margin-top:12px">
+    <input id="cmd" placeholder="Digite o comando e aperte Enter..."
+           onkeydown="if(event.key==='Enter')mandarComando()">
+    <button class="b" onclick="mandarComando()">Executar</button>
+  </div>
+</section>
+
 <section class="aba" id="aba-ferramentas">
-  <div class="aviso">Ferramentas que alteram o sistema pedem confirmacao na JANELA DO AGENTE
-    (o cmd preto). Se uma acao ficar "executando", olhe la e responda sim/nao.</div>
+  <div class="aviso">Ferramentas que alteram o sistema pedem confirmacao: a pergunta aparece
+    aqui mesmo, numa janelinha, e nada acontece sem o seu "sim".</div>
   <div class="busca">
     <input id="q" placeholder="O que voce quer fazer? ex.: memoria, wifi, duplicados, git, cpf">
     <button class="b" onclick="buscar()">Buscar</button>
@@ -3128,6 +3158,16 @@ ou peca uma acao — respondo aqui mesmo, sem nuvem.</div></div></div>
 </section>
 
 </main>
+<div class="fundo" id="fundo">
+  <div class="modal">
+    <h3>O agente precisa da sua confirmacao</h3>
+    <p id="pergunta">...</p>
+    <div class="bts">
+      <button class="b g" onclick="responder('nao')">Nao</button>
+      <button class="b" onclick="responder('sim')">Sim, pode</button>
+    </div>
+  </div>
+</div>
 <script>
 const $ = s => document.querySelector(s);
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
@@ -3176,17 +3216,45 @@ function pedir(nome, params){
   }
   rodar(nome, dados);
 }
+let jobPergunta = null;
+function mostrarPergunta(jid, texto){
+  jobPergunta = jid;
+  document.getElementById('pergunta').textContent = texto;
+  document.getElementById('fundo').classList.add('on');
+}
+async function responder(r){
+  document.getElementById('fundo').classList.remove('on');
+  if(!jobPergunta) return;
+  await fetch('/api/responder', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id: jobPergunta, resposta: r})});
+  jobPergunta = null;
+}
+function acompanhar(id, aoTerminar, aoAndamento){
+  const t = setInterval(async () => {
+    const s = await (await fetch('/api/job?id=' + id)).json();
+    if(s.pergunta && jobPergunta !== id) mostrarPergunta(id, s.pergunta);
+    if(s.pronto){ clearInterval(t); aoTerminar(s.saida); }
+    else if(aoAndamento) aoAndamento();
+  }, 600);
+}
+async function mandarComando(){
+  const t = $('#cmd').value.trim(); if(!t) return; $('#cmd').value = '';
+  const term = $('#term');
+  term.textContent += '\n\n> ' + t + '\n';
+  term.scrollTop = 1e6;
+  const r = await fetch('/api/comando', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({texto: t})});
+  const {id} = await r.json();
+  acompanhar(id, saida => { term.textContent += saida + '\n'; term.scrollTop = 1e6; });
+}
 async function rodar(nome, params){
   const alvo = $('#aba-ferramentas').classList.contains('on') ? $('#saida2') : $('#saida');
   alvo.textContent = 'Executando ' + nome + '...';
   const r = await fetch('/api/executar', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({nome, params})});
   const {id} = await r.json();
-  const t = setInterval(async () => {
-    const s = await (await fetch('/api/job?id=' + id)).json();
-    if(s.pronto){ clearInterval(t); alvo.textContent = s.saida; }
-    else alvo.textContent = 'Executando ' + nome + '...  (se pedir confirmacao, responda na janela do agente)';
-  }, 700);
+  acompanhar(id, saida => { alvo.textContent = saida; },
+                 () => { alvo.textContent = 'Executando ' + nome + '...'; });
 }
 async function listar(){
   const p = $('#caminho').value;
@@ -3238,6 +3306,107 @@ async function rodarRotina(nome){
 </html>"""
 
 
+# --- Ponte console <-> painel: saida capturada e PERGUNTAS respondidas no site ---
+# Sem isto, uma ferramenta que pede "sim/nao" travaria esperando resposta no cmd
+# preto, e o painel ficaria eternamente "executando". Aqui a pergunta viaja ate
+# o navegador e a resposta volta - por isso da pra viver so dentro do site.
+_JOB_ATUAL = threading.local()
+_input_original = None
+
+
+class _SaidaDividida:
+    """Espelha o que o agente imprime: continua indo pro console E, se a linha
+    veio de um trabalho do painel, tambem vai pro buffer daquele trabalho."""
+
+    def __init__(self, original):
+        self.original = original
+        self.buffers = {}
+
+    def write(self, texto):
+        try:
+            buf = self.buffers.get(threading.get_ident())
+            if buf is not None:
+                buf.write(texto)
+        except Exception:
+            pass
+        try:
+            self.original.write(texto)
+        except Exception:
+            pass
+
+    def flush(self):
+        try:
+            self.original.flush()
+        except Exception:
+            pass
+
+    def isatty(self):
+        return False
+
+
+def _input_do_painel(mensagem=""):
+    """Substitui o input() do Python. No console, funciona como sempre. Dentro
+    de um trabalho do painel, manda a pergunta pro navegador e espera a
+    resposta chegar de la."""
+    jid = getattr(_JOB_ATUAL, "id", None)
+    if not jid or jid not in _PAINEL["jobs"]:
+        return _input_original(mensagem)
+    job = _PAINEL["jobs"][jid]
+    evento = threading.Event()
+    job["pergunta"] = str(mensagem) or "Confirmar?"
+    job["evento"] = evento
+    job["resposta"] = None
+    try:
+        _PAINEL["saida"].original.write("\n[painel] aguardando sua resposta no navegador: "
+                                        + str(mensagem)[:110] + "\n")
+    except Exception:
+        pass
+    respondeu = evento.wait(timeout=600)
+    resposta = job.get("resposta")
+    job["pergunta"] = None
+    job["evento"] = None
+    if not respondeu or resposta is None:
+        return "nao"
+    return str(resposta)
+
+
+def _preparar_ponte_painel():
+    """Instala a captura de saida e o input do painel (uma vez so)."""
+    global _input_original
+    import builtins
+    if _PAINEL.get("saida") is None:
+        _PAINEL["saida"] = _SaidaDividida(sys.stdout)
+        sys.stdout = _PAINEL["saida"]
+    if _input_original is None:
+        _input_original = builtins.input
+        builtins.input = _input_do_painel
+
+
+def _rodar_no_job(job_id, funcao):
+    """Roda algo capturando tudo que ele imprime, para mostrar no painel."""
+    import io as _io
+    buffer = _io.StringIO()
+    _JOB_ATUAL.id = job_id
+    saida = _PAINEL.get("saida")
+    if saida is not None:
+        saida.buffers[threading.get_ident()] = buffer
+    try:
+        retorno = funcao()
+    except Exception as e:
+        retorno = "Erro: " + type(e).__name__ + " - " + str(e)[:300]
+    finally:
+        if saida is not None:
+            saida.buffers.pop(threading.get_ident(), None)
+        _JOB_ATUAL.id = None
+    impresso = buffer.getvalue().strip()
+    texto = str(retorno).strip() if retorno is not None else ""
+    if impresso and texto and texto not in impresso:
+        final = impresso + "\n" + texto
+    else:
+        final = impresso or texto or "(sem saida)"
+    _PAINEL["jobs"][job_id] = {"pronto": True, "saida": final, "pergunta": None}
+
+
 def _painel_status() -> dict:
     import platform as _pl
     dados = {"cpu": 0.0, "ram": 0.0, "disco": 0.0, "uptime": "?", "processos": 0,
@@ -3273,11 +3442,23 @@ def _painel_status() -> dict:
 
 
 def _painel_executar_job(job_id: str, nome: str, params: dict) -> None:
-    try:
-        resultado = _invocar_local(nome, **(params or {}))
-    except Exception as e:
-        resultado = "Erro ao executar: " + type(e).__name__ + " - " + str(e)[:200]
-    _PAINEL["jobs"][job_id] = {"pronto": True, "saida": str(resultado)}
+    _rodar_no_job(job_id, lambda: _invocar_local(nome, **(params or {})))
+
+
+def _painel_rodar_comando(job_id: str, texto: str) -> None:
+    """Roda no painel QUALQUER comando que voce digitaria no console: passa
+    pelo mesmo cerebro local (regras, rotinas, plano de varios passos, ponte
+    para as ferramentas), com a saida capturada e as perguntas indo pro site."""
+    def _executar():
+        if not _processar_cerebro_local(texto):
+            achados = _buscar_ferramentas(texto, 3)
+            if achados:
+                return ("Nao tenho regra pronta pra isso. Ferramentas parecidas: "
+                        + ", ".join(i["nome"] for _n, i in achados)
+                        + ". Use a aba Ferramentas para executar com os parametros.")
+            return "Nao entendi esse comando. Digite 'ajuda' para ver o menu."
+        return ""
+    _rodar_no_job(job_id, _executar)
 
 
 def _criar_handler_painel():
@@ -3326,7 +3507,10 @@ def _criar_handler_painel():
                 return self._json({"itens": itens})
             if rota.path == "/api/job":
                 jid = (q.get("id") or [""])[0]
-                return self._json(_PAINEL["jobs"].get(jid, {"pronto": False, "saida": ""}))
+                job = _PAINEL["jobs"].get(jid, {"pronto": False, "saida": ""})
+                return self._json({"pronto": job.get("pronto", False),
+                                   "saida": job.get("saida", ""),
+                                   "pergunta": job.get("pergunta")})
             if rota.path == "/api/arquivos":
                 alvo = unquote((q.get("path") or [""])[0]) or os.path.expanduser("~")
                 alvo = os.path.abspath(alvo)
@@ -3385,6 +3569,27 @@ def _criar_handler_painel():
                 threading.Thread(target=_painel_executar_job,
                                  args=(jid, nome, params), daemon=True).start()
                 return self._json({"id": jid})
+            if rota.path == "/api/comando":
+                texto = str(dados.get("texto") or "").strip()
+                if not texto:
+                    return self._json({"erro": "comando vazio"}, 400)
+                _PAINEL["seq"] += 1
+                jid = "c" + str(_PAINEL["seq"])
+                _PAINEL["jobs"][jid] = {"pronto": False, "saida": "", "pergunta": None}
+                threading.Thread(target=_painel_rodar_comando,
+                                 args=(jid, texto), daemon=True).start()
+                return self._json({"id": jid})
+            if rota.path == "/api/responder":
+                jid = str(dados.get("id") or "")
+                job = _PAINEL["jobs"].get(jid)
+                if not job or not job.get("evento"):
+                    return self._json({"ok": False})
+                job["resposta"] = str(dados.get("resposta") or "nao")
+                try:
+                    job["evento"].set()
+                except Exception:
+                    pass
+                return self._json({"ok": True})
             if rota.path == "/api/chat":
                 texto = str(dados.get("texto") or "").strip()
                 if not texto:
@@ -3424,6 +3629,7 @@ def _iniciar_painel(porta: int = 8777, publico: bool = False):
     from http.server import ThreadingHTTPServer
     if _PAINEL["servidor"] is not None:
         return _PAINEL["porta"]
+    _preparar_ponte_painel()
     endereco = "0.0.0.0" if publico else "127.0.0.1"
     servidor = ThreadingHTTPServer((endereco, int(porta)), _criar_handler_painel())
     _PAINEL["servidor"] = servidor
@@ -3455,6 +3661,19 @@ def abrir_painel_web(porta: int = 8777) -> str:
             "  Abas: Painel (tempo real), Ferramentas (busca e executa as " +
             str(len(tools)) + "), Arquivos (edita com backup), Conversar e Rotinas.\n"
             "  Para fechar: 'fechar painel'.")
+
+
+@tool
+def painel_ao_iniciar(acao: str = "ligar") -> str:
+    """Liga ou desliga a abertura AUTOMATICA do painel web toda vez que o
+    agente inicia - assim o iniciar.bat ja te entrega a interface pronta."""
+    ligar = acao.strip().lower().startswith(("lig", "ativ", "sim"))
+    config["abrir_painel_no_inicio"] = ligar
+    salvar_json(ARQ_CONFIG, config)
+    if ligar:
+        return ("Pronto: a partir de agora, sempre que voce abrir o iniciar.bat eu ja "
+                "subo o painel e abro no navegador. Para desligar: 'painel ao iniciar desligar'.")
+    return "Ok, nao abro mais o painel sozinho. Use 'abrir painel' quando quiser."
 
 
 @tool
@@ -6303,6 +6522,11 @@ def _processar_cerebro_local(comando: str) -> bool:
     if cmd.startswith("abrir painel ") or cmd.startswith("abre o painel "):
         _porta_p = "".join(ch for ch in cmd if ch.isdigit())
         _rel(_invocar_local("abrir_painel_web", porta=int(_porta_p or 8777))); return True
+    if n in ("painelaoiniciar", "painelsempre", "abrirpainelnoinicio",
+             "painelautomatico", "sempreabriropainel"):
+        _rel(_invocar_local("painel_ao_iniciar", acao="ligar")); return True
+    if n in ("painelaoiniciardesligar", "naoabrirpainelnoinicio", "desligarpainelautomatico"):
+        _rel(_invocar_local("painel_ao_iniciar", acao="desligar")); return True
     if n in ("fecharpainel", "desligarpainel", "fecharpainelweb", "pararpainel"):
         _rel(_invocar_local("fechar_painel_web")); return True
 
@@ -19912,6 +20136,7 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    painel_ao_iniciar,
     # --- autoprogramacao local (o agente editando a si mesmo) ---
     criar_ferramenta_nova,
     remover_ferramenta_minha,
@@ -20565,6 +20790,15 @@ else:
     print(" Para ter uma IA que roda 100% no PC (sem cota e sem limite), digite: criar ia")
     print("   Depois ela liga sozinha. Para ver todos os comandos, digite: ajuda")
 print(" Digite 'ajuda' para ver o menu completo de comandos.")
+# Painel web automatico na abertura (se voce pediu com 'painel ao iniciar').
+if config.get("abrir_painel_no_inicio"):
+    try:
+        _porta_painel = _iniciar_painel(8777)
+        _url_painel = "http://127.0.0.1:" + str(_porta_painel)
+        print(" Painel web no ar: " + _url_painel + " (abrindo no navegador...)")
+        subprocess.Popen('start "" "' + _url_painel + '"', shell=True)
+    except Exception:
+        print(" (nao consegui subir o painel web automaticamente)")
 _checar_iniciar_bat()
 print("")
 falar("Agente pronto para uso.")
