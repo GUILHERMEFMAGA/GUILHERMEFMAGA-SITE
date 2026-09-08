@@ -831,8 +831,34 @@ def carregar_json(caminho, padrao):
 
 
 def salvar_json(caminho, dados):
-    with open(caminho, "w", encoding="utf-8") as f:
-        json.dump(dados, f, ensure_ascii=False, indent=2)
+    """Grava snapshot completo em temporario antes de substituir o destino.
+
+    Nao torna operacoes ler-modificar-gravar transacionais entre threads.
+    Em falha de serializacao/escrita, conserva o arquivo anterior.
+    """
+    import tempfile
+    from pathlib import Path
+    destino = Path(caminho).resolve()
+    conteudo = json.dumps(dados, ensure_ascii=False, indent=2)
+    temporario = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False,
+                                         dir=str(destino.parent),
+                                         prefix="." + destino.name + ".", suffix=".tmp") as f:
+            temporario = f.name
+            f.write(conteudo)
+            f.flush()
+            os.fsync(f.fileno())
+        if destino.exists():
+            os.chmod(temporario, destino.stat().st_mode & 0o777)
+        os.replace(temporario, str(destino))
+        temporario = None
+    finally:
+        if temporario is not None:
+            try:
+                os.unlink(temporario)
+            except OSError:
+                pass
 
 
 def _extrair_texto(conteudo) -> str:
@@ -2672,8 +2698,7 @@ def _abrir_app_ou_site(alvo: str) -> str:
 
 
 def _invocar_local(nome_fn, **params):
-    """Chama uma ferramenta @tool do proprio agente DIRETO (sem IA/nuvem). Tenta
-    o wrapper LangChain (.invoke) e, se nao houver, chama a funcao crua."""
+    """Escolhe UM adaptador; falha nao autoriza repetir uma acao via outro."""
     fn = globals().get(nome_fn)
     if fn is None:
         return f"(ferramenta '{nome_fn}' indisponivel)"
@@ -2681,12 +2706,12 @@ def _invocar_local(nome_fn, **params):
         inv = getattr(fn, "invoke", None)
         if callable(inv):
             return inv(params)
-    except Exception:
-        pass
-    try:
-        return fn(**params)
+        if callable(fn):
+            return fn(**params)
+        return f"(ferramenta '{nome_fn}' nao e executavel)"
     except Exception as e:
-        return f"(nao consegui executar '{nome_fn}': {type(e).__name__})"
+        return (f"(falha em '{nome_fn}': {type(e).__name__}; nao repeti a chamada. "
+                "Confira o resultado antes de tentar novamente: pode ter havido efeito parcial.)")
 
 
 _INTRO_LOCAL = (
@@ -7815,6 +7840,11 @@ def _processar_cerebro_local(comando: str) -> bool:
         return True
     if n.startswith(("tchau", "atelogo", "flw")) or n in ("tchau", "flw"):
         _rel("Falou! Vou ficar por aqui. E so chamar quando precisar.")
+        return True
+
+    # Comando especifico vem ANTES do generico abrir programa/painel Windows.
+    if n in ("abrirpainel", "abrepainel", "abreopainel", "abrirpainelweb"):
+        _rel(_invocar_local("abrir_painel_web"))
         return True
 
     # ---- CONFIGURACOES DO PC / RESOLVER SISTEMA (local, com sim/nao) ----
@@ -22946,7 +22976,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Ideias fundamentadas 2026-09-08-r6] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Ferramentas mais confiaveis 2026-09-08-r7] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -81,3 +81,42 @@ Testes isolados incluem cache/invalidação, fonte que causaria erro se executad
 referências falsas, títulos duplicados, JSON inválido, motor ausente, roteamento
 nos dois modos e ausência de escrita no fonte. Ainda é necessário avaliar a
 saída do GGUF e o tempo de geração no Windows real.
+
+## r7 — Primeiro lote de confiabilidade das ferramentas existentes
+
+Escolha do usuário: aprimorar as ferramentas existentes, não adicionar 300 novas.
+Preservadas as 463 entradas da lista tools, na mesma ordem e com as mesmas
+assinaturas de funções. Nenhuma ferramenta removida ou fundida.
+
+- salvar_json: serializa antes, escreve em temporário no mesmo diretório,
+  flush/fsync e os.replace. Em falha normal, preserva o destino e limpa o
+  temporário. Não é transação entre threads, backup permanente nem garantia
+  contra todo tipo de queda de energia; escrita pode custar mais tempo.
+- _invocar_local: escolhe .invoke OU chamada direta. Não cai na chamada direta
+  após erro de .invoke. Informa possível efeito parcial sem imprimir parâmetros
+  ou mensagem crua da exceção. Não elimina retries internos de cada ferramenta
+  ou do executar_com_autocura; estes ainda precisam de classificação por efeito.
+- abrir painel: prioridade do painel web sobre o atalho do Painel de Controle.
+  A segurança/autenticação da API do painel ainda é um ponto pendente separado.
+
+Referências primárias no GitHub consultadas em 08/09/2026:
+- https://github.com/untitaker/python-atomicwrites (MIT): temporário no mesmo
+  diretório e substituição. O projeto está descontinuado; não foi instalado.
+  Seu README recomenda considerar os.replace da biblioteca padrão.
+- https://github.com/jd/tenacity (Apache-2.0): políticas explícitas de repetição,
+  limites e tratamento de erros. Não foi instalado nem copiado código.
+
+Implementação própria sem nova dependência de runtime.
+
+Auditoria reproduzível: python scripts/auditar_ferramentas.py
+Resultado: docs/AUDITORIA_FERRAMENTAS_R7.md. Verifica registro, nomes, presença
+no AST, corpos idênticos e possíveis sobreposições por similaridade textual.
+Não prova ausência de duplicação semântica entre todas as ferramentas.
+Exemplos revisados: csv_para_json e json_para_csv são operações inversas;
+inicializacao_windows/remover_programa_inicializacao têm sobreposição parcial,
+mas abrangência diferente (HKCU Run versus várias chaves Run/RunOnce).
+Nenhuma foi removida porque têm interfaces e escopos diferentes.
+
+Próximos lotes ainda NÃO implementados: classificação de efeitos e retries,
+validação uniforme dos resultados de comandos Windows, revisão de permissões,
+segurança do painel e comparação funcional aprofundada das 463 ferramentas.
