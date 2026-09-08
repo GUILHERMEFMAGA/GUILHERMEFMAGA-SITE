@@ -2796,6 +2796,284 @@ def restaurar_versao_do_projeto(pasta: str = "", qual: str = "") -> str:
             "entao da pra desfazer isto tambem.")
 
 
+def _arquivos_do_editor_fluxo():
+    """Gera o EDITOR VISUAL DE FLUXO (estilo n8n): tela com as ferramentas em
+    caixinhas ligadas por linhas. Arrasta, liga uma na outra, roda tudo em
+    ordem e salva - e o fluxo salvo vira rotina do agente."""
+    html = (
+        "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+        "<title>Editor de Fluxo</title>\n<link rel=\"stylesheet\" href=\"estilo.css\">\n"
+        "<link rel=\"stylesheet\" href=\"fluxo.css\">\n</head>\n<body>\n"
+        "<header>\n  <div class=\"marca\">SA</div>\n  <h1>Editor de Fluxo</h1>\n"
+        "  <div class=\"acoes\">\n"
+        "    <select id=\"salvos\"><option value=\"\">-- fluxos salvos --</option></select>\n"
+        "    <button onclick=\"rodarFluxo()\" class=\"verde\">Executar fluxo</button>\n"
+        "    <button onclick=\"salvarFluxo()\">Salvar</button>\n"
+        "    <button onclick=\"limpar()\">Limpar</button>\n"
+        "    <a href=\"index.html\" class=\"link\">voltar aos aplicativos</a>\n"
+        "  </div>\n  <span id=\"ligado\" class=\"pill\">conectando...</span>\n</header>\n"
+        "<div class=\"corpo\">\n"
+        "  <aside>\n"
+        "    <input id=\"busca\" placeholder=\"Buscar ferramenta...\">\n"
+        "    <div id=\"lista\"></div>\n"
+        "  </aside>\n"
+        "  <div id=\"tela\">\n"
+        "    <svg id=\"linhas\"></svg>\n"
+        "    <div id=\"dica\">Clique numa ferramenta a esquerda para colocar na tela.<br>"
+        "Ligue a bolinha da DIREITA de uma caixa na bolinha da ESQUERDA da outra.<br>"
+        "Depois clique em <b>Executar fluxo</b>.</div>\n"
+        "  </div>\n</div>\n"
+        "<div id=\"barra\"><pre id=\"saida\">Saida da execucao aparece aqui.</pre></div>\n"
+        "<div id=\"fundo\"><div class=\"modal\"><h3>Precisa da sua confirmacao</h3>"
+        "<p id=\"pergunta\"></p><div class=\"bts\">"
+        "<button onclick=\"responder('nao')\">Nao</button>"
+        "<button class=\"ok\" onclick=\"responder('sim')\">Sim, pode</button>"
+        "</div></div></div>\n"
+        "<script src=\"fluxo.js\"></script>\n</body>\n</html>\n")
+
+    css = (
+        ".acoes{margin-left:24px;display:flex;gap:8px;align-items:center}\n"
+        ".acoes button{background:#28304a;color:#fff;border:0;border-radius:8px;"
+        "padding:8px 14px;cursor:pointer;font-size:.85rem}\n"
+        ".acoes button:hover{filter:brightness(1.2)}\n"
+        ".acoes button.verde{background:#1f8a5f}\n"
+        ".acoes select{background:#0d1220;color:#e6ebf5;border:1px solid #232c3d;"
+        "border-radius:8px;padding:8px 10px;font-size:.85rem}\n"
+        ".acoes .link{color:#8792a8;font-size:.82rem;text-decoration:none;margin-left:6px}\n"
+        ".corpo{display:grid;grid-template-columns:250px 1fr;height:calc(100vh - 59px - 150px)}\n"
+        "aside{border-right:1px solid #232c3d;padding:12px;background:#0d121c;overflow:auto}\n"
+        "aside input{margin-bottom:10px}\n"
+        ".fer{padding:9px 11px;border-radius:8px;cursor:pointer;font-size:.8rem;"
+        "font-family:ui-monospace,Consolas,monospace;color:#8792a8;border:1px solid transparent}\n"
+        ".fer:hover{background:#1c2433;color:#e6ebf5;border-color:#4f8cff}\n"
+        "#tela{position:relative;overflow:auto;background:#0a0d14;"
+        "background-image:radial-gradient(#1b2233 1px,transparent 1px);background-size:22px 22px}\n"
+        "#linhas{position:absolute;inset:0;width:4000px;height:3000px;pointer-events:none}\n"
+        "#dica{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);"
+        "color:#5e6675;text-align:center;font-size:.88rem;line-height:1.9}\n"
+        ".no{position:absolute;width:198px;background:#151b27;border:1px solid #2b3550;"
+        "border-radius:11px;box-shadow:0 6px 18px rgba(0,0,0,.45);user-select:none}\n"
+        ".no.sel{border-color:#4f8cff}\n"
+        ".no.rodando{border-color:#ffcc66;box-shadow:0 0 0 3px rgba(255,204,102,.18)}\n"
+        ".no.ok{border-color:#3ddc97}\n.no.erro{border-color:#ff6b6b}\n"
+        ".no .cab{padding:9px 11px;font-size:.8rem;font-weight:600;cursor:grab;"
+        "display:flex;align-items:center;gap:7px;border-bottom:1px solid #232c3d}\n"
+        ".no .cab .ic{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;"
+        "font-size:.6rem;background:linear-gradient(135deg,#4f8cff,#7b5cff)}\n"
+        ".no .cab .x{margin-left:auto;color:#8792a8;cursor:pointer;font-size:1rem;"
+        "line-height:1}\n.no .cab .x:hover{color:#ff6b6b}\n"
+        ".no .cmd{padding:9px 11px;font-size:.74rem;color:#8792a8;font-family:ui-monospace,"
+        "Consolas,monospace;word-break:break-word}\n"
+        ".no .ent,.no .sai{position:absolute;top:16px;width:13px;height:13px;border-radius:50%;"
+        "background:#0d1220;border:2px solid #4f8cff;cursor:crosshair}\n"
+        ".no .ent{left:-7px}.no .sai{right:-7px}\n"
+        ".no .sai:hover,.no .ent:hover{background:#4f8cff}\n"
+        ".no .sai.ativa{background:#ffcc66;border-color:#ffcc66}\n"
+        "#barra{border-top:1px solid #232c3d;background:#0d121c;padding:11px 16px;height:150px}\n"
+        "#barra pre{margin:0;height:100%;min-height:0;border:0;background:#050810}\n")
+
+    js = (
+        "const AGENTE = 'http://127.0.0.1:8777';\n"
+        "let nos = [], ligacoes = [], seq = 0, ligando = null, jobAtual = null, TUDO = [];\n"
+        "const tela = document.getElementById('tela'), svg = document.getElementById('linhas');\n\n"
+        "async function status(){\n"
+        "  try{ const d = await (await fetch(AGENTE + '/api/status')).json();\n"
+        "    ligado.textContent = d.ferramentas + ' ferramentas | ' + d.pc;\n"
+        "  }catch(e){ ligado.textContent = 'agente offline - digite \"abrir painel\" nele'; }\n"
+        "}\nsetInterval(status, 4000); status();\n\n"
+        "async function carregarFerramentas(){\n"
+        "  try{\n"
+        "    const d = await (await fetch(AGENTE + '/api/todas')).json();\n"
+        "    TUDO = [];\n"
+        "    for(const c of Object.keys(d.grupos)) for(const f of d.grupos[c]) TUDO.push(f);\n"
+        "    desenharLista();\n"
+        "  }catch(e){ lista.innerHTML = '<div class=\"fer\">agente offline</div>'; }\n"
+        "}\n"
+        "function desenharLista(){\n"
+        "  const f = busca.value.trim().toLowerCase();\n"
+        "  const itens = TUDO.filter(x => !f || x.nome.includes(f) ||\n"
+        "    (x.desc || '').toLowerCase().includes(f)).slice(0, 200);\n"
+        "  lista.innerHTML = itens.map(x =>\n"
+        "    '<div class=\"fer\" onclick=\"addNo(\\'' + x.nome + '\\')\">' +\n"
+        "    x.nome.replace(/_/g, ' ') + '</div>').join('');\n"
+        "}\n"
+        "busca.addEventListener('input', desenharLista);\n\n"
+        "function addNo(nome){\n"
+        "  dica.style.display = 'none';\n"
+        "  const f = TUDO.find(x => x.nome === nome) || {nome, desc: '', params: []};\n"
+        "  seq++;\n"
+        "  const no = {id: 's' + seq, nome, comando: nome.replace(/_/g, ' '),\n"
+        "              params: f.params || [], x: 60 + (nos.length % 4) * 230,\n"
+        "              y: 50 + Math.floor(nos.length / 4) * 130};\n"
+        "  nos.push(no); desenhar();\n"
+        "}\n"
+        "function removerNo(id){\n"
+        "  nos = nos.filter(n => n.id !== id);\n"
+        "  ligacoes = ligacoes.filter(l => l.de !== id && l.para !== id);\n"
+        "  desenhar();\n"
+        "}\n"
+        "function desenhar(){\n"
+        "  tela.querySelectorAll('.no').forEach(e => e.remove());\n"
+        "  for(const n of nos){\n"
+        "    const d = document.createElement('div');\n"
+        "    d.className = 'no'; d.dataset.id = n.id;\n"
+        "    d.style.left = n.x + 'px'; d.style.top = n.y + 'px';\n"
+        "    d.innerHTML = '<div class=\"ent\"></div><div class=\"sai\"></div>' +\n"
+        "      '<div class=\"cab\"><span class=\"ic\">' + n.nome.slice(0,2).toUpperCase() +\n"
+        "      '</span>' + n.nome.replace(/_/g,' ').slice(0,20) +\n"
+        "      '<span class=\"x\" title=\"remover\">&times;</span></div>' +\n"
+        "      '<div class=\"cmd\">' + n.comando + '</div>';\n"
+        "    d.querySelector('.x').onclick = e => { e.stopPropagation(); removerNo(n.id); };\n"
+        "    d.querySelector('.cmd').onclick = () => {\n"
+        "      const novo = prompt('Comando deste passo:', n.comando);\n"
+        "      if(novo !== null){ n.comando = novo.trim() || n.comando; desenhar(); }\n"
+        "    };\n"
+        "    d.querySelector('.sai').onclick = e => {\n"
+        "      e.stopPropagation();\n"
+        "      document.querySelectorAll('.sai').forEach(s => s.classList.remove('ativa'));\n"
+        "      ligando = n.id; e.target.classList.add('ativa');\n"
+        "    };\n"
+        "    d.querySelector('.ent').onclick = e => {\n"
+        "      e.stopPropagation();\n"
+        "      if(ligando && ligando !== n.id){\n"
+        "        if(!ligacoes.some(l => l.de === ligando && l.para === n.id))\n"
+        "          ligacoes.push({de: ligando, para: n.id});\n"
+        "        ligando = null; desenhar();\n"
+        "      }\n"
+        "    };\n"
+        "    arrastar(d, n);\n"
+        "    tela.appendChild(d);\n"
+        "  }\n"
+        "  desenharLinhas();\n"
+        "}\n"
+        "function arrastar(el, n){\n"
+        "  const cab = el.querySelector('.cab');\n"
+        "  cab.onmousedown = e => {\n"
+        "    if(e.target.classList.contains('x')) return;\n"
+        "    e.preventDefault();\n"
+        "    const dx = e.clientX - el.offsetLeft + tela.scrollLeft;\n"
+        "    const dy = e.clientY - el.offsetTop + tela.scrollTop;\n"
+        "    function mover(ev){\n"
+        "      n.x = Math.max(0, ev.clientX - dx + tela.scrollLeft);\n"
+        "      n.y = Math.max(0, ev.clientY - dy + tela.scrollTop);\n"
+        "      el.style.left = n.x + 'px'; el.style.top = n.y + 'px'; desenharLinhas();\n"
+        "    }\n"
+        "    function soltar(){ document.removeEventListener('mousemove', mover);\n"
+        "      document.removeEventListener('mouseup', soltar); }\n"
+        "    document.addEventListener('mousemove', mover);\n"
+        "    document.addEventListener('mouseup', soltar);\n"
+        "  };\n"
+        "}\n"
+        "function desenharLinhas(){\n"
+        "  let d = '';\n"
+        "  for(const l of ligacoes){\n"
+        "    const a = nos.find(n => n.id === l.de), b = nos.find(n => n.id === l.para);\n"
+        "    if(!a || !b) continue;\n"
+        "    const x1 = a.x + 198, y1 = a.y + 22, x2 = b.x, y2 = b.y + 22;\n"
+        "    const meio = Math.max(40, Math.abs(x2 - x1) / 2);\n"
+        "    d += '<path d=\"M' + x1 + ',' + y1 + ' C' + (x1 + meio) + ',' + y1 + ' ' +\n"
+        "         (x2 - meio) + ',' + y2 + ' ' + x2 + ',' + y2 +\n"
+        "         '\" fill=\"none\" stroke=\"#3ddc97\" stroke-width=\"2\"/>' +\n"
+        "         '<circle cx=\"' + x2 + '\" cy=\"' + y2 + '\" r=\"3\" fill=\"#3ddc97\"/>';\n"
+        "  }\n"
+        "  svg.innerHTML = d;\n"
+        "}\n"
+        "function ordenar(){\n"
+        "  const entradas = {}, saidas = {};\n"
+        "  nos.forEach(n => { entradas[n.id] = 0; saidas[n.id] = []; });\n"
+        "  ligacoes.forEach(l => { if(saidas[l.de]){ saidas[l.de].push(l.para);\n"
+        "    entradas[l.para] = (entradas[l.para] || 0) + 1; } });\n"
+        "  let fila = nos.filter(n => !entradas[n.id]).sort((a,b) => a.y - b.y || a.x - b.x)\n"
+        "               .map(n => n.id);\n"
+        "  const ordem = [], vistos = new Set();\n"
+        "  while(fila.length){\n"
+        "    const id = fila.shift(); if(vistos.has(id)) continue; vistos.add(id);\n"
+        "    ordem.push(nos.find(n => n.id === id));\n"
+        "    for(const p of (saidas[id] || [])){ entradas[p]--; if(entradas[p] <= 0) fila.push(p); }\n"
+        "  }\n"
+        "  nos.forEach(n => { if(!vistos.has(n.id)) ordem.push(n); });\n"
+        "  return ordem;\n"
+        "}\n"
+        "function mostrarPergunta(id, texto){ jobAtual = id; pergunta.textContent = texto;\n"
+        "  fundo.classList.add('on'); }\n"
+        "async function responder(r){\n"
+        "  fundo.classList.remove('on'); if(!jobAtual) return;\n"
+        "  await fetch(AGENTE + '/api/responder', {method:'POST',\n"
+        "    headers:{'Content-Type':'application/json'},\n"
+        "    body: JSON.stringify({id: jobAtual, resposta: r})});\n"
+        "  jobAtual = null;\n"
+        "}\n"
+        "function esperar(id){\n"
+        "  return new Promise(ok => {\n"
+        "    const t = setInterval(async () => {\n"
+        "      const s = await (await fetch(AGENTE + '/api/job?id=' + id)).json();\n"
+        "      if(s.pergunta && jobAtual !== id) mostrarPergunta(id, s.pergunta);\n"
+        "      if(s.pronto){ clearInterval(t); ok(s.saida); }\n"
+        "    }, 600);\n"
+        "  });\n"
+        "}\n"
+        "async function rodarFluxo(){\n"
+        "  const ordem = ordenar();\n"
+        "  if(!ordem.length){ saida.textContent = 'Coloque pelo menos uma ferramenta na tela.';\n"
+        "    return; }\n"
+        "  saida.textContent = 'Executando ' + ordem.length + ' passo(s) em ordem...\\n';\n"
+        "  document.querySelectorAll('.no').forEach(e =>\n"
+        "    e.classList.remove('ok','erro','rodando'));\n"
+        "  for(let i = 0; i < ordem.length; i++){\n"
+        "    const n = ordem[i];\n"
+        "    const el = document.querySelector('.no[data-id=\"' + n.id + '\"]');\n"
+        "    if(el) el.classList.add('rodando');\n"
+        "    saida.textContent += '\\n[' + (i+1) + '/' + ordem.length + '] ' + n.comando + '\\n';\n"
+        "    saida.scrollTop = 1e6;\n"
+        "    try{\n"
+        "      const r = await fetch(AGENTE + '/api/comando', {method:'POST',\n"
+        "        headers:{'Content-Type':'application/json'},\n"
+        "        body: JSON.stringify({texto: n.comando})});\n"
+        "      const {id} = await r.json();\n"
+        "      const res = await esperar(id);\n"
+        "      saida.textContent += res + '\\n'; saida.scrollTop = 1e6;\n"
+        "      if(el){ el.classList.remove('rodando'); el.classList.add('ok'); }\n"
+        "    }catch(e){\n"
+        "      if(el){ el.classList.remove('rodando'); el.classList.add('erro'); }\n"
+        "      saida.textContent += 'falhou: ' + e + '\\n';\n"
+        "    }\n"
+        "  }\n"
+        "  saida.textContent += '\\nFluxo concluido.\\n';\n"
+        "}\n"
+        "async function salvarFluxo(){\n"
+        "  const nome = prompt('Nome do fluxo (vira uma rotina do agente):');\n"
+        "  if(!nome) return;\n"
+        "  const d = await (await fetch(AGENTE + '/api/fluxo', {method:'POST',\n"
+        "    headers:{'Content-Type':'application/json'},\n"
+        "    body: JSON.stringify({nome, nos, ligacoes})})).json();\n"
+        "  saida.textContent = d.msg || 'salvo';\n"
+        "  listarSalvos();\n"
+        "}\n"
+        "async function listarSalvos(){\n"
+        "  try{\n"
+        "    const d = await (await fetch(AGENTE + '/api/fluxos')).json();\n"
+        "    salvos.innerHTML = '<option value=\"\">-- fluxos salvos --</option>' +\n"
+        "      d.itens.map(f => '<option>' + f.nome + '</option>').join('');\n"
+        "  }catch(e){}\n"
+        "}\n"
+        "salvos.onchange = async () => {\n"
+        "  if(!salvos.value) return;\n"
+        "  const d = await (await fetch(AGENTE + '/api/fluxo?nome=' +\n"
+        "    encodeURIComponent(salvos.value))).json();\n"
+        "  nos = d.nos || []; ligacoes = d.ligacoes || [];\n"
+        "  seq = nos.length; dica.style.display = nos.length ? 'none' : 'block';\n"
+        "  desenhar();\n"
+        "};\n"
+        "function limpar(){ if(!confirm('Limpar a tela?')) return;\n"
+        "  nos = []; ligacoes = []; dica.style.display = 'block'; desenhar(); }\n"
+        "tela.onclick = () => { ligando = null;\n"
+        "  document.querySelectorAll('.sai').forEach(s => s.classList.remove('ativa')); };\n"
+        "carregarFerramentas(); listarSalvos();\n")
+
+    return {"fluxo.html": html, "fluxo.css": css, "fluxo.js": js}
+
+
 @tool
 def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> str:
     """Cria um SITE SEU no estilo loja de aplicativos: mostra TODAS as
@@ -2821,7 +3099,8 @@ def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> 
         "    <span>CPU <b id=\"cpu\">--</b></span>\n"
         "    <span>RAM <b id=\"ram\">--</b></span>\n"
         "    <span>Disco <b id=\"disco\">--</b></span>\n"
-        "  </div>\n  <span id=\"ligado\" class=\"pill\">conectando...</span>\n</header>\n"
+        "  </div>\n  <a href=\"fluxo.html\" class=\"link-fluxo\">Editor de fluxo</a>\n"
+        "  <span id=\"ligado\" class=\"pill\">conectando...</span>\n</header>\n"
         "<div class=\"corpo\">\n"
         "  <aside id=\"menu\"></aside>\n"
         "  <main>\n"
@@ -2853,7 +3132,10 @@ def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> 
         "h1{font-size:1.02rem;font-weight:600}\n"
         ".medidores{margin-left:24px;display:flex;gap:18px;font-size:.8rem;color:var(--fraco)}\n"
         ".medidores b{color:var(--txt);font-size:.95rem;margin-left:4px}\n"
-        ".pill{margin-left:auto;font-size:.76rem;color:var(--fraco);border:1px solid var(--linha);"
+        ".link-fluxo{margin-left:auto;color:var(--verde);font-size:.84rem;text-decoration:none;"
+        "border:1px solid #1f8a5f;padding:6px 13px;border-radius:8px}\n"
+        ".link-fluxo:hover{background:#12241c}\n"
+        ".pill{margin-left:14px;font-size:.76rem;color:var(--fraco);border:1px solid var(--linha);"
         "padding:5px 11px;border-radius:20px}\n"
         ".corpo{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 59px)}\n"
         "aside{border-right:1px solid var(--linha);padding:16px 12px;background:#0d121c}\n"
@@ -3011,6 +3293,7 @@ def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> 
               "`/api/comando` - ou copie o bloco do campo `cmd`.\n")
 
     arquivos = {"index.html": html, "estilo.css": css, "agente.js": js, "README.md": leiame}
+    arquivos.update(_arquivos_do_editor_fluxo())
     for rel, conteudo in arquivos.items():
         with open(os.path.join(destino, rel), "w", encoding="utf-8") as f:
             f.write(conteudo)
@@ -3849,6 +4132,41 @@ def _categoria_da_ferramenta(nome: str, descricao: str = "") -> str:
     return "Outros"
 
 
+ARQ_FLUXOS = os.path.join(PASTA_BASE, "fluxos.json")
+
+
+def _ordenar_fluxo(fluxo: dict):
+    """Coloca os nos na ordem certa de execucao seguindo as ligacoes (quem
+    depende de quem). E o mesmo principio de um grafo de tarefas: primeiro os
+    que nao dependem de ninguem. Se alguem fizer um ciclo, o resto vai no fim
+    em vez de travar."""
+    nos = {str(n.get("id")): n for n in (fluxo.get("nos") or [])}
+    entradas = {i: 0 for i in nos}
+    saidas = {i: [] for i in nos}
+    for lig in (fluxo.get("ligacoes") or []):
+        de, para = str(lig.get("de")), str(lig.get("para"))
+        if de in nos and para in nos:
+            saidas[de].append(para)
+            entradas[para] += 1
+    fila = [i for i, n in entradas.items() if n == 0]
+    fila.sort(key=lambda i: (nos[i].get("y", 0), nos[i].get("x", 0)))
+    ordem, vistos = [], set()
+    while fila:
+        atual = fila.pop(0)
+        if atual in vistos:
+            continue
+        vistos.add(atual)
+        ordem.append(nos[atual])
+        for prox in saidas.get(atual, []):
+            entradas[prox] -= 1
+            if entradas[prox] <= 0 and prox not in vistos:
+                fila.append(prox)
+    for i, n in nos.items():
+        if i not in vistos:
+            ordem.append(n)
+    return ordem
+
+
 def _painel_status() -> dict:
     import platform as _pl
     dados = {"cpu": 0.0, "ram": 0.0, "disco": 0.0, "uptime": "?", "processos": 0,
@@ -3955,6 +4273,14 @@ def _criar_handler_painel():
                     itens.append({"nome": item["nome"], "desc": item["desc"],
                                   "params": item["obrig"], "nota": round(nota, 2)})
                 return self._json({"itens": itens})
+            if rota.path == "/api/fluxos":
+                dados = carregar_json(ARQ_FLUXOS, {})
+                return self._json({"itens": [{"nome": k, "nos": len(v.get("nos", []))}
+                                             for k, v in dados.items()]})
+            if rota.path == "/api/fluxo":
+                nome = unquote((q.get("nome") or [""])[0])
+                dados = carregar_json(ARQ_FLUXOS, {})
+                return self._json(dados.get(nome) or {"nos": [], "ligacoes": []})
             if rota.path == "/api/todas":
                 grupos = {}
                 for item in _indice_ferramentas():
@@ -4039,6 +4365,29 @@ def _criar_handler_painel():
                 threading.Thread(target=_painel_rodar_comando,
                                  args=(jid, texto), daemon=True).start()
                 return self._json({"id": jid})
+            if rota.path == "/api/fluxo":
+                nome = str(dados.get("nome") or "").strip()
+                if not nome:
+                    return self._json({"ok": False, "msg": "de um nome ao fluxo"}, 400)
+                todos = carregar_json(ARQ_FLUXOS, {})
+                todos[nome] = {"nos": dados.get("nos") or [],
+                               "ligacoes": dados.get("ligacoes") or [],
+                               "salvo_em": datetime.now().strftime("%d/%m/%Y %H:%M")}
+                salvar_json(ARQ_FLUXOS, todos)
+                # o fluxo tambem vira ROTINA: assim ele roda pelo console tambem
+                passos = [str(x.get("comando") or x.get("nome") or "")
+                          for x in _ordenar_fluxo(todos[nome])]
+                passos = [x for x in passos if x]
+                if passos:
+                    try:
+                        rotinas = _carregar_rotinas()
+                        rotinas[nome.lower()] = passos
+                        salvar_json(ARQ_ROTINAS, rotinas)
+                    except Exception:
+                        pass
+                return self._json({"ok": True, "msg": "Fluxo '" + nome + "' salvo com " +
+                                   str(len(passos)) + " passo(s). Ele virou uma rotina: "
+                                   "digite '" + nome.lower() + "' no agente que ele roda tudo."})
             if rota.path == "/api/responder":
                 jid = str(dados.get("id") or "")
                 job = _PAINEL["jobs"].get(jid)
