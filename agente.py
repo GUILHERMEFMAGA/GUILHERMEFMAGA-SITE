@@ -2692,6 +2692,1126 @@ _INTRO_LOCAL = (
 
 
 
+# ==================== PAINEL WEB LOCAL (a "mesa de trabalho" do agente) ====================
+# Um site que roda DENTRO do seu PC (127.0.0.1) servido pelo proprio agente,
+# sem internet e sem instalar nada: da pra ver o estado da maquina em tempo
+# real, buscar e executar qualquer uma das ferramentas, navegar e EDITAR
+# arquivos (com backup e validacao), rodar rotinas e conversar com a IA local.
+_PAINEL = {"servidor": None, "porta": 0, "jobs": {}, "seq": 0}
+
+HTML_PAINEL = r"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Super Agente PC - Painel</title>
+<style>
+:root{--bg:#0b0e14;--card:#141926;--card2:#1b2233;--linha:#242c3d;--txt:#e6ebf5;
+      --fraco:#8792a8;--azul:#4f8cff;--verde:#3ddc97;--amarelo:#ffcc66;--vermelho:#ff6b6b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);
+     min-height:100vh;display:flex;flex-direction:column}
+header{background:linear-gradient(90deg,#141926,#1b2233);border-bottom:1px solid var(--linha);
+       padding:14px 22px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:9}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--azul),#7b5cff);
+      display:grid;place-items:center;font-weight:700;font-size:15px}
+h1{font-size:1.05rem;font-weight:600}
+.pill{margin-left:auto;font-size:.78rem;color:var(--fraco);background:#0e1420;border:1px solid var(--linha);
+      padding:5px 11px;border-radius:20px}
+nav{display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid var(--linha);background:#0e1220}
+nav button{background:none;border:0;color:var(--fraco);padding:10px 16px;cursor:pointer;
+           font-size:.9rem;border-bottom:2px solid transparent;transition:.15s}
+nav button:hover{color:var(--txt)}
+nav button.on{color:var(--azul);border-bottom-color:var(--azul)}
+main{padding:22px;flex:1;max-width:1180px;width:100%;margin:0 auto}
+.aba{display:none}.aba.on{display:block}
+.grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-bottom:20px}
+.cartao{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:16px}
+.rot{font-size:.74rem;color:var(--fraco);text-transform:uppercase;letter-spacing:.6px}
+.val{font-size:1.75rem;font-weight:650;margin-top:6px}
+.barra{height:6px;background:#0b0f18;border-radius:4px;margin-top:10px;overflow:hidden}
+.barra i{display:block;height:100%;background:var(--verde);transition:width .5s,background .5s}
+.busca{display:flex;gap:9px;margin-bottom:14px}
+input,textarea,select{background:#0d1220;border:1px solid var(--linha);color:var(--txt);
+      border-radius:9px;padding:11px 13px;font-size:.92rem;font-family:inherit;width:100%}
+input:focus,textarea:focus{outline:0;border-color:var(--azul)}
+button.b{background:var(--azul);color:#fff;border:0;border-radius:9px;padding:11px 17px;
+         cursor:pointer;font-size:.9rem;white-space:nowrap;transition:.15s}
+button.b:hover{filter:brightness(1.15)}
+button.g{background:#28304a}
+.item{background:var(--card);border:1px solid var(--linha);border-radius:11px;padding:13px 15px;
+      margin-bottom:9px;display:flex;gap:13px;align-items:flex-start}
+.item .nome{font-weight:600;font-size:.93rem;color:var(--azul);font-family:ui-monospace,Consolas,monospace}
+.item .desc{color:var(--fraco);font-size:.83rem;margin-top:4px;line-height:1.45}
+.item .dir{margin-left:auto}
+pre.saida{background:#070a11;border:1px solid var(--linha);border-radius:11px;padding:15px;
+     font-family:ui-monospace,Consolas,monospace;font-size:.82rem;white-space:pre-wrap;
+     max-height:420px;overflow:auto;color:#c8d3e6;line-height:1.5}
+.lista{max-height:430px;overflow:auto}
+.linha-arq{padding:8px 11px;border-radius:7px;cursor:pointer;font-size:.87rem;
+           font-family:ui-monospace,Consolas,monospace;display:flex;gap:9px}
+.linha-arq:hover{background:var(--card2)}
+.duas{display:grid;grid-template-columns:300px 1fr;gap:15px}
+textarea.editor{min-height:430px;font-family:ui-monospace,Consolas,monospace;font-size:.85rem;
+                line-height:1.55;resize:vertical}
+.chat{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:16px;
+      height:430px;overflow:auto;margin-bottom:12px}
+.msg{margin-bottom:13px;display:flex;gap:10px}
+.msg .quem{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+           font-size:.72rem;font-weight:700;flex-shrink:0}
+.msg.eu .quem{background:#2b3550}.msg.ia .quem{background:linear-gradient(135deg,var(--azul),#7b5cff)}
+.msg .txt{background:var(--card2);padding:10px 13px;border-radius:10px;font-size:.9rem;
+          line-height:1.55;white-space:pre-wrap;max-width:82%}
+.aviso{background:#1d1a10;border:1px solid #453a1a;color:var(--amarelo);padding:11px 14px;
+       border-radius:10px;font-size:.85rem;margin-bottom:15px}
+.tag{font-size:.7rem;background:#0e1626;border:1px solid var(--linha);color:var(--fraco);
+     padding:2px 8px;border-radius:12px}
+h2.t{font-size:1rem;margin-bottom:13px;color:var(--fraco);font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">SA</div>
+  <h1>Super Agente PC — Painel de Controle</h1>
+  <span class="pill" id="pill">conectando…</span>
+</header>
+<nav>
+  <button class="on" data-aba="painel">Painel</button>
+  <button data-aba="ferramentas">Ferramentas</button>
+  <button data-aba="arquivos">Arquivos</button>
+  <button data-aba="chat">Conversar</button>
+  <button data-aba="rotinas">Rotinas</button>
+</nav>
+<main>
+
+<section class="aba on" id="aba-painel">
+  <div class="grade">
+    <div class="cartao"><div class="rot">Processador</div><div class="val" id="v-cpu">--</div>
+      <div class="barra"><i id="b-cpu" style="width:0"></i></div></div>
+    <div class="cartao"><div class="rot">Memoria RAM</div><div class="val" id="v-ram">--</div>
+      <div class="barra"><i id="b-ram" style="width:0"></i></div></div>
+    <div class="cartao"><div class="rot">Disco</div><div class="val" id="v-disco">--</div>
+      <div class="barra"><i id="b-disco" style="width:0"></i></div></div>
+    <div class="cartao"><div class="rot">Ligado ha</div><div class="val" id="v-up">--</div>
+      <div class="rot" style="margin-top:9px" id="v-proc">--</div></div>
+  </div>
+  <div class="grade">
+    <div class="cartao"><div class="rot">Ferramentas</div><div class="val" id="v-tools">--</div>
+      <div class="rot" style="margin-top:9px">todas disponiveis offline</div></div>
+    <div class="cartao"><div class="rot">IA neural local</div><div class="val" id="v-ia">--</div>
+      <div class="rot" style="margin-top:9px">conversa sem internet</div></div>
+    <div class="cartao"><div class="rot">Acoes rapidas</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:11px">
+        <button class="b g" onclick="rodar('detectar_gargalo',{})">Gargalo</button>
+        <button class="b g" onclick="rodar('top_processos_memoria',{})">Top RAM</button>
+        <button class="b g" onclick="rodar('espaco_recuperavel',{})">Espaco</button>
+        <button class="b g" onclick="rodar('tempo_ligado',{})">Uptime</button>
+      </div></div>
+  </div>
+  <h2 class="t">Resultado</h2>
+  <pre class="saida" id="saida">Clique numa acao rapida ou execute uma ferramenta na aba "Ferramentas".</pre>
+</section>
+
+<section class="aba" id="aba-ferramentas">
+  <div class="aviso">Ferramentas que alteram o sistema pedem confirmacao na JANELA DO AGENTE
+    (o cmd preto). Se uma acao ficar "executando", olhe la e responda sim/nao.</div>
+  <div class="busca">
+    <input id="q" placeholder="O que voce quer fazer? ex.: memoria, wifi, duplicados, git, cpf">
+    <button class="b" onclick="buscar()">Buscar</button>
+  </div>
+  <div id="res"></div>
+  <h2 class="t" style="margin-top:18px">Resultado</h2>
+  <pre class="saida" id="saida2">—</pre>
+</section>
+
+<section class="aba" id="aba-arquivos">
+  <div class="busca">
+    <input id="caminho" placeholder="Caminho da pasta">
+    <button class="b" onclick="listar()">Abrir</button>
+  </div>
+  <div class="duas">
+    <div class="cartao lista" id="arvore">—</div>
+    <div>
+      <div class="busca">
+        <input id="arqatual" readonly placeholder="nenhum arquivo aberto">
+        <button class="b" onclick="salvar()">Salvar</button>
+      </div>
+      <textarea class="editor" id="editor" placeholder="Clique num arquivo a esquerda para editar. Ao salvar, faco backup antes e recuso a gravacao se o codigo ficar quebrado."></textarea>
+      <pre class="saida" id="saida3" style="margin-top:11px;max-height:110px">—</pre>
+    </div>
+  </div>
+</section>
+
+<section class="aba" id="aba-chat">
+  <div class="chat" id="chat"><div class="msg ia"><div class="quem">IA</div>
+    <div class="txt">Oi! Sou a IA local do agente, rodando no seu PC. Pergunte o que quiser,
+ou peca uma acao — respondo aqui mesmo, sem nuvem.</div></div></div>
+  <div class="busca">
+    <input id="msg" placeholder="Escreva sua mensagem..." onkeydown="if(event.key==='Enter')enviar()">
+    <button class="b" onclick="enviar()">Enviar</button>
+  </div>
+</section>
+
+<section class="aba" id="aba-rotinas">
+  <h2 class="t">Suas rotinas (varios comandos com um nome so)</h2>
+  <div id="rotinas">—</div>
+  <pre class="saida" id="saida4" style="margin-top:14px">—</pre>
+</section>
+
+</main>
+<script>
+const $ = s => document.querySelector(s);
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll('.aba').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); $('#aba-' + b.dataset.aba).classList.add('on');
+  if (b.dataset.aba === 'rotinas') carregarRotinas();
+});
+function cor(el, v){ el.style.background = v >= 90 ? 'var(--vermelho)' : v >= 70 ? 'var(--amarelo)' : 'var(--verde)'; }
+async function atualizar(){
+  try{
+    const r = await fetch('/api/status'); const d = await r.json();
+    $('#v-cpu').textContent = d.cpu.toFixed(0) + '%';
+    $('#v-ram').textContent = d.ram.toFixed(0) + '%';
+    $('#v-disco').textContent = d.disco.toFixed(0) + '%';
+    $('#v-up').textContent = d.uptime;
+    $('#v-proc').textContent = d.processos + ' processos ativos';
+    $('#v-tools').textContent = d.ferramentas;
+    $('#v-ia').textContent = d.ia_local ? 'PRONTA' : 'desligada';
+    $('#b-cpu').style.width = d.cpu + '%'; cor($('#b-cpu'), d.cpu);
+    $('#b-ram').style.width = d.ram + '%'; cor($('#b-ram'), d.ram);
+    $('#b-disco').style.width = d.disco + '%'; cor($('#b-disco'), d.disco);
+    $('#pill').textContent = 'conectado ao agente · ' + d.pc;
+  }catch(e){ $('#pill').textContent = 'agente offline'; }
+}
+setInterval(atualizar, 3000); atualizar();
+
+async function buscar(){
+  const q = $('#q').value.trim(); if(!q) return;
+  const r = await fetch('/api/ferramentas?q=' + encodeURIComponent(q));
+  const d = await r.json();
+  $('#res').innerHTML = d.itens.length ? d.itens.map(f =>
+    '<div class="item"><div><div class="nome">' + f.nome + '</div><div class="desc">' +
+    f.desc + '</div>' + (f.params.length ? '<div class="tag" style="margin-top:7px">pede: ' +
+    f.params.join(', ') + '</div>' : '') + '</div><div class="dir"><button class="b" onclick="pedir(\'' +
+    f.nome + '\',' + JSON.stringify(f.params).replace(/"/g, '&quot;') + ')">Executar</button></div></div>'
+  ).join('') : '<div class="item"><div class="desc">Nada encontrado. Tente outra palavra.</div></div>';
+}
+$('#q').addEventListener('keydown', e => { if(e.key === 'Enter') buscar(); });
+
+function pedir(nome, params){
+  const dados = {};
+  for(const p of params){
+    const v = prompt('Valor para "' + p + '" (ferramenta ' + nome + ')');
+    if(v === null) return; dados[p] = v;
+  }
+  rodar(nome, dados);
+}
+async function rodar(nome, params){
+  const alvo = $('#aba-ferramentas').classList.contains('on') ? $('#saida2') : $('#saida');
+  alvo.textContent = 'Executando ' + nome + '...';
+  const r = await fetch('/api/executar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({nome, params})});
+  const {id} = await r.json();
+  const t = setInterval(async () => {
+    const s = await (await fetch('/api/job?id=' + id)).json();
+    if(s.pronto){ clearInterval(t); alvo.textContent = s.saida; }
+    else alvo.textContent = 'Executando ' + nome + '...  (se pedir confirmacao, responda na janela do agente)';
+  }, 700);
+}
+async function listar(){
+  const p = $('#caminho').value;
+  const d = await (await fetch('/api/arquivos?path=' + encodeURIComponent(p))).json();
+  $('#caminho').value = d.atual;
+  $('#arvore').innerHTML = d.itens.map(i =>
+    '<div class="linha-arq" onclick="' + (i.pasta ? 'abrirPasta' : 'abrirArquivo') +
+    '(\'' + i.caminho.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')">' +
+    (i.pasta ? '[+]' : '   ') + ' ' + i.nome + '</div>').join('');
+}
+function abrirPasta(p){ $('#caminho').value = p; listar(); }
+async function abrirArquivo(p){
+  const d = await (await fetch('/api/arquivo?path=' + encodeURIComponent(p))).json();
+  $('#arqatual').value = d.caminho; $('#editor').value = d.conteudo;
+  $('#saida3').textContent = d.aviso || ('Aberto: ' + d.linhas + ' linhas');
+}
+async function salvar(){
+  const caminho = $('#arqatual').value; if(!caminho) return;
+  const d = await (await fetch('/api/salvar', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({caminho, conteudo: $('#editor').value})})).json();
+  $('#saida3').textContent = d.msg;
+}
+async function enviar(){
+  const t = $('#msg').value.trim(); if(!t) return; $('#msg').value = '';
+  $('#chat').innerHTML += '<div class="msg eu"><div class="quem">EU</div><div class="txt">' +
+    t.replace(/</g,'&lt;') + '</div></div>';
+  $('#chat').scrollTop = 1e6;
+  const d = await (await fetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({texto: t})})).json();
+  $('#chat').innerHTML += '<div class="msg ia"><div class="quem">IA</div><div class="txt">' +
+    d.resposta.replace(/</g,'&lt;') + '</div></div>';
+  $('#chat').scrollTop = 1e6;
+}
+async function carregarRotinas(){
+  const d = await (await fetch('/api/rotinas')).json();
+  $('#rotinas').innerHTML = d.itens.length ? d.itens.map(r =>
+    '<div class="item"><div><div class="nome">' + r.nome + '</div><div class="desc">' +
+    r.passos.join('  >  ') + '</div></div><div class="dir"><button class="b" onclick="rodarRotina(\'' +
+    r.nome + '\')">Rodar</button></div></div>').join('')
+    : '<div class="item"><div class="desc">Voce ainda nao criou rotinas. Na janela do agente: criar rotina modo estudo: fecha o discord > abre o spotify</div></div>';
+}
+async function rodarRotina(nome){
+  $('#saida4').textContent = 'Rodando rotina ' + nome + '...';
+  const d = await (await fetch('/api/rotina?nome=' + encodeURIComponent(nome))).json();
+  $('#saida4').textContent = d.msg;
+}
+</script>
+</body>
+</html>"""
+
+
+def _painel_status() -> dict:
+    import platform as _pl
+    dados = {"cpu": 0.0, "ram": 0.0, "disco": 0.0, "uptime": "?", "processos": 0,
+             "ferramentas": 0, "ia_local": False, "pc": ""}
+    try:
+        dados["ferramentas"] = len(tools)
+    except Exception:
+        pass
+    try:
+        dados["ia_local"] = bool(ia_local_disponivel())
+    except Exception:
+        pass
+    try:
+        dados["pc"] = _pl.node()
+    except Exception:
+        pass
+    try:
+        import psutil
+        dados["cpu"] = psutil.cpu_percent(interval=0.3)
+        dados["ram"] = psutil.virtual_memory().percent
+        dados["processos"] = len(psutil.pids())
+        try:
+            dados["disco"] = psutil.disk_usage("C:\\" if os.name == "nt" else "/").percent
+        except Exception:
+            pass
+        seg = time.time() - psutil.boot_time()
+        dias = int(seg // 86400)
+        horas = int((seg % 86400) // 3600)
+        dados["uptime"] = (str(dias) + "d " + str(horas) + "h") if dias else (str(horas) + "h")
+    except Exception:
+        pass
+    return dados
+
+
+def _painel_executar_job(job_id: str, nome: str, params: dict) -> None:
+    try:
+        resultado = _invocar_local(nome, **(params or {}))
+    except Exception as e:
+        resultado = "Erro ao executar: " + type(e).__name__ + " - " + str(e)[:200]
+    _PAINEL["jobs"][job_id] = {"pronto": True, "saida": str(resultado)}
+
+
+def _criar_handler_painel():
+    from http.server import BaseHTTPRequestHandler
+    from urllib.parse import urlparse, parse_qs, unquote
+
+    class Painel(BaseHTTPRequestHandler):
+        server_version = "SuperAgentePainel"
+
+        def _envia(self, codigo, corpo, tipo="application/json; charset=utf-8"):
+            if not isinstance(corpo, (bytes, bytearray)):
+                corpo = corpo.encode("utf-8")
+            self.send_response(codigo)
+            self.send_header("Content-Type", tipo)
+            self.send_header("Content-Length", str(len(corpo)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            try:
+                self.wfile.write(corpo)
+            except Exception:
+                pass
+
+        def _json(self, obj, codigo=200):
+            self._envia(codigo, json.dumps(obj, ensure_ascii=False))
+
+        def _corpo(self):
+            try:
+                tam = int(self.headers.get("Content-Length") or 0)
+                return json.loads(self.rfile.read(tam).decode("utf-8") or "{}")
+            except Exception:
+                return {}
+
+        def do_GET(self):
+            rota = urlparse(self.path)
+            q = parse_qs(rota.query)
+            if rota.path in ("/", "/index.html"):
+                return self._envia(200, HTML_PAINEL, "text/html; charset=utf-8")
+            if rota.path == "/api/status":
+                return self._json(_painel_status())
+            if rota.path == "/api/ferramentas":
+                termo = (q.get("q") or [""])[0]
+                itens = []
+                for nota, item in _buscar_ferramentas(termo, 12):
+                    itens.append({"nome": item["nome"], "desc": item["desc"],
+                                  "params": item["obrig"], "nota": round(nota, 2)})
+                return self._json({"itens": itens})
+            if rota.path == "/api/job":
+                jid = (q.get("id") or [""])[0]
+                return self._json(_PAINEL["jobs"].get(jid, {"pronto": False, "saida": ""}))
+            if rota.path == "/api/arquivos":
+                alvo = unquote((q.get("path") or [""])[0]) or os.path.expanduser("~")
+                alvo = os.path.abspath(alvo)
+                itens = []
+                if os.path.isdir(alvo):
+                    pai = os.path.dirname(alvo)
+                    if pai and pai != alvo:
+                        itens.append({"nome": "..", "caminho": pai, "pasta": True})
+                    try:
+                        for nome in sorted(os.listdir(alvo)):
+                            cam = os.path.join(alvo, nome)
+                            itens.append({"nome": nome, "caminho": cam,
+                                          "pasta": os.path.isdir(cam)})
+                    except Exception:
+                        pass
+                return self._json({"atual": alvo, "itens": itens[:400]})
+            if rota.path == "/api/arquivo":
+                cam = os.path.abspath(unquote((q.get("path") or [""])[0]))
+                if not os.path.isfile(cam):
+                    return self._json({"caminho": cam, "conteudo": "", "linhas": 0,
+                                       "aviso": "Arquivo nao encontrado."})
+                try:
+                    if os.path.getsize(cam) > 2 * 1024 * 1024:
+                        return self._json({"caminho": cam, "conteudo": "", "linhas": 0,
+                                           "aviso": "Arquivo grande demais para editar aqui."})
+                    texto = open(cam, encoding="utf-8", errors="ignore").read()
+                except Exception as e:
+                    return self._json({"caminho": cam, "conteudo": "", "linhas": 0,
+                                       "aviso": "Nao consegui abrir: " + type(e).__name__})
+                return self._json({"caminho": cam, "conteudo": texto,
+                                   "linhas": len(texto.splitlines()), "aviso": ""})
+            if rota.path == "/api/rotinas":
+                try:
+                    rot = _carregar_rotinas()
+                except Exception:
+                    rot = {}
+                return self._json({"itens": [{"nome": n, "passos": p} for n, p in rot.items()]})
+            if rota.path == "/api/rotina":
+                nome = unquote((q.get("nome") or [""])[0])
+                threading.Thread(target=_rotina_rodar, args=(nome,), daemon=True).start()
+                return self._json({"msg": "Rotina '" + nome + "' disparada. "
+                                          "Acompanhe o passo a passo na janela do agente."})
+            return self._json({"erro": "rota desconhecida"}, 404)
+
+        def do_POST(self):
+            rota = urlparse(self.path)
+            dados = self._corpo()
+            if rota.path == "/api/executar":
+                nome = str(dados.get("nome") or "")
+                params = dados.get("params") or {}
+                if not nome:
+                    return self._json({"erro": "faltou o nome"}, 400)
+                _PAINEL["seq"] += 1
+                jid = "j" + str(_PAINEL["seq"])
+                _PAINEL["jobs"][jid] = {"pronto": False, "saida": ""}
+                threading.Thread(target=_painel_executar_job,
+                                 args=(jid, nome, params), daemon=True).start()
+                return self._json({"id": jid})
+            if rota.path == "/api/chat":
+                texto = str(dados.get("texto") or "").strip()
+                if not texto:
+                    return self._json({"resposta": "Escreva alguma coisa :)"})
+                resposta = None
+                try:
+                    resposta = _resposta_da_neural(texto)
+                except Exception:
+                    resposta = None
+                if not resposta:
+                    achados = _buscar_ferramentas(texto, 3)
+                    if achados:
+                        resposta = ("A IA neural local esta desligada, mas para isso eu tenho: "
+                                    + ", ".join(i["nome"] for _n, i in achados)
+                                    + ". Use a aba Ferramentas para executar.")
+                    else:
+                        resposta = ("A IA neural local esta desligada. Na janela do agente, "
+                                    "digite 'criar ia' (uma vez) para conversar offline.")
+                return self._json({"resposta": resposta})
+            if rota.path == "/api/salvar":
+                cam = os.path.abspath(str(dados.get("caminho") or ""))
+                conteudo = str(dados.get("conteudo") or "")
+                if not cam or not os.path.isfile(cam):
+                    return self._json({"msg": "Arquivo invalido."})
+                ok, msg = _escrever_com_rede(cam, conteudo, "edicao pelo painel web")
+                return self._json({"msg": ("SALVO. " if ok else "") + msg})
+            return self._json({"erro": "rota desconhecida"}, 404)
+
+        def log_message(self, *args):
+            return
+
+    return Painel
+
+
+def _iniciar_painel(porta: int = 8777, publico: bool = False):
+    """Sobe o painel numa thread. Por padrao SO aceita conexao do proprio PC."""
+    from http.server import ThreadingHTTPServer
+    if _PAINEL["servidor"] is not None:
+        return _PAINEL["porta"]
+    endereco = "0.0.0.0" if publico else "127.0.0.1"
+    servidor = ThreadingHTTPServer((endereco, int(porta)), _criar_handler_painel())
+    _PAINEL["servidor"] = servidor
+    _PAINEL["porta"] = servidor.server_address[1]
+    threading.Thread(target=servidor.serve_forever, daemon=True).start()
+    return _PAINEL["porta"]
+
+
+@tool
+def abrir_painel_web(porta: int = 8777) -> str:
+    """PAINEL WEB DO AGENTE: abre no navegador uma central visual que roda no
+    seu proprio PC - estado da maquina em tempo real, busca e execucao de
+    qualquer ferramenta, navegador de arquivos com editor (com backup),
+    rotinas e conversa com a IA local. Sem internet, so no seu computador."""
+    try:
+        real = _iniciar_painel(int(porta))
+    except OSError:
+        return ("A porta " + str(porta) + " ja esta em uso. Tente outra, ex.: "
+                "'abrir painel 8790'.")
+    except Exception as e:
+        return "Nao consegui subir o painel: " + type(e).__name__
+    url = "http://127.0.0.1:" + str(real)
+    try:
+        subprocess.Popen('start "" "' + url + '"', shell=True)
+    except Exception:
+        pass
+    return ("PAINEL NO AR: " + url + "\n"
+            "  Abri no seu navegador. Ele roda dentro do seu PC (ninguem de fora acessa).\n"
+            "  Abas: Painel (tempo real), Ferramentas (busca e executa as " +
+            str(len(tools)) + "), Arquivos (edita com backup), Conversar e Rotinas.\n"
+            "  Para fechar: 'fechar painel'.")
+
+
+@tool
+def fechar_painel_web() -> str:
+    """Desliga o painel web local (libera a porta)."""
+    servidor = _PAINEL.get("servidor")
+    if servidor is None:
+        return "O painel nao esta rodando."
+    try:
+        servidor.shutdown()
+        servidor.server_close()
+    except Exception:
+        pass
+    _PAINEL["servidor"] = None
+    _PAINEL["jobs"] = {}
+    return "Painel web desligado."
+
+
+# ==================== CONTROLE DO VS CODE + MOTOR DE EDICAO ====================
+# Aqui o agente deixa de "abrir o VS Code" e passa a TRABALHAR nele: instala
+# extensao, cria projeto pronto, abre no ponto exato do erro, compara arquivos
+# e - o mais importante - EDITA codigo com rede de seguranca:
+#   backup automatico -> aplica -> valida a sintaxe -> se quebrou, desfaz sozinho.
+PASTA_BACKUPS_EDICAO = os.path.join(PASTA_BASE, "backups_edicao")
+ARQ_HISTORICO_EDICOES = os.path.join(PASTA_BASE, "historico_edicoes.json")
+_ASPAS3 = chr(34) * 3
+
+
+def _code_cli() -> str:
+    """Acha o executavel do VS Code (code.cmd) mesmo se nao estiver no PATH."""
+    from shutil import which
+    achado = which("code") or which("code.cmd")
+    if achado:
+        return '"' + achado + '"'
+    candidatos = [
+        os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                     "Programs", "Microsoft VS Code", "bin", "code.cmd"),
+        r"C:\Program Files\Microsoft VS Code\bin\code.cmd",
+        r"C:\Program Files (x86)\Microsoft VS Code\bin\code.cmd",
+    ]
+    for c in candidatos:
+        if c and os.path.exists(c):
+            return '"' + c + '"'
+    return ""
+
+
+def _registrar_edicao(caminho: str, conteudo_antigo: str, descricao: str) -> str:
+    """Salva o estado ANTERIOR do arquivo e registra a edicao (para desfazer)."""
+    try:
+        os.makedirs(PASTA_BACKUPS_EDICAO, exist_ok=True)
+        carimbo = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        destino = os.path.join(PASTA_BACKUPS_EDICAO,
+                               carimbo + "__" + os.path.basename(caminho) + ".bak")
+        with open(destino, "w", encoding="utf-8") as f:
+            f.write(conteudo_antigo)
+        hist = carregar_json(ARQ_HISTORICO_EDICOES, [])
+        if not isinstance(hist, list):
+            hist = []
+        hist.append({"quando": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                     "arquivo": caminho, "backup": destino, "o_que": descricao})
+        salvar_json(ARQ_HISTORICO_EDICOES, hist[-200:])
+        return destino
+    except Exception:
+        return ""
+
+
+def _validar_arquivo(caminho: str, conteudo: str):
+    """Confere se o conteudo novo continua valido para o tipo do arquivo.
+    Devolve (ok, mensagem). Valida Python e JSON de verdade."""
+    baixo = caminho.lower()
+    if baixo.endswith(".py"):
+        try:
+            compile(conteudo, caminho, "exec")
+        except SyntaxError as e:
+            return False, "erro de sintaxe Python na linha %s: %s" % (e.lineno, e.msg)
+    elif baixo.endswith(".json"):
+        try:
+            json.loads(conteudo)
+        except Exception as e:
+            return False, "JSON invalido: " + str(e)[:90]
+    return True, "ok"
+
+
+def _escrever_com_rede(caminho: str, conteudo_novo: str, descricao: str):
+    """Grava com rede de seguranca: backup, validacao ANTES de gravar e recusa
+    de qualquer alteracao que deixe o arquivo quebrado."""
+    antigo = ""
+    if os.path.exists(caminho):
+        try:
+            antigo = open(caminho, encoding="utf-8", errors="ignore").read()
+        except Exception:
+            antigo = ""
+    ok, motivo = _validar_arquivo(caminho, conteudo_novo)
+    if not ok:
+        return False, ("NAO GRAVEI: a alteracao deixaria o arquivo quebrado (" + motivo +
+                       "). O original esta intacto.")
+    backup = _registrar_edicao(caminho, antigo, descricao) if antigo else ""
+    try:
+        pasta = os.path.dirname(os.path.abspath(caminho))
+        if pasta:
+            os.makedirs(pasta, exist_ok=True)
+        with open(caminho, "w", encoding="utf-8") as f:
+            f.write(conteudo_novo)
+    except Exception as e:
+        return False, "Nao consegui gravar: " + type(e).__name__
+    if backup:
+        return True, "Gravado. Backup do estado anterior: " + os.path.basename(backup)
+    return True, "Arquivo criado."
+
+
+def _diff_curto(antigo: str, novo: str, nome: str = "arquivo", linhas: int = 24) -> str:
+    import difflib
+    d = list(difflib.unified_diff(antigo.splitlines(), novo.splitlines(),
+                                  fromfile=nome + " (antes)", tofile=nome + " (depois)",
+                                  lineterm="", n=1))
+    return "\n".join(d[:linhas]) if d else "(sem diferenca)"
+
+
+@tool
+def vscode_status() -> str:
+    """Diz se o VS Code esta instalado, a versao, onde esta e quantas extensoes
+    voce tem. E a checagem inicial antes de qualquer automacao no editor."""
+    cli = _code_cli()
+    if not cli:
+        return ("VS Code NAO encontrado no PATH. Instale em https://code.visualstudio.com "
+                "e marque 'Adicionar ao PATH' (ou reabra o terminal depois de instalar).")
+    saida, _e, _c = _rodar_cmd(cli + " --version", 60)
+    linhas = [l.strip() for l in saida.splitlines() if l.strip()]
+    ext, _e2, _c2 = _rodar_cmd(cli + " --list-extensions", 90)
+    qtd = len([l for l in ext.splitlines() if l.strip()])
+    return ("VS CODE INSTALADO\n  Versao: " + (linhas[0] if linhas else "?") +
+            "\n  Build: " + (linhas[1] if len(linhas) > 1 else "?") +
+            "\n  Executavel: " + cli.strip('"') +
+            "\n  Extensoes instaladas: " + str(qtd))
+
+
+@tool
+def vscode_abrir(caminho: str = "", linha: int = 0, nova_janela: str = "nao") -> str:
+    """Abre uma pasta ou arquivo no VS Code. Com 'linha', abre JA no ponto
+    exato (util pra cair direto no erro). Reaproveita a janela aberta."""
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado. Rode 'vscode status' pra ver como resolver."
+    alvo = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.exists(alvo):
+        return "Nao existe: " + alvo
+    janela = "-n" if nova_janela.strip().lower().startswith("s") else "-r"
+    if linha and os.path.isfile(alvo):
+        cmd = cli + " " + janela + ' --goto "' + alvo + ":" + str(int(linha)) + '"'
+        onde = alvo + " na linha " + str(linha)
+    else:
+        cmd = cli + " " + janela + ' "' + alvo + '"'
+        onde = alvo
+    try:
+        subprocess.Popen(cmd, shell=True)
+    except Exception as e:
+        return "Falhei ao abrir: " + type(e).__name__
+    return "Abri no VS Code: " + onde
+
+
+@tool
+def vscode_listar_extensoes(filtro: str = "") -> str:
+    """Lista as extensoes instaladas no VS Code (opcionalmente filtrando por
+    nome), com a versao de cada uma."""
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado."
+    saida, _e, _c = _rodar_cmd(cli + " --list-extensions --show-versions", 120)
+    itens = [l.strip() for l in saida.splitlines() if l.strip()]
+    if filtro.strip():
+        itens = [i for i in itens if filtro.strip().lower() in i.lower()]
+    if not itens:
+        return "Nenhuma extensao encontrada com esse filtro."
+    return "EXTENSOES (" + str(len(itens)) + "):\n  " + "\n  ".join(itens[:60])
+
+
+@tool
+def vscode_instalar_extensao(identificador: str) -> str:
+    """Instala extensao(oes) no VS Code pelo identificador (ex.:
+    'ms-python.python', 'esbenp.prettier-vscode'). Aceita varias por virgula."""
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado."
+    ids = [i.strip() for i in identificador.replace(";", ",").split(",") if i.strip()]
+    if not ids:
+        return "Diga o identificador, ex.: ms-python.python"
+    if not _confirma_poderoso("Instalar no VS Code: " + ", ".join(ids) + "?"):
+        return "Cancelado."
+    resultados = []
+    for ident in ids:
+        saida, erro, cod = _rodar_cmd(cli + " --install-extension " + ident + " --force", 300)
+        texto = (saida or erro).strip().splitlines()
+        estado = "instalada" if cod == 0 else (texto[-1][:70] if texto else "falhou")
+        resultados.append("  " + ident + ": " + estado)
+    return "INSTALACAO DE EXTENSOES:\n" + "\n".join(resultados)
+
+
+@tool
+def vscode_remover_extensao(identificador: str) -> str:
+    """Remove (desinstala) uma extensao do VS Code. Pede confirmacao."""
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado."
+    if not _confirma_poderoso("REMOVER a extensao '" + identificador + "' do VS Code?"):
+        return "Cancelado."
+    saida, erro, cod = _rodar_cmd(cli + " --uninstall-extension " + identificador.strip(), 180)
+    return "Extensao removida." if cod == 0 else ("Falhou: " + (erro or saida)[:150])
+
+
+@tool
+def vscode_pacote_extensoes(tipo: str = "python") -> str:
+    """Instala de uma vez o PACOTE de extensoes recomendado: 'python', 'web',
+    'dados', 'geral' ou 'tudo'."""
+    pacotes = {
+        "python": ["ms-python.python", "ms-python.vscode-pylance", "ms-python.debugpy",
+                   "charliermarsh.ruff"],
+        "web": ["esbenp.prettier-vscode", "ritwickdey.liveserver",
+                "formulahendry.auto-rename-tag", "dbaeumer.vscode-eslint"],
+        "dados": ["mechatroner.rainbow-csv", "ms-toolsai.jupyter"],
+        "geral": ["ms-ceintl.vscode-language-pack-pt-br", "eamodio.gitlens",
+                  "pkief.material-icon-theme"],
+    }
+    escolha = tipo.strip().lower()
+    if escolha == "tudo":
+        ids = [i for lista in pacotes.values() for i in lista]
+    else:
+        ids = pacotes.get(escolha)
+    if not ids:
+        return "Pacotes disponiveis: " + ", ".join(pacotes) + ", tudo"
+    return _invocar_local("vscode_instalar_extensao", identificador=",".join(ids))
+
+
+@tool
+def vscode_comparar_arquivos(arquivo_a: str, arquivo_b: str) -> str:
+    """Abre os DOIS arquivos lado a lado no VS Code, no modo comparacao,
+    destacando cada diferenca."""
+    cli = _code_cli()
+    if not cli:
+        return "VS Code nao encontrado."
+    a, b = _pasta_padrao(arquivo_a), _pasta_padrao(arquivo_b)
+    if not os.path.isfile(a) or not os.path.isfile(b):
+        return "Preciso de dois arquivos que existam."
+    try:
+        subprocess.Popen(cli + ' -r --diff "' + a + '" "' + b + '"', shell=True)
+    except Exception as e:
+        return "Falhei: " + type(e).__name__
+    return "Comparacao aberta no VS Code:\n  " + os.path.basename(a) + "  x  " + os.path.basename(b)
+
+
+@tool
+def vscode_configurar_projeto(caminho: str = "", tipo: str = "python") -> str:
+    """Cria a pasta .vscode do projeto com settings.json (formatar ao salvar,
+    identacao certa) e extensions.json (recomendacoes pra quem abrir depois)."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    if not os.path.isdir(base):
+        return "Pasta nao encontrada: " + base
+    pasta = os.path.join(base, ".vscode")
+    os.makedirs(pasta, exist_ok=True)
+    escolha = tipo.strip().lower()
+    settings = {
+        "editor.formatOnSave": True,
+        "editor.tabSize": 4 if escolha == "python" else 2,
+        "files.trimTrailingWhitespace": True,
+        "files.insertFinalNewline": True,
+        "files.encoding": "utf8",
+        "files.exclude": {"**/__pycache__": True, "**/node_modules": True, "**/.venv": True},
+    }
+    if escolha == "python":
+        settings["python.analysis.typeCheckingMode"] = "basic"
+        recomendadas = ["ms-python.python", "ms-python.vscode-pylance", "charliermarsh.ruff"]
+    elif escolha == "web":
+        settings["editor.defaultFormatter"] = "esbenp.prettier-vscode"
+        recomendadas = ["esbenp.prettier-vscode", "ritwickdey.liveserver", "dbaeumer.vscode-eslint"]
+    else:
+        recomendadas = ["eamodio.gitlens", "pkief.material-icon-theme"]
+    ok1, m1 = _escrever_com_rede(os.path.join(pasta, "settings.json"),
+                                 json.dumps(settings, indent=2, ensure_ascii=False),
+                                 "configuracao do VS Code")
+    ok2, m2 = _escrever_com_rede(os.path.join(pasta, "extensions.json"),
+                                 json.dumps({"recommendations": recomendadas}, indent=2),
+                                 "extensoes recomendadas")
+    return ("Projeto configurado para '" + escolha + "' em " + pasta +
+            "\n  settings.json: " + ("ok" if ok1 else m1) +
+            "\n  extensions.json: " + ("ok" if ok2 else m2) +
+            "\n  Recomendadas: " + ", ".join(recomendadas))
+
+
+@tool
+def vscode_criar_tarefa(caminho: str = "", nome: str = "rodar",
+                        comando: str = "python main.py") -> str:
+    """Cria uma TAREFA no VS Code (.vscode/tasks.json) que voce roda com
+    Ctrl+Shift+B - ex.: rodar o projeto, os testes ou o build."""
+    base = _pasta_padrao(caminho) if caminho else os.getcwd()
+    pasta = os.path.join(base, ".vscode")
+    os.makedirs(pasta, exist_ok=True)
+    arquivo = os.path.join(pasta, "tasks.json")
+    dados = {"version": "2.0.0", "tasks": []}
+    if os.path.exists(arquivo):
+        try:
+            lido = json.loads(open(arquivo, encoding="utf-8").read())
+            if isinstance(lido, dict):
+                dados = lido
+        except Exception:
+            pass
+    dados.setdefault("tasks", [])
+    dados["tasks"] = [t for t in dados["tasks"] if t.get("label") != nome]
+    dados["tasks"].append({
+        "label": nome, "type": "shell", "command": comando,
+        "group": {"kind": "build", "isDefault": True},
+        "presentation": {"reveal": "always", "panel": "shared"},
+        "problemMatcher": [],
+    })
+    ok, msg = _escrever_com_rede(arquivo, json.dumps(dados, indent=2, ensure_ascii=False),
+                                 "tarefa '" + nome + "' no VS Code")
+    if ok:
+        return ("Tarefa '" + nome + "' criada (" + comando + "). Rode com Ctrl+Shift+B.\n  " + msg)
+    return msg
+
+
+def _modelo_projeto(tipo: str, nome: str):
+    """Modelos de projeto (arquivos prontos). Separado para manter o codigo
+    legivel e permitir adicionar novos tipos com facilidade."""
+    aspas3 = _ASPAS3
+    if tipo.startswith("sit") or tipo.startswith("web"):
+        html = (
+            "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n"
+            "  <meta charset=\"UTF-8\">\n"
+            "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+            "  <title>" + nome + "</title>\n"
+            "  <link rel=\"stylesheet\" href=\"estilo.css\">\n</head>\n<body>\n"
+            "  <header>\n    <h1>" + nome + "</h1>\n"
+            "    <p class=\"sub\">Criado pelo Super Agente PC</p>\n  </header>\n"
+            "  <main>\n    <section class=\"cartao\">\n      <h2>Comece por aqui</h2>\n"
+            "      <p>Edite <code>index.html</code>, <code>estilo.css</code> e "
+            "<code>script.js</code>.</p>\n"
+            "      <button id=\"botao\">Clique em mim</button>\n"
+            "      <p id=\"saida\"></p>\n    </section>\n  </main>\n"
+            "  <footer><small>Feito localmente, sem nuvem.</small></footer>\n"
+            "  <script src=\"script.js\"></script>\n</body>\n</html>\n")
+        css = (
+            ":root{--fundo:#0f1115;--cartao:#171a21;--texto:#e8ecf1;--destaque:#4f8cff;"
+            "--borda:#252a35}\n"
+            "*{box-sizing:border-box;margin:0;padding:0}\n"
+            "body{font-family:system-ui,Segoe UI,sans-serif;background:var(--fundo);"
+            "color:var(--texto);min-height:100vh;display:flex;flex-direction:column;"
+            "align-items:center;padding:40px 20px;gap:24px}\n"
+            "header{text-align:center} h1{font-size:2.2rem;letter-spacing:-.5px}\n"
+            ".sub{color:#8b95a6;margin-top:6px}\n"
+            ".cartao{background:var(--cartao);border:1px solid var(--borda);border-radius:14px;"
+            "padding:28px;max-width:640px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.35)}\n"
+            "h2{margin-bottom:10px;font-size:1.2rem}\n"
+            "code{background:#0b0d11;padding:2px 6px;border-radius:5px;color:var(--destaque)}\n"
+            "button{margin-top:16px;background:var(--destaque);color:#fff;border:0;"
+            "border-radius:9px;padding:11px 18px;font-size:1rem;cursor:pointer;transition:.15s}\n"
+            "button:hover{filter:brightness(1.15);transform:translateY(-1px)}\n"
+            "#saida{margin-top:12px;color:#9fe6a0;min-height:20px}\n"
+            "footer{color:#5e6675}\n")
+        js = ("document.getElementById('botao').addEventListener('click', () => {\n"
+              "  const agora = new Date().toLocaleTimeString('pt-BR');\n"
+              "  document.getElementById('saida').textContent = 'Funcionando! Horario: ' + agora;\n"
+              "});\n")
+        return {"index.html": html, "estilo.css": css, "script.js": js}
+    if tipo.startswith("py"):
+        main = (aspas3 + "Projeto " + nome + " criado pelo Super Agente PC." + aspas3 + "\n\n\n"
+                "def principal() -> None:\n"
+                "    print(\"Projeto " + nome + " rodando!\")\n\n\n"
+                "if __name__ == \"__main__\":\n    principal()\n")
+        teste = ("from main import principal\n\n\n"
+                 "def test_principal_roda():\n    principal()\n")
+        return {"main.py": main, "requirements.txt": "", "testes/test_main.py": teste}
+    if tipo.startswith("api"):
+        servidor = (aspas3 + "API simples (so biblioteca padrao) criada pelo Super Agente PC."
+                    + aspas3 + "\nimport json\n"
+                    "from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\n\n"
+                    "DADOS = {\"mensagem\": \"API no ar\", \"itens\": []}\n\n\n"
+                    "class Handler(BaseHTTPRequestHandler):\n"
+                    "    def _responder(self, codigo, corpo):\n"
+                    "        bruto = json.dumps(corpo, ensure_ascii=False).encode(\"utf-8\")\n"
+                    "        self.send_response(codigo)\n"
+                    "        self.send_header(\"Content-Type\", \"application/json; charset=utf-8\")\n"
+                    "        self.send_header(\"Content-Length\", str(len(bruto)))\n"
+                    "        self.end_headers()\n"
+                    "        self.wfile.write(bruto)\n\n"
+                    "    def do_GET(self):\n        self._responder(200, DADOS)\n\n"
+                    "    def log_message(self, *args):\n        pass\n\n\n"
+                    "if __name__ == \"__main__\":\n"
+                    "    print(\"API em http://localhost:8000\")\n"
+                    "    ThreadingHTTPServer((\"127.0.0.1\", 8000), Handler).serve_forever()\n")
+        return {"servidor.py": servidor}
+    pacote = json.dumps({"name": nome.lower().replace(" ", "-"), "version": "1.0.0",
+                         "main": "index.js", "scripts": {"start": "node index.js"}}, indent=2)
+    return {"index.js": "console.log('Projeto " + nome + " rodando!');\n",
+            "package.json": pacote}
+
+
+@tool
+def vscode_novo_projeto(nome: str, tipo: str = "site", onde: str = "") -> str:
+    """Cria um PROJETO COMPLETO do zero e abre no VS Code: 'site' (HTML/CSS/JS
+    prontos), 'python', 'api' (servidor) ou 'node'. Ja vem com README,
+    .gitignore, git iniciado, primeiro commit e configuracao do editor."""
+    if not nome.strip():
+        return "Diga o nome do projeto."
+    base = _pasta_padrao(onde) if onde else os.path.join(os.path.expanduser("~"), "projetos")
+    destino = os.path.join(base, nome.strip().replace(" ", "-"))
+    if os.path.exists(destino):
+        return "Ja existe uma pasta em " + destino + ". Escolha outro nome."
+    escolha = tipo.strip().lower()
+    arquivos = _modelo_projeto(escolha, nome)
+    arquivos["README.md"] = ("# " + nome + "\n\nProjeto criado pelo Super Agente PC.\n\n"
+                             "Tipo: " + escolha + "\nCriado em: " +
+                             datetime.now().strftime("%d/%m/%Y") + "\n")
+    arquivos[".gitignore"] = "__pycache__/\n*.pyc\nnode_modules/\n.env\n.venv/\ndist/\nbuild/\n"
+    os.makedirs(destino, exist_ok=True)
+    criados = []
+    for rel, conteudo in arquivos.items():
+        caminho = os.path.join(destino, rel)
+        pasta_arq = os.path.dirname(caminho)
+        if pasta_arq:
+            os.makedirs(pasta_arq, exist_ok=True)
+        with open(caminho, "w", encoding="utf-8") as f:
+            f.write(conteudo)
+        criados.append(rel)
+    try:
+        _invocar_local("vscode_configurar_projeto", caminho=destino,
+                       tipo="python" if escolha.startswith("py") else "web")
+    except Exception:
+        pass
+    _rodar_cmd('git -C "' + destino + '" init', 45)
+    _rodar_cmd('git -C "' + destino + '" add -A', 45)
+    _rodar_cmd('git -C "' + destino + '" commit -m "projeto criado pelo agente"', 45)
+    cli = _code_cli()
+    if cli:
+        try:
+            subprocess.Popen(cli + ' -r "' + destino + '"', shell=True)
+        except Exception:
+            pass
+    return ("PROJETO '" + nome + "' CRIADO (" + escolha + ")\n  Pasta: " + destino +
+            "\n  Arquivos: " + ", ".join(criados) +
+            "\n  Git iniciado com o primeiro commit" +
+            ("\n  Aberto no VS Code." if cli else "\n  VS Code nao encontrado - abra a pasta na mao."))
+
+
+@tool
+def editar_arquivo_seguro(caminho: str, procurar: str, substituir: str,
+                          todas_ocorrencias: str = "nao", aplicar: str = "nao") -> str:
+    """EDICAO AVANCADA com rede de seguranca: mostra o diff do que vai mudar,
+    faz backup, valida a sintaxe e RECUSA a alteracao se ela quebrar o arquivo.
+    Por padrao so simula; use aplicar='sim' pra valer."""
+    cam = _pasta_padrao(caminho)
+    if not os.path.isfile(cam):
+        return "Arquivo nao encontrado: " + cam
+    try:
+        atual = open(cam, encoding="utf-8", errors="ignore").read()
+    except Exception as e:
+        return "Nao consegui ler: " + type(e).__name__
+    n = atual.count(procurar)
+    if n == 0:
+        return "O trecho procurado nao existe em " + os.path.basename(cam) + ". Nada mudou."
+    todas = todas_ocorrencias.strip().lower().startswith("s")
+    if n > 1 and not todas:
+        return ("O trecho aparece " + str(n) + " vezes. Por seguranca eu nao chuto qual: "
+                "de mais contexto, ou repita com todas_ocorrencias='sim'.")
+    novo = atual.replace(procurar, substituir) if todas else atual.replace(procurar, substituir, 1)
+    previa = _diff_curto(atual, novo, os.path.basename(cam))
+    if not aplicar.strip().lower().startswith("s"):
+        return ("SIMULACAO (" + str(n) + " ocorrencia(s)) em " + os.path.basename(cam) + ":\n" +
+                previa + "\nPara aplicar de verdade: aplicar='sim'.")
+    ok, msg = _escrever_com_rede(cam, novo, "substituicao em " + os.path.basename(cam))
+    if not ok:
+        return msg
+    return "EDITADO " + os.path.basename(cam) + " (" + str(n) + " troca(s)).\n" + previa + "\n" + msg
+
+
+@tool
+def inserir_no_arquivo(caminho: str, texto: str, depois_de: str = "") -> str:
+    """Insere um trecho num arquivo: logo depois de uma linha de referencia
+    (depois_de='texto da linha') ou no fim. Com backup e validacao."""
+    cam = _pasta_padrao(caminho)
+    if not os.path.isfile(cam):
+        return "Arquivo nao encontrado: " + cam
+    atual = open(cam, encoding="utf-8", errors="ignore").read()
+    if depois_de.strip():
+        if depois_de not in atual:
+            return "Nao achei a referencia '" + depois_de[:50] + "' no arquivo."
+        pos = atual.index(depois_de) + len(depois_de)
+        quebra = atual.find("\n", pos)
+        corte = quebra + 1 if quebra != -1 else len(atual)
+        novo = atual[:corte] + texto.rstrip("\n") + "\n" + atual[corte:]
+        onde = "depois de '" + depois_de[:40] + "'"
+    else:
+        sep = "" if (atual.endswith("\n") or not atual) else "\n"
+        novo = atual + sep + texto.rstrip("\n") + "\n"
+        onde = "no fim do arquivo"
+    ok, msg = _escrever_com_rede(cam, novo, "insercao " + onde)
+    if not ok:
+        return msg
+    return ("Inseri " + onde + " em " + os.path.basename(cam) + ".\n" +
+            _diff_curto(atual, novo, os.path.basename(cam)) + "\n" + msg)
+
+
+@tool
+def renomear_simbolo_na_pasta(pasta: str, de: str, para: str,
+                              extensoes: str = "py,js,ts,html,css,json",
+                              aplicar: str = "nao") -> str:
+    """REFATORACAO em varios arquivos: troca um nome (variavel, funcao, classe,
+    texto) em toda a pasta. Mostra onde vai mexer antes; com aplicar='sim'
+    altera com backup e validacao arquivo a arquivo."""
+    base = _pasta_padrao(pasta)
+    if not os.path.isdir(base):
+        return "Pasta nao encontrada: " + base
+    if not de.strip():
+        return "Diga o nome que deve ser trocado."
+    exts = tuple("." + e.strip().lstrip(".").lower() for e in extensoes.split(",") if e.strip())
+    valendo = aplicar.strip().lower().startswith("s")
+    alvos = []
+    for raiz, dirs, arqs in os.walk(base):
+        dirs[:] = [d for d in dirs if d not in
+                   ("node_modules", ".git", "venv", ".venv", "__pycache__", "backups_edicao")]
+        for a in arqs:
+            if not a.lower().endswith(exts):
+                continue
+            cam = os.path.join(raiz, a)
+            try:
+                texto = open(cam, encoding="utf-8", errors="ignore").read()
+            except Exception:
+                continue
+            if de in texto:
+                alvos.append((cam, texto.count(de), texto))
+    if not alvos:
+        return "'" + de + "' nao aparece em nenhum arquivo de " + base + "."
+    total = sum(n for _c, n, _t in alvos)
+    if not valendo:
+        linhas = ["SIMULACAO: '" + de + "' -> '" + para + "' em " + str(len(alvos)) +
+                  " arquivo(s), " + str(total) + " ocorrencia(s):"]
+        for cam, n, _t in alvos[:15]:
+            linhas.append("  " + str(n).rjust(3) + "x  " + os.path.relpath(cam, base))
+        linhas.append("Para aplicar: aplicar='sim' (faco backup de cada arquivo).")
+        return "\n".join(linhas)
+    if not _confirma_poderoso("Trocar '" + de + "' por '" + para + "' em " + str(len(alvos)) +
+                              " arquivo(s) (" + str(total) + " ocorrencias)?"):
+        return "Cancelado."
+    feitos, recusados = [], []
+    for cam, n, texto in alvos:
+        ok, msg = _escrever_com_rede(cam, texto.replace(de, para),
+                                     "refatoracao " + de + " -> " + para)
+        if ok:
+            feitos.append(os.path.relpath(cam, base))
+        else:
+            recusados.append(os.path.relpath(cam, base) + " (" + msg[:60] + ")")
+    saida = ["REFATORADO em " + str(len(feitos)) + " arquivo(s) (" + str(total) + " ocorrencias)."]
+    saida += ["  ok: " + f for f in feitos[:12]]
+    if recusados:
+        saida.append("  NAO alterados (ficariam quebrados): " + "; ".join(recusados[:5]))
+    saida.append("Para reverter: 'desfazer edicao'.")
+    return "\n".join(saida)
+
+
+@tool
+def historico_de_edicoes(quantidade: int = 15) -> str:
+    """Mostra as ultimas edicoes que o agente fez em arquivos, com data,
+    arquivo e o backup correspondente (para poder reverter)."""
+    hist = carregar_json(ARQ_HISTORICO_EDICOES, [])
+    if not hist:
+        return "Ainda nao editei nenhum arquivo."
+    linhas = ["ULTIMAS EDICOES (" + str(len(hist)) + " no total):"]
+    for item in list(hist)[-int(quantidade):][::-1]:
+        linhas.append("  " + str(item.get("quando", "?")) + " | " +
+                      os.path.basename(str(item.get("arquivo", ""))) + " | " +
+                      str(item.get("o_que", "")))
+    linhas.append("Para reverter a ultima: 'desfazer edicao'.")
+    return "\n".join(linhas)
+
+
+@tool
+def desfazer_edicao(arquivo: str = "") -> str:
+    """DESFAZ a ultima edicao feita pelo agente (ou a ultima naquele arquivo),
+    restaurando o backup automatico. Pede confirmacao."""
+    hist = carregar_json(ARQ_HISTORICO_EDICOES, [])
+    if not hist:
+        return "Nao ha edicoes para desfazer."
+    alvo = None
+    for item in reversed(hist):
+        if not arquivo.strip() or arquivo.strip().lower() in str(item.get("arquivo", "")).lower():
+            alvo = item
+            break
+    if not alvo:
+        return "Nao achei edicao registrada para '" + arquivo + "'."
+    backup = alvo.get("backup", "")
+    destino = alvo.get("arquivo", "")
+    if not os.path.isfile(backup):
+        return "O backup dessa edicao nao existe mais (" + str(backup) + ")."
+    if not _confirma_poderoso("Restaurar " + os.path.basename(destino) + " para como estava em " +
+                              str(alvo.get("quando")) + "?"):
+        return "Cancelado."
+    conteudo = open(backup, encoding="utf-8", errors="ignore").read()
+    atual = ""
+    if os.path.exists(destino):
+        atual = open(destino, encoding="utf-8", errors="ignore").read()
+    _registrar_edicao(destino, atual, "estado antes de desfazer")
+    with open(destino, "w", encoding="utf-8") as f:
+        f.write(conteudo)
+    hist.remove(alvo)
+    salvar_json(ARQ_HISTORICO_EDICOES, hist)
+    return "DESFEITO: " + destino + " voltou ao estado de " + str(alvo.get("quando")) + "."
+
+
+@tool
+def criar_arquivo_com_conteudo(caminho: str, conteudo: str, abrir_no_editor: str = "sim") -> str:
+    """Cria um arquivo com o conteudo informado (valida sintaxe de .py e .json
+    antes de gravar) e abre no VS Code. Nao sobrescreve sem avisar."""
+    cam = _pasta_padrao(caminho)
+    if os.path.exists(cam):
+        if not _confirma_poderoso("O arquivo " + os.path.basename(cam) +
+                                  " JA EXISTE. Sobrescrever?"):
+            return "Cancelado (arquivo preservado)."
+    ok, msg = _escrever_com_rede(cam, conteudo, "criacao de arquivo")
+    if not ok:
+        return msg
+    if abrir_no_editor.strip().lower().startswith("s") and _code_cli():
+        try:
+            subprocess.Popen(_code_cli() + ' -r "' + cam + '"', shell=True)
+        except Exception:
+            pass
+    return "Arquivo criado: " + cam + " (" + str(len(conteudo.splitlines())) + " linhas)\n  " + msg
+
+
 # ============ MEMORIA DE CONHECIMENTO LOCAL (RAG offline de verdade) ============
 # O salto: em vez de so EXECUTAR, o agente passa a CONHECER o conteudo dos seus
 # arquivos. Ele indexa os textos em pedacos, faz busca por relevancia (BM25,
@@ -3055,7 +4175,7 @@ def _estudar_pc() -> str:
     texto = "\n".join(f"- {f}" for f in fatos)
     try:
         for f in fatos:
-            gravar_memoria_core.invoke({"secao": "PC do usuario", "fato": f})
+            _invocar_local("gravar_memoria_core", secao="PC do usuario", fato=f)
     except Exception:
         try:
             with open(ARQ_MEMORIA_CORE, "a", encoding="utf-8") as arq:
@@ -4277,6 +5397,17 @@ def _menu_ajuda_local():
     print("                        314 e pergunto antes de executar (sem nuvem)")
     print("   ferramentas de <assunto> ....... lista o que existe sobre o tema")
     print("                        (ex.: 'ferramentas de rede', 'ferramentas de disco')")
+    print("PAINEL WEB (uma central visual rodando no seu PC):")
+    print("   abrir painel ....... abre no navegador: estado em tempo real, busca e")
+    print("                        executa ferramentas, edita arquivos, chat e rotinas")
+    print("   fechar painel ...... desliga o painel")
+    print("VS CODE (o agente trabalhando dentro do editor):")
+    print("   vscode status ...... confere instalacao, versao e extensoes")
+    print("   abre no vscode <pasta/arquivo>")
+    print("   novo projeto <nome> [site|python|api|node] .. cria tudo e abre no editor")
+    print("   instala a extensao <id> | pacote de extensoes python|web|dados|geral")
+    print("   desfazer edicao .... reverte a ultima alteracao que eu fiz num arquivo")
+    print("   historico de edicoes")
     print("MEMORIA DE CONHECIMENTO (le os SEUS arquivos, 100% offline):")
     print("   indexar meus arquivos <pasta> .. le e indexa seus documentos")
     print("   nos meus arquivos, <pergunta> .. responde citando o arquivo e o trecho")
@@ -4860,6 +5991,57 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
         return True
+
+    # ---- PAINEL WEB LOCAL ----
+    if n in ("abrirpainel", "painel", "painelweb", "abrirpainelweb", "abrepainel",
+             "mesadetrabalho", "abrircentral", "interface", "abririnterface"):
+        _rel(_invocar_local("abrir_painel_web")); return True
+    if cmd.startswith("abrir painel ") or cmd.startswith("abre o painel "):
+        _porta_p = "".join(ch for ch in cmd if ch.isdigit())
+        _rel(_invocar_local("abrir_painel_web", porta=int(_porta_p or 8777))); return True
+    if n in ("fecharpainel", "desligarpainel", "fecharpainelweb", "pararpainel"):
+        _rel(_invocar_local("fechar_painel_web")); return True
+
+    # ---- VS CODE ----
+    if n in ("vscodestatus", "statusvscode", "temvscode", "vscodeinstalado"):
+        _rel(_invocar_local("vscode_status")); return True
+    for _pre in ("abre no vscode", "abrir no vscode", "abre no code", "vscode abrir",
+                 "abre o vscode em", "abre o projeto"):
+        if cmd.startswith(_pre):
+            _alvo_vs = comando[len(_pre):].strip(" :,.")
+            _rel(_invocar_local("vscode_abrir", caminho=_alvo_vs)); return True
+    if n in ("vscodeextensoes", "listarextensoes", "minhasextensoes", "extensoesvscode"):
+        _rel(_invocar_local("vscode_listar_extensoes")); return True
+    for _pre in ("instala a extensao", "instalar extensao", "instala extensao",
+                 "adiciona a extensao"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("vscode_instalar_extensao",
+                                identificador=comando[len(_pre):].strip(" :,."))); return True
+    for _pre in ("pacote de extensoes", "instala o pacote de extensoes", "extensoes de"):
+        if cmd.startswith(_pre):
+            _rel(_invocar_local("vscode_pacote_extensoes",
+                                tipo=cmd[len(_pre):].strip(" :,.") or "python")); return True
+    for _pre in ("novo projeto", "cria um projeto", "criar projeto", "cria o projeto",
+                 "novo site", "cria um site chamado", "criar um site"):
+        if cmd.startswith(_pre):
+            _resto_pj = comando[len(_pre):].strip(" :,.")
+            _tipo_pj = "site"
+            for _t in ("python", "api", "node", "site", "web"):
+                if (" " + _t) in _resto_pj.lower() or _resto_pj.lower().startswith(_t):
+                    _tipo_pj = _t
+                    _resto_pj = _resto_pj.lower().replace(_t, "").strip(" -:,.")
+                    break
+            if not _resto_pj:
+                _rel("Diga o nome. Ex.: 'novo projeto meu-site' ou 'novo projeto python calculadora'.")
+                return True
+            _rel(_invocar_local("vscode_novo_projeto", nome=_resto_pj, tipo=_tipo_pj)); return True
+
+    # ---- EDICOES: desfazer e historico ----
+    if n in ("desfazeredicao", "desfazaultimaedicao", "desfazer", "voltaredicao",
+             "desfazoquevocefez"):
+        _rel(_invocar_local("desfazer_edicao")); return True
+    if n in ("historicodeedicoes", "oquevoceeditou", "edicoesfeitas", "historicoedicoes"):
+        _rel(_invocar_local("historico_de_edicoes")); return True
 
     # ---- MEMORIA DE CONHECIMENTO (RAG local sobre os SEUS arquivos) ----
     for _pre in ("indexar meus arquivos", "indexa meus arquivos", "indexar meus documentos",
@@ -18426,6 +19608,26 @@ def limpar_texto_colado(texto: str) -> str:
 
 
 tools = [
+    # --- painel web local ---
+    abrir_painel_web,
+    fechar_painel_web,
+    # --- VS Code e motor de edicao (backup, validacao, desfazer) ---
+    vscode_status,
+    vscode_abrir,
+    vscode_listar_extensoes,
+    vscode_instalar_extensao,
+    vscode_remover_extensao,
+    vscode_pacote_extensoes,
+    vscode_comparar_arquivos,
+    vscode_configurar_projeto,
+    vscode_criar_tarefa,
+    vscode_novo_projeto,
+    editar_arquivo_seguro,
+    inserir_no_arquivo,
+    renomear_simbolo_na_pasta,
+    historico_de_edicoes,
+    desfazer_edicao,
+    criar_arquivo_com_conteudo,
     o_que_o_agente_aprendeu,
     # --- memoria de conhecimento local (RAG offline) ---
     indexar_meus_arquivos,
