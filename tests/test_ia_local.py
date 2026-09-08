@@ -6,10 +6,10 @@ from test_roteamento_conversa import carregar
 
 class IALocal(unittest.TestCase):
     def ambiente(self, **extras):
-        return carregar('_quantidade_lista_local', '_contar_itens_lista_local',
+        return carregar('_perfil_resposta_local', '_quantidade_lista_local', '_contar_itens_lista_local',
                         '_montar_contexto_local', 'perguntar_ia_local',
                         '_resposta_da_neural',
-                        _sys_ia_local=lambda: 'Sistema', **extras)
+                        _sys_ia_local=lambda: 'Sistema', config={}, **extras)
 
     def test_historico_limitado_sem_modificar_memoria(self):
         historico = [{'role': 'user' if i % 2 == 0 else 'assistant',

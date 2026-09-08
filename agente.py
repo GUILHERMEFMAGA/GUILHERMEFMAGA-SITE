@@ -7604,6 +7604,8 @@ def _menu_ajuda_local():
     _pronta = ia_local_disponivel()
     print("")
     print("================= MENU DO AGENTE =================")
+    print("ESTILO LOCAL: resposta rapida | resposta equilibrada | resposta analitica")
+    print("HUMOR: humor desligado | humor leve | humor criativo | estilo da conversa")
     print("IA NEURAL LOCAL (roda no PC, sem internet/cota/limite):")
     print("   criar ia ........... baixa e liga a IA que conversa offline (so na 1a vez)")
     print("   status ia .......... diz se a IA local esta pronta" + ("  [AGORA: PRONTA]" if _pronta else "  [AGORA: nao instalada]"))
@@ -8959,7 +8961,7 @@ def _contexto_pc() -> str:
     try:
         fatos.append(f"Sistema: {_pl.system()} {_pl.release()} (build {_pl.version()})")
         fatos.append(f"PC: {_pl.node()}")
-        fatos.append(f"Nivel de permissao do agente: {config.get('nivel_permissao','admin')} (roda como administrador)")
+        fatos.append(f"Nivel configurado do agente: {config.get('nivel_permissao','padrao')}; elevacao do Windows nao verificada neste resumo")
     except Exception:
         pass
     try:
@@ -9111,6 +9113,65 @@ def _parece_pedido_de_acao(cmd: str) -> bool:
     return False
 
 
+def _perfil_resposta_local(pergunta: str, configuracao: dict):
+    """Politica leve: nao usa outra IA para decidir como responder."""
+    import unicodedata
+    texto = "".join(c for c in unicodedata.normalize("NFD", pergunta.lower())
+                    if unicodedata.category(c) != "Mn")
+    modo = configuracao.get("resposta_local", "equilibrada")
+    if modo not in ("rapida", "equilibrada", "analitica"):
+        modo = "equilibrada"
+    if any(x in texto for x in ("em detalhes", "detalhadamente", "analise completa",
+                                "resposta longa", "compare as alternativas")):
+        modo = "analitica"
+    elif any(x in texto for x in ("em uma frase", "resposta curta", "resuma", "seja breve")):
+        modo = "rapida"
+    tokens, orientacao = {
+        "rapida": (220, "Responda direto em poucas frases, sem introducao ou repeticoes."),
+        "equilibrada": (450, "De a resposta principal, uma explicacao curta e exemplo se util."),
+        "analitica": (1000, "Organize em conclusao, justificativas verificaveis, alternativas "
+                     "e limitacoes, somente quando pertinentes. Distinga fatos de hipoteses. "
+                     "Nao invente referencias ou resultados de testes."),
+    }[modo]
+    humor = configuracao.get("humor_local", "leve")
+    if humor not in ("desligado", "leve", "criativo"):
+        humor = "leve"
+    orientacao += {
+        "desligado": " Use tom profissional, sem piadas.",
+        "leve": " Pode usar uma observacao bem-humorada curta se couber, sem forcar.",
+        "criativo": " Use analogias criativas e humor amigavel quando pertinente, sem perder a precisao.",
+    }[humor]
+    orientacao += (" Em assuntos serios, sofrimento, saude, seguranca ou perda de dados, "
+                   "priorize clareza e respeito, sem piadas. Humor nunca substitui a resposta. "
+                   "Propostas de funcoes sao ideias, nao capacidades ja instaladas.")
+    return tokens, orientacao
+
+
+def _configurar_conversa_local(comando: str) -> bool:
+    """Configuracao explicita e persistente; nunca muda permissoes ou provedor."""
+    n = _norm_pt(comando)
+    opcoes = {
+        "respostarapida": ("resposta_local", "rapida"),
+        "respostaequilibrada": ("resposta_local", "equilibrada"),
+        "respostaanalitica": ("resposta_local", "analitica"),
+        "humordesligado": ("humor_local", "desligado"),
+        "humorleve": ("humor_local", "leve"),
+        "humorcriativo": ("humor_local", "criativo"),
+    }
+    if n not in opcoes and n != "estilodaconversa":
+        return False
+    if n in opcoes:
+        chave, valor = opcoes[n]
+        config[chave] = valor
+        salvar_json(ARQ_CONFIG, config)
+    print("\n[Conversa local]: resposta " + str(config.get("resposta_local", "equilibrada"))
+          + " | humor " + str(config.get("humor_local", "leve")))
+    print("  resposta rapida | resposta equilibrada | resposta analitica")
+    print("  humor desligado | humor leve | humor criativo")
+    print("  Respostas longas podem demorar mais. O estilo nao garante acerto factual.")
+    return True
+
+
 def _sys_ia_local() -> str:
     """Instrucoes curtas e factuais: menos contexto para processar na CPU."""
     return (
@@ -9163,6 +9224,7 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5) -> str:
         "model": "local", "messages": msgs, "temperature": temperatura,
         "max_tokens": max_tokens, "stream": False,
         "top_p": 0.9, "repeat_penalty": 1.05,
+        "cache_prompt": True,  # llama.cpp: reutiliza prefixo, nao respostas antigas
     }).encode("utf-8")
     req = urllib.request.Request(_url_ia_local + "/v1/chat/completions",
                                  data=corpo, method="POST",
@@ -9200,7 +9262,8 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
         raise ValueError("A pergunta nao pode estar vazia.")
     msgs = _montar_contexto_local(pergunta, historico)
     quantidade = _quantidade_lista_local(pergunta)
-    tokens = 350
+    tokens, estilo = _perfil_resposta_local(pergunta, config)
+    msgs[0]["content"] += " " + estilo
     if quantidade:
         alvo = min(quantidade, 50)
         tokens = min(1800, max(350, alvo * 32 + 120))
@@ -9291,6 +9354,9 @@ def processar_atalho_rapido(comando: str) -> bool:
 
     if cmd == "status":
         mostrar_status()
+        return True
+
+    if _configurar_conversa_local(comando):
         return True
 
     # CEREBRO LOCAL (sem API/cota/limite): tenta resolver por regra antes de
@@ -22714,7 +22780,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Comunicacao local 2026-09-08-r4] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Perfis de conversa local 2026-09-08-r5] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
