@@ -6899,6 +6899,25 @@ def _executar_objetivo(objetivo: str) -> bool:
     return True
 
 
+def _pedido_explicativo(comando: str) -> bool:
+    """Explicacoes devem ir ao chat ANTES das regras por palavra-chave.
+
+    Nao confunde 'qual o espaco em disco' com 'o que e armazenamento'.
+    """
+    import re
+    import unicodedata
+    texto = "".join(c for c in unicodedata.normalize("NFD", comando.lower())
+                    if unicodedata.category(c) != "Mn")
+    texto = " ".join(re.sub(r"[^a-z0-9 ]", " ", texto).split())
+    texto = re.sub(r"^por favor\s+", "", texto)
+    return bool(re.match(
+        r"^(?:(?:me )?(?:explique|explica|explique-me|ensine|ensina|conte|fale)\b"
+        r"|(?:o ?que|oq) (?:e|eh|significa|sao)\b"
+        r"|(?:qual|quais) (?:e |eh |sao )?(?:a |as )?diferenca"
+        r"|como (?:funciona|funcionam|faco para|faco pra|posso)\b"
+        r"|por ?que\b)", texto))
+
+
 def _eh_pergunta_de_conversa(comando: str) -> bool:
     """Perguntas explicativas nao autorizam a busca/execucao de ferramentas."""
     import re
@@ -7759,6 +7778,11 @@ def _processar_cerebro_local(comando: str) -> bool:
              "digite: status ia. 'desligar ia local' encerra o motor local; "
              "nao e o comando para voltar ao modo local.")
         return True
+
+    # Prioridade de intencao: a palavra "armazenamento" numa explicacao
+    # nao autoriza consultar discos; "firewall" nao autoriza muda-lo.
+    if _pedido_explicativo(comando):
+        return False  # processar_atalho_rapido encaminha ao chat local/nuvem
 
     # ---- Conversa / saudações (resposta local, sem nuvem) ----
     saud = ("ola", "oi", "oie", "ei", "iae", "eai", "eae", "eaew",
@@ -9228,142 +9252,144 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _processar_cerebro_local(comando):
         return True
 
-    # --- Atalhos INSTANTANEOS (sem IA, resposta na hora) ---
-    # Cotacao do dolar/euro/bitcoin e clima: rodam direto a ferramenta local,
-    # sem gastar cota - resposta quase instantanea.
-    if any(p in cmd for p in ("dolar", "dólar", "cotação", "cotacao", "euro", "bitcoin", "clima", "tempo agora", "vai chover")):
-        try:
-            _cid = ""
-            for chave in ("clima em", "tempo em", "em "):
-                if chave in cmd:
-                    _cid = cmd.split(chave)[-1].strip(" ?!")
-                    break
-            print("\n[Rapido]: " + cotacao_e_clima.invoke({"cidade": _cid}))
-        except Exception as _e:
-            print(f"\n[Rapido]: nao consegui consultar agora ({type(_e).__name__}).")
-        return True
-    # Bloquear a tela na hora (Win+L) - instantaneo.
-    if any(p in cmd for p in ("bloquear tela", "bloquear pc", "travar tela", "trancar tela", "bloqueia a tela")):
-        controle_de_energia.invoke({"acao": "bloquear"})
-        print("\n[Rapido]: tela bloqueada.")
-        return True
-    # Calculadora instantanea: se o comando for basicamente uma conta (so
-    # numeros, operadores e parenteses), calcula na hora sem gastar IA.
-    _limpo = cmd.strip().rstrip("=").strip().replace(",", ".")
-    if any(ch in _limpo for ch in "+-*/") and any(ch.isdigit() for ch in _limpo):
-        _so_conta = _limpo.replace(" ", "")
-        _permitidos = set("0123456789+-*/().%")
-        if set(_so_conta) <= _permitidos and any(ch.isdigit() for ch in _so_conta):
+    # Explicacoes tambem pulam atalhos secundarios de midia/energia/cache.
+    if not _pedido_explicativo(comando):
+        # --- Atalhos INSTANTANEOS (sem IA, resposta na hora) ---
+        # Cotacao do dolar/euro/bitcoin e clima: rodam direto a ferramenta local,
+        # sem gastar cota - resposta quase instantanea.
+        if any(p in cmd for p in ("dolar", "dólar", "cotação", "cotacao", "euro", "bitcoin", "clima", "tempo agora", "vai chover")):
             try:
-                print("\n[Rapido]: " + calculadora.invoke({"expressao": cmd.strip()}))
-                return True
-            except Exception:
-                pass
+                _cid = ""
+                for chave in ("clima em", "tempo em", "em "):
+                    if chave in cmd:
+                        _cid = cmd.split(chave)[-1].strip(" ?!")
+                        break
+                print("\n[Rapido]: " + cotacao_e_clima.invoke({"cidade": _cid}))
+            except Exception as _e:
+                print(f"\n[Rapido]: nao consegui consultar agora ({type(_e).__name__}).")
+            return True
+        # Bloquear a tela na hora (Win+L) - instantaneo.
+        if any(p in cmd for p in ("bloquear tela", "bloquear pc", "travar tela", "trancar tela", "bloqueia a tela")):
+            controle_de_energia.invoke({"acao": "bloquear"})
+            print("\n[Rapido]: tela bloqueada.")
+            return True
+        # Calculadora instantanea: se o comando for basicamente uma conta (so
+        # numeros, operadores e parenteses), calcula na hora sem gastar IA.
+        _limpo = cmd.strip().rstrip("=").strip().replace(",", ".")
+        if any(ch in _limpo for ch in "+-*/") and any(ch.isdigit() for ch in _limpo):
+            _so_conta = _limpo.replace(" ", "")
+            _permitidos = set("0123456789+-*/().%")
+            if set(_so_conta) <= _permitidos and any(ch.isdigit() for ch in _so_conta):
+                try:
+                    print("\n[Rapido]: " + calculadora.invoke({"expressao": cmd.strip()}))
+                    return True
+                except Exception:
+                    pass
 
-    # --- Comando de NIVEL DE PERMISSAO (modo) ---
-    # "modo admin"  -> faz tudo sozinho (so trava comandos catastroficos);
-    # "modo padrao" -> pergunta sim/nao nas acoes sensiveis;
-    # "modo basico" -> bloqueia alteracoes no sistema.
-    if cmd in ("modo", "modo?") or cmd.startswith("modo "):
-        _alvo = cmd.replace("modo", "", 1).strip().lower()
-        if _alvo in ("admin", "administrador", "autonomo", "total", "tudo"):
-            config["nivel_permissao"] = "admin"
-            salvar_json(ARQ_CONFIG, config)
-            print("\n[Modo]: ADMIN (autonomo) ligado. Agora eu faco praticamente tudo")
-            print("sozinho - analisar, editar, apagar, instalar, configurar, enviar.")
-            print("Unica trava: comandos catastroficos (formatar, desligar, apagar o")
-            print("disco inteiro, registro) ainda pedem um 'sim' final, por seguranca.")
-        elif _alvo in ("padrao", "normal", "default"):
-            config["nivel_permissao"] = "padrao"
-            salvar_json(ARQ_CONFIG, config)
-            print("\n[Modo]: PADRAO. Vou pedir 'sim/nao' antes de acoes sensiveis")
-            print("(apagar, enviar, instalar, mudar configuracao).")
-        elif _alvo in ("basico", "seguro", "leitur"):
-            config["nivel_permissao"] = "basico"
-            salvar_json(ARQ_CONFIG, config)
-            print("\n[Modo]: BASICO. Somente leitura/atalhos; alteracoes no sistema")
-            print("estao bloqueadas.")
-        else:
-            print(f"\n[Modo] atual: '{config.get('nivel_permissao')}'.")
-            print("Use: 'modo admin' (tudo sozinho), 'modo padrao' (pergunta) ou")
-            print("'modo basico' (so leitura).")
-        return True
+        # --- Comando de NIVEL DE PERMISSAO (modo) ---
+        # "modo admin"  -> faz tudo sozinho (so trava comandos catastroficos);
+        # "modo padrao" -> pergunta sim/nao nas acoes sensiveis;
+        # "modo basico" -> bloqueia alteracoes no sistema.
+        if cmd in ("modo", "modo?") or cmd.startswith("modo "):
+            _alvo = cmd.replace("modo", "", 1).strip().lower()
+            if _alvo in ("admin", "administrador", "autonomo", "total", "tudo"):
+                config["nivel_permissao"] = "admin"
+                salvar_json(ARQ_CONFIG, config)
+                print("\n[Modo]: ADMIN (autonomo) ligado. Agora eu faco praticamente tudo")
+                print("sozinho - analisar, editar, apagar, instalar, configurar, enviar.")
+                print("Unica trava: comandos catastroficos (formatar, desligar, apagar o")
+                print("disco inteiro, registro) ainda pedem um 'sim' final, por seguranca.")
+            elif _alvo in ("padrao", "normal", "default"):
+                config["nivel_permissao"] = "padrao"
+                salvar_json(ARQ_CONFIG, config)
+                print("\n[Modo]: PADRAO. Vou pedir 'sim/nao' antes de acoes sensiveis")
+                print("(apagar, enviar, instalar, mudar configuracao).")
+            elif _alvo in ("basico", "seguro", "leitur"):
+                config["nivel_permissao"] = "basico"
+                salvar_json(ARQ_CONFIG, config)
+                print("\n[Modo]: BASICO. Somente leitura/atalhos; alteracoes no sistema")
+                print("estao bloqueadas.")
+            else:
+                print(f"\n[Modo] atual: '{config.get('nivel_permissao')}'.")
+                print("Use: 'modo admin' (tudo sozinho), 'modo padrao' (pergunta) ou")
+                print("'modo basico' (so leitura).")
+            return True
 
-    # NOVO: checa atalho de mídia ANTES de qualquer outra coisa — isso é o
-    # que corrige o bug de "pausar música" ser interpretado errado e abrir
-    # o navegador. Aqui a ação é instantânea e não passa pelo LLM.
-    chave_midia = cmd if cmd in ATALHOS_MIDIA else resolver_atalho_midia_por_similaridade(cmd)
-    if chave_midia:
-        tecla = ATALHOS_MIDIA[chave_midia]
-        pyautogui.press(tecla)
-        print(f"\n[Atalho de mídia]: comando '{tecla}' enviado ao player ativo.")
-        falar("Feito.")
-        return True
+        # NOVO: checa atalho de mídia ANTES de qualquer outra coisa — isso é o
+        # que corrige o bug de "pausar música" ser interpretado errado e abrir
+        # o navegador. Aqui a ação é instantânea e não passa pelo LLM.
+        chave_midia = cmd if cmd in ATALHOS_MIDIA else resolver_atalho_midia_por_similaridade(cmd)
+        if chave_midia:
+            tecla = ATALHOS_MIDIA[chave_midia]
+            pyautogui.press(tecla)
+            print(f"\n[Atalho de mídia]: comando '{tecla}' enviado ao player ativo.")
+            falar("Feito.")
+            return True
 
-    # ABERTURA SEGURA: so usa atalho EXATO conhecido. NAO chuta por
-    # similaridade (isso abria o programa errado, ex.: 'Bambu Studio'->VS Code,
-    # 'Instagram'->Paint). Quem pede "abre <X>" ja foi tratado pelo cerebro local
-    # (que procura o programa REAL no Menu Iniciar ou o site). Aqui ficam so os
-    # atalhos exatos da tabela, que sao confiaveis.
-    chave = cmd if cmd in ATALHOS_PROGRAMAS else None
-    if chave:
-        executavel, nome_amigavel = ATALHOS_PROGRAMAS[chave]
-        subprocess.Popen(executavel, shell=True)
-        print(f"\n[Atalho]: {nome_amigavel} aberto instantaneamente.")
-        falar(f"{nome_amigavel} aberto.")
-        return True
+        # ABERTURA SEGURA: so usa atalho EXATO conhecido. NAO chuta por
+        # similaridade (isso abria o programa errado, ex.: 'Bambu Studio'->VS Code,
+        # 'Instagram'->Paint). Quem pede "abre <X>" ja foi tratado pelo cerebro local
+        # (que procura o programa REAL no Menu Iniciar ou o site). Aqui ficam so os
+        # atalhos exatos da tabela, que sao confiaveis.
+        chave = cmd if cmd in ATALHOS_PROGRAMAS else None
+        if chave:
+            executavel, nome_amigavel = ATALHOS_PROGRAMAS[chave]
+            subprocess.Popen(executavel, shell=True)
+            print(f"\n[Atalho]: {nome_amigavel} aberto instantaneamente.")
+            falar(f"{nome_amigavel} aberto.")
+            return True
 
-    # Cache: se já respondemos algo idêntico antes E a resposta ainda está
-    # dentro da validade, não gasta API de novo. Formato antigo (string pura,
-    # sem validade) é tratado como expirado, pra forçar recálculo uma vez.
-    if cmd in cache_respostas:
-        entrada_cache = cache_respostas[cmd]
-        # Nunca servir uma resposta de cache VAZIA (isso causou o bug do
-        # "[Cache]: " em branco que engolia o comando sem rodar a IA).
-        _resp_cache = entrada_cache.get("resposta", "") if isinstance(entrada_cache, dict) else str(entrada_cache)
-        if isinstance(entrada_cache, dict) and "timestamp" in entrada_cache and str(_resp_cache).strip():
-            idade_segundos = (datetime.now() - datetime.fromisoformat(entrada_cache["timestamp"])).total_seconds()
-            if idade_segundos < TEMPO_EXPIRACAO_CACHE_SEGUNDOS:
-                print(f"\n[Cache]: {entrada_cache['resposta']}")
-                return True
-        cache_respostas.pop(cmd, None)  # expirado, formato antigo ou vazio: recalcula
+        # Cache: se já respondemos algo idêntico antes E a resposta ainda está
+        # dentro da validade, não gasta API de novo. Formato antigo (string pura,
+        # sem validade) é tratado como expirado, pra forçar recálculo uma vez.
+        if cmd in cache_respostas:
+            entrada_cache = cache_respostas[cmd]
+            # Nunca servir uma resposta de cache VAZIA (isso causou o bug do
+            # "[Cache]: " em branco que engolia o comando sem rodar a IA).
+            _resp_cache = entrada_cache.get("resposta", "") if isinstance(entrada_cache, dict) else str(entrada_cache)
+            if isinstance(entrada_cache, dict) and "timestamp" in entrada_cache and str(_resp_cache).strip():
+                idade_segundos = (datetime.now() - datetime.fromisoformat(entrada_cache["timestamp"])).total_seconds()
+                if idade_segundos < TEMPO_EXPIRACAO_CACHE_SEGUNDOS:
+                    print(f"\n[Cache]: {entrada_cache['resposta']}")
+                    return True
+            cache_respostas.pop(cmd, None)  # expirado, formato antigo ou vazio: recalcula
 
-    # PERGUNTAS DE PERSONALIDADE DO AGENTE: se o usuario pergunta o que o PROPRIO
-    # agente acha/quer/sonha/quantas ferramentas tem, respondemos DIRETO com as
-    # ferramentas de personalidade (sem gastar API e sem a IA inventar funcoes).
-    _cl = cmd.lower().strip()
-    _eh_pergunta_do_agente = (
-        ("gostaria de ter" in _cl or "gostaria de colocar" in _cl or "quer ter" in _cl
-         or "sonha" in _cl or "que voce acha" in _cl or "sua opiniao" in _cl
-         or "opniao" in _cl or "opini" in _cl)
-        and ("ferrament" in _cl or "fun" in _cl or "poder" in _cl or "voce" in _cl or "vc" in _cl)
-    ) or ("quantas ferramentas" in _cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
-    if _eh_pergunta_do_agente:
-        _pediu_poder = ("quantas" in _cl or "poder" in _cl) and ("melhor" not in _cl and "deixa" not in _cl and "pc" not in _cl)
-        _pediu_ideias = ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl
-                         or "opini" in _cl or "opniao" in _cl or "que voce acha" in _cl or "ideia" in _cl)
-        _r = (estatisticas_poder.invoke({}) if _pediu_poder and not _pediu_ideias else (
-            agente_opinioes.invoke({}) if _pediu_ideias else auto_melhoria_pc.invoke({})))
-        historico_conversas.append({"role": "assistant", "content": _r})
-        salvar_historico()
-        print(f"\n[Agente]: {_r}")
-        falar(_r[:200])
-        return True
-    # Frase de motivacao/humor quando pedem algo como "fala algo", "frase forte"
-    if any(p in _cl for p in ("frase forte", "frase poderosa", "me motiva", "fala algo forte", "fala uma frase")):
-        _r = frase_poderosa.invoke({})
-        historico_conversas.append({"role": "assistant", "content": _r})
-        salvar_historico()
-        print(f"\n[Agente]: {_r}")
-        falar(_r)
-        return True
-    if _cl in ("voce e esperto", "vc e esperto", "você é esperto", "vc é esperto", "voce e inteligente", "vc e foda"):
-        _r = frase_poderosa.invoke({})
-        historico_conversas.append({"role": "assistant", "content": _r})
-        salvar_historico()
-        print(f"\n[Agente]: {_r}")
-        falar(_r)
-        return True
+        # PERGUNTAS DE PERSONALIDADE DO AGENTE: se o usuario pergunta o que o PROPRIO
+        # agente acha/quer/sonha/quantas ferramentas tem, respondemos DIRETO com as
+        # ferramentas de personalidade (sem gastar API e sem a IA inventar funcoes).
+        _cl = cmd.lower().strip()
+        _eh_pergunta_do_agente = (
+            ("gostaria de ter" in _cl or "gostaria de colocar" in _cl or "quer ter" in _cl
+             or "sonha" in _cl or "que voce acha" in _cl or "sua opiniao" in _cl
+             or "opniao" in _cl or "opini" in _cl)
+            and ("ferrament" in _cl or "fun" in _cl or "poder" in _cl or "voce" in _cl or "vc" in _cl)
+        ) or ("quantas ferramentas" in _cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
+        if _eh_pergunta_do_agente:
+            _pediu_poder = ("quantas" in _cl or "poder" in _cl) and ("melhor" not in _cl and "deixa" not in _cl and "pc" not in _cl)
+            _pediu_ideias = ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl
+                             or "opini" in _cl or "opniao" in _cl or "que voce acha" in _cl or "ideia" in _cl)
+            _r = (estatisticas_poder.invoke({}) if _pediu_poder and not _pediu_ideias else (
+                agente_opinioes.invoke({}) if _pediu_ideias else auto_melhoria_pc.invoke({})))
+            historico_conversas.append({"role": "assistant", "content": _r})
+            salvar_historico()
+            print(f"\n[Agente]: {_r}")
+            falar(_r[:200])
+            return True
+        # Frase de motivacao/humor quando pedem algo como "fala algo", "frase forte"
+        if any(p in _cl for p in ("frase forte", "frase poderosa", "me motiva", "fala algo forte", "fala uma frase")):
+            _r = frase_poderosa.invoke({})
+            historico_conversas.append({"role": "assistant", "content": _r})
+            salvar_historico()
+            print(f"\n[Agente]: {_r}")
+            falar(_r)
+            return True
+        if _cl in ("voce e esperto", "vc e esperto", "você é esperto", "vc é esperto", "voce e inteligente", "vc e foda"):
+            _r = frase_poderosa.invoke({})
+            historico_conversas.append({"role": "assistant", "content": _r})
+            salvar_historico()
+            print(f"\n[Agente]: {_r}")
+            falar(_r)
+            return True
 
     # Roteamento robusto: normaliza tirando espacos/acentos/pontuacao para que
     # "OQUE VC FAZ?", "o que voce faz", "iae" etc. caiam no chat PURO mesmo
@@ -9379,12 +9405,14 @@ def processar_atalho_rapido(comando: str) -> bool:
     _conversa_norm = {_norm(p) for p in PALAVRAS_CONVERSA if _norm(p)}
     _tarefa_norm = {_norm(p) for p in PALAVRAS_TAREFA_COMPLEXA if _norm(p)}
     _cmd_low = cmd.lower()
-    _eh_conversa = (_eh_pergunta_de_conversa(comando)
+    _eh_conversa = (_pedido_explicativo(comando)
+                    or _eh_pergunta_de_conversa(comando)
                     or any(p in _cmd_low for p in PALAVRAS_CONVERSA)
                     or any(p and p in _cmd_norm for p in _conversa_norm if len(p) >= 3))
     _eh_tarefa = (any(p in _cmd_low for p in PALAVRAS_TAREFA_COMPLEXA)
                   or any(p and p in _cmd_norm for p in _tarefa_norm if len(p) >= 3))
-    if _eh_conversa and (not _eh_tarefa or _eh_pergunta_de_conversa(comando)):
+    if _eh_conversa and (not _eh_tarefa or _eh_pergunta_de_conversa(comando)
+                         or _pedido_explicativo(comando)):
         # Se a nuvem (rodizio de IAs) estiver DESLIGADA, responde no papo com
         # texto local (sem API) - o agente nunca fica mudo e nao gasta cota.
         if not config.get("usar_ia_nuvem", True):
@@ -22640,7 +22668,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [IA local otimizada 2026-09-08-r2] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Conversa antes de ferramentas 2026-09-08-r3] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

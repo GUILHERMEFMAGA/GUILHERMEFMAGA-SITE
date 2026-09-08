@@ -79,6 +79,37 @@ class RoteamentoConversa(unittest.TestCase):
         self.assertIn('python -m py_compile agente_novo.py', bat)
         self.assertIn('SEM_ATUALIZAR.txt', bat)
 
+    def test_explicacoes_passam_pelo_roteador_sem_ferramentas(self):
+        for nuvem in (False, True):
+            for texto in [
+                'Explique a diferença entre memória RAM e armazenamento.',
+                'O que é armazenamento?', 'Qual a diferença entre RAM e disco?',
+                'Me explica como desligar o firewall',
+                'Por favor explique o que é limpar lixo',
+                'Como funciona o modo jogo?',
+            ]:
+                with self.subTest(nuvem=nuvem, texto=texto):
+                    invocar = Mock(side_effect=AssertionError('Nao executar ferramenta'))
+                    env = carregar('_norm_pt', '_eh_pergunta_de_conversa',
+                                   '_pedido_explicativo', '_processar_cerebro_local',
+                                   config={'usar_ia_nuvem': nuvem},
+                                   _ULTIMO_COMANDO={}, _invocar_local=invocar)
+                    self.assertFalse(env['_processar_cerebro_local'](texto))
+                    invocar.assert_not_called()
+
+    def test_consulta_real_de_disco_preservada(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        invocar = Mock(return_value='Espaco consultado')
+        env = carregar('_norm_pt', '_eh_pergunta_de_conversa',
+                       '_pedido_explicativo', '_processar_cerebro_local',
+                       config={}, _ULTIMO_COMANDO={}, _invocar_local=invocar,
+                       _interpretar_ajuste_pc=lambda texto: None,
+                       historico_conversas=[], falar=Mock(), salvar_historico=Mock())
+        with redirect_stdout(StringIO()):
+            self.assertTrue(env['_processar_cerebro_local']('espaco em disco'))
+        invocar.assert_called_once_with('espaco_em_disco')
+
     def test_sintaxe_completa(self):
         compile(SOURCE.read_text(encoding='utf-8'), str(SOURCE), 'exec')
 
