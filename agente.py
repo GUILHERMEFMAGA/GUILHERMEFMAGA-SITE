@@ -2695,10 +2695,11 @@ _INTRO_LOCAL = (
 
 @tool
 def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> str:
-    """Cria um SITE SEU que ja vem CONECTADO ao agente: a pagina fala com a API
-    do painel local, entao ela mostra o PC em tempo real e executa comandos de
-    verdade. Voce edita esse site no VS Code do jeito que quiser - e a sua
-    interface pessoal do agente, separada do painel padrao."""
+    """Cria um SITE SEU no estilo loja de aplicativos: mostra TODAS as
+    ferramentas do agente em cartoes, separadas por categoria, com busca - e
+    cada cartao executa de verdade. Ja vem conectado a API do agente (estado
+    do PC em tempo real, caixa de comando e confirmacao na propria pagina).
+    Edite no VS Code do jeito que quiser."""
     if not nome.strip():
         nome = "meu-painel"
     base = _pasta_padrao(onde) if onde else os.path.join(os.path.expanduser("~"), "projetos")
@@ -2707,128 +2708,204 @@ def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> 
         return "Ja existe uma pasta em " + destino + ". Escolha outro nome."
     os.makedirs(destino, exist_ok=True)
 
-    html = ("<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n"
-            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-            "<title>" + nome + "</title>\n<link rel=\"stylesheet\" href=\"estilo.css\">\n"
-            "</head>\n<body>\n"
-            "<header><h1>" + nome + "</h1>\n"
-            "  <span id=\"ligado\" class=\"pill\">conectando ao agente...</span></header>\n"
-            "<main>\n"
-            "  <section class=\"cartoes\">\n"
-            "    <div class=\"c\"><span>CPU</span><b id=\"cpu\">--</b></div>\n"
-            "    <div class=\"c\"><span>RAM</span><b id=\"ram\">--</b></div>\n"
-            "    <div class=\"c\"><span>Disco</span><b id=\"disco\">--</b></div>\n"
-            "    <div class=\"c\"><span>Ferramentas</span><b id=\"tools\">--</b></div>\n"
-            "  </section>\n"
-            "  <section class=\"linha\">\n"
-            "    <input id=\"cmd\" placeholder=\"Digite um comando do agente e aperte Enter\">\n"
-            "    <button onclick=\"mandar()\">Executar</button>\n"
-            "  </section>\n"
-            "  <pre id=\"saida\">Escreva um comando acima. Exemplos: ajuda | detectar gargalo | "
-            "tempo ligado</pre>\n"
-            "  <section class=\"atalhos\">\n"
-            "    <button onclick=\"rodar('detectar gargalo')\">Gargalo</button>\n"
-            "    <button onclick=\"rodar('tempo ligado')\">Uptime</button>\n"
-            "    <button onclick=\"rodar('espaco recuperavel')\">Espaco</button>\n"
-            "  </section>\n</main>\n"
-            "<div id=\"fundo\"><div class=\"modal\"><h3>Precisa da sua confirmacao</h3>"
-            "<p id=\"pergunta\"></p><div class=\"bts\">"
-            "<button onclick=\"responder('nao')\">Nao</button>"
-            "<button class=\"ok\" onclick=\"responder('sim')\">Sim</button></div></div></div>\n"
-            "<script src=\"agente.js\"></script>\n</body>\n</html>\n")
+    html = (
+        "<!DOCTYPE html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"UTF-8\">\n"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+        "<title>" + nome + "</title>\n<link rel=\"stylesheet\" href=\"estilo.css\">\n"
+        "</head>\n<body>\n"
+        "<header>\n  <div class=\"marca\">SA</div>\n  <h1>" + nome + "</h1>\n"
+        "  <div class=\"medidores\">\n"
+        "    <span>CPU <b id=\"cpu\">--</b></span>\n"
+        "    <span>RAM <b id=\"ram\">--</b></span>\n"
+        "    <span>Disco <b id=\"disco\">--</b></span>\n"
+        "  </div>\n  <span id=\"ligado\" class=\"pill\">conectando...</span>\n</header>\n"
+        "<div class=\"corpo\">\n"
+        "  <aside id=\"menu\"></aside>\n"
+        "  <main>\n"
+        "    <div class=\"topo\">\n"
+        "      <input id=\"busca\" placeholder=\"Buscar ferramenta... (ex.: memoria, wifi, git)\">\n"
+        "      <input id=\"cmd\" placeholder=\"Ou digite um comando do agente e aperte Enter\">\n"
+        "    </div>\n"
+        "    <div id=\"grade\" class=\"grade\"></div>\n"
+        "    <h3 class=\"tit\">Saida</h3>\n"
+        "    <pre id=\"saida\">Clique num aplicativo acima ou digite um comando.</pre>\n"
+        "  </main>\n</div>\n"
+        "<div id=\"fundo\"><div class=\"modal\"><h3>Precisa da sua confirmacao</h3>"
+        "<p id=\"pergunta\"></p><div class=\"bts\">"
+        "<button onclick=\"responder('nao')\">Nao</button>"
+        "<button class=\"ok\" onclick=\"responder('sim')\">Sim, pode</button>"
+        "</div></div></div>\n"
+        "<script src=\"agente.js\"></script>\n</body>\n</html>\n")
 
-    css = (":root{--bg:#0b0e14;--card:#161c28;--linha:#242c3d;--txt:#e6ebf5;--fraco:#8792a8;"
-           "--azul:#4f8cff;--verde:#3ddc97}\n"
-           "*{box-sizing:border-box;margin:0;padding:0}\n"
-           "body{font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--txt);"
-           "min-height:100vh}\n"
-           "header{padding:18px 26px;border-bottom:1px solid var(--linha);display:flex;"
-           "align-items:center;gap:14px}\n"
-           "h1{font-size:1.15rem}\n"
-           ".pill{margin-left:auto;font-size:.78rem;color:var(--fraco);border:1px solid "
-           "var(--linha);padding:5px 11px;border-radius:20px}\n"
-           "main{padding:26px;max-width:900px;margin:0 auto;display:flex;flex-direction:column;"
-           "gap:16px}\n"
-           ".cartoes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}\n"
-           ".c{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:15px}\n"
-           ".c span{font-size:.74rem;color:var(--fraco);text-transform:uppercase;"
-           "letter-spacing:.6px}\n"
-           ".c b{display:block;font-size:1.6rem;margin-top:5px}\n"
-           ".linha{display:flex;gap:9px}\n"
-           "input{flex:1;background:#0d1220;border:1px solid var(--linha);color:var(--txt);"
-           "border-radius:9px;padding:12px 14px;font-size:.95rem}\n"
-           "input:focus{outline:0;border-color:var(--azul)}\n"
-           "button{background:var(--azul);color:#fff;border:0;border-radius:9px;padding:12px 18px;"
-           "cursor:pointer;font-size:.92rem}\n"
-           "button:hover{filter:brightness(1.15)}\n"
-           ".atalhos{display:flex;gap:9px;flex-wrap:wrap}\n"
-           ".atalhos button{background:#28304a}\n"
-           "pre{background:#060910;border:1px solid var(--linha);border-radius:12px;padding:16px;"
-           "font-family:ui-monospace,Consolas,monospace;font-size:.85rem;white-space:pre-wrap;"
-           "min-height:230px;max-height:430px;overflow:auto;line-height:1.55;color:#c8d3e6}\n"
-           "#fundo{position:fixed;inset:0;background:rgba(3,6,12,.8);display:none;place-items:center}\n"
-           "#fundo.on{display:grid}\n"
-           ".modal{background:var(--card);border:1px solid var(--linha);border-radius:14px;"
-           "padding:24px;max-width:520px;width:92%}\n"
-           ".modal h3{color:#ffcc66;margin-bottom:10px}\n"
-           ".modal p{margin-bottom:18px;line-height:1.6;white-space:pre-wrap}\n"
-           ".bts{display:flex;gap:10px;justify-content:flex-end}\n"
-           ".bts button{background:#28304a}.bts .ok{background:var(--azul)}\n")
+    css = (
+        ":root{--bg:#0a0d14;--card:#151b27;--card2:#1c2433;--linha:#232c3d;--txt:#e6ebf5;"
+        "--fraco:#8792a8;--azul:#4f8cff;--roxo:#7b5cff;--verde:#3ddc97}\n"
+        "*{box-sizing:border-box;margin:0;padding:0}\n"
+        "body{font-family:system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--txt);"
+        "min-height:100vh}\n"
+        "header{display:flex;align-items:center;gap:14px;padding:13px 22px;background:#101623;"
+        "border-bottom:1px solid var(--linha);position:sticky;top:0;z-index:10}\n"
+        ".marca{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;"
+        "font-weight:700;font-size:14px;background:linear-gradient(135deg,var(--azul),var(--roxo))}\n"
+        "h1{font-size:1.02rem;font-weight:600}\n"
+        ".medidores{margin-left:24px;display:flex;gap:18px;font-size:.8rem;color:var(--fraco)}\n"
+        ".medidores b{color:var(--txt);font-size:.95rem;margin-left:4px}\n"
+        ".pill{margin-left:auto;font-size:.76rem;color:var(--fraco);border:1px solid var(--linha);"
+        "padding:5px 11px;border-radius:20px}\n"
+        ".corpo{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 59px)}\n"
+        "aside{border-right:1px solid var(--linha);padding:16px 12px;background:#0d121c}\n"
+        "aside button{display:block;width:100%;text-align:left;background:none;border:0;"
+        "color:var(--fraco);padding:9px 12px;border-radius:8px;cursor:pointer;font-size:.87rem;"
+        "margin-bottom:2px}\n"
+        "aside button:hover{background:var(--card2);color:var(--txt)}\n"
+        "aside button.on{background:var(--azul);color:#fff}\n"
+        "aside button i{float:right;font-style:normal;opacity:.6;font-size:.78rem}\n"
+        "main{padding:20px 24px}\n"
+        ".topo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}\n"
+        "input{background:#0d1220;border:1px solid var(--linha);color:var(--txt);border-radius:9px;"
+        "padding:11px 14px;font-size:.9rem;width:100%}\n"
+        "input:focus{outline:0;border-color:var(--azul)}\n"
+        ".grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px;"
+        "margin-bottom:22px}\n"
+        ".app{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:14px;"
+        "cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:6px}\n"
+        ".app:hover{border-color:var(--azul);transform:translateY(-2px);"
+        "box-shadow:0 8px 22px rgba(0,0,0,.4)}\n"
+        ".app .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;"
+        "font-size:.72rem;font-weight:700;background:linear-gradient(135deg,var(--azul),var(--roxo));"
+        "margin-bottom:2px}\n"
+        ".app .n{font-weight:600;font-size:.87rem;font-family:ui-monospace,Consolas,monospace;"
+        "word-break:break-word}\n"
+        ".app .d{font-size:.78rem;color:var(--fraco);line-height:1.45}\n"
+        ".app .p{font-size:.68rem;color:#ffcc66;border:1px solid #453a1a;background:#1d1a10;"
+        "padding:2px 7px;border-radius:10px;align-self:flex-start}\n"
+        ".tit{font-size:.95rem;color:var(--fraco);margin-bottom:10px;font-weight:600}\n"
+        "pre{background:#050810;border:1px solid var(--linha);border-radius:12px;padding:16px;"
+        "font-family:ui-monospace,Consolas,monospace;font-size:.83rem;white-space:pre-wrap;"
+        "min-height:170px;max-height:400px;overflow:auto;line-height:1.55;color:#c8d3e6}\n"
+        "#fundo{position:fixed;inset:0;background:rgba(3,6,12,.8);display:none;place-items:center;"
+        "z-index:99}\n#fundo.on{display:grid}\n"
+        ".modal{background:var(--card);border:1px solid var(--linha);border-radius:15px;"
+        "padding:24px;max-width:540px;width:92%}\n"
+        ".modal h3{color:#ffcc66;margin-bottom:10px}\n"
+        ".modal p{margin-bottom:18px;line-height:1.6;white-space:pre-wrap}\n"
+        ".bts{display:flex;gap:10px;justify-content:flex-end}\n"
+        ".bts button{background:#28304a;color:#fff;border:0;border-radius:9px;padding:11px 17px;"
+        "cursor:pointer}\n.bts .ok{background:var(--azul)}\n")
 
-    js = ("// Este site conversa com o SEU agente, que precisa estar com o painel ligado.\n"
-          "// Na janela do agente digite: abrir painel\n"
-          "const AGENTE = 'http://127.0.0.1:8777';\n"
-          "let jobAtual = null;\n\n"
-          "async function status(){\n"
-          "  try{\n"
-          "    const d = await (await fetch(AGENTE + '/api/status')).json();\n"
-          "    cpu.textContent = d.cpu.toFixed(0) + '%';\n"
-          "    ram.textContent = d.ram.toFixed(0) + '%';\n"
-          "    disco.textContent = d.disco.toFixed(0) + '%';\n"
-          "    tools.textContent = d.ferramentas;\n"
-          "    ligado.textContent = 'conectado a ' + d.pc;\n"
-          "  }catch(e){ ligado.textContent = 'agente offline - digite \"abrir painel\" nele'; }\n"
-          "}\n"
-          "setInterval(status, 3000); status();\n\n"
-          "function mostrarPergunta(id, texto){\n"
-          "  jobAtual = id; pergunta.textContent = texto; fundo.classList.add('on');\n"
-          "}\n"
-          "async function responder(r){\n"
-          "  fundo.classList.remove('on');\n"
-          "  if(!jobAtual) return;\n"
-          "  await fetch(AGENTE + '/api/responder', {method:'POST',\n"
-          "    headers:{'Content-Type':'application/json'},\n"
-          "    body: JSON.stringify({id: jobAtual, resposta: r})});\n"
-          "  jobAtual = null;\n"
-          "}\n"
-          "async function rodar(texto){\n"
-          "  saida.textContent += '\\n\\n> ' + texto + '\\n';\n"
-          "  const r = await fetch(AGENTE + '/api/comando', {method:'POST',\n"
-          "    headers:{'Content-Type':'application/json'},\n"
-          "    body: JSON.stringify({texto})});\n"
-          "  const {id} = await r.json();\n"
-          "  const t = setInterval(async () => {\n"
-          "    const s = await (await fetch(AGENTE + '/api/job?id=' + id)).json();\n"
-          "    if(s.pergunta && jobAtual !== id) mostrarPergunta(id, s.pergunta);\n"
-          "    if(s.pronto){ clearInterval(t); saida.textContent += s.saida + '\\n';\n"
-          "                  saida.scrollTop = 1e6; }\n"
-          "  }, 600);\n"
-          "}\n"
-          "function mandar(){ const t = cmd.value.trim(); if(!t) return; cmd.value=''; rodar(t); }\n"
-          "cmd.addEventListener('keydown', e => { if(e.key === 'Enter') mandar(); });\n")
+    js = (
+        "// Este site conversa com o SEU agente. Na janela dele digite: abrir painel\n"
+        "const AGENTE = 'http://127.0.0.1:8777';\n"
+        "let TUDO = {}, categoria = 'Todos', jobAtual = null;\n\n"
+        "async function status(){\n"
+        "  try{\n"
+        "    const d = await (await fetch(AGENTE + '/api/status')).json();\n"
+        "    cpu.textContent = d.cpu.toFixed(0) + '%';\n"
+        "    ram.textContent = d.ram.toFixed(0) + '%';\n"
+        "    disco.textContent = d.disco.toFixed(0) + '%';\n"
+        "    ligado.textContent = d.ferramentas + ' ferramentas | ' + d.pc;\n"
+        "  }catch(e){ ligado.textContent = 'agente offline - digite \"abrir painel\" nele'; }\n"
+        "}\n"
+        "setInterval(status, 3000); status();\n\n"
+        "async function carregarApps(){\n"
+        "  try{\n"
+        "    const d = await (await fetch(AGENTE + '/api/todas')).json();\n"
+        "    TUDO = d.grupos;\n"
+        "    const cats = ['Todos'].concat(Object.keys(TUDO).sort());\n"
+        "    menu.innerHTML = cats.map(c => {\n"
+        "      const n = c === 'Todos' ? d.total : TUDO[c].length;\n"
+        "      return '<button data-c=\"' + c + '\">' + c + '<i>' + n + '</i></button>';\n"
+        "    }).join('');\n"
+        "    menu.querySelectorAll('button').forEach(b => b.onclick = () => {\n"
+        "      categoria = b.dataset.c; desenhar();\n"
+        "    });\n"
+        "    desenhar();\n"
+        "  }catch(e){\n"
+        "    grade.innerHTML = '<div class=\"app\"><div class=\"d\">Nao consegui falar com o '\n"
+        "      + 'agente. Na janela dele digite: abrir painel</div></div>';\n"
+        "  }\n"
+        "}\n"
+        "function desenhar(){\n"
+        "  const filtro = busca.value.trim().toLowerCase();\n"
+        "  let itens = [];\n"
+        "  for(const c of Object.keys(TUDO)){\n"
+        "    if(categoria !== 'Todos' && c !== categoria) continue;\n"
+        "    for(const f of TUDO[c]) itens.push(f);\n"
+        "  }\n"
+        "  if(filtro) itens = itens.filter(f =>\n"
+        "    f.nome.toLowerCase().includes(filtro) || f.desc.toLowerCase().includes(filtro));\n"
+        "  menu.querySelectorAll('button').forEach(b =>\n"
+        "    b.classList.toggle('on', b.dataset.c === categoria));\n"
+        "  grade.innerHTML = itens.slice(0, 300).map(f =>\n"
+        "    '<div class=\"app\" onclick=\"abrirApp(\\'' + f.nome + '\\')\">' +\n"
+        "    '<div class=\"ic\">' + f.nome.slice(0,2).toUpperCase() + '</div>' +\n"
+        "    '<div class=\"n\">' + f.nome.replace(/_/g, ' ') + '</div>' +\n"
+        "    '<div class=\"d\">' + (f.desc || '') + '</div>' +\n"
+        "    (f.params.length ? '<div class=\"p\">pede: ' + f.params.join(', ') + '</div>' : '') +\n"
+        "    '</div>').join('') || '<div class=\"app\"><div class=\"d\">Nada encontrado.</div></div>';\n"
+        "}\n"
+        "busca.addEventListener('input', desenhar);\n\n"
+        "function achar(nome){\n"
+        "  for(const c of Object.keys(TUDO)) for(const f of TUDO[c]) if(f.nome === nome) return f;\n"
+        "  return null;\n"
+        "}\n"
+        "async function abrirApp(nome){\n"
+        "  const f = achar(nome); if(!f) return;\n"
+        "  const params = {};\n"
+        "  for(const p of f.params){\n"
+        "    const v = prompt('A ferramenta \"' + nome + '\" precisa de: ' + p);\n"
+        "    if(v === null) return; params[p] = v;\n"
+        "  }\n"
+        "  saida.textContent = 'Executando ' + nome + '...';\n"
+        "  const r = await fetch(AGENTE + '/api/executar', {method:'POST',\n"
+        "    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nome, params})});\n"
+        "  const {id} = await r.json();\n"
+        "  acompanhar(id, s => { saida.textContent = s; });\n"
+        "}\n"
+        "function acompanhar(id, aoFim){\n"
+        "  const t = setInterval(async () => {\n"
+        "    const s = await (await fetch(AGENTE + '/api/job?id=' + id)).json();\n"
+        "    if(s.pergunta && jobAtual !== id) mostrarPergunta(id, s.pergunta);\n"
+        "    if(s.pronto){ clearInterval(t); aoFim(s.saida); }\n"
+        "  }, 600);\n"
+        "}\n"
+        "function mostrarPergunta(id, texto){\n"
+        "  jobAtual = id; pergunta.textContent = texto; fundo.classList.add('on');\n"
+        "}\n"
+        "async function responder(r){\n"
+        "  fundo.classList.remove('on'); if(!jobAtual) return;\n"
+        "  await fetch(AGENTE + '/api/responder', {method:'POST',\n"
+        "    headers:{'Content-Type':'application/json'},\n"
+        "    body: JSON.stringify({id: jobAtual, resposta: r})});\n"
+        "  jobAtual = null;\n"
+        "}\n"
+        "cmd.addEventListener('keydown', async e => {\n"
+        "  if(e.key !== 'Enter') return;\n"
+        "  const t = cmd.value.trim(); if(!t) return; cmd.value = '';\n"
+        "  saida.textContent += '\\n\\n> ' + t + '\\n';\n"
+        "  const r = await fetch(AGENTE + '/api/comando', {method:'POST',\n"
+        "    headers:{'Content-Type':'application/json'}, body: JSON.stringify({texto: t})});\n"
+        "  const {id} = await r.json();\n"
+        "  acompanhar(id, s => { saida.textContent += s + '\\n'; saida.scrollTop = 1e6; });\n"
+        "});\n"
+        "carregarApps();\n")
 
-    leiame = ("# " + nome + "\n\nSite conectado ao Super Agente PC.\n\n"
+    leiame = ("# " + nome + "\n\nSeu painel do Super Agente PC, no estilo loja de aplicativos.\n\n"
               "## Como usar\n\n"
-              "1. Na janela do agente, digite: `abrir painel` (isso liga a API na porta 8777)\n"
-              "2. Na janela do agente, digite: `rodar site " + destino + "`\n"
+              "1. Na janela do agente: `abrir painel`  (liga a API na porta 8777)\n"
+              "2. Na janela do agente: `rodar site " + destino + "`\n"
               "3. Abra http://localhost:5500\n\n"
               "## O que ja funciona\n\n"
-              "- CPU, RAM, disco e numero de ferramentas em tempo real\n"
-              "- Caixa de comando: roda qualquer comando do agente\n"
-              "- Confirmacao (sim/nao) aparece na propria pagina\n\n"
+              "- TODAS as ferramentas do agente em cartoes, separadas por categoria\n"
+              "- Busca por nome ou descricao\n"
+              "- Clique num cartao: se a ferramenta precisar de dados, ele pergunta\n"
+              "- Caixa de comando: qualquer comando que voce daria no cmd\n"
+              "- Confirmacao sim/nao aparece na propria pagina\n"
+              "- CPU, RAM e disco em tempo real\n\n"
               "## Personalize\n\n"
-              "Mexa em `estilo.css` para a aparencia e em `agente.js` para adicionar botoes.\n"
-              "Cada botao novo e so chamar `rodar('seu comando aqui')`.\n")
+              "`estilo.css` muda a aparencia. `agente.js` muda o comportamento.\n"
+              "Para um botao novo com comando fixo, chame: `acompanhar` apos um POST em\n"
+              "`/api/comando` - ou copie o bloco do campo `cmd`.\n")
 
     arquivos = {"index.html": html, "estilo.css": css, "agente.js": js, "README.md": leiame}
     for rel, conteudo in arquivos.items():
@@ -2844,15 +2921,17 @@ def criar_site_conectado_ao_agente(nome: str = "meu-painel", onde: str = "") -> 
             subprocess.Popen(cli + ' -r "' + destino + '"', shell=True)
         except Exception:
             pass
-    return ("SITE CONECTADO AO AGENTE CRIADO\n  Pasta: " + destino +
-            "\n  Arquivos: " + ", ".join(arquivos) +
-            "\n\n  Para ver funcionando, em ordem:\n"
+    return ("SITE CRIADO (estilo loja de aplicativos, com TODAS as ferramentas)\n"
+            "  Pasta: " + destino + "\n  Arquivos: " + ", ".join(arquivos) +
+            "\n\n  Para ver funcionando, nesta ordem:\n"
             "    1) abrir painel          (liga a API do agente)\n"
             "    2) rodar site " + destino + "\n"
-            "    3) abre http://localhost:5500\n"
-            "\n  Esse site e SEU: edite o estilo.css e o agente.js no VS Code. "
-            "Cada botao novo e uma linha: rodar('comando do agente')." +
+            "    3) abra http://localhost:5500\n"
+            "\n  Ele mostra cada ferramenta como um aplicativo, separadas por categoria,\n"
+            "  com busca e caixa de comando. Edite estilo.css e agente.js no VS Code." +
             ("\n  Ja abri a pasta no VS Code." if cli else ""))
+
+
 
 
 # --- Rodar o site criado: fecha o ciclo criar -> ver funcionando no navegador ---
@@ -3632,6 +3711,41 @@ def _rodar_no_job(job_id, funcao):
     _PAINEL["jobs"][job_id] = {"pronto": True, "saida": final, "pergunta": None}
 
 
+def _categoria_da_ferramenta(nome: str, descricao: str = "") -> str:
+    """Classifica uma ferramenta num grupo, para o site poder mostrar tudo
+    organizado por assunto (tipo uma tela de aplicativos)."""
+    t = (nome + " " + (descricao or "")).lower()
+    regras = (
+        ("VS Code e edicao", ("vscode", "editar_arquivo", "inserir_no_arquivo",
+                              "renomear_simbolo", "desfazer_edicao", "historico_de_edicoes",
+                              "criar_arquivo_com")),
+        ("Codigo e Git", ("git_", "pip_", "venv", "pytest", "codigo", "python", "projeto",
+                          "testes", "segredos", "sintaxe", "api")),
+        ("Agente e IA", ("agente", "ferramenta_nova", "painel", "rotina", "memoria",
+                         "aprend", "ideia", "opiniao", "conhecimento", "objetivo", "site_")),
+        ("Rede e internet", ("rede", "wifi", "ping", "dns", "ip_", "_ip", "porta", "site",
+                             "url", "http", "latencia", "internet", "firewall", "bluetooth")),
+        ("Arquivos e disco", ("arquivo", "pasta", "disco", "backup", "zip", "duplicad",
+                              "csv", "json_para", "para_json", "espaco", "lixeira")),
+        ("Sistema e hardware", ("processo", "cpu", "ram", "memoria_ram", "sistema", "windows",
+                                "servico", "driver", "registro", "energia", "bateria",
+                                "usuario", "boot", "desligar", "reiniciar", "hardware",
+                                "monitor", "temperatura", "gargalo", "otimiz", "limpar",
+                                "reparar", "atualiz")),
+        ("Seguranca", ("seguranca", "senha", "defender", "cripto", "bitlocker", "antivirus",
+                       "vazad", "permiss", "bloquear")),
+        ("Texto e dados", ("texto", "traduzir", "resumir", "base64", "hash", "uuid", "cpf",
+                           "email", "porcentagem", "data", "calcul", "romano", "tabela")),
+        ("Midia e comunicacao", ("whatsapp", "spotify", "midia", "audio", "voz", "musica",
+                                 "imagem", "tela", "print", "video", "contato")),
+    )
+    for grupo, marcas in regras:
+        for m in marcas:
+            if m in t:
+                return grupo
+    return "Outros"
+
+
 def _painel_status() -> dict:
     import platform as _pl
     dados = {"cpu": 0.0, "ram": 0.0, "disco": 0.0, "uptime": "?", "processos": 0,
@@ -3738,6 +3852,16 @@ def _criar_handler_painel():
                     itens.append({"nome": item["nome"], "desc": item["desc"],
                                   "params": item["obrig"], "nota": round(nota, 2)})
                 return self._json({"itens": itens})
+            if rota.path == "/api/todas":
+                grupos = {}
+                for item in _indice_ferramentas():
+                    cat = _categoria_da_ferramenta(item["nome"], item["desc"])
+                    grupos.setdefault(cat, []).append(
+                        {"nome": item["nome"], "desc": item["desc"], "params": item["obrig"]})
+                for lista in grupos.values():
+                    lista.sort(key=lambda x: x["nome"])
+                return self._json({"total": sum(len(v) for v in grupos.values()),
+                                   "grupos": grupos})
             if rota.path == "/api/job":
                 jid = (q.get("id") or [""])[0]
                 job = _PAINEL["jobs"].get(jid, {"pronto": False, "saida": ""})
