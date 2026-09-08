@@ -9087,27 +9087,48 @@ def _parece_pedido_de_acao(cmd: str) -> bool:
 
 
 def _sys_ia_local() -> str:
-    """Prompt de sistema da IA neural local (curto = mais rapido)."""
+    """Instrucoes curtas e factuais: menos contexto para processar na CPU."""
     return (
-        "Voce e o Super Agente PC: um PROGRAMA que roda 100% local no PC do "
-        "usuario (Guilherme), no Windows, COM PRIVILEGIOS DE ADMINISTRADOR e "
-        "controle total da maquina. Voce NAO e um 'assistente de voz', NAO e um "
-        "chatbot generico e NAO e um modelo sem acesso: o sistema em que voce "
-        "esta embutido executa comandos reais no Windows como admin (abrir e "
-        "fechar programas, configuracoes, Wi-Fi, firewall, energia, limpeza, "
-        "reparos, WhatsApp, Spotify, print da tela). "
-        "REGRA 1: NUNCA diga que nao tem acesso, permissao, admin ou controle do "
-        "PC - isso e falso aqui; se perguntarem, confirme que voce roda como "
-        "administrador. "
-        "REGRA 2: quem aperta os botoes e o motor de comandos, nao voce; entao "
-        "NUNCA diga que ja executou algo nem escreva '[executa a acao]'. Se "
-        "pedirem uma ACAO, responda curto: e so falar o comando (ex.: 'abre o "
-        "spotify', 'otimiza tudo', 'desliga o wifi', 'ver a tela'). "
-        "REGRA 3: toda mudanca no sistema pede sim/nao ao usuario antes. "
-        "Fale portugues do Brasil, direto, sem emoji, com personalidade e "
-        "opiniao propria. Raciocine passo a passo em assunto tecnico e de a "
-        "resposta pratica. DADOS DESTE PC: " + _contexto_pc()
+        "Voce e a IA de conversa local do Super Agente PC. Responda em portugues "
+        "do Brasil, com clareza e personalidade. Responda primeiro a pergunta, "
+        "de forma concisa; detalhe quando solicitado. Nao invente fatos, "
+        "resultados, permissoes ou ferramentas. Se nao souber, diga isso. "
+        "O modelo conversa; as ferramentas Python do agente executam acoes no "
+        "Windows. Voce nao executou uma acao apenas por descreve-la. Nunca "
+        "afirme que abriu, apagou, instalou ou verificou algo sem resultado "
+        "real da ferramenta. Permissoes dependem da configuracao e da elevacao "
+        "do processo; nao prometa confirmacao em todas as acoes. "
+        "Para usar conversa local: desligar ia. Para nuvem: ligar ia. "
+        "Para consultar o motor local: status ia. A conversa local nao usa "
+        "creditos de API externa, mas usa RAM, processamento e energia. "
+        "DADOS DISPONIVEIS DO PC (podem estar desatualizados): " + _contexto_pc()
     )
+
+
+def _montar_contexto_local(pergunta: str, historico=None):
+    """Limita somente o historico enviado, sem apagar memoria ou cortar o pedido."""
+    msgs = [{"role": "system", "content": _sys_ia_local()}]
+    candidatos = []
+    for m in (historico or [])[-6:]:
+        if not isinstance(m, dict) or m.get("role") not in ("user", "assistant"):
+            continue
+        texto = str(m.get("content") or "").strip()
+        if texto:
+            candidatos.append({"role": m["role"], "content": texto})
+    # Alguns chamadores ja registraram a pergunta: nao envia duas vezes.
+    if candidatos and candidatos[-1] == {"role": "user", "content": pergunta.strip()}:
+        candidatos.pop()
+    recentes = []
+    restante = 2400  # caracteres, nao tokens; conserva as mensagens mais recentes
+    for m in reversed(candidatos):
+        if restante <= 0:
+            break
+        texto = m["content"][:min(1200, restante)]
+        recentes.append({"role": m["role"], "content": texto})
+        restante -= len(texto)
+    msgs.extend(reversed(recentes))
+    msgs.append({"role": "user", "content": pergunta})
+    return msgs
 
 
 def _chamar_neural(msgs, max_tokens=350, temperatura=0.5) -> str:
@@ -9128,50 +9149,14 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5) -> str:
 
 
 def perguntar_ia_local(pergunta: str, historico=None) -> str:
-    """Envia uma mensagem para a IA neural local (OpenAI-compativel) e devolve a
-    resposta em texto. Levanta excecao se algo falhar (o chamador trata).
-
-    Duas travas importantes:
-      1) LIMPEZA DO HISTORICO: respostas antigas em que a IA negou ter admin
-         ('sou um assistente de voz...') sao DESCARTADAS do contexto, senao ela
-         le o proprio erro e repete a mentira pra sempre.
-      2) FILTRO ANTI-RECUSA: se mesmo assim ela negar ter acesso/admin, a
-         resposta e refeita com uma correcao dura; persistindo, devolvemos a
-         resposta factual por regra (_resposta_identidade)."""
-    msgs = [{"role": "system", "content": _sys_ia_local()}]
-    for m in (historico or [])[-6:]:
-        if m.get("role") not in ("user", "assistant"):
-            continue
-        conteudo = str(m.get("content") or "")
-        if not conteudo:
-            continue
-        # trava 1: nao realimenta a neural com a propria recusa
-        if m.get("role") == "assistant" and _eh_recusa_neural(conteudo):
-            continue
-        msgs.append({"role": m["role"], "content": conteudo[:1500]})
-    msgs.append({"role": "user", "content": pergunta})
-
-    resposta = _chamar_neural(msgs)
-
-    # trava 2: recusou? corrige e tenta de novo (uma vez).
-    if _eh_recusa_neural(resposta):
-        msgs2 = list(msgs)
-        msgs2.append({"role": "assistant", "content": resposta})
-        msgs2.append({"role": "user", "content":
-                      "Isso esta ERRADO. Voce roda neste PC como ADMINISTRADOR e o "
-                      "sistema executa comandos reais no Windows. Responda de novo, "
-                      "curto, confirmando que tem acesso de administrador e dizendo o "
-                      "que da pra fazer. Nao repita que e assistente de voz nem que "
-                      "nao tem acesso."})
-        try:
-            resposta2 = _chamar_neural(msgs2, max_tokens=250, temperatura=0.3)
-        except Exception:
-            resposta2 = ""
-        if resposta2 and not _eh_recusa_neural(resposta2):
-            return resposta2
-        # insistiu na mentira: entrega o fato por regra.
-        return _resposta_identidade()
-    return resposta
+    """Uma geracao por pedido, sem forcar o modelo a alegar acesso/admin."""
+    if not isinstance(pergunta, str) or not pergunta.strip():
+        raise ValueError("A pergunta nao pode estar vazia.")
+    msgs = _montar_contexto_local(pergunta, historico)
+    resposta = _chamar_neural(msgs, temperatura=0.3)
+    if not isinstance(resposta, str) or not resposta.strip():
+        raise ValueError("O motor local devolveu uma resposta vazia.")
+    return resposta.strip()
 
 
 def _resposta_da_neural(comando: str, tentar_subir: bool = False):
@@ -9185,7 +9170,9 @@ def _resposta_da_neural(comando: str, tentar_subir: bool = False):
             if resposta:
                 return resposta
         except Exception:
-            pass
+            # O motor respondeu ao health check: reiniciar/repetir a mesma
+            # inferencia nao corrige uma falha da resposta e duplica a espera.
+            return None
     if tentar_subir:
         try:
             if preparar_ia_local():
@@ -22653,7 +22640,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Roteamento conversa 2026-09-08-r1] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [IA local otimizada 2026-09-08-r2] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
