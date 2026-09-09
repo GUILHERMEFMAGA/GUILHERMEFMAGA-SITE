@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tela de carregamento — demo | TITULO GAMES</title>
+
+<!-- ===================================================================
+     É ISTO que vai no <head> do site.  Só 3 linhas.
+     (aqui o src aponta pro loop de demonstracao; troque pelo loader.mp4
+      que tools/video2loader.py gerar a partir do seu video)
+     =================================================================== -->
+<link rel="preload" as="video" href="assets/loading/demo/demo-loader.mp4">
+<link rel="stylesheet" href="assets/loading/loader.css">
+<script src="assets/loading/loader.js"
+        data-src="assets/loading/demo/demo-loader.mp4"
+        data-webm="assets/loading/demo/demo-loader.webm"
+        data-poster="assets/loading/demo/demo-loader-poster.jpg"
+        data-texto="Carregando"
+        data-min="1200"
+        data-max="6000"></script>
+
+<style>
+  body{margin:0;background:#0a0618;color:#fff6e0;
+       font:16px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{max-width:820px;margin:0 auto;padding:48px 22px 90px}
+  h1{font-size:clamp(26px,6vw,44px);margin:0 0 6px;letter-spacing:.04em;
+     color:#fff6e0;text-shadow:0 3px 0 #ff3d98}
+  .kicker{letter-spacing:.34em;text-transform:uppercase;color:#38e8e8;font-size:12px}
+  p{opacity:.92}
+  .card{background:#120c2a;border:2px solid #2b1f55;border-radius:4px;padding:18px 20px;margin:22px 0}
+  .card h2{margin:0 0 8px;font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:#ff3d98}
+  code,pre{font-family:inherit;background:#080518;border:1px solid #2b1f55;border-radius:3px}
+  code{padding:.1em .38em}
+  pre{padding:14px 16px;overflow:auto;color:#cfe8ff;font-size:13px;line-height:1.7}
+  .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:16px}
+  figure{margin:0;border:2px solid #2b1f55;background:#000;border-radius:4px;overflow:hidden}
+  figure video,figure img{display:block;width:100%;height:auto}
+  figcaption{font-size:11px;letter-spacing:.12em;padding:8px 10px;color:#8f86b8;text-transform:uppercase}
+  button{font:inherit;letter-spacing:.16em;text-transform:uppercase;background:#ff3d98;color:#12060f;
+         border:0;border-radius:3px;padding:12px 20px;cursor:pointer;box-shadow:0 4px 0 #8f1d56}
+  button:active{transform:translateY(3px);box-shadow:0 1px 0 #8f1d56}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin:26px 0 6px}
+  .tiny{font-size:12px;color:#8f86b8}
+  .loop{max-height:340px;object-fit:cover;width:100%;display:block;background:#000}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="kicker">TITULO GAMES · INTRO</p>
+  <h1>Tela de carregamento em loop</h1>
+  <p>O vídeo virou uma <strong>animação de intro</strong>: mesmo visual, pesando pouco,
+     tocando em loop atrás do conteúdo e saindo de cena sozinha quando a página termina de carregar.
+     Recarregue esta página (<code>Ctrl/Cmd&nbsp;+&nbsp;R</code>) para ver de novo.</p>
+
+  <div class="row">
+    <button id="replay">▶ Ver o loader de novo</button>
+    <button id="toggle" class="alt">⏯ Pausar / tocar o loop</button>
+  </div>
+
+  <div class="card">
+    <h2>Como usar no site</h2>
+    <pre>&lt;link rel="stylesheet" href="assets/loading/loader.css"&gt;
+&lt;script src="assets/loading/loader.js"
+        data-src="assets/loading/loader.mp4"
+        data-webm="assets/loading/loader.webm"
+        data-poster="assets/loading/loader-poster.jpg"&gt;&lt;/script&gt;</pre>
+    <p class="tiny">O loader some sozinho no <code>window.load</code>, segura no mínimo
+      <code>data-min</code> ms (padrão 900) e tem trava de segurança de <code>data-max</code> ms
+      (padrão 6000) — nunca deixa o site preso. <kbd>Esc</kbd> ou “Pular ›” fecham na hora.</p>
+  </div>
+
+  <div class="card">
+    <h2>Transformar o SEU vídeo nisto</h2>
+    <pre>python3 tools/video2loader.py  SEU_VIDEO.mp4  --loop pingpong --width 1280 --gif
+
+# saida: assets/loading/loader.mp4 · loader.webm · loader-poster.jpg · loader.json</pre>
+    <p class="tiny">Sem FFmpeg instalado? Não precisa: ele pega o binário do
+      <code>imageio-ffmpeg</code> (<code>pip3 install imageio-ffmpeg pillow</code>).
+      O modo <code>pingpong</code> faz o vídeo ir e voltar, então o loop fecha
+      sem aquele “salto” no final.</p>
+  </div>
+
+  <div class="card">
+    <h2>Prévia dos arquivos</h2>
+    <video class="loop" id="loop" src="assets/loading/demo/demo-loader.mp4"
+           autoplay muted loop playsinline></video>
+    <div class="grid">
+      <figure><video src="assets/loading/demo/demo-loader.webm" autoplay muted loop playsinline></video>
+        <figcaption>WebM · VP9</figcaption></figure>
+      <figure><img src="assets/loading/demo/demo-loader-poster.jpg" alt="poster">
+        <figcaption>Poster · JPG</figcaption></figure>
+    </div>
+    <p class="tiny">Alvo do loader: ≤ 600 KB, 720p, 30 fps, sem áudio, preto puro, loop emendado.
+       Acima disso o usuário espera a intro em vez de ver o site.</p>
+  </div>
+</div>
+
+<script>
+  document.getElementById('replay').addEventListener('click', function () {
+    location.reload();
+  });
+  document.getElementById('toggle').addEventListener('click', function () {
+    var v = document.getElementById('loop');
+    v.paused ? v.play() : v.pause();
+  });
+</script>
+</body>
+</html>

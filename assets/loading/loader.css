@@ -1,0 +1,131 @@
+/* ==========================================================================
+   Tela de carregamento do site — carrega o video em loop e sai de cena
+   quando a pagina estiver pronta. Sem dependencias, ~2 KB.
+   ========================================================================== */
+
+#tlo,                                  /* host opcional (container do app)     */
+.tlo {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  background: #0a0618;                 /* mesma cor do fundo do video: 0 fade */
+  color: #fff6e0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity .45s ease, visibility .45s;
+  /* nao deixa o loader bloquear scroll/select depois de sair */
+  will-change: opacity;
+}
+
+.tlo[hidden] { display: none; }
+
+.tlo.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* O video preenche a tela sem distorcer (cover) e fica atras do texto */
+.tlo__media,
+.tlo__poster,
+.tlo__fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;                   /* use "contain" para nao cortar nada */
+  display: block;
+}
+
+.tlo__poster { object-fit: cover; }
+.tlo--contain .tlo__media,
+.tlo--contain .tlo__poster { object-fit: contain; background: #000; }
+
+.tlo__media { z-index: 2; }        /* video por cima do fallback CSS */
+.tlo__poster { z-index: 0; }
+
+/* CSS puro: aparece se o video falhar / carregar devagar */
+.tlo__fallback {
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  grid-auto-flow: row;
+  align-content: center;
+  background:
+    radial-gradient(120% 90% at 50% 30%, #1b0f3a 0%, #0a0618 60%, #000 100%);
+}
+
+.tlo__bar {
+  width: min(280px, 62vw);
+  height: 10px;
+  border: 2px solid #ff3d98;
+  box-shadow: 0 0 18px rgba(255, 61, 152, .45);
+  background: #0f0a24;
+  overflow: hidden;
+}
+
+.tlo__bar::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, #38e8e8, #ff3d98);
+  animation: tlo-slide 1.6s cubic-bezier(.65, 0, .35, 1) infinite;
+}
+
+@keyframes tlo-slide {
+  0%   { transform: translateX(-110%); }
+  100% { transform: translateX(340%); }
+}
+
+.tlo__label {
+  position: relative;
+  z-index: 3;
+  letter-spacing: .22em;
+  font-size: clamp(11px, 2.4vw, 14px);
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .6);
+}
+
+.tlo__skip {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  z-index: 4;
+  background: rgba(0, 0, 0, .45);
+  color: #fff6e0;
+  border: 1px solid rgba(255, 246, 224, .35);
+  border-radius: 2px;
+  padding: 6px 12px;
+  font: inherit;
+  letter-spacing: .12em;
+  cursor: pointer;
+  transition: background .2s, border-color .2s;
+}
+
+.tlo__skip:hover,
+.tlo__skip:focus-visible {
+  background: rgba(255, 61, 152, .25);
+  border-color: #ff3d98;
+  outline: none;
+}
+
+/* conteudo atras do loader fica travado enquanto ele esta visivel */
+html.tlo-lock,
+html.tlo-lock body { overflow: hidden; }
+
+/* acessibilidade: reduz animacao, mantem o poster estatico */
+@media (prefers-reduced-motion: reduce) {
+  .tlo { transition-duration: .01s; }
+  .tlo__media { display: none; }
+  .tlo__bar::after { animation-duration: 4s; }
+}
+
+/* se a pagina inteira for JS-free, o loader se remove sozinho */
+@media print {
+  .tlo { display: none !important; }
+}
