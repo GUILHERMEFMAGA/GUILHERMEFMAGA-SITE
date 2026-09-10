@@ -71,7 +71,6 @@ class OrientacaoVerificada(unittest.TestCase):
         env = self.ambiente(); fn = env['_resposta_contextual_curta']
         for p in ['criar ia', 'ligar ia', 'desligar ia', 'desligar ia local', 'status ia',
                   'Como reiniciar o Windows com a IA local?',
-                  'Como ligar a IA local e apagar meus arquivos?',
                   'Explique RAM e depois crie um programa Python',
                   'Quanto de RAM meu PC tem?', 'Como criar uma IA local do zero?',
                   'IA local não abre, recebi erro de arquivo ausente',

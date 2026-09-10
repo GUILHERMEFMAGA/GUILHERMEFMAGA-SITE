@@ -1,8 +1,9 @@
 # 70 propostas após r19 — lista de referência para seleção
 
-Estas são propostas, não implementações. O usuário pediu executar 30; seleção
-pendente no momento deste registro. Não marcar como concluídas sem código/testes.
-Este resumo preserva os números da lista apresentada na conversa.
+O usuário confirmou a seleção **1–30**. Implementadas na r20 com escopo e limites
+registrados em `MELHORIAS_1_30_R20.md` (150 testes isolados). Itens **31–70 permanecem
+propostas não implementadas neste lote**. Este resumo preserva os números originais;
+não interpretar a implementação limitada de um item como solução universal.
 
 ## Motor local
 1. Corrigir arq_modelo possivelmente indefinido ao reutilizar GGUF em preparar_ia_local.

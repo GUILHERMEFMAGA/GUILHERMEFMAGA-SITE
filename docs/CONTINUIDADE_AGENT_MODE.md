@@ -1,6 +1,7 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 10/09/2026. Este documento descreve a base **r19, commit 494482a**.
+Atualizado em 10/09/2026. Este documento descreve a **r20**, posterior à base r19 (494482a).
+Consulte `git log` e o PR #3 para o hash mais recente.
 Ele não substitui a inspeção do código, do histórico Git e dos comentários posteriores.
 
 ## Onde continuar
@@ -43,7 +44,7 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 
 ## Arquivos que devem ser inspecionados em Files changed / View all changes
 
-- `agente.py`: implementação principal; 479 ferramentas registradas na r19.
+- `agente.py`: implementação principal; 479 ferramentas registradas na r20.
   Contém motor local, provedores, histórico, roteamento, ferramentas, painel e
   autoedição. **Não importar o monólito para testes:** há efeitos no topo.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch do
@@ -87,7 +88,7 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19: **121 testes isolados passaram**; 479 ferramentas antigas preservadas.
+- Na r19 foram 121 testes; na r20 **150 testes isolados passaram**; 479 ferramentas antigas preservadas.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
@@ -95,15 +96,25 @@ ou relatórios reais sem revisão e autorização.
 
 Documentação complementar:
 `AUTOEDICAO_CONTROLADA.md`, `PROJETOS_AVANCADOS_R16.md`, `PRECISAO_LOCAL_R17.md`,
-`OFICINA_LOCAL_R18.md`, `ORIENTACAO_VERIFICADA_R19.md`.
+`OFICINA_LOCAL_R18.md`, `ORIENTACAO_VERIFICADA_R19.md`, `MELHORIAS_1_30_R20.md`.
 
 ## Pedido atual — NÃO confundir plano com implementação
 
-O usuário pediu implementar **30 melhorias** após uma lista de **70 propostas**.
-No momento de escrever este guia, **quais 30 ainda aguardam confirmação**.
-A lista numerada está em `PROPOSTAS_70_MELHORIAS.md`. Não presumir que ele escolheu
-as primeiras 30 nem que essas melhorias já foram feitas. Atualizar esta seção
-assim que a seleção e as implementações forem confirmadas.
+O usuário confirmou explicitamente **as primeiras 30 (1–30)**. A r20 implementa
+esse lote, com matriz de evidências e limites em `MELHORIAS_1_30_R20.md`:
+- lifecycle/identidade do motor, fila não bloqueante por lock, pressão de RAM,
+  threads configuráveis e streaming opcional (default desligado);
+- comandos canônicos compartilhados, paráfrases/compostos limitados, metadados e
+  conflitos conhecidos, pares de histórico/orçamento estimado, origem da resposta;
+- evidência documental com abstenção lexical e calibração humana opcional,
+  citações limitadas às fontes realmente enviadas (não prova semântica);
+- avaliação protocolo v2/software r20, fingerprints em blocos, finish_reason e
+  métricas, casos extras opcionais, repetições/seeds/ordem contrabalançada, arquivo
+  por ID e julgamento humano confirmado. Default ainda 4 gerações; ampliada até 36.
+Nenhuma medição no GGUF/Windows real nesta entrega. Hash de motor é fingerprint,
+não versão semântica autenticada; orçamento de tokens é aproximado. Veja limites
+antes de declarar qualquer problema resolvido universalmente.
+**31–70 não foram implementadas neste lote.** A próxima seleção depende do usuário.
 
 A meta anterior de 100 ideias e 700 ferramentas também não foi concluída: r18
 entregou 14 capacidades da expansão; total 479, faltando 221 para 700. Não inflar
@@ -150,11 +161,11 @@ para documentos/dados. Alterações confirmadas foram autorizadas, não autonomi
 > Python; não foi treinada do zero. Preserve meu modelo e priorize correção.
 > IA nuvem é o rodízio de provedores/cotas disponíveis, especialmente Groq e
 > GitHub Models; preserve-o sem ativação silenciosa ou substituição por API paga.
-> Na base r19 existem 479 ferramentas e 121 testes isolados aprovados. Confirme
-> se houve versões posteriores. A proteção r19 responde alguns comandos e
+> Na r20 existem 479 ferramentas e 150 testes isolados aprovados. Confirme
+> se houve versões posteriores e leia docs/MELHORIAS_1_30_R20.md. A proteção r19 responde alguns comandos e
 > conceitos sem o modelo; a avaliação do GGUF permanece bruta e pode errar.
-> Pedi 30 melhorias de uma lista de 70: verifique a seleção registrada; se não
-> estiver definida, pergunte quais são antes de implementar. Preserve funções,
+> Selecionei as melhorias 1–30, implementadas com limites na r20. As propostas
+> 31–70 ainda não foram implementadas neste lote; confirme o próximo escopo comigo. Preserve funções,
 > memórias, permissões, confirmações e autoedições protegidas por SEM_ATUALIZAR.txt.
 > Não crie capacidades repetidas nem diga que atingimos 700 ferramentas sem
 > auditoria. Teste, documente resultados/limites e atualize o PR #3 e o guia de

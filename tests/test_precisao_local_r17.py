@@ -100,7 +100,8 @@ class PrecisaoLocal(unittest.TestCase):
             env = ambiente(pasta)
             diretorio = Path(pasta)/'avaliacoes_ia_local'
             diretorio.symlink_to(fora, target_is_directory=True)
-            self.assertIn('redirecionamento', env['_executar_avaliacao_precisao_local']())
+            with self.assertRaises(ValueError):
+                env['_executar_avaliacao_precisao_local']()
             self.assertFalse(list(Path(fora).iterdir()))
             diretorio.unlink()
             diretorio.mkdir()
