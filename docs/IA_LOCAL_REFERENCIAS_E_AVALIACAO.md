@@ -151,3 +151,19 @@ com navegador simulado. Abertura real no Windows ainda precisa ser conferida.
 - 44 testes isolados passaram, incluindo exemplos completos no roteador,
   virada de data UTC/Brasilia, periodos e humor desligado. Sem teste do modelo
   real, alteracao da voz ou verificacao astronomica de nascer/por do sol.
+
+## r10 — Casos reais de conversa/capacidades
+
+- `esta de noite?` usa Ribeirao Preto como referencia explicitamente informada,
+  sem exigir repetir a cidade; continua dependendo do relogio correto do PC.
+- Perguntas de capacidade de integracao com VS Code consultam a presenca das
+  ferramentas carregadas e explicam comandos existentes, sem executar nenhuma.
+  Nao afirmam que uma extensao de chat esteja instalada.
+- Identidade verifica IsUserAnAdmin no Windows e separa elevacao real de nivel
+  configurado. Nao promete confirmacao para toda mudanca em modo admin.
+- `ok oque gostaria de ter?` encaminha para o modo de sugestoes do proprio agente.
+- Se o JSON das ideias for aceito mas todas as propostas forem descartadas,
+  preserva o resultado zero e oferece um roteiro FIXO de testes para funcoes
+  existentes, rotulado como nao gerado pela IA. Nao certifica raciocinio do
+  modelo, ausencia de duplicatas ou melhoria automatica de suas sugestoes.
+- 48 testes isolados passaram; geracao do GGUF real ainda nao testada.

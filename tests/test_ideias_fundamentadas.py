@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 from test_roteamento_conversa import carregar, SOURCE
 
-NOMES = ('_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
+NOMES = ('_roteiro_revisao_alternativo', '_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
          '_selecionar_evidencias_ideias', '_formatar_ideias_verificadas',
          '_sugerir_ideias_do_codigo', '_quantidade_lista_local')
 
@@ -59,6 +59,14 @@ class IdeiasFundamentadas(unittest.TestCase):
         self.assertIn('ler (linha 10)', saida)
         self.assertNotIn('Inventada', saida)
         self.assertIn('auditoria integral', saida)
+
+    def test_zero_sugestoes_oferece_roteiro_identificado(self):
+        env = carregar(*NOMES)
+        inv = {'hash': 'teste', 'funcoes': {'salvar_json': {'linha': 10}}}
+        r = env['_formatar_ideias_verificadas']('{"ideias": [{}]}', inv, [], 3)
+        self.assertIn('validos: 0/3', r)
+        self.assertIn('nao gerado pela IA', r)
+        self.assertIn('salvar_json (linha 10)', r)
 
     def test_json_invalido_nao_vira_analise(self):
         env = carregar(*NOMES)

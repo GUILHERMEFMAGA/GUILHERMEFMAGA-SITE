@@ -9065,33 +9065,23 @@ def _contexto_pc() -> str:
 # e voce sao respondidas por REGRA (determinista), sem passar pela neural.
 
 def _resposta_identidade() -> str:
-    """Resposta factual sobre quem o agente e e que poderes ele tem."""
-    try:
-        _n_tools = len(tools)
-    except Exception:
-        _n_tools = 0
-    nivel = "admin"
-    try:
-        nivel = config.get("nivel_permissao", "admin")
-    except Exception:
-        pass
-    partes = [
-        "SIM, eu tenho acesso de ADMINISTRADOR neste PC (nivel de permissao: "
-        f"'{nivel}'). O iniciar.bat me abre elevado, entao eu executo de verdade.",
-        "Eu nao sou 'assistente de voz' nem um chat sem maos: eu sou o Super Agente PC, "
-        f"um programa que roda 100% no seu computador com {_n_tools} ferramentas reais.",
-        "O que eu faco de fato: abrir/fechar qualquer programa (inclusive apps da Loja, "
-        "Brave, Spotify, WhatsApp), mexer nas configuracoes do Windows (Wi-Fi, firewall, "
-        "hibernacao, inicio rapido, energia, tema), reparar internet, otimizar/limpar, "
-        "atualizar o Windows, organizar pastas, achar arquivos grandes, desinstalar em "
-        "lote, modo jogo, ver a tela, mandar WhatsApp e controlar o Spotify.",
-        "Toda mudanca no sistema pede sua permissao (sim/nao) antes de rodar.",
-    ]
-    try:
-        partes.append("Dados deste PC: " + _contexto_pc())
-    except Exception:
-        pass
-    return " ".join(partes)
+    """Distingue configuracao do agente de elevacao real no Windows."""
+    nivel = config.get("nivel_permissao", "padrao")
+    estado = "Nao confirmei a elevacao do processo Windows."
+    if os.name == "nt":
+        try:
+            import ctypes
+            elevado = bool(ctypes.windll.shell32.IsUserAnAdmin())
+            estado = ("O processo esta elevado como administrador no Windows." if elevado
+                      else "O processo NAO esta elevado como administrador no Windows.")
+        except Exception:
+            pass
+    confirmacoes = ("No modo admin, varias ferramentas dispensam confirmacao; "
+                    "nao e correto prometer sim/nao em toda mudanca." if nivel == "admin"
+                    else "As confirmacoes dependem da ferramenta e do nivel configurado.")
+    return (f"{estado} Nivel configurado no agente: {nivel}. {confirmacoes} "
+            f"Tenho {len(tools)} ferramentas registradas, mas cada acao depende "
+            "do programa instalado, das permissoes e do resultado real da execucao.")
 
 
 # Trechos (ja normalizados, sem espaco/acento) que denunciam pergunta sobre
@@ -9199,6 +9189,9 @@ def _parece_pedido_de_acao(cmd: str) -> bool:
 def _pedido_ideias_do_agente(comando: str) -> bool:
     """Somente pedidos de sugestoes sobre o proprio agente, nunca autoedicao."""
     n = _norm_pt(comando)
+    if n in ("okoquegostariadeter", "oquegostariadeter", "oquevcgostariadeter",
+             "oquevocegostariadeter"):
+        return True
     if n in ("ideiasparaoagente", "opiniaosobreseucodigo",
              "analisesuasmelhorias", "sugestoesparaoagente"):
         return True
@@ -9260,6 +9253,23 @@ def _selecionar_evidencias_ideias(inventario, pedido: str):
     return sorted(inventario['funcoes'].values(), key=pontuar, reverse=True)[:6]
 
 
+def _roteiro_revisao_alternativo(inventario):
+    """Roteiro fixo de testes, claramente separado das ideias rejeitadas do modelo."""
+    candidatos = (
+        ("perguntar_ia_local", "Testar perguntas curtas e continuacoes; conferir se a resposta atende ao pedido."),
+        ("_invocar_local", "Simular falhas parciais e confirmar que o despachante nao repete a acao por outro adaptador."),
+        ("salvar_json", "Simular falha na gravacao e confirmar que o arquivo anterior continua legivel."),
+    )
+    linhas = ["\n[Roteiro alternativo, definido no programa — nao gerado pela IA]:"]
+    for nome, proposta in candidatos:
+        if nome in inventario['funcoes']:
+            linhas.append(f"- {nome} (linha {inventario['funcoes'][nome]['linha']}): {proposta}")
+    if len(linhas) == 1:
+        linhas.append("Escolha uma funcao do inventario para uma revisao especifica.")
+    linhas.append("Sao testes sugeridos de recursos existentes, nao falhas comprovadas nem melhorias instaladas.")
+    return '\n'.join(linhas)
+
+
 def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade):
     """Valida formato/referencias, nao a verdade semantica das recomendacoes."""
     import json
@@ -9308,6 +9318,9 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade):
         linhas.append('   Referencias no fonte: ' + ', '.join(
             f"{r} (linha {inventario['funcoes'][r]['linha']})" for r in dict.fromkeys(refs)))
     linhas.append(f'\nSugestoes com formato/referencias validos: {aceitos}/{quantidade}; descartadas: {descartados}.')
+    if aceitos == 0:
+        linhas.append('O modelo nao entregou propostas completas com referencias aceitas; nenhuma foi validada.')
+        linhas.append(_roteiro_revisao_alternativo(inventario))
     linhas.append('Limite: nao foi feita auditoria integral. Algo nao citado pode existir em outra funcao. '
                   'Titulos repetidos sao filtrados; equivalencia entre ideias ainda precisa de revisao humana.')
     return '\n'.join(linhas)
@@ -9422,9 +9435,22 @@ def _resposta_contextual_curta(comando: str, configuracao: dict, agora=None):
             return "Estou no estilo mais serio, como configurado. Se quiser um papo descontraido, use 'humor leve'."
         return ("No jeito de conversar, sim! Posso deixar o papo mais leve — sem precisar de cafe. "
                 "Meu humor e um estilo de resposta, nao um sentimento. O que manda?")
+    if ("vscode" in n or "visualstudiocode" in n) and any(
+            x in n for x in ("vocepode", "vcpode", "voceconsegue", "vcconsegue", "temintegracao")):
+        disponiveis = [nome for nome in ("vscode_status", "vscode_abrir", "vscode_novo_projeto",
+                       "vscode_instalar_extensao", "vscode_criar_tarefa") if nome in globals()]
+        if disponiveis:
+            return ("Sim, o agente tem ferramentas para trabalhar com o VS Code: "
+                    + ", ".join(disponiveis) + ". Para conferir a instalacao, digite 'vscode status'; "
+                    "para abrir uma pasta, 'abre no vscode <pasta>'. Isso usa as ferramentas do "
+                    "agente; nao significa que exista uma extensao de chat instalada. Nao executei nada agora.")
+        return "Nao encontrei as ferramentas de VS Code carregadas nesta sessao; nao vou afirmar uma integracao disponivel."
+    # Perguntas curtas usam explicitamente Ribeirao Preto como referencia.
+    curta = n in ("estádenoite", "estadenoite", "tadenoite", "enoite", "jaenoite",
+                  "estádedia", "estádia", "estadedia", "edia", "ediaounoite", "quehorassao")
     # Perguntas de tempo atual somente para a cidade explicitamente suportada.
-    ribeirao = "ribeiraopreto" in n
-    periodo = any(x in n for x in ("diaounoite", "noiteoudia", "agoraedia", "ediaem", "enoite"))
+    ribeirao = "ribeiraopreto" in n or curta
+    periodo = (curta and n != "quehorassao") or any(x in n for x in ("diaounoite", "noiteoudia", "agoraedia", "ediaem", "enoite"))
     horario = any(x in n for x in ("quehoras", "qualohorario", "horarioagora"))
     if ribeirao and (periodo or horario):
         if agora is None:
@@ -9438,7 +9464,7 @@ def _resposta_contextual_curta(comando: str, configuracao: dict, agora=None):
             # Windows pode nao ter tzdata. SP usa UTC-3 sem horario de verao desde 2019.
             fuso = timezone(timedelta(hours=-3))
         local = agora.astimezone(fuso)
-        resposta = f"Em Ribeirao Preto, sao {local:%H:%M} de {local:%d/%m/%Y}, pelo relogio do seu PC (horario de Brasilia)."
+        resposta = ("Usando Ribeirao Preto como referencia: " if curta else "") + f"Em Ribeirao Preto, sao {local:%H:%M} de {local:%d/%m/%Y}, pelo relogio do seu PC (horario de Brasilia)."
         if periodo:
             faixa = "madrugada" if local.hour < 6 else ("manha" if local.hour < 12 else ("tarde" if local.hour < 18 else "noite"))
             resposta += (f" Pelo horario, e {faixa}. Isso nao verifica a luz do dia nem o nascer/por do sol.")
@@ -23074,7 +23100,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Conversa contextual 2026-09-08-r9] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Conversa e capacidades 2026-09-08-r10] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

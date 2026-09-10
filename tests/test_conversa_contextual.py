@@ -34,6 +34,20 @@ class ConversaContextual(unittest.TestCase):
         self.assertIsNone(self.resposta('qual o horario em Tokyo?', None))
         self.assertIsNone(self.resposta('abra o youtube', None))
 
+    def test_pergunta_curta_sobre_noite(self):
+        r = self.resposta('está de noite?', datetime(2026, 9, 9, 1, tzinfo=timezone.utc))
+        self.assertIn('Usando Ribeirao Preto como referencia', r)
+        self.assertIn('noite', r)
+
+    def test_vscode_descreve_sem_executar(self):
+        ferramenta = Mock(side_effect=AssertionError('Nao executar'))
+        env = carregar('_norm_pt', '_resposta_contextual_curta', vscode_status=ferramenta,
+                       vscode_abrir=ferramenta)
+        r = env['_resposta_contextual_curta']('você pode se integrar pro VsCode?', {})
+        self.assertIn('vscode_status', r)
+        self.assertIn('Nao executei nada', r)
+        ferramenta.assert_not_called()
+
     def test_fluxo_nao_invoca_ferramentas_nem_modelo(self):
         for texto in ['vc esta de bom humor?', 'agora e noite ou dia em Ribeirão Preto']:
             env = carregar('processar_atalho_rapido', '_norm_pt', '_resposta_contextual_curta',
