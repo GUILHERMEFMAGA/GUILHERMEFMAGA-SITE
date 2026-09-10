@@ -75,3 +75,34 @@ recusa, conflito de versão, aplicação/rollback, bloqueio do atualizador, vali
 de cabeçalhos e manifestos, mapa sem segredos e geração simulada. As mesmas 463
 ferramentas mantêm nomes e assinaturas. Não houve autoedição do agente real durante
 os testes. Modelo GGUF real e execução completa no Windows ainda não testados.
+
+## r15 — Análise anterior à geração e controle de repetição
+
+Antes de gerar código (ou preparar código fornecido), o fluxo cataloga as funções
+do fonte atual e mostra até quatro funções potencialmente relacionadas ao pedido,
+com linhas. Essa pré-análise fica no manifesto e aparece com o diff antes da
+aprovação. Nomes de função explicitamente mencionados também contam na busca.
+Ausência de correspondência é informada como inconclusiva, não como prova de novidade.
+
+Adições com corpo AST idêntico a uma função existente ou a outra adição são
+bloqueadas na preparação E na aplicação. A comparação ignora a docstring e o
+nome externo da função. Não detecta toda equivalência com variáveis renomeadas,
+algoritmos diferentes ou funções distribuídas em outros arquivos; pode também
+barrar wrappers deliberadamente iguais. Correções mantêm o fluxo pontual anterior.
+Nenhuma função antiga foi removida para eliminar sobreposição.
+
+O modo de ideias guarda até 300 títulos aceitos no config.json local (ignorado
+pelo Git). A partir desta versão, filtra títulos iguais após normalização ou
+muito semelhantes (SequenceMatcher >= 0,94, mínimo de 24 caracteres). Envia apenas
+os últimos oito ao modelo como lembrete, mas verifica os 300 após a geração.
+Não migra automaticamente ideias antigas da conversa e não retreina o GGUF.
+
+Comandos: `ideias ja sugeridas` e `limpar historico de ideias`. Limpar exige digitar
+LIMPAR, não remove ferramentas ou outras memórias. Títulos podem conter informações
+pessoais do pedido; evite compartilhar o config.json.
+
+78 testes isolados passaram. Sem avaliação do modelo GGUF real ou do Windows.
+O registro das 463 ferramentas e suas assinaturas foi preservado. Mudanças da
+r15 não afetam o rodízio de nuvem; as sugestões/preparação usam _chamar_neural.
+Se SEM_ATUALIZAR.txt existir por uma autoedição anterior, não o remova antes de
+salvar/reconciliar suas mudanças: o download pode sobrescrevê-las.

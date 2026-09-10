@@ -10,7 +10,7 @@ from test_roteamento_conversa import carregar
 
 BASE = '@tool\ndef existente(x: int = 1) -> str:\n    """Exemplo."""\n    return str(x)\n\ntools = [\n    existente,\n]\n'
 NOVO = '@tool\ndef nova() -> str:\n    """Retorna texto."""\n    return "ok"\n'
-NOMES = ('_auto_propor_trecho', '_auto_mapa_pasta', '_auto_hash', '_auto_texto_atomico', '_auto_validar_candidato', '_auto_montar_candidato',
+NOMES = ('_auto_detectar_corpos_repetidos', '_relacionadas_no_inventario', '_auto_propor_trecho', '_auto_mapa_pasta', '_auto_hash', '_auto_texto_atomico', '_auto_validar_candidato', '_auto_montar_candidato',
          '_auto_propor', '_auto_aplicar', '_auditar_fonte', '_inventario_para_ideias',
          '_selecionar_evidencias_ideias')
 

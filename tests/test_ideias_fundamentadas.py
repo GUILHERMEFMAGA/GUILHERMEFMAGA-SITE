@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 from test_roteamento_conversa import carregar, SOURCE
 
-NOMES = ('_relacionadas_no_inventario', '_roteiro_revisao_alternativo', '_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
+NOMES = ('_titulo_ideia_repetido', '_relacionadas_no_inventario', '_roteiro_revisao_alternativo', '_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
          '_selecionar_evidencias_ideias', '_formatar_ideias_verificadas',
          '_sugerir_ideias_do_codigo', '_quantidade_lista_local')
 
@@ -102,6 +102,7 @@ class IdeiasFundamentadas(unittest.TestCase):
             env = carregar('processar_atalho_rapido', '_pedido_ideias_do_agente', '_norm_pt',
                            config={'usar_ia_nuvem': nuvem},
                            _configurar_conversa_local=lambda x: False,
+                           _historico_ideias_local=lambda _: False,
                            _processar_autoedicao_controlada=lambda _: False,
                            _interacao_e_feedback_local=lambda x: False,
                            _resposta_contextual_curta=lambda *args: None,
