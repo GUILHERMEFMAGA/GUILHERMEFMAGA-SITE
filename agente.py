@@ -7773,7 +7773,7 @@ def _processar_cerebro_local(comando: str) -> bool:
     if n in ("statusia", "statusial", "statusdalial", "ialpronta", "comoestaria",
              "estadoial", "estadoia", "ialocalpronta", "prontaal", "comovaial", "iadepronta"):
         print("\n[IA Local]: " + ("PRONTA e respondendo offline (sem cota)."
-              if ia_local_disponivel() else "ainda nao instalada. Digite 'criar ia' para baixar (uma vez)."))
+              if ia_local_disponivel() else "indisponivel agora (pode estar parado ou iniciando). Use criar ia para preparar/iniciar; se faltarem arquivos, pode haver download."))
         return True
     if n in ("desligarialocal", "pararia", "mataria", "encerraria",
              "desligarial", "pararialogo"):
@@ -9968,6 +9968,62 @@ def _resposta_contextual_curta(comando: str, configuracao: dict, agora=None):
     """Fatos do relogio e estilo de conversa, sem inferencia ou acoes no PC."""
     from datetime import datetime, timezone, timedelta
     n = _norm_pt(comando)
+    # Respostas verificadas de escopo estreito. Nao sao geradas pelo GGUF e
+    # nao executam os comandos descritos. Perguntas compostas fora dos modelos
+    # abaixo seguem o fluxo normal, em vez de perder parte do pedido.
+    if not configuracao.get('usar_ia_nuvem', False):
+        import re
+        import unicodedata
+        texto = ''.join(c for c in unicodedata.normalize('NFD', comando.lower())
+                        if unicodedata.category(c) != 'Mn')
+        texto = re.sub(r'[?!.;,]', ' ', texto)
+        texto = re.sub(r'\s+', ' ', texto).strip()
+        comandos = {
+            'criar ia': 'prepara/inicia o motor local, reaproveitando os arquivos existentes quando disponiveis. Se faltarem arquivos, a preparacao pode precisar de download',
+            'status ia': 'consulta a disponibilidade do motor local',
+            'desligar ia': 'desativa a nuvem; nao encerra o motor local',
+            'desligar ia local': 'encerra o motor local controlado pelo agente; nao e o comando de desativar a nuvem',
+            'ligar ia': 'habilita a nuvem (rodizio de provedores); nao e o comando de iniciar o motor local',
+        }
+        pref = '[Orientacao verificada do agente; sem geracao do modelo]\n'
+        aviso = '\nDigite o comando no campo "O que o agente deve fazer no PC?". Isto e orientacao: nao executei nenhuma acao.'
+        motor = re.fullmatch(
+            r'(?:como (?:eu )?(?:faco (?:para|pra) )?(?:ligar|iniciar|reiniciar|reativar|ligo|inicio|reinicio|reativo) '
+            r'(?:a ia local|o motor local|o motor da ia local)(?: (?:novamente|de novo))?'
+            r'|(?:encerrei|desliguei) a ia local(?: com desligar ia local)? como (?:eu )?(?:ligo|inicio|reinicio) '
+            r'(?:o motor|a ia local)(?: (?:novamente|de novo))?'
+            r'|qual (?:e )?o comando para (?:ligar|iniciar|reiniciar) (?:a ia local|o motor local))', texto)
+        if motor:
+            return (pref + 'Para iniciar o motor local parado, digite: criar ia.\n'
+                    'Depois, use status ia para conferir a disponibilidade.\n'
+                    'Se quiser reiniciar um motor ainda em execucao, use desligar ia local antes de criar ia.\n'
+                    'Para conversar sem nuvem, use desligar ia (sem a palavra local).\n'
+                    'Nao precisa importar create_ia ou usar CreateIA: esse exemplo nao faz parte do agente.\n'
+                    'A preparacao reutiliza os arquivos existentes quando disponiveis; se faltarem, pode precisar de download.' + aviso)
+        explicacao = re.fullmatch(
+            r'(?:o que (?:faz|significa)|para que serve|explique(?: o comando)?|como funciona) '
+            r'(?:o comando )?(criar ia|status ia|desligar ia local|desligar ia|ligar ia)', texto)
+        if explicacao:
+            chave = explicacao.group(1)
+            return pref + chave + ': ' + comandos[chave] + '.' + aviso
+        if texto in ('qual a diferenca entre desligar ia e desligar ia local',
+                     'qual e a diferenca entre desligar ia e desligar ia local',
+                     'quais sao os comandos da ia local', 'como alternar entre ia local e nuvem'):
+            return pref + '\n'.join(k + ': ' + v + '.' for k, v in comandos.items()) + aviso
+        if n in ('expliqueadiferencaentreramcachedacpuearmazenamento',
+                 'qualadiferencaentreramcachedacpuearmazenamento',
+                 'qualeadiferencaentreramcachedacpuearmazenamento',
+                 'diferencaentreramcachedacpuearmazenamento',
+                 'ramecache', 'memoriaramecache', 'ramememoriapermanente'):
+            return ('[Explicacao conceitual revisada; sem geracao do modelo]\n'
+                    'RAM: memoria principal de trabalho, normalmente volatil; perde os dados sem energia. '
+                    'Nao e sinonimo de cache da CPU.\n'
+                    'Cache da CPU: memoria geralmente menor e mais rapida, proxima dos nucleos, que guarda '
+                    'copias de dados/instrucoes para reduzir acessos mais lentos a RAM.\n'
+                    'Armazenamento persistente: SSD e HD/HDD conservam dados sem energia. SSD usa memoria '
+                    'flash; HD/HDD usa discos magneticos e partes mecanicas. SSD significa Solid State Drive, '
+                    'nao "seguintes a HDs". Persistente nao significa indestrutivel: backup continua necessario.\n'
+                    'Estes sao conceitos gerais; nao consultei a memoria ou os discos deste PC.')
     if n in ("vcestadebomhumor", "voceestadebomhumor", "vcestadebomhumorhoje",
              "voceestadebomhumorhoje", "tabemhumorado", "vctadebomhumor"):
         humor = configuracao.get("humor_local", "leve")
@@ -10126,7 +10182,9 @@ def _mostrar_avaliacao_precisao_local():
     dados = carregar_json(str(pasta / 'ultima.json'), {})
     if not isinstance(dados, dict) or not dados.get('casos'):
         return 'Ainda nao ha avaliacao com resultados. Use avaliar precisao local.'
-    linhas = ['AVALIACAO LOCAL — leitura humana, sem nota automatica de inteligencia.']
+    linhas = ['AVALIACAO LOCAL — leitura humana, sem nota automatica de inteligencia.',
+              'Respostas BRUTAS do GGUF, sem as orientacoes deterministicas da conversa. '
+              'Podem conter comandos/codigo inventados: nao os execute sem verificar.']
     for caso in dados['casos']:
         linhas.append('\nPergunta: ' + caso['pergunta'])
         linhas.append('Conferir: ' + ' | '.join(caso['criterios']))
@@ -24687,7 +24745,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Oficina local 2026-09-10-r18] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Orientacao local verificada 2026-09-10-r19] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
