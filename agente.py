@@ -10403,6 +10403,8 @@ def processar_atalho_rapido(comando: str) -> bool:
         salvar_historico()
         return True
 
+    if _comandos_oficina_local(comando):
+        return True
     if _comandos_precisao_local(comando):
         return True
 
@@ -23466,6 +23468,7 @@ def _menu_avancado_codigo(comando):
         print('MENU AVANCADO — Codigo e projetos (visivel, sem funcoes ocultas)')
         print('mapa de imports: <pasta> — dependencias internas e ciclos Python, sem executar')
         print('conferir dependencias: <pasta> — declaracoes versus Python do agente, sem instalar')
+        print('oficina local — 14 analises adicionais offline de codigo, documentos e dados')
         print('Ferramentas existentes: git status/diff, metricas_codigo, rodar_testes_python.')
         print('Atencao: executar testes roda codigo do projeto; as duas analises acima nao.')
         return True
@@ -23483,7 +23486,569 @@ def _menu_avancado_codigo(comando):
 
 
 
+def _oficina_ler(caminho, binario=False):
+    """Le somente arquivo explicito regular, ate 1 MB, sem links ou pastas sensiveis."""
+    import os
+    import stat
+    from pathlib import Path
+    bruto = caminho.strip().strip('"')
+    if bruto.startswith(('//', '\\\\')) or '://' in bruto:
+        raise ValueError('Informe caminho local, nao URL/UNC.')
+    p = Path(os.path.abspath(Path(bruto).expanduser()))
+    for parte in (p, *p.parents):
+        if parte.is_symlink() or getattr(parte, 'is_junction', lambda: False)():
+            raise ValueError('Links/redirecionamentos nao permitidos.')
+        nome = parte.name.lower()
+        if nome in {'.git', '.ssh', '.aws', '.azure', '.env', 'chaves.txt', 'credentials'}:
+            raise ValueError('Caminho sensivel bloqueado.')
+    if not stat.S_ISREG(p.stat().st_mode):
+        raise ValueError('Informe arquivo regular.')
+    if p.stat().st_size > 1_000_000:
+        raise ValueError('Limite de 1 MB por arquivo.')
+    with p.open('rb') as f:
+        dados = f.read(1_000_001)
+    if len(dados) > 1_000_000:
+        raise ValueError('Limite de 1 MB por arquivo.')
+    return dados if binario else dados.decode('utf-8-sig')
+
+
+def _oficina_nome(valor):
+    """Escapa controles e limita identificadores; nao imprime valores dos documentos."""
+    import json
+    return json.dumps(str(valor)[:120], ensure_ascii=True)
+
+
+def _oficina_relatorio(titulo, linhas):
+    linhas = list(linhas)
+    return (titulo + '\n' + ('\n'.join(linhas[:80]) or 'Nenhum achado nas verificacoes implementadas.') +
+            (f'\nSaida parcial: {len(linhas)} itens, exibindo 80.' if len(linhas) > 80 else '') +
+            '\nSomente leitura local. Nao e certificacao de seguranca/correcao; nenhum codigo do arquivo foi executado.')
+
+
+def _oficina_ast(caminho):
+    import ast
+    # ast.parse(bytes) respeita a declaracao de encoding Python.
+    arvore = ast.parse(_oficina_ler(caminho, True))
+    if sum(1 for _ in ast.walk(arvore)) > 50000:
+        raise ValueError('Limite de 50000 nos AST.')
+    return arvore
+
+
+@tool
+def auditar_armadilhas_python(caminho: str) -> str:
+    """AUDITORIA AST OFFLINE de armadilhas Python: defaults mutaveis literais,
+    except amplo/silencioso e comparacao is com literal. Nao executa nem corrige.
+    Recebe um arquivo Python ate 1 MB. Complementa a revisao por IA com regras objetivas."""
+    import ast
+    achados = []
+    for n in ast.walk(_oficina_ast(caminho)):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for d in [*n.args.defaults, *n.args.kw_defaults]:
+                if isinstance(d, (ast.List, ast.Dict, ast.Set)):
+                    achados.append(f'L{n.lineno}: default mutavel literal; estado pode persistir entre chamadas.')
+        if isinstance(n, ast.ExceptHandler):
+            if n.type is None or isinstance(n.type, ast.Name) and n.type.id == 'BaseException':
+                achados.append(f'L{n.lineno}: except captura inclusive interrupcoes; revisar intencao.')
+            if n.body and all(isinstance(x, ast.Pass) for x in n.body):
+                achados.append(f'L{n.lineno}: except silencioso com pass; revisar perda de diagnostico.')
+        if isinstance(n, ast.Compare):
+            for esquerda, op, direita in zip([n.left, *n.comparators], n.ops, n.comparators):
+                if isinstance(op, (ast.Is, ast.IsNot)) and any(
+                    isinstance(x, ast.Constant) and x.value is not None and type(x.value) is not bool
+                    for x in (esquerda, direita)):
+                    achados.append(f'L{n.lineno}: identidade is com literal; talvez devesse comparar igualdade.')
+    return _oficina_relatorio('Armadilhas Python — regras limitadas, revisar cada aviso', sorted(set(achados)))
+
+
+def _oficina_api(arvore):
+    import ast
+    contratos = {}
+    for n in arvore.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.name.startswith('_'):
+            if n.name in contratos:
+                raise ValueError('Definicao publica duplicada; comparacao ambigua.')
+            # Guarda estrutura sem imprimi-la: defaults/annotations podem conter dados privados.
+            contratos[n.name] = (type(n).__name__, ast.dump(n.args),
+                                ast.dump(n.returns) if n.returns else '',
+                                tuple(ast.dump(x) for x in n.decorator_list))
+    return contratos
+
+
+@tool
+def comparar_api_python(antes: str, depois: str) -> str:
+    """COMPARA contratos de funcoes publicas no topo de dois arquivos Python.
+    Detecta adicoes, remocoes, parametros/defaults/anotacoes/decoradores alterados,
+    sem exibir valores nem executar imports. Nao prova compatibilidade de runtime."""
+    a, b = _oficina_api(_oficina_ast(antes)), _oficina_api(_oficina_ast(depois))
+    linhas = ['Escopo: funcoes publicas de topo; classes, exports dinamicos e comportamento nao avaliados.']
+    linhas += ['REMOVIDA: ' + _oficina_nome(n) for n in sorted(a.keys() - b.keys())]
+    linhas += ['ADICIONADA: ' + _oficina_nome(n) for n in sorted(b.keys() - a.keys())]
+    linhas += ['CONTRATO ALTERADO (revisar compatibilidade): ' + _oficina_nome(n)
+               for n in sorted(a.keys() & b.keys()) if a[n] != b[n]]
+    linhas.append(f'Contratos identicos neste criterio: {sum(a[n] == b[n] for n in a.keys() & b.keys())}')
+    return _oficina_relatorio('Comparacao de API Python', linhas)
+
+
+@tool
+def inventariar_testes_python(caminho: str) -> str:
+    """INVENTARIO ESTATICO de candidatos a testes Python num arquivo, sem rodar pytest
+    ou unittest. Lista test_* de topo e metodos de classes Test* ou TestCase.
+    Parametrizacao, fixtures e coleta real nao sao executadas nem contadas como casos."""
+    import ast
+    arvore = _oficina_ast(caminho)
+    candidatos = []
+    for n in arvore.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith('test_'):
+            candidatos.append((n.name, n.lineno))
+        if isinstance(n, ast.ClassDef) and (n.name.startswith('Test') or any(
+                isinstance(b, ast.Name) and b.id == 'TestCase' or
+                isinstance(b, ast.Attribute) and b.attr == 'TestCase' for b in n.bases)):
+            candidatos += [(n.name + '.' + f.name, f.lineno) for f in n.body
+                           if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef)) and f.name.startswith('test_')]
+    return _oficina_relatorio(f'Candidatos a testes: {len(candidatos)}; nao e cobertura nem resultado de execucao',
+                             [f'L{linha}: {_oficina_nome(nome)}' for nome, linha in candidatos])
+
+
+@tool
+def validar_notebook_local(caminho: str) -> str:
+    """INSPECAO BASICA de notebook ipynb v4: tipos de celulas, source, contadores,
+    outputs persistidos e IDs repetidos. Nao abre kernel nem mostra codigo/outputs.
+    Nao substitui validacao completa pelo schema oficial nbformat."""
+    import json
+    d = json.loads(_oficina_ler(caminho))
+    if not isinstance(d, dict) or d.get('nbformat') != 4 or not isinstance(d.get('cells'), list):
+        return 'Notebook fora do escopo: esperado objeto nbformat 4 com cells em lista.'
+    if len(d['cells']) > 2000:
+        return 'Limite de 2000 celulas excedido; nao analisado.'
+    linhas, ids, com_saidas = [], set(), 0
+    for i, c in enumerate(d['cells'], 1):
+        if not isinstance(c, dict):
+            linhas.append(f'Celula {i}: nao e objeto.'); continue
+        if c.get('cell_type') not in ('code', 'markdown', 'raw'):
+            linhas.append(f'Celula {i}: tipo invalido.')
+        src = c.get('source')
+        if not (isinstance(src, str) or isinstance(src, list) and all(isinstance(x, str) for x in src)):
+            linhas.append(f'Celula {i}: source invalido.')
+        cid = c.get('id')
+        if cid is not None:
+            if not isinstance(cid, str) or cid in ids:
+                linhas.append(f'Celula {i}: ID invalido ou duplicado.')
+            else:
+                ids.add(cid)
+        if c.get('cell_type') == 'code':
+            if not isinstance(c.get('outputs'), list):
+                linhas.append(f'Celula {i}: outputs ausente/invalido.')
+            elif c['outputs']:
+                com_saidas += 1
+            if 'execution_count' not in c or (c['execution_count'] is not None and type(c['execution_count']) is not int):
+                linhas.append(f'Celula {i}: execution_count invalido/ausente.')
+    linhas.insert(0, f"Celulas: {len(d['cells'])}; celulas com outputs persistidos: {com_saidas}. Revisar privacidade antes de compartilhar.")
+    return _oficina_relatorio('Notebook v4 — verificacoes parciais, nao validacao de schema', linhas)
+
+
+@tool
+def auditar_dockerfile_local(caminho: str) -> str:
+    """AUDITA texto de Dockerfile offline: FROM sem pin, ADD, uso final de root,
+    sudo e downloads enviados a shell. Nao constroi imagem nem consulta registries.
+    Heuristica limitada; heredoc/escape personalizado recusados para evitar falsa analise."""
+    import re
+    texto = _oficina_ler(caminho)
+    if '<<' in texto or re.search(r'(?im)^\s*#\s*escape\s*=', texto):
+        return 'Dockerfile fora do escopo: heredoc/escape personalizado; use linter completo.'
+    linhas, trecho, inicio, estagios, usuario = [], '', 0, 0, None
+    for numero, bruta in enumerate(texto.splitlines(), 1):
+        x = bruta.strip()
+        if not x or x.startswith('#'):
+            continue
+        if not trecho:
+            inicio = numero
+        trecho += x[:-1] + ' ' if x.endswith('\\') else x
+        if x.endswith('\\'):
+            continue
+        partes = trecho.split(None, 1); trecho = ''
+        instrucao = partes[0].upper(); valor = partes[1] if len(partes) > 1 else ''
+        if instrucao == 'FROM':
+            estagios += 1; usuario = None
+            tokens = [p for p in valor.split() if not p.startswith('--')]
+            imagem = tokens[0] if tokens else ''
+            if imagem != 'scratch' and '@sha256:' not in imagem:
+                linhas.append(f'L{inicio}: FROM sem digest sha256; tag/estagio/variavel requer revisao, nao prova defeito.')
+        elif instrucao == 'USER':
+            usuario = valor.split(':')[0].strip()
+        elif instrucao == 'ADD':
+            linhas.append(f'L{inicio}: ADD tem semantica de extracao/download; confira se COPY bastaria.')
+        elif instrucao == 'RUN':
+            if re.search(r'\b(curl|wget)\b.*\|\s*(sh|bash)\b', valor):
+                linhas.append(f'L{inicio}: download encaminhado a shell; revisar origem/integridade.')
+            if re.search(r'\bsudo\b', valor):
+                linhas.append(f'L{inicio}: sudo em build; revisar necessidade.')
+    if trecho:
+        linhas.append('Instrucao continuada incompleta no fim.')
+    if not estagios:
+        linhas.append('Nenhum FROM identificado.')
+    elif usuario in ('root', '0'):
+        linhas.append('Ultimo USER explicito e root/0.')
+    elif usuario is None:
+        linhas.append('Estagio final sem USER explicito; usuario herdado nao verificado.')
+    else:
+        linhas.append('USER final declarado; identidade efetiva nao verificada.')
+    return _oficina_relatorio('Dockerfile — heuristicas limitadas, nao substitui Hadolint', linhas)
+
+
+@tool
+def verificar_links_markdown_locais(caminho: str) -> str:
+    """VERIFICA existencia de destinos de links Markdown inline simples, dentro da
+    pasta do documento, sem rede e sem abrir os destinos. Ignora fragmentos/URLs,
+    nao interpreta referencias, HTML, anchors ou Markdown completo."""
+    import re
+    import os
+    from pathlib import Path
+    from urllib.parse import urlsplit, unquote
+    texto = _oficina_ler(caminho)
+    base = Path(caminho.strip().strip('"')).expanduser().absolute().parent.resolve()
+    linhas, contados, ignorados = [], 0, 0
+    # Remove blocos fenced e codigo inline simples para reduzir falsos positivos.
+    texto = re.sub(r'(?ms)^\s*(```|~~~).*?^\s*\1[^\n]*$', '', texto)
+    texto = re.sub(r'`[^`\n]*`', '', texto)
+    for m in re.finditer(r'!?\[[^\]\n]*\]\(([^\s()]+)\)', texto):
+        if contados + ignorados >= 500:
+            linhas.append('Limite de 500 links; resultado parcial.'); break
+        url = m.group(1).strip('<>'); pedacos = urlsplit(url)
+        if pedacos.scheme or pedacos.netloc or not pedacos.path:
+            ignorados += 1; continue
+        rel = unquote(pedacos.path)
+        contados += 1
+        if '\\' in rel or '\x00' in rel or ':' in rel:
+            linhas.append(f'Link {contados}: caminho nao suportado.'); continue
+        p = Path(os.path.abspath(base / rel))
+        if not p.is_relative_to(base):
+            linhas.append(f'Link {contados}: fora da pasta; nao consultado.'); continue
+        if any(x.is_symlink() or getattr(x, 'is_junction', lambda: False)()
+               for x in (p, *p.parents) if x != base and x.is_relative_to(base)):
+            linhas.append(f'Link {contados}: redirecionamento; nao consultado.'); continue
+        if not p.exists():
+            linhas.append(f'Link {contados}: destino ausente.')
+    linhas.insert(0, f'Links locais simples: {contados}; externos/fragmentos ignorados: {ignorados}. Ancora nao validada.')
+    return _oficina_relatorio('Links Markdown — escopo limitado a pasta do documento', linhas)
+
+
+def _oficina_json(texto):
+    import json
+    def pares(itens):
+        d = {}
+        for chave, valor in itens:
+            if chave in d:
+                raise ValueError('Chave JSON duplicada.')
+            d[chave] = valor
+        return d
+    def constante(_):
+        raise ValueError('NaN/Infinity nao sao JSON padrao.')
+    return json.loads(texto, object_pairs_hook=pares, parse_constant=constante)
+
+
+def _oficina_estrutura_json(dados):
+    import json
+    estrutura, pendentes, nos = {}, [('$', dados, 0)], 0
+    while pendentes:
+        caminho, valor, profundidade = pendentes.pop(); nos += 1
+        if profundidade > 30 or nos > 10000:
+            raise ValueError('Estrutura JSON excede 30 niveis/10000 nos.')
+        tipo = ('null' if valor is None else 'boolean' if isinstance(valor, bool) else
+                'number' if isinstance(valor, (int, float)) else 'string' if isinstance(valor, str) else
+                'object' if isinstance(valor, dict) else 'array')
+        estrutura.setdefault(caminho, set()).add(tipo)
+        if isinstance(valor, dict):
+            pendentes.extend((caminho + '[' + json.dumps(k, ensure_ascii=True) + ']', v, profundidade+1)
+                             for k, v in valor.items())
+        elif isinstance(valor, list):
+            pendentes.extend((caminho + '[]', v, profundidade+1) for v in valor)
+    return estrutura
+
+
+@tool
+def comparar_estrutura_json(antes: str, depois: str) -> str:
+    """COMPARA caminhos/tipos observados em dois arquivos JSON, sem mostrar valores.
+    Arrays sao agregados por tipos, nao por posicao; nao infere obrigatoriedade
+    nem valida JSON Schema. Rejeita chaves duplicadas e constantes nao padrao."""
+    a = _oficina_estrutura_json(_oficina_json(_oficina_ler(antes)))
+    b = _oficina_estrutura_json(_oficina_json(_oficina_ler(depois)))
+    linhas = ['Estrutura observada, nao contrato/schema; ausencia numa amostra nao prova campo removido da API.']
+    for p in sorted(a.keys() | b.keys()):
+        if p not in a:
+            linhas.append('CAMINHO NOVO: ' + _oficina_nome(p))
+        elif p not in b:
+            linhas.append('CAMINHO AUSENTE: ' + _oficina_nome(p))
+        elif a[p] != b[p]:
+            linhas.append('TIPOS DIFERENTES: ' + _oficina_nome(p) + ': ' + ','.join(sorted(a[p])) + ' -> ' + ','.join(sorted(b[p])))
+    return _oficina_relatorio('Comparacao estrutural JSON', linhas)
+
+
+@tool
+def validar_jsonl_local(caminho: str) -> str:
+    """VALIDA JSON Lines/NDJSON registro a registro com numero de linha, sem expor
+    conteudo. Detecta linhas vazias, JSON invalido, NaN/Infinity e chaves duplicadas.
+    Ate 1 MB/10000 linhas; nao confundir com validar um unico documento JSON."""
+    linhas = _oficina_ler(caminho).splitlines()
+    if len(linhas) > 10000:
+        return 'Limite de 10000 linhas excedido; arquivo nao validado.'
+    achados, validas = [], 0
+    for i, linha in enumerate(linhas, 1):
+        try:
+            if not linha.strip():
+                raise ValueError('vazia')
+            _oficina_json(linha); validas += 1
+        except (ValueError, RecursionError):
+            achados.append(f'L{i}: registro invalido ou vazio; conteudo omitido.')
+    if not linhas:
+        achados.append('Arquivo vazio: nenhum registro validado.')
+    return _oficina_relatorio(f'JSONL: {validas}/{len(linhas)} registros validos', achados)
+
+
+def _oficina_csv(caminho, delimitador):
+    import csv
+    import io
+    if len(delimitador) != 1 or delimitador in '\r\n"':
+        raise ValueError('Delimitador deve ser um caractere, nao aspas/quebra de linha.')
+    leitor = csv.reader(io.StringIO(_oficina_ler(caminho), newline=''), delimiter=delimitador, strict=True)
+    cabecalho = next(leitor, [])
+    if not cabecalho or len(set(cabecalho)) != len(cabecalho) or any(not x for x in cabecalho):
+        raise ValueError('Cabecalho vazio/duplicado nao suportado.')
+    linhas = []
+    for linha in leitor:
+        if len(linha) != len(cabecalho):
+            raise ValueError('Quantidade de campos inconsistente.')
+        if len(linhas) >= 10000:
+            raise ValueError('Limite de 10000 registros CSV.')
+        linhas.append(linha)
+    return cabecalho, linhas
+
+
+@tool
+def verificar_chaves_csv(caminho: str, colunas: str, delimitador: str = ',') -> str:
+    """VERIFICA chave simples/composta de CSV: unicidade e campos vazios, sem mostrar
+    valores. Colunas separadas por virgula; delimitador explicito. Diferente de
+    remover linhas repetidas: verifica somente a identidade indicada, nao altera dados."""
+    cab, linhas = _oficina_csv(caminho, delimitador)
+    nomes = [x.strip() for x in colunas.split(',')]
+    if not nomes or len(set(nomes)) != len(nomes) or any(n not in cab for n in nomes):
+        return 'Selecao de colunas invalida; use nomes distintos presentes no cabecalho.'
+    indices = [cab.index(n) for n in nomes]; vistos = {}; avisos = []
+    for i, linha in enumerate(linhas, 1):
+        chave = tuple(linha[j] for j in indices)
+        if any(not v.strip() for v in chave):
+            avisos.append(f'Registro {i}: componente de chave vazio.'); continue
+        if chave in vistos:
+            avisos.append(f'Registro {i}: chave repetida do registro {vistos[chave]}.')
+        else:
+            vistos[chave] = i
+    return _oficina_relatorio(f'Chaves CSV: {len(linhas)} registros; comparacao textual exata, sem normalizar', avisos)
+
+
+@tool
+def conferir_relacao_csv(pai: str, filho: str, coluna_pai: str, coluna_filho: str, delimitador: str = ',') -> str:
+    """CONFERE integridade referencial entre dois CSVs (uma coluna pai/filho).
+    Relata chaves pai repetidas/vazias e filhos orfaos/vazios sem expor valores.
+    Nao faz merge, nao presume tipos numericos e nao altera arquivos."""
+    cp, lp = _oficina_csv(pai, delimitador); cf, lf = _oficina_csv(filho, delimitador)
+    if coluna_pai not in cp or coluna_filho not in cf:
+        return 'Coluna pai ou filho nao encontrada.'
+    ip, jf = cp.index(coluna_pai), cf.index(coluna_filho)
+    valores, avisos = set(), []
+    for i, linha in enumerate(lp, 1):
+        chave = linha[ip]
+        if not chave.strip():
+            avisos.append(f'Pai {i}: chave vazia.')
+        elif chave in valores:
+            avisos.append(f'Pai {i}: chave duplicada; relacao ambigua.')
+        else:
+            valores.add(chave)
+    for i, linha in enumerate(lf, 1):
+        if not linha[jf].strip():
+            avisos.append(f'Filho {i}: chave vazia; nulabilidade nao definida.')
+        elif linha[jf] not in valores:
+            avisos.append(f'Filho {i}: chave orfa.')
+    return _oficina_relatorio(f'Relacao CSV: {len(lp)} pais, {len(lf)} filhos; comparacao textual exata', avisos)
+
+
+@tool
+def auditar_zip_local(caminho: str) -> str:
+    """INSPECIONA metadados de ZIP sem extrair/descomprimir: caminhos perigosos,
+    nomes repetidos, links Unix, criptografia e alta expansao declarada. Ate 1 MB.
+    Nao valida CRC nem detecta malware; tamanhos sao declaracoes do arquivo."""
+    import io
+    import stat
+    import zipfile
+    from pathlib import PurePosixPath, PureWindowsPath
+    dados = _oficina_ler(caminho, True)
+    with zipfile.ZipFile(io.BytesIO(dados)) as z:
+        itens = z.infolist()
+        if len(itens) > 5000:
+            return 'ZIP excede 5000 entradas; inspecao recusada.'
+        vistos, avisos, total = set(), [], 0
+        for i, item in enumerate(itens, 1):
+            nome = item.filename.replace('\\', '/')
+            p = PurePosixPath(nome); w = PureWindowsPath(nome)
+            if p.is_absolute() or w.drive or '..' in p.parts or ':' in nome:
+                avisos.append(f'Entrada {i}: caminho absoluto/traversal/drive ou stream Windows.')
+            normal = nome.rstrip('/').casefold()
+            if normal in vistos:
+                avisos.append(f'Entrada {i}: nome repetido ou colisao por caixa.')
+            vistos.add(normal)
+            if stat.S_ISLNK(item.external_attr >> 16):
+                avisos.append(f'Entrada {i}: link simbolico Unix.')
+            if item.flag_bits & 1:
+                avisos.append(f'Entrada {i}: criptografada; conteudo nao verificado.')
+            if item.file_size > 100_000_000 or item.file_size / max(1, item.compress_size) > 100:
+                avisos.append(f'Entrada {i}: expansao declarada elevada; nao extrair sem revisar.')
+            total += item.file_size
+    return _oficina_relatorio(f'ZIP: {len(itens)} entradas; tamanho expandido declarado {total} bytes; CRC nao verificado', avisos)
+
+
+@tool
+def validar_legendas_srt(caminho: str) -> str:
+    """VERIFICA sequencia e intervalos de legendas SRT: numeracao, timestamps,
+    duracao nao positiva e sobreposicoes. Nao traduz nem altera legendas.
+    Sobreposicao pode ser intencional; suporta formato HH:MM:SS,mmm simples."""
+    import re
+    texto = _oficina_ler(caminho).replace('\r\n', '\n').strip()
+    blocos = re.split(r'\n[ \t]*\n', texto) if texto else []
+    if len(blocos) > 5000:
+        return 'Limite de 5000 blocos SRT excedido.'
+    avisos, fim_anterior = [], -1
+    def milissegundos(s):
+        h, m, seg, ms = map(int, re.split(r'[:,]', s))
+        if m >= 60 or seg >= 60:
+            raise ValueError('timestamp invalido')
+        return ((h * 60 + m) * 60 + seg) * 1000 + ms
+    for i, bloco in enumerate(blocos, 1):
+        linhas = bloco.splitlines()
+        if len(linhas) < 3:
+            avisos.append(f'Bloco {i}: numero, intervalo ou texto ausente.'); continue
+        if linhas[0].strip() != str(i):
+            avisos.append(f'Bloco {i}: numeracao nao sequencial.')
+        m = re.fullmatch(r'(\d{2,}:\d{2}:\d{2},\d{3})\s+-->\s+(\d{2,}:\d{2}:\d{2},\d{3})', linhas[1].strip())
+        try:
+            if not m:
+                raise ValueError('formato')
+            inicio, fim = map(milissegundos, m.groups())
+            if fim <= inicio:
+                avisos.append(f'Bloco {i}: duracao nao positiva.')
+            if inicio < fim_anterior:
+                avisos.append(f'Bloco {i}: sobreposicao ou ordem temporal incorreta; revisar intencao.')
+            fim_anterior = max(fim_anterior, fim)
+        except ValueError:
+            avisos.append(f'Bloco {i}: timestamp invalido/fora do escopo.')
+    return _oficina_relatorio(f'SRT: {len(blocos)} blocos; texto omitido', avisos)
+
+
+@tool
+def validar_xml_local(caminho: str) -> str:
+    """VERIFICA XML UTF-8 bem formado e conta elementos/atributos, sem imprimir
+    valores. DTD e declaracoes de entidades sao recusadas; nao valida XSD,
+    namespaces de negocio ou links e nao processa XInclude."""
+    import re
+    import xml.etree.ElementTree as ET
+    texto = _oficina_ler(caminho)
+    if re.search(r'<!\s*(DOCTYPE|ENTITY)\b', texto, re.I):
+        return 'XML recusado: DTD/entidades nao sao permitidos nesta ferramenta.'
+    try:
+        raiz = ET.fromstring(texto)
+    except ET.ParseError as erro:
+        return f'XML malformado: linha {erro.position[0]}, coluna {erro.position[1]}; conteudo omitido.'
+    elementos = list(raiz.iter())
+    return _oficina_relatorio('XML bem formado; nao implica conformidade com schema',
+                             [f'Elementos: {len(elementos)}; atributos: {sum(len(n.attrib) for n in elementos)}.'])
+
+
+@tool
+def inspecionar_sqlite_local(caminho: str) -> str:
+    """INSPECIONA catalogo de snapshot SQLite ate 1 MB em memoria: tabelas,
+    views, indices e triggers, sem ler registros ou executar SQL fornecido.
+    Ignora WAL externo; copie/exporte um snapshot consistente antes de analisar."""
+    import sqlite3
+    dados = _oficina_ler(caminho, True)
+    if not dados.startswith(b'SQLite format 3\x00'):
+        return 'Arquivo sem cabecalho SQLite 3.'
+    con = sqlite3.connect(':memory:')
+    try:
+        if not hasattr(con, 'deserialize'):
+            return 'Este Python/SQLite nao oferece deserialize; nenhum banco em disco foi aberto.'
+        con.deserialize(dados)
+        con.execute('PRAGMA trusted_schema=OFF')
+        con.execute('PRAGMA query_only=ON')
+        con.set_progress_handler(lambda: 1, 100000)
+        itens = con.execute("SELECT type,name FROM sqlite_master ORDER BY type,name LIMIT 501").fetchall()
+        linhas = [tipo + ': ' + _oficina_nome(nome) for tipo, nome in itens[:500]]
+        if len(itens) > 500:
+            linhas.append('Catalogo parcial: limite de 500 objetos.')
+        return _oficina_relatorio('SQLite — catalogo do snapshot, sem WAL externo e sem validar integridade', linhas)
+    finally:
+        con.close()
+
+
+def _oficina_catalogo_local():
+    """Lista explicita das capacidades r18 e parametros aceitos no atalho offline."""
+    return {
+        'auditar_armadilhas_python': ('caminho',),
+        'comparar_api_python': ('antes', 'depois'),
+        'inventariar_testes_python': ('caminho',),
+        'validar_notebook_local': ('caminho',),
+        'auditar_dockerfile_local': ('caminho',),
+        'verificar_links_markdown_locais': ('caminho',),
+        'comparar_estrutura_json': ('antes', 'depois'),
+        'validar_jsonl_local': ('caminho',),
+        'verificar_chaves_csv': ('caminho', 'colunas', 'delimitador'),
+        'conferir_relacao_csv': ('pai', 'filho', 'coluna_pai', 'coluna_filho', 'delimitador'),
+        'auditar_zip_local': ('caminho',),
+        'validar_legendas_srt': ('caminho',),
+        'validar_xml_local': ('caminho',),
+        'inspecionar_sqlite_local': ('caminho',),
+    }
+
+
+def _comandos_oficina_local(comando):
+    """Atalho inequivoco e allowlist: nunca delega pedidos malformados para a IA."""
+    catalogo = _oficina_catalogo_local()
+    if _norm_pt(comando) == 'oficinalocal':
+        print('OFICINA LOCAL — analises offline, somente leitura, arquivos ate 1 MB.')
+        for nome, params in catalogo.items():
+            print(nome + ' — parametros: ' + ', '.join(params))
+        print('Uso: oficina local NOME: {"caminho":"C:/projeto/arquivo"}')
+        print('JSON: use / ou \\\\ nos caminhos Windows. Nenhuma ferramenta altera arquivos neste lote.')
+        return True
+    cabeca, sep, corpo = comando.partition(':')
+    n = _norm_pt(cabeca)
+    if not n.startswith('oficinalocal'):
+        return False
+    nome = next((x for x in catalogo if 'oficinalocal' + _norm_pt(x) == n), None)
+    if not sep or not nome or len(corpo) > 12000:
+        print('Comando invalido. Digite oficina local para ver nomes e parametros.'); return True
+    try:
+        params = _oficina_json(corpo)
+        if not isinstance(params, dict) or any(k not in catalogo[nome] or not isinstance(v, str)
+                                               for k, v in params.items()):
+            raise ValueError('parametros')
+    except (ValueError, RecursionError):
+        print('Parametros invalidos: use objeto JSON com nomes permitidos e valores de texto.'); return True
+    print(_invocar_local(nome, **params))
+    return True
+
+
 tools = [
+    auditar_armadilhas_python,
+    comparar_api_python,
+    inventariar_testes_python,
+    validar_notebook_local,
+    auditar_dockerfile_local,
+    verificar_links_markdown_locais,
+    comparar_estrutura_json,
+    validar_jsonl_local,
+    verificar_chaves_csv,
+    conferir_relacao_csv,
+    auditar_zip_local,
+    validar_legendas_srt,
+    validar_xml_local,
+    inspecionar_sqlite_local,
     mapa_imports_projeto,
     conferir_dependencias_projeto,
     integrar_agente_no_site,
@@ -24122,7 +24687,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Precisao local verificavel 2026-09-10-r17] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Oficina local 2026-09-10-r18] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
