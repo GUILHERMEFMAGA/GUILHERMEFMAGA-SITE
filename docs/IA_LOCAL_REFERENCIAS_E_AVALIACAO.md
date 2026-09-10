@@ -167,3 +167,26 @@ com navegador simulado. Abertura real no Windows ainda precisa ser conferida.
   existentes, rotulado como nao gerado pela IA. Nao certifica raciocinio do
   modelo, ausencia de duplicatas ou melhoria automatica de suas sugestoes.
 - 48 testes isolados passaram; geracao do GGUF real ainda nao testada.
+
+## r11 — Interação, feedback e planejamento
+
+Implementações pequenas a partir das ideias do modelo; não se adotaram as
+alegações sem evidência sobre vendas/transações ou ausência de agenda.
+
+- Aliases de conversa reutilizam perfis existentes: responda mais curto,
+  responda com mais detalhes, menos piadas, mais leve.
+- `corrija sua resposta: ...` vincula uma correção explícita ao último par
+  pergunta/resposta encontrado no histórico. Mostra a pergunta vinculada.
+  Até 30 correções, 600 caracteres cada, no config.json local já ignorado.
+- `minhas correcoes` permite consultar. `apagar correcoes da conversa` pede
+  confirmação e apaga só essa coleção, não memórias ou configurações gerais.
+- Recuperação por palavras compartilhadas, até duas correções; adicionadas
+  como dados no pedido local, não ao prompt de sistema. Não é treino do GGUF,
+  verificação da verdade ou garantia de obediência; pode recuperar algo
+  pouco relevante por coincidência de palavras. Não registrar credenciais.
+- `plano de foco 60: estudar; revisar; praticar`: divisão determinista do tempo
+  entre tarefas na ordem indicada, com pausas quando há orçamento. Não
+  estima dificuldade, inicia cronômetro, chama ferramentas ou grava agenda.
+  Aceita 5–480 minutos, até 8 tarefas e pelo menos 5 minutos por tarefa.
+- Agenda, agendamento e Pomodoro existentes foram preservados, sem duplicação.
+- 53 testes isolados passaram. Modelo/Windows reais não testados nesta etapa.
