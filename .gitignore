@@ -54,3 +54,6 @@ fluxos.json
 # Propostas e backups locais (podem conter dados privados)
 autoedicao_pendente/
 backups_codigo/
+
+# Respostas e relatorios da avaliacao local
+avaliacoes_ia_local/
