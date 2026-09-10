@@ -7617,6 +7617,7 @@ def _menu_ajuda_local():
     print("CONVERSA: responda mais curto | responda com mais detalhes | menos piadas")
     print("FEEDBACK: corrija sua resposta: <correcao> | minhas correcoes | apagar correcoes da conversa")
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
+    print("MENU AVANCADO: menu avancado — analises de imports/dependencias de projetos")
     print("HISTORICO DE IDEIAS: ideias ja sugeridas | limpar historico de ideias")
     print("IDEIAS COM REFERENCIAS: ideias para o agente | me de 3 ideias para melhorar seu codigo")
     print("  Analise local somente leitura; ate 5 propostas, sem autoedicao.")
@@ -10242,6 +10243,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         historico_conversas.append({"role": "user", "content": comando})
         historico_conversas.append({"role": "assistant", "content": contextual})
         salvar_historico()
+        return True
+
+    if _menu_avancado_codigo(comando):
         return True
 
     if _historico_ideias_local(comando):
@@ -23057,7 +23061,270 @@ def limpar_texto_colado(texto: str) -> str:
             + ("\n..." if len(t) > 2000 else ""))
 
 
+def _arquivos_python_limitados(caminho):
+    """Inventario limitado, sem seguir links ou carregar modulos do projeto."""
+    import os
+    from pathlib import Path
+    base = Path(caminho).expanduser().resolve()
+    if not base.is_dir():
+        raise ValueError('Informe uma pasta de projeto existente.')
+    arquivos, avisos, total = [], [], 0
+    ignoradas = {'.git', '.venv', 'venv', 'node_modules', '__pycache__', 'ia_local',
+                 'autoedicao_pendente', 'backups_codigo', 'backups_edicao', 'build', 'dist'}
+    for raiz, dirs, nomes in os.walk(base, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if d.lower() not in ignoradas and not d.startswith('.')
+                          and not (Path(raiz)/d).is_symlink()
+                          and not getattr(Path(raiz)/d, 'is_junction', lambda: False)())
+        if len(Path(raiz).relative_to(base).parts) >= 8:
+            dirs[:] = []
+            avisos.append('Profundidade maxima de 8 niveis atingida.')
+        for nome in sorted(nomes):
+            p = Path(raiz)/nome
+            if p.suffix != '.py' or p.is_symlink() or any(x in nome.lower() for x in ('secret','chaves','senha','backup')):
+                continue
+            try:
+                tamanho = p.stat().st_size
+                if tamanho > 512_000:
+                    avisos.append(str(p.relative_to(base)) + ': maior que 512 KB, ignorado.')
+                    continue
+            except OSError:
+                avisos.append('Arquivo inacessivel: ' + str(p.relative_to(base)))
+                continue
+            if len(arquivos) >= 200 or total + tamanho > 8_000_000:
+                avisos.append('Limite de 200 arquivos/8 MB atingido; mapa parcial.')
+                return base, arquivos, avisos
+            arquivos.append(p)
+            total += tamanho
+    return base, arquivos, avisos
+
+
+def _grafo_imports_python(caminho):
+    import ast
+    import tokenize
+    base, arquivos, avisos = _arquivos_python_limitados(caminho)
+    modulos, ambiguos = {}, set()
+    for p in arquivos:
+        partes = list(p.relative_to(base).with_suffix('').parts)
+        if partes[0] == 'src' and len(partes) > 1:
+            partes.pop(0)
+        pacote = partes[-1] == '__init__'
+        if pacote:
+            partes.pop()
+        if not partes:
+            continue
+        nome = '.'.join(partes)
+        if nome in modulos:
+            ambiguos.add(nome)
+        else:
+            modulos[nome] = (p, pacote)
+    for nome in ambiguos:
+        modulos.pop(nome, None)
+        avisos.append('Modulo ambiguo excluido: ' + nome)
+    grafo = {nome:set() for nome in modulos}
+    def resolver(destino):
+        partes = destino.split('.')
+        while partes:
+            nome = '.'.join(partes)
+            if nome in modulos:
+                return nome
+            partes.pop()
+        return None
+    for nome, (p, pacote) in modulos.items():
+        try:
+            with tokenize.open(p) as f:
+                arvore = ast.parse(f.read(), filename=str(p))
+        except (OSError, UnicodeError, SyntaxError, LookupError) as erro:
+            avisos.append(str(p.relative_to(base)) + ': nao analisado (' + type(erro).__name__ + ').')
+            continue
+        for no in ast.walk(arvore):
+            alvos = []
+            if isinstance(no, ast.Import):
+                alvos = [a.name for a in no.names]
+            elif isinstance(no, ast.ImportFrom):
+                partes = nome.split('.') if pacote else nome.split('.')[:-1]
+                if no.level:
+                    if no.level > len(partes):
+                        avisos.append('Import relativo fora da raiz em ' + nome)
+                        continue
+                    prefixo = partes[:len(partes)-no.level+1]
+                else:
+                    prefixo = []
+                if no.module:
+                    prefixo += no.module.split('.')
+                origem = '.'.join(prefixo)
+                alvos = [origem + '.' + a.name if origem else a.name for a in no.names if a.name != '*']
+                if origem:
+                    alvos.append(origem)
+            for alvo in alvos:
+                destino = resolver(alvo)
+                if destino and destino != nome:
+                    grafo[nome].add(destino)
+    # Componentes fortemente conexas: grupos com dependencia circular estatica.
+    indice, indices, baixos, pilha, ativos, ciclos = 0, {}, {}, [], set(), []
+    def visitar(v):
+        nonlocal indice
+        indices[v] = baixos[v] = indice; indice += 1
+        pilha.append(v); ativos.add(v)
+        for w in sorted(grafo[v]):
+            if w not in indices:
+                visitar(w); baixos[v] = min(baixos[v], baixos[w])
+            elif w in ativos:
+                baixos[v] = min(baixos[v], indices[w])
+        if baixos[v] == indices[v]:
+            grupo = []
+            while True:
+                w = pilha.pop(); ativos.remove(w); grupo.append(w)
+                if w == v:
+                    break
+            if len(grupo) > 1:
+                ciclos.append(sorted(grupo))
+    for nome in sorted(grafo):
+        if nome not in indices:
+            visitar(nome)
+    return grafo, ciclos, avisos
+
+
+@tool
+def mapa_imports_projeto(caminho: str = '') -> str:
+    """MAPA AVANCADO de imports entre modulos Python e grupos circulares.
+    Somente leitura via AST; nao importa nem executa o projeto. Nao instala nada.
+    Reconhece layout src e imports relativos, com limites explicitados no relatorio."""
+    try:
+        grafo, ciclos, avisos = _grafo_imports_python(caminho or PASTA_BASE)
+    except (OSError, ValueError) as erro:
+        return 'Nao consegui mapear a pasta: ' + str(erro)[:200]
+    linhas = [f'MAPA ESTATICO: {len(grafo)} modulos; {sum(map(len, grafo.values()))} ligacoes internas.',
+              'Grupos circulares: ' + str(len(ciclos))]
+    for grupo in ciclos[:15]:
+        linhas.append('  Grupo: ' + ', '.join(grupo))
+    linhas.append('Dependencias internas (ate 60 modulos):')
+    for nome in sorted(grafo)[:60]:
+        linhas.append('  ' + nome + ' -> ' + (', '.join(sorted(grafo[nome])) or '(nenhuma resolvida)'))
+    linhas.extend('Aviso: ' + a for a in avisos[:20])
+    linhas.append('Limites: AST nao resolve imports dinamicos, sys.path customizado ou distingue TYPE_CHECKING. '
+                  'Um ciclo estatico nao prova falha em execucao; ausencia de ciclos nao certifica arquitetura. '
+                  'Nenhum arquivo foi alterado.')
+    return '\n'.join(linhas)
+
+
+def _comparar_requisitos_local(declaracoes, versao_instalada):
+    """Compara declaracoes com metadata do interpretador atual; nao importa pacotes."""
+    from packaging.requirements import Requirement, InvalidRequirement
+    from packaging.utils import canonicalize_name
+    from packaging.version import InvalidVersion
+    resultados, vistos = [], set()
+    for origem, texto in declaracoes[:200]:
+        texto = texto.strip()
+        if not texto or texto.startswith('#'):
+            continue
+        if texto.startswith('-') or '://' in texto or '\\' in texto:
+            resultados.append(origem + ': diretiva, origem externa ou continuacao nao verificada.')
+            continue
+        try:
+            req = Requirement(texto.split(' #', 1)[0].strip())
+        except InvalidRequirement:
+            resultados.append(origem + ': declaracao nao reconhecida (conteudo omitido).')
+            continue
+        if req.marker and not req.marker.evaluate({'extra':''}):
+            resultados.append(req.name + ': marcador nao ativo neste ambiente.')
+            continue
+        nome = canonicalize_name(req.name)
+        if nome in vistos:
+            resultados.append(req.name + ': declaracao repetida; restricoes verificadas separadamente.')
+        vistos.add(nome)
+        try:
+            versao = versao_instalada(req.name)
+        except Exception:
+            versao = None
+        if versao is None:
+            resultados.append(req.name + ': nao encontrado no interpretador do agente.')
+        else:
+            try:
+                atende = not req.specifier or req.specifier.contains(versao, prereleases=None)
+                resultados.append(req.name + ': versao instalada ' + versao +
+                                  (' atende a declaracao.' if atende else ' NAO atende ' + str(req.specifier)))
+            except InvalidVersion:
+                resultados.append(req.name + ': metadata de versao invalida; comparacao inconclusiva.')
+        if req.extras:
+            resultados.append(req.name + ': dependencias dos extras nao foram verificadas.')
+    return resultados
+
+
+@tool
+def conferir_dependencias_projeto(caminho: str = '') -> str:
+    """CONFERE requirements.txt e dependencias diretas de pyproject.toml contra
+    as versoes instaladas no Python DO AGENTE. Offline, sem pip install, sem
+    executar setup.py ou importar o projeto. Nao e auditoria de vulnerabilidades."""
+    from pathlib import Path
+    import sys
+    from importlib.metadata import version
+    base = Path(caminho or PASTA_BASE).expanduser().resolve()
+    if not base.is_dir():
+        return 'Informe uma pasta de projeto existente.'
+    declaracoes, avisos = [], []
+    for nome in ('requirements.txt', 'pyproject.toml'):
+        p = base/nome
+        if not p.exists():
+            continue
+        if p.is_symlink():
+            avisos.append(nome + ': link simbolico ignorado.'); continue
+        try:
+            if p.stat().st_size > 256_000:
+                avisos.append(nome + ': maior que 256 KB, ignorado.'); continue
+            if nome == 'requirements.txt':
+                declaracoes.extend((f'{nome}:{i}', l) for i,l in enumerate(p.read_text(encoding='utf-8-sig').splitlines(), 1))
+            else:
+                try:
+                    import tomllib
+                except ImportError:
+                    avisos.append('pyproject.toml requer Python 3.11+ para esta leitura.'); continue
+                dados = tomllib.loads(p.read_text(encoding='utf-8-sig'))
+                deps = dados.get('project', {}).get('dependencies', [])
+                if not isinstance(deps, list) or any(not isinstance(x, str) for x in deps):
+                    avisos.append('pyproject.toml: dependencies deve ser lista de strings.'); continue
+                declaracoes.extend((nome, x) for x in deps)
+                avisos.append('pyproject: apenas project.dependencies; grupos, Poetry, build e extras nao analisados.')
+        except (OSError, UnicodeError, ValueError, AttributeError):
+            avisos.append(nome + ': nao foi possivel ler/analisar.')
+    try:
+        resultado = _comparar_requisitos_local(declaracoes, version)
+    except ImportError:
+        return 'Biblioteca packaging indisponivel no Python do agente. Nada foi instalado automaticamente.'
+    if len(declaracoes) > 200:
+        avisos.append('Limite de 200 declaracoes; resultado parcial.')
+    return '\n'.join(['DEPENDENCIAS DECLARADAS — Python consultado: ' + sys.executable,
+                      'Este pode NAO ser o ambiente virtual do projeto.'] +
+                     (resultado or ['Nenhuma dependencia suportada foi comparada.']) + avisos +
+                     ['Sem acesso a rede, instalacao, auditoria de CVEs ou verificacao de dependencias transitivas.'])
+
+
+def _menu_avancado_codigo(comando):
+    """Atalhos locais explicitos para analise de projetos, sem modelo de IA."""
+    n = _norm_pt(comando)
+    if n in ('menuavancado', 'ferramentasavancadas'):
+        print('MENU AVANCADO — Codigo e projetos (visivel, sem funcoes ocultas)')
+        print('mapa de imports: <pasta> — dependencias internas e ciclos Python, sem executar')
+        print('conferir dependencias: <pasta> — declaracoes versus Python do agente, sem instalar')
+        print('Ferramentas existentes: git status/diff, metricas_codigo, rodar_testes_python.')
+        print('Atencao: executar testes roda codigo do projeto; as duas analises acima nao.')
+        return True
+    if ':' in comando:
+        cabeca, caminho = comando.split(':', 1)
+        nome = {'mapadeimports': 'mapa_imports_projeto',
+                'conferirdependencias': 'conferir_dependencias_projeto'}.get(_norm_pt(cabeca))
+        if nome:
+            caminho = caminho.strip().strip('"')
+            if not caminho:
+                print('Informe a pasta depois dos dois pontos.'); return True
+            print(_invocar_local(nome, caminho=caminho))
+            return True
+    return False
+
+
+
 tools = [
+    mapa_imports_projeto,
+    conferir_dependencias_projeto,
     integrar_agente_no_site,
     salvar_versao_do_projeto,
     listar_versoes_do_projeto,
@@ -23694,7 +23961,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Analise antes de adicionar 2026-09-10-r15] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Projetos avancados 2026-09-10-r16] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -102,6 +102,7 @@ class IdeiasFundamentadas(unittest.TestCase):
             env = carregar('processar_atalho_rapido', '_pedido_ideias_do_agente', '_norm_pt',
                            config={'usar_ia_nuvem': nuvem},
                            _configurar_conversa_local=lambda x: False,
+                           _menu_avancado_codigo=lambda _: False,
                            _historico_ideias_local=lambda _: False,
                            _processar_autoedicao_controlada=lambda _: False,
                            _interacao_e_feedback_local=lambda x: False,
