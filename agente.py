@@ -9117,6 +9117,9 @@ def _pergunta_de_identidade(cmd: str) -> bool:
         pass
     if any(t in n for t in _IDENTIDADE_TRECHOS):
         return True
+    if any(x in n for x in ("vc", "voce")) and any(x in n for x in (
+            "controlesobrepc", "controlesobreopc", "controledepc", "controledopc")):
+        return True
     # Rede de seguranca: fala de admin/permissao referindo-se a VOCE (o agente).
     if ("admin" in n or "permissao" in n or "privilegio" in n):
         if any(x in n for x in ("voce", "vc", "tu", "teu", "seu", "tem", "pode", "consegue")):
@@ -9200,7 +9203,7 @@ def _pedido_ideias_do_agente(comando: str) -> bool:
         return True
     proposta = any(x in n for x in ("ideia", "sugest", "opini", "melhoria", "melhorar", "queriater", "gostariadeter", "oquemelhoraria",
                                     "oquefalta", "oquemelhorar"))
-    proprio = any(x in n for x in ("agente", "seucodigo", "teucodigo", "emvoce",
+    proprio = ("gostariadeter" in n or "queriater" in n) or any(x in n for x in ("agente", "seucodigo", "teucodigo", "emvoce",
                                    "emvc", "dentrodevc", "dentrodevoce", "suasfuncoes"))
     # Uma instrucao de edicao continua no fluxo de ferramentas existente.
     editar = n.startswith(("implemente", "implementa", "adicione", "adiciona",
@@ -9265,12 +9268,35 @@ def _roteiro_revisao_alternativo(inventario):
     )
     linhas = ["\n[Roteiro alternativo, definido no programa — nao gerado pela IA]:"]
     for nome, proposta in candidatos:
-        if nome in inventario['funcoes']:
+        if nome in inventario.get('funcoes', {}):
             linhas.append(f"- {nome} (linha {inventario['funcoes'][nome]['linha']}): {proposta}")
     if len(linhas) == 1:
         linhas.append("Escolha uma funcao do inventario para uma revisao especifica.")
     linhas.append("Sao testes sugeridos de recursos existentes, nao falhas comprovadas nem melhorias instaladas.")
     return '\n'.join(linhas)
+
+
+def _relacionadas_no_inventario(titulo: str, inventario):
+    """Busca indicios no inventario INTEIRO, sem certificar ausencia/equivalencia."""
+    import re
+    import unicodedata
+    def tokens(texto):
+        texto = ''.join(c for c in unicodedata.normalize('NFD', texto.lower())
+                        if unicodedata.category(c) != 'Mn')
+        return set(re.findall(r'[a-z]{4,}', texto))
+    termos = tokens(titulo) - {'adicionar', 'melhorar', 'aumentar', 'funcoes', 'funcao',
+                                'ferramentas', 'agente', 'sistema', 'para', 'mais', 'gerenciamento'}
+    dominios = {'tempo': ('agenda', 'agendar', 'pomodoro'),
+                'feedback': ('correcoes', 'feedback', 'aprender'),
+                'interacao': ('conversa', 'contextual', 'feedback')}
+    extras = [x for termo, nomes in dominios.items() if termo in termos for x in nomes]
+    candidatos = []
+    for nome, item in inventario.get('funcoes', {}).items():
+        nota = len(termos & tokens(nome.replace('_', ' ') + ' ' + item.get('descricao', '')))
+        nota += 2 * any(x in nome for x in extras)
+        if nota >= 2:
+            candidatos.append((nota, nome, item['linha']))
+    return sorted(candidatos, reverse=True)[:4]
 
 
 def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade):
@@ -9286,10 +9312,10 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade):
     except (ValueError, TypeError):
         return ('Nao consegui estruturar as sugestoes com referencias verificaveis. '
                 'Nao vou apresentar texto nao validado como analise do codigo. '
-                'Tente pedir 3 ideias sobre um tema especifico.')
+                'Tente pedir 3 ideias sobre um tema especifico.' + _roteiro_revisao_alternativo(inventario))
     itens = dados.get('ideias') if isinstance(dados, dict) else None
     if not isinstance(itens, list):
-        return 'A IA nao devolveu a lista estruturada esperada; nenhuma sugestao foi validada.'
+        return 'A IA nao devolveu a lista estruturada esperada; nenhuma sugestao foi validada.' + _roteiro_revisao_alternativo(inventario)
     conhecidas = {x['nome'] for x in evidencias}
     linhas = [f"[Ideias fundamentadas | fonte {inventario['hash']}]",
               f"Inventario: {len(inventario['funcoes'])} funcoes; recorte consultado: {len(evidencias)}.",
@@ -9320,6 +9346,11 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade):
             linhas.append(f"   {rotulo}: {item[chave][:500]}")
         linhas.append('   Referencias no fonte: ' + ', '.join(
             f"{r} (linha {inventario['funcoes'][r]['linha']})" for r in dict.fromkeys(refs)))
+        relacionadas = _relacionadas_no_inventario(item['titulo'], inventario)
+        if relacionadas:
+            linhas.append('   Recursos possivelmente relacionados ja existentes: ' + ', '.join(
+                f'{nome} (linha {linha})' for _, nome, linha in relacionadas))
+            linhas.append('   Compare antes de adicionar: isso e indicio de sobreposicao, nao equivalencia comprovada.')
     linhas.append(f'\nSugestoes com formato/referencias validos: {aceitos}/{quantidade}; descartadas: {descartados}.')
     if aceitos == 0:
         linhas.append('O modelo nao entregou propostas completas com referencias aceitas; nenhuma foi validada.')
@@ -9338,7 +9369,10 @@ def _sugerir_ideias_do_codigo(pedido: str) -> str:
         return 'Nao consegui ler/analisar agente.py. Nao vou inventar um inventario.'
     if not ia_local_disponivel():
         return 'O motor local nao esta pronto. Use criar ia e depois repita o pedido; nao usei a nuvem.'
-    quantidade = min(5, max(1, _quantidade_lista_local(pedido) or 3))
+    solicitada = _quantidade_lista_local(pedido) or 3
+    quantidade = min(5, max(1, solicitada))
+    aviso_lote = (f"Voce pediu {solicitada} itens; esta consulta avalia somente um lote de ate 5. "
+                  "Nao vou apresentar esse lote como a lista completa.\n" if solicitada > 5 else "")
     evidencias = _selecionar_evidencias_ideias(inventario, pedido)
     if not evidencias:
         return 'Nao encontrei funcoes no fonte para fundamentar sugestoes.'
@@ -9359,15 +9393,16 @@ def _sugerir_ideias_do_codigo(pedido: str) -> str:
     )
     msgs = [{'role': 'system', 'content': sistema},
             {'role': 'user', 'content': 'EVIDENCIAS AST (recorte):\n' +
-             json.dumps(evidencias, ensure_ascii=False) + '\nPEDIDO:\n' + pedido[:1200]}]
+             json.dumps(evidencias, ensure_ascii=False) + '\nPEDIDO ORIGINAL (somente tema):\n' + pedido[:1200] +
+             f'\nESCOPO DESTA RESPOSTA: apenas {quantidade} propostas de software para este agente. Nao completar a quantidade original maior.'}]
     try:
         resposta = _chamar_neural(msgs, max_tokens=min(1800, quantidade * 300 + 100), temperatura=0.2)
         resultado = _formatar_ideias_verificadas(resposta, inventario, evidencias, quantidade)
         if (_quantidade_lista_local(pedido) or 0) > 5:
             resultado += '\nPara manter a analise limitada, este modo trata ate 5 sugestoes por pedido.'
-        return resultado
+        return aviso_lote + resultado
     except Exception:
-        return 'A analise local falhou. Nenhum arquivo foi alterado; tente novamente com um tema mais especifico.'
+        return aviso_lote + 'A analise local falhou. Nenhum arquivo foi alterado; tente novamente com um tema mais especifico.'
 
 
 def _correcoes_relevantes_local(pergunta: str, configuracao: dict):
@@ -9657,8 +9692,36 @@ def _quantidade_lista_local(pergunta: str) -> int:
     import unicodedata
     texto = "".join(c for c in unicodedata.normalize("NFD", pergunta.lower())
                     if unicodedata.category(c) != "Mn")
-    achado = re.search(r"\b(\d{1,4})\s+(?:ideias|sugestoes|exemplos|dicas|itens|melhorias)\b", texto)
-    return int(achado.group(1)) if achado else 0
+    achado = re.search(r"\b(\d{1,4})\s+(?:ideias|sugestoes|exemplos|dicas|itens|melhorias|funcoes|ferramentas|ferramenats)\b", texto)
+    if not achado:
+        return 0
+    quantidade = int(achado.group(1))
+    return quantidade + 1 if re.search(r'mais de\s*$', texto[:achado.start()]) else quantidade
+
+
+def _remover_itens_repetidos_local(resposta: str):
+    """Remove repeticao textual normalizada; nao promete equivalencia semantica."""
+    import re
+    import unicodedata
+    padrao = r"(?m)^\s*(?:\*\*)?\d+[.)](?:\*\*)?\s+"
+    marcas = list(re.finditer(padrao, resposta))
+    if not marcas:
+        return resposta, 0
+    vistos, itens, removidos = set(), [], 0
+    for i, marca in enumerate(marcas):
+        fim = marcas[i + 1].start() if i + 1 < len(marcas) else len(resposta)
+        texto = resposta[marca.end():fim].strip()
+        chave = ''.join(c for c in unicodedata.normalize('NFD', texto.lower())
+                        if unicodedata.category(c) != 'Mn')
+        chave = re.sub(r'[^a-z0-9]', '', chave)
+        if not chave or chave in vistos:
+            removidos += 1
+            continue
+        vistos.add(chave)
+        itens.append(texto)
+    if not removidos:
+        return resposta, 0
+    return '\n'.join(f'{i}. {texto}' for i, texto in enumerate(itens, 1)), removidos
 
 
 def _contar_itens_lista_local(resposta: str) -> int:
@@ -9699,7 +9762,11 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
         raise ValueError("O motor local devolveu uma resposta vazia.")
     resposta = resposta.strip()
     if quantidade:
+        resposta, repetidos = _remover_itens_repetidos_local(resposta)
         recebidos = _contar_itens_lista_local(resposta)
+        if repetidos:
+            resposta += f"\n\n[Repeticoes]: removi {repetidos} itens textualmente repetidos/vazios."
+
         if recebidos != quantidade:
             resposta += (f"\n\n[Aviso de completude]: identifiquei {recebidos} itens "
                          f"numerados em sequencia; voce pediu {quantidade}. "
@@ -23214,7 +23281,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Feedback e planejamento 2026-09-08-r11] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Ideias e listas revisadas 2026-09-08-r12] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

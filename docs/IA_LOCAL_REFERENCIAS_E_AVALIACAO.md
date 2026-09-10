@@ -190,3 +190,30 @@ alegações sem evidência sobre vendas/transações ou ausência de agenda.
   Aceita 5–480 minutos, até 8 tarefas e pelo menos 5 minutos por tarefa.
 - Agenda, agendamento e Pomodoro existentes foram preservados, sem duplicação.
 - 53 testes isolados passaram. Modelo/Windows reais não testados nesta etapa.
+
+## r12 — Revisão dos exemplos de ideias e listas
+
+- Pedidos implícitos como `me de 50 ideias do que gostaria de ter?` passam ao
+  modo de ideias sobre o próprio agente; listas de receitas continuam fora.
+- Reconhece quantidades antes de funções/ferramentas e da grafia ferramenats.
+  `mais de 40` é interpretado como mínimo 41, mas a geração segue limitada a
+  cinco propostas por consulta, com aviso explícito antes do resultado.
+- Propostas aceitas recebem busca adicional de possíveis recursos relacionados
+  no inventário AST inteiro, por palavras e algumas famílias (tempo, feedback,
+  interação). É triagem heurística, não prova de equivalência ou de ausência.
+- JSON inválido também oferece roteiro alternativo FIXO identificado como tal,
+  sem converter a falha em uma falsa análise bem-sucedida.
+- Listas de conversa removem repetições textuais após normalização e recalculam
+  a contagem. Não identifica toda paráfrase nem garante relevância/verdade.
+- `vc tem todo controle sobre pc?` reconhecida como pergunta de capacidade,
+  preservando a distinção entre ferramentas, permissões e elevação real.
+- 59 testes isolados passaram. Análise sintática/compilação do arquivo inteiro
+  (23.454 linhas neste commit), registro de 463 ferramentas idêntico em nomes,
+  ordem e assinaturas; nenhuma função de topo removida em relação à r11.
+- Leitura manual focada nos fluxos relatados, não auditoria funcional completa
+  de cada linha. Sem execução real do agente no Windows ou geração pelo GGUF.
+
+Limites pendentes: geração contínua de 40/50 propostas fundamentadas, avaliação
+semântica de todas as funcionalidades e diagnóstico uniforme de permissões por
+ferramenta não foram implementados nesta revisão. Não afirmar que o agente
+já consegue provar tudo que ainda não tem ou decidir quais permissões precisa.

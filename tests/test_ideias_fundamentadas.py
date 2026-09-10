@@ -9,7 +9,7 @@ from contextlib import redirect_stdout
 from io import StringIO
 from test_roteamento_conversa import carregar, SOURCE
 
-NOMES = ('_roteiro_revisao_alternativo', '_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
+NOMES = ('_relacionadas_no_inventario', '_roteiro_revisao_alternativo', '_norm_pt', '_pedido_ideias_do_agente', '_inventario_para_ideias',
          '_selecionar_evidencias_ideias', '_formatar_ideias_verificadas',
          '_sugerir_ideias_do_codigo', '_quantidade_lista_local')
 
