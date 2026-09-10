@@ -217,3 +217,16 @@ Limites pendentes: geração contínua de 40/50 propostas fundamentadas, avalia�
 semântica de todas as funcionalidades e diagnóstico uniforme de permissões por
 ferramenta não foram implementados nesta revisão. Não afirmar que o agente
 já consegue provar tudo que ainda não tem ou decidir quais permissões precisa.
+
+## r13 — Perguntas sobre ferramentas ausentes
+
+Reconhece pedidos sobre ferramentas/funções/recursos que o agente ou `vc/voce`
+não tem/possui ou que faltam, mesmo sem a palavra ideias. Mantém instruções
+explícitas de implementação fora desse caminho de análise somente leitura.
+Reconhece `lista de 100`, `lista com 40` e `lista 20` como quantidade.
+
+A frase completa reportada foi testada no dispatcher com nuvem ligada/desligada,
+sem chegar à conversa genérica. 61 testes isolados passaram. O modo de análise
+continua limitado a cinco propostas por consulta e NÃO prova ausência de 100
+ferramentas nem autoriza modificações. Não implementa paginação automática ou
+melhoria de conhecimento do GGUF. Execução real no Windows não testada.

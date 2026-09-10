@@ -9208,7 +9208,11 @@ def _pedido_ideias_do_agente(comando: str) -> bool:
     # Uma instrucao de edicao continua no fluxo de ferramentas existente.
     editar = n.startswith(("implemente", "implementa", "adicione", "adiciona",
                             "criaumaferramenta", "criarferramenta", "edite", "altere"))
-    return proposta and proprio and not editar
+    # Perguntar o que falta nao exige usar a palavra "ideias".
+    recursos = any(x in n for x in ("ferrament", "funcao", "funcoes", "recurso", "capacidade"))
+    ausencia = any(x in n for x in ("naotem", "naopossui", "faltam", "falta", "aindanaofaz"))
+    referente = any(x in n for x in ("vc", "voce", "agente", "seucodigo", "teucodigo"))
+    return ((proposta and proprio) or (recursos and ausencia and referente)) and not editar
 
 
 def _inventario_para_ideias(caminho: str):
@@ -9694,7 +9698,8 @@ def _quantidade_lista_local(pergunta: str) -> int:
                     if unicodedata.category(c) != "Mn")
     achado = re.search(r"\b(\d{1,4})\s+(?:ideias|sugestoes|exemplos|dicas|itens|melhorias|funcoes|ferramentas|ferramenats)\b", texto)
     if not achado:
-        return 0
+        lista = re.search(r"\blista\s+(?:de\s+|com\s+)?(\d{1,4})\b", texto)
+        return int(lista.group(1)) if lista else 0
     quantidade = int(achado.group(1))
     return quantidade + 1 if re.search(r'mais de\s*$', texto[:achado.start()]) else quantidade
 
@@ -23281,7 +23286,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Ideias e listas revisadas 2026-09-08-r12] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Pedidos de ferramentas 2026-09-08-r13] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
