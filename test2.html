@@ -7,13 +7,32 @@
 <style>
   body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
   .animacao { display: block; max-width: 800px; width: 100%; height: auto; margin: 20px auto; border-radius: 12px; }
+  .planeta-box { background: #000; border-radius: 12px; max-width: 520px; width: 100%; margin: 20px auto; overflow: hidden; }
+  .planeta-box svg { display: block; width: 100%; height: auto; }
 </style>
 </head>
 <body>
 
 <h1>Sobre a Ctrl+Play</h1>
 
-<img class="animacao" width="800" height="450" alt="b_deixe_um_pouco_mais_-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/a73e7bcd-c59c-463b-8b60-aae618b7e519" />
+<div class="planeta-box">
+  <svg viewBox="0 0 400 400" role="img" aria-label="Animação de planeta roxo com anel orbital">
+    <rect width="400" height="400" fill="#000"/>
+    <g transform="rotate(-25 200 200)">
+      <!-- metade de trás do anel (fica atrás do planeta) -->
+      <path d="M 30,200 A 170,60 0 0 1 370,200" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      <!-- planeta -->
+      <circle cx="200" cy="200" r="110" fill="#6f4df2"/>
+      <!-- metade da frente do anel (passa na frente do planeta, com contorno preto igual ao GIF) -->
+      <path d="M 370,200 A 170,60 0 0 1 30,200" fill="none" stroke="#000" stroke-width="13" stroke-linecap="round"/>
+      <path d="M 370,200 A 170,60 0 0 1 30,200" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+      <!-- satélite/ponto branco orbitando o anel -->
+      <circle r="8" fill="#fff" stroke="#000" stroke-width="3">
+        <animateMotion dur="4s" repeatCount="indefinite" path="M 30,200 A 170,60 0 0 1 370,200 A 170,60 0 0 1 30,200"/>
+      </circle>
+    </g>
+  </svg>
+</div>
 
 <p>Somos uma escola de programação e robótica para crianças e adolescentes. <u><b>Acreditamos</b></u> que, em um mundo movido pela tecnologia, é importante que os nossos jovens compreendam essas inovações e mais que isso, contribuam com a produção dessas tecnologias.</p>
 
