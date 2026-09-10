@@ -1,3 +1,1 @@
-# GUILHERMEFMAGA-SITE
-
-Site feito no curso da Ctrl+Play 🚀
+<img alt="Animação" src="animacao.gif" />
