@@ -26,6 +26,7 @@ class PedidosFerramentas(unittest.TestCase):
             env = carregar('processar_atalho_rapido', '_norm_pt', '_pedido_ideias_do_agente',
                            config={'usar_ia_nuvem': nuvem},
                            _resposta_contextual_curta=lambda *args: None,
+                           _processar_autoedicao_controlada=lambda _: False,
                            _interacao_e_feedback_local=lambda _: False,
                            _configurar_conversa_local=lambda _: False,
                            _sugerir_ideias_do_codigo=analise,
