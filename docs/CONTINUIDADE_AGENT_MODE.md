@@ -107,9 +107,10 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23 **218 testes
-  isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas antigas
-  sempre preservadas em nomes/ordem/assinaturas).
+- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24
+  **230 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
+  prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -159,7 +160,15 @@ ou relatórios reais sem revisão e autorização.
   **memória de ideias rejeitadas** (`ideia rejeitada: <titulo>` / `ideias rejeitadas` /
   `limpar ideias rejeitadas`, integrada ao modo de ideias como filtro de dados — não é treino).
   **O GGUF em si NÃO ficou mais inteligente** (regra do usuário: sem trocar modelo/treinar);
-  o que cresceu é a capacidade determinística e o roteamento. Selo `-r23`. **180 propostas de ferramentas + o lote 1 estão no catálogo
+  o que cresceu é a capacidade determinística e o roteamento. Selo `-r23`.
+- **r24 (sistema/velocidade — pedido "aprimorar sem trocar nada"):** 549 ferramentas mantidas;
+  ganhos internos de resposta rápida: memoização de `_norm_pt` (função pura, cache ≤512 — acelera
+  todo o roteamento); **cache curto de respostas locais idênticas** (mesma pergunta SEM histórico,
+  resposta rotulada `[Cache local]`; 5 min por padrão, 0–120 via `configurar ia local:
+  {"cache_minutos":N}`, 0 desliga; perfil/humor na chave; não vale para `refazer com penalidade`);
+  registro dos últimos 20 tempos de geração + comando **`velocidade ia local`** (última, média das
+  10, tokens/s quando o servidor devolve usage, estado do cache e dicas honestas). Nada trocado:
+  GGUF, nuvem, ferramentas, confirmações. Selo `-r24`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
