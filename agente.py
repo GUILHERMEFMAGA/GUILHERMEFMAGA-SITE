@@ -2079,8 +2079,11 @@ threading.Thread(target=worker_agendador, daemon=True).start()
 # usuario nao entende por que as correcoes nao chegam. Entao: conferimos (so
 # leitura) e, se estiver errado, avisamos e deixamos um ATUALIZAR_INICIAR.bat
 # pronto na pasta - dois cliques e resolve, sem digitar comando nenhum.
+# MANUTENCAO POR ENTREGA: esta URL precisa apontar para a MESMA branch usada
+# nas URLs do iniciar.bat (passo permanente em docs/CONTINUIDADE_AGENT_MODE.md);
+# divergencia gera falso alarme e um corretor que reverteria a entrega.
 URL_AGENTE_OFICIAL = ("https://raw.githubusercontent.com/GUILHERMEFMAGA/"
-                      "GUILHERMEFMAGA-SITE/arena/01a082fd-guilhermefmaga-site/agente.py")
+                      "GUILHERMEFMAGA-SITE/arena/01a08d8e-guilhermefmaga-site/agente.py")
 URL_INICIAR_OFICIAL = URL_AGENTE_OFICIAL.replace("/agente.py", "/iniciar.bat")
 
 
@@ -2109,6 +2112,15 @@ def _checar_iniciar_bat() -> None:
                       "use sempre o 'iniciar.bat'. Pode apagar aquele arquivo.")
         achadas = _re.findall(r"https://raw\.githubusercontent\.com/\S+?agente\.py", conteudo)
         if not achadas or achadas[0] == URL_AGENTE_OFICIAL:
+            # Endereco correto: remove corretor antigo que ficou para tras.
+            try:
+                sobra_corretor = os.path.join(pasta, "ATUALIZAR_INICIAR.bat")
+                if os.path.exists(sobra_corretor):
+                    os.remove(sobra_corretor)
+                    print("\n[Limpeza]: o endereco do iniciar.bat ja esta correto; "
+                          "removi o 'ATUALIZAR_INICIAR.bat' que tinha ficado para tras.")
+            except Exception:
+                pass
             return  # esta certo, nao enche o saco
         # Endereco velho: monta o corretor de dois cliques.
         corretor = os.path.join(pasta, "ATUALIZAR_INICIAR.bat")

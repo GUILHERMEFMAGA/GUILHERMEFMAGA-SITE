@@ -82,6 +82,48 @@ class RoteamentoConversa(unittest.TestCase):
         self.assertIn('python -m py_compile agente_novo.py', bat)
         self.assertIn('SEM_ATUALIZAR.txt', bat)
 
+    def test_agente_e_bat_apontam_para_a_mesma_branch(self):
+        # r21: a checagem interna do agente (URL_AGENTE_OFICIAL) precisa apontar
+        # para a MESMA branch das URLs do iniciar.bat; divergencia gerava falso
+        # alarme no PC real e um ATUALIZAR_INICIAR.bat que reverteria a entrega.
+        import re as _re
+        no_agente = _re.search(r'GUILHERMEFMAGA-SITE/(arena/[a-z0-9-]+)/agente\.py',
+                               SOURCE.read_text())
+        bat = (SOURCE.parent / 'iniciar.bat').read_text()
+        no_bat = _re.search(r'GUILHERMEFMAGA-SITE/(arena/[a-z0-9-]+)/agente\.py', bat)
+        self.assertIsNotNone(no_agente)
+        self.assertIsNotNone(no_bat)
+        self.assertEqual(no_agente.group(1), no_bat.group(1))
+
+    def test_checar_iniciar_bat_limpa_sobra_e_avisa_somente_com_url_errada(self):
+        import os as _os
+        import shutil
+        import tempfile
+        import types as _types
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from pathlib import Path as _Path
+        pasta = _Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, pasta, ignore_errors=True)
+        url = ('https://raw.githubusercontent.com/GUILHERMEFMAGA/'
+               'GUILHERMEFMAGA-SITE/arena/branch-teste/agente.py')
+        fake = _types.SimpleNamespace(name='nt', path=_os.path, remove=_os.remove)
+        env = carregar('_checar_iniciar_bat', os=fake, __file__=str(pasta / 'agente.py'))
+        env['URL_AGENTE_OFICIAL'] = url
+        env['URL_INICIAR_OFICIAL'] = url.replace('/agente.py', '/iniciar.bat')
+        (pasta / 'iniciar.bat').write_text('x ' + url + ' y', encoding='utf-8')
+        (pasta / 'ATUALIZAR_INICIAR.bat').write_text('velho', encoding='utf-8')
+        with redirect_stdout(StringIO()) as saida:
+            env['_checar_iniciar_bat']()
+        self.assertFalse((pasta / 'ATUALIZAR_INICIAR.bat').exists())
+        self.assertIn('Limpeza', saida.getvalue())
+        (pasta / 'iniciar.bat').write_text(
+            'x https://raw.githubusercontent.com/antiga/agente.py y', encoding='utf-8')
+        with redirect_stdout(StringIO()):
+            env['_checar_iniciar_bat']()
+        self.assertIn('branch-teste/iniciar.bat',
+                      (pasta / 'ATUALIZAR_INICIAR.bat').read_text(encoding='utf-8'))
+
     def test_explicacoes_passam_pelo_roteador_sem_ferramentas(self):
         for nuvem in (False, True):
             for texto in [

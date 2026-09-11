@@ -58,7 +58,10 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch da entrega atual
   (r21: `arena/01a08d8e-guilhermefmaga-site`; URLs do agente e da autoatualização trocadas com
   autorização do usuário). Pode substituir o fonte local, faz backup e respeita `SEM_ATUALIZAR.txt`.
-  **Passo permanente:** cada nova entrega, autorizada, atualiza essas URLs para a branch nova da sessão.
+  **Passo permanente:** cada nova entrega, autorizada, atualiza essas URLs **e também a constante
+  `URL_AGENTE_OFICIAL` do `agente.py` (checagem do iniciar.bat, ~linha 2082)** para a branch nova
+  da sessão; o teste `test_agente_e_bat_apontam_para_a_mesma_branch` falha se divergirem.
+  Divergência real (ocorrência r21): falso alarme no PC e corretor que reverteria a entrega.
 - `chaves_EXEMPLO.txt`: somente modelo com placeholders, nunca credenciais reais.
   Textos de cotas/instruções de provedores podem envelhecer: validar antes de alterar.
 - `.gitignore`: exclui segredos, dados locais e relatórios privados.
@@ -104,6 +107,12 @@ ou relatórios reais sem revisão e autorização.
   ferramentas antigas preservadas (nomes/ordem/assinaturas conferidas por AST). Matriz e limites
   da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
+- **Validação real no PC (usuário, Windows, 10-11/09/2026):** r21 confirmada — selo r21 na abertura,
+  sugestão de erro de digitação funcionou (`sttus ia` → pergunta → `sim` → `status ia` executado),
+  sem falso positivo em `oi`, motor saudável, nuvem preservada. Incidente detectado e corrigido:
+  a constante `URL_AGENTE_OFICIAL` (checagem do BAT) ficou na branch antiga → falso alarme
+  "endereco ANTIGO" e criação de ATUALIZAR_INICIAR.bat que reverteria a URL; corrigido com
+  limpeza automática do corretor obsoleto e teste de regressão (agente e BAT na mesma branch).
 - r21 (confiabilidade das respostas locais): sugestão de comando com erro de digitação
   (difflib + confirmação "sim", só no modo local), detecção de colapso de repetição com aviso
   transparente (texto bruto preservado), `refazer com penalidade` confirmado (1x, +0,15),
