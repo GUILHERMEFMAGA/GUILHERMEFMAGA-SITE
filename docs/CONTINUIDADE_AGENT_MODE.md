@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31 **328 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32 **335 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -249,6 +249,16 @@ ou relatórios reais sem revisão e autorização.
   agora compartilham a mesma garantia anti-repetição. Nota: a geração continua no GGUF LOCAL
   (llama-server, `_chamar_neural`); nada na nuvem. Loader extrai `_r31_`. Selo `-r31`. Não
   testado no Windows real.
+- **r32 (verificação pós-geração + radiografia completa, tudo somente leitura):** fecha o ciclo
+  "colocar ideia em código e conferir que ficou certinho". **[1]** `_r29_gerar_esqueleto` agora
+  roda `_r32_conferir_codigo` (ast.parse + presença da função) logo após gravar e inclui na
+  mensagem "Verificacao pos-geracao: sintaxe OK, funcao X presente" — se falhar, aviso honesto
+  com o motivo (arquivo mantido, nunca apagado às cegas). **[2]** `conferir esqueletos` valida
+  TODOS os .py da pasta (OK/QUEBRADO com motivo; orienta levar o quebrado ao chat).
+  **[3]** `analisar agente` = radiografia determinística completa do agente.py: linhas, funções
+  de topo, com/sem docstring, nomes duplicados, ferramentas registradas, camadas r2x presentes,
+  esqueletos e telemetria acumulada — 100% AST, zero alteração. Loader extrai `_r32_`. Selo
+  `-r32`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

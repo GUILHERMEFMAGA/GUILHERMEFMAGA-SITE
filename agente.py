@@ -7717,6 +7717,7 @@ def _menu_ajuda_local():
     print("IDEIAS COM REFERENCIAS: ideias para o agente | me de 3 ideias para melhorar seu codigo")
     print("  Analise local somente leitura; ate 5 propostas, sem autoedicao.")
     print("IDEIAS FUNDAMENTADAS (r31): sugestao cujo nome ja existe e descartada (zero duplicata) | ideia do catalogo vem com #N")
+    print("ANALISE/CONFERENCIA (r32): 'analisar agente' = radiografia completa do codigo (so leitura) | 'conferir esqueletos' = valida o codigo das ideias")
     print("ESTILO LOCAL: resposta rapida | resposta equilibrada | resposta analitica")
     print("HUMOR: humor desligado | humor leve | humor criativo | estilo da conversa")
     print('MODOS DE IA — comandos canonicos verificados:')
@@ -9748,8 +9749,15 @@ def _r29_gerar_esqueleto(nome_ideia):
                    + ' do catalogo foi para a docstring')
     if analise['vizinhas']:
         resumo += ' | vizinhas: ' + vizinhas_txt
+    verificacao = _r32_conferir_codigo(codigo, nome_seguro)
+    if verificacao['ok']:
+        linha_ver = ('Verificacao pos-geracao: sintaxe OK, funcao ' + nome_seguro + ' presente.')
+    else:
+        linha_ver = ('ATENCAO: a verificacao pos-geracao falhou (' + verificacao['motivo']
+                     + '). O arquivo ficou em ' + caminho + '; nao use sem revisar e me avise no chat.')
     return ('Esqueleto criado: ' + caminho + '\n' + resumo + '\n'
             'Contem a funcao ' + nome_seguro + '() com docstring, aviso de pendencia e exemplo de uso.\n'
+            + linha_ver + '\n'
             'Ele NAO entra no agente sozinho: para virar ferramenta de verdade, cole no chat do '
             'Agent Mode e peca a integracao (testes + auditoria + sua aprovacao).')
 
@@ -9813,6 +9821,128 @@ def _r29_comandos(comando):
         return True
     if _norm_pt(comando) == 'listaresqueletos':
         print(_r29_listar())
+        return True
+    return False
+
+
+def _r32_conferir_codigo(codigo, nome_funcao):
+    """r32: verificacao pos-geracao — o codigo parseia e a funcao esperada
+    esta la? Analise pura, sem executar nada."""
+    import ast
+    try:
+        arvore = ast.parse(str(codigo))
+    except SyntaxError as erro:
+        return {'ok': False, 'motivo': 'erro de sintaxe: ' + str(erro)}
+    for no in arvore.body:
+        if isinstance(no, ast.FunctionDef) and no.name == str(nome_funcao):
+            return {'ok': True, 'motivo': ''}
+    return {'ok': False, 'motivo': 'funcao "' + str(nome_funcao) + '" nao encontrada no arquivo'}
+
+
+def _r32_conferir_esqueletos():
+    """r32: revalida TODOS os esqueletos da pasta (sintaxe + funcao presente)
+    e aponta os quebrados. Leitura somente; nada e alterado."""
+    import os
+    pasta = _r29_pasta_esqueletos()
+    if not pasta:
+        return 'Sem pasta real do agente (modo de teste); nada conferido.'
+    if not os.path.isdir(pasta):
+        return ('Nenhum esqueleto para conferir (a pasta ainda nao existe). '
+                'Crie com: esqueleto de ideia: <nome>')
+    arquivos = sorted(a for a in os.listdir(pasta) if a.endswith('.py'))
+    if not arquivos:
+        return 'A pasta de esqueletos esta vazia; nada a conferir.'
+    ok, quebrados = [], []
+    for nome_arq in arquivos:
+        caminho = os.path.join(pasta, nome_arq)
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                conteudo = f.read()
+        except (OSError, UnicodeError) as erro:
+            quebrados.append((nome_arq, 'nao consegui ler: ' + str(erro)))
+            continue
+        resultado = _r32_conferir_codigo(conteudo, nome_arq[:-3])
+        if resultado['ok']:
+            ok.append(nome_arq)
+        else:
+            quebrados.append((nome_arq, resultado['motivo']))
+    linhas = ['Conferencia dos esqueletos (somente leitura): ' + str(len(ok))
+              + ' OK, ' + str(len(quebrados)) + ' quebrado(s).']
+    for nome_arq in ok:
+        linhas.append('  OK ' + nome_arq)
+    for nome_arq, motivo in quebrados:
+        linhas.append('  QUEBRADO ' + nome_arq + ' (' + motivo + ')')
+    if quebrados:
+        linhas.append('Nao apague nada as cegas: cole o arquivo quebrado no chat do Agent Mode.')
+    return '\n'.join(linhas)
+
+
+def _r32_analisar_agente():
+    """r32: radiografia COMPLETA e deterministica do agente.py (leitura
+    somente, bloco a bloco por AST): funcoes, docstrings, versoes r2x,
+    ferramentas registradas, esqueletos e telemetria. Nada e alterado."""
+    import ast
+    import os
+    caminho = globals().get('_CAMINHO_AGENTE_PY') or ''
+    if not caminho or not os.path.exists(caminho):
+        return ('Sem o arquivo do agente nesta pasta; nada analisado '
+                '(modo de teste isolado).')
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            fonte = f.read()
+        arvore = ast.parse(fonte)
+    except (OSError, UnicodeError, SyntaxError) as erro:
+        return 'Nao consegui ler/analisar o agente.py: ' + str(erro)
+    funcoes = [n for n in arvore.body if isinstance(n, ast.FunctionDef)]
+    sem_doc = [f.name for f in funcoes if not ast.get_docstring(f)]
+    nomes = [f.name for f in funcoes]
+    duplicatas = len(nomes) - len(set(nomes))
+    versoes = {}
+    for f in funcoes:
+        if f.name.startswith('_r2'):
+            chave = f.name[:4]
+            versoes[chave] = versoes.get(chave, 0) + 1
+    ferramentas = globals().get('tools') or []
+    linhas = ['=================== ANALISE COMPLETA DO AGENTE (r32) ====================',
+              'Arquivo: ' + str(caminho) + ' (' + str(len(fonte.splitlines())) + ' linhas)',
+              'Leitura SOMENTE; nada foi alterado neste comando.', '',
+              '[1] Funcoes de topo: ' + str(len(funcoes))
+              + ' | com docstring: ' + str(len(funcoes) - len(sem_doc))
+              + ' | sem docstring: ' + str(len(sem_doc))
+              + ' | nomes duplicados: ' + str(duplicatas)]
+    if sem_doc:
+        linhas.append('    Sem docstring (ate 10): ' + ', '.join(sem_doc[:10]))
+    linhas.append('[2] Ferramentas registradas na lista: ' + str(len(ferramentas)))
+    if duplicatas:
+        linhas.append('    ATENCAO: nomes duplicados precisam de auditoria no chat.')
+    linha_versao = '; '.join(chave + ': ' + str(qtd) for chave, qtd in sorted(versoes.items()))
+    if linha_versao:
+        linhas.append('[3] Camadas de melhoria no arquivo: ' + linha_versao)
+    pasta = _r29_pasta_esqueletos()
+    if pasta and os.path.isdir(pasta):
+        esqueletos = [a for a in os.listdir(pasta) if a.endswith('.py')]
+        linhas.append('[4] Esqueletos de ideia na pasta: ' + str(len(esqueletos))
+                      + " ('conferir esqueletos' valida um por um)")
+    registro = _r28_carregar_telemetria()
+    if registro:
+        com_erro = sum(1 for item in registro.values() if item.get('erros'))
+        linhas.append('[5] Telemetria acumulada: ' + str(len(registro))
+                      + ' ferramenta(s) usada(s), ' + str(com_erro) + ' com erro'
+                      + " ('diagnostico ferramentas' detalha)")
+    linhas.append('')
+    linhas.append('Isto e radiografia, nao diagnostico completo: decisao de melhoria')
+    linhas.append('segue no chat, com auditoria e a sua aprovacao (nenhuma autoedicao).')
+    return '\n'.join(linhas)
+
+
+def _r32_comandos(comando):
+    """r32: conferencia pos-geracao e radiografia completa (somente leitura)."""
+    n = _norm_pt(comando)
+    if n in ('analisaragente', 'analisaroagente', 'analisecompletadoagente'):
+        print(_r32_analisar_agente())
+        return True
+    if n in ('conferiresqueletos', 'conferiresqueleto'):
+        print(_r32_conferir_esqueletos())
         return True
     return False
 
@@ -12002,6 +12132,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r29_comandos(comando):
+        return True
+
+    if _r32_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -28858,7 +28991,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r31] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r32] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
