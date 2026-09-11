@@ -141,7 +141,9 @@ ou relatórios reais sem revisão e autorização.
   helper `_pedido_contagem_ferramentas` rotas a pergunta de contagem para `estatisticas_poder`
   (resposta com contagem real, sem geração do modelo) e guarda em `_quantidade_lista_local`
   que só zera a quantidade em perguntas de existência/contagem (pedidos implícitos r12 como
-  "mais de 40 funções" preservados — a suíte pegou a primeira tentativa larga e ela foi afinada). **180 propostas de ferramentas + o lote 1 estão no catálogo
+  "mais de 40 funções" preservados — a suíte pegou a primeira tentativa larga e ela foi afinada).
+  **Hotfix validado no PC real**: a mesma frase do relato agora recebe "EU TENHO 500 FERRAMENTAS"
+  determinístico, sem alucinação do modelo e sem aviso de completude falso. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
