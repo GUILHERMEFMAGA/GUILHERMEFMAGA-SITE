@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29 **316 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30 **324 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -231,6 +231,14 @@ ou relatórios reais sem revisão e autorização.
   NUNCA sobrescreve esqueleto existente, NUNCA toca no `agente.py`, sem `PASTA_BASE` (testes AST)
   nada é escrito. Integração real segue a esteira: colar no chat → testes → auditoria → aprovação.
   Loader extrai `_r29_`. Selo `-r29`. Não testado no Windows real.
+- **r30 (ANÁLISE da ideia antes do esqueleto):** `_r30_analisar_ideia` roda ANTES de criar o
+  arquivo: **[1] colisão** com as ferramentas registradas BLOQUEIA a criação (zero duplicata;
+  sugere `usar <nome> com {...}` ou reformular); **[2] catálogo** — proposta correspondente
+  (nome igual, substring ≥8 ou ≥2 palavras em comum) enriquece a docstring ("Catalogo #N: desc");
+  **[3] vizinhas** — até 3 ferramentas com palavras em comum vão para o cabeçalho do esqueleto e
+  para o resumo ("porque vale reaproveitar"). Palavra curta não é colisão falsa (norma exata).
+  Resumo da análise na mensagem ("Analise da ideia: ..."). Loader extrai `_r30_`. Selo `-r30`.
+  Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

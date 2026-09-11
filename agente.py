@@ -7707,7 +7707,7 @@ def _menu_ajuda_local():
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
-    print("ESQUELETOS (r29): 'esqueleto de ideia: <nome>' cria o codigo base .py na pasta esqueletos_ideias/ | 'listar esqueletos' | 'abrir esqueleto: <nome>'")
+    print("ESQUELETOS (r30): 'esqueleto de ideia: <nome>' analisa (colisao, catalogo, vizinhas) e cria o codigo .py em esqueletos_ideias/ | 'listar esqueletos' | 'abrir esqueleto: <nome>'")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
@@ -9638,10 +9638,56 @@ def _r29_nome_seguro(nome_ideia):
     return limpo[:60]
 
 
+def _r30_analisar_ideia(nome_ideia):
+    """r30: analisa a ideia ANTES de virar esqueleto: colisao com as
+    ferramentas registradas (bloqueia duplicata), proposta correspondente
+    no catalogo local (enriquece a docstring) e ferramentas vizinhas
+    (palavras em comum) para reaproveitar o que ja existe."""
+    resultado = {'bloqueia': False, 'motivo': '', 'descricao': '',
+                 'vizinhas': [], 'numero_catalogo': 0}
+    nome_seguro = _r29_nome_seguro(nome_ideia)
+    ferramentas = globals().get('tools') or []
+    nomes = [str(getattr(f, 'name', '') or '') for f in ferramentas]
+    if nome_seguro and nomes:
+        if _norm_pt(nome_seguro) in (_norm_pt(x) for x in nomes):
+            resultado['bloqueia'] = True
+            resultado['motivo'] = ('ANALISE: ja existe a ferramenta "' + nome_seguro
+                                   + '" no agente. Esqueleto NAO criado (zero duplicata). '
+                                   'Use o que existe: usar ' + nome_seguro + ' com {...} '
+                                   'ou reformule a ideia com outro nome.')
+            return resultado
+    palavras = _r26_palavras(nome_ideia)
+    if palavras:
+        for nome_tool in nomes:
+            comuns = [p for p in _r26_palavras(nome_tool) if p in palavras]
+            if comuns:
+                resultado['vizinhas'].append((nome_tool, len(comuns)))
+        resultado['vizinhas'].sort(key=lambda par: (-par[1], par[0]))
+        resultado['vizinhas'] = resultado['vizinhas'][:3]
+    propostas, _caminho = _r26_propostas_catalogo()
+    alvo_norm = _norm_pt(nome_seguro or '')
+    melhor = None
+    for proposta in propostas:
+        pn = _norm_pt(proposta['nome'])
+        if alvo_norm and (alvo_norm == pn or (min(len(alvo_norm), len(pn)) >= 8
+                                              and (alvo_norm in pn or pn in alvo_norm))):
+            melhor = proposta
+            break
+        comuns = set(_r26_palavras(proposta['nome'] + ' ' + proposta['descricao'])).intersection(palavras)
+        if len(comuns) >= 2 and melhor is None:
+            melhor = proposta
+    if melhor:
+        resultado['descricao'] = melhor['descricao'][:200]
+        resultado['numero_catalogo'] = melhor['numero']
+    return resultado
+
+
 def _r29_gerar_esqueleto(nome_ideia):
-    """r29: transforma uma ideia em esqueleto de codigo .py na pasta
-    esqueletos_ideias/. Arquivo NOVO; nunca sobrescreve; nunca toca no
-    agente.py (a integracao oficial passa pela esteira: chat + testes +
+    """r29/r30: transforma uma ideia em esqueleto de codigo .py na pasta
+    esqueletos_ideias/, depois de ANALISAR: colisao com as ferramentas
+    registradas (bloqueia duplicata), proposta do catalogo (enriquece a
+    docstring) e ferramentas vizinhas. Nunca sobrescreve; nunca toca no
+    agente.py; a integracao oficial segue a esteira (chat + testes +
     auditoria + aprovacao do usuario)."""
     import os
     import datetime as _dt
@@ -9649,6 +9695,9 @@ def _r29_gerar_esqueleto(nome_ideia):
     if not nome_seguro:
         return ("Nao consegui transformar '" + str(nome_ideia or '').strip()
                 + "' em nome de arquivo. Ex.: esqueleto de ideia: medidor de agua")
+    analise = _r30_analisar_ideia(nome_ideia)
+    if analise['bloqueia']:
+        return analise['motivo']
     pasta = _r29_pasta_esqueletos()
     if not pasta:
         return ('Esqueletos precisam da pasta real do agente; no modo de teste '
@@ -9659,10 +9708,16 @@ def _r29_gerar_esqueleto(nome_ideia):
                 + '\nEscolha outro nome ou apague o antigo antes (eu nunca sobrescrevo por cima).')
     os.makedirs(pasta, exist_ok=True)
     data = _dt.date.today().isoformat()
+    vizinhas_txt = ', '.join(nome for nome, _ in analise['vizinhas'])
+    extra_header = ('# Analise r30 - ferramentas vizinhas p/ reaproveitar: '
+                    + vizinhas_txt + '\n') if vizinhas_txt else ''
+    extra_doc = ('    Catalogo #' + str(analise['numero_catalogo']) + ': '
+                 + analise['descricao'] + '\n\n') if analise['descricao'] else ''
     codigo = (
         '# ============================================================\n'
-        '# ESQUELETO DE IDEIA gerado pelo Super Agente (r29) em ' + data + '\n'
+        '# ESQUELETO DE IDEIA gerado pelo Super Agente (r29/r30) em ' + data + '\n'
         '# Ideia original: ' + str(nome_ideia).strip()[:120] + '\n'
+        + extra_header +
         '# Este arquivo NAO e o agente: fica em esqueletos_ideias/ e\n'
         '# sobrevive ao atualizador (que so troca agente.py e afins).\n'
         '# Para virar ferramenta REAL: cole este arquivo no chat do Agent\n'
@@ -9671,7 +9726,8 @@ def _r29_gerar_esqueleto(nome_ideia):
         '# ============================================================\n'
         '\n\n'
         'def ' + nome_seguro + '(entrada: str = "") -> str:\n'
-        '    """' + str(nome_ideia).strip()[:100] + ' (esqueleto r29).\n\n'
+        '    """' + str(nome_ideia).strip()[:100] + ' (esqueleto r29/r30).\n\n'
+        + extra_doc +
         '    Complete o algoritmo no corpo (ou cole este arquivo no chat do\n'
         '    Agent Mode e peca a integracao com testes de verdade).\n'
         '    """\n'
@@ -9685,7 +9741,13 @@ def _r29_gerar_esqueleto(nome_ideia):
         '        print("Ideia ainda em esqueleto:", erro)\n')
     with open(caminho, 'w', encoding='utf-8', newline='\n') as f:
         f.write(codigo)
-    return ('Esqueleto criado: ' + caminho + '\n'
+    resumo = 'Analise da ideia: sem colisao com as ferramentas registradas'
+    if analise['descricao']:
+        resumo += (' | proposta #' + str(analise['numero_catalogo'])
+                   + ' do catalogo foi para a docstring')
+    if analise['vizinhas']:
+        resumo += ' | vizinhas: ' + vizinhas_txt
+    return ('Esqueleto criado: ' + caminho + '\n' + resumo + '\n'
             'Contem a funcao ' + nome_seguro + '() com docstring, aviso de pendencia e exemplo de uso.\n'
             'Ele NAO entra no agente sozinho: para virar ferramenta de verdade, cole no chat do '
             'Agent Mode e peca a integracao (testes + auditoria + sua aprovacao).')
@@ -28757,7 +28819,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r29] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r30] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
