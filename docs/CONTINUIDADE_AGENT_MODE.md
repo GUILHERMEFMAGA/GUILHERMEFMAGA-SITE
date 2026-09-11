@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27 **286 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28 **301 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -208,8 +208,20 @@ ou relatórios reais sem revisão e autorização.
   exato + 7 nome ajustado); 11 semelhanças difusas RECUSADAS (ex.: Vigenere≠César, DDD≠IP
   estático) e voltaram para restantes. Catálogo agora: 109 ✅ conferidos 1-a-1 contra defs,
   110 propostas restantes (589+110=699; a próxima ideia nova fecha 700). Suíte: +48 casos
-  (test_ferramentas_lote4_r27.py). Selo `-r27`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
-  220 (caminho até 700)**; lotes seguintes dependem de autorização.
+  (test_ferramentas_lote4_r27.py). Selo `-r27`. Não testado no Windows real.
+- **r28 (fábrica PROFISSIONAL — o que faltava na máquina de ideias):** nada novo na lista
+  (589 mantidas; tudo interno). **[1] Telemetria persistente**: `_r25_uso_ferramentas` agora
+  carrega/grava `telemetria_ferramentas.json` em PASTA_BASE (load preguiçoso só se o registro
+  global é None; save com throttle de 60s + flush forçado em estatisticas/fabrica; falha de
+  disco nunca derruba ferramenta; `zerar telemetria` exige LIMPAR). Sem PASTA_BASE (testes
+  AST) fica só em memória — zero arquivo criado. **[2] Justificativa**: cada sugestão da
+  fábrica mostra "(porque voce usa: ...)" com o vocabulário casado do top de uso.
+  **[3] Rotação**: `fabrica_apresentadas` (config, cap 50) — novidades primeiro; já
+  apresentadas só voltam se faltarem opções. **[4] Ciclo de feedback**: `ideia boa: <nome>`
+  grava `ideias_favoritas` (cap 100) e a fábrica prioriza marcando "[voce marcou como BOA]";
+  veto continua pelo `ideia rejeitada` da r23. Cabeçalho da fábrica diz se os dados são
+  acumulados entre sessões. Loader de testes extrai `_r28_`. Selo `-r28`. Não testado no
+  Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

@@ -2767,7 +2767,8 @@ def _abrir_app_ou_site(alvo: str) -> str:
 
 
 def _r25_registrar_uso(nome_fn, segundos, ok, tipo_erro=''):
-    """r25: telemetria local das ferramentas (memoria da sessao; nada sai do PC)."""
+    """r25: telemetria local das ferramentas (r28: persistente em arquivo local)."""
+    _r28_carregar_telemetria()
     registro = globals().setdefault('_r25_uso_ferramentas', {})
     item = registro.setdefault(str(nome_fn), {'usos': 0, 'erros': 0, 'tempo_s': 0.0,
                                               'ultimo_erro': '', 'ultima_duracao_s': 0.0})
@@ -2781,6 +2782,7 @@ def _r25_registrar_uso(nome_fn, segundos, ok, tipo_erro=''):
     if len(registro) > 800:
         for chave_antiga in list(registro)[:200]:
             del registro[chave_antiga]
+    _r28_salvar_telemetria()
 
 
 def _r25_sugerir_ferramenta(nome_fn):
@@ -7704,6 +7706,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
+    print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
@@ -9350,6 +9353,7 @@ def _r25_comandos(comando):
     import json
     n = _norm_pt(comando)
     if n == 'estatisticasferramentas':
+        _r28_carregar_telemetria()
         registro = globals().get('_r25_uso_ferramentas', {})
         if not registro:
             print('Nenhuma ferramenta foi usada nesta sessao ainda.')
@@ -9361,8 +9365,10 @@ def _r25_comandos(comando):
                       + str(round(item['tempo_s'] / max(1, item['usos']), 3)) + 's')
             print('  ' + nome + ': ' + estado)
         print('Total de ferramentas distintas usadas: ' + str(len(registro)))
+        _r28_salvar_telemetria(forcar=True)
         return True
     if n == 'diagnosticoferramentas':
+        _r28_carregar_telemetria()
         registro = globals().get('_r25_uso_ferramentas', {})
         problemas = [(nome, item) for nome, item in registro.items() if item['erros']]
         if not problemas:
@@ -9500,10 +9506,13 @@ def _r26_priorizar(propostas):
 
 def _r26_relatorio():
     """r26: relatorio da fabrica de ideias — dados locais do usuario; zero magica."""
+    _r28_carregar_telemetria()
+    persiste = _r28_caminho_telemetria() is not None
     linhas = ['=================== FABRICA DE IDEIAS (r26) ====================',
-              'Analise deterministica dos SEUS dados (telemetria r25 + catalogo local).',
+              'Analise deterministica dos SEUS dados (telemetria + catalogo local).',
+              'Telemetria acumulada entre sessoes (arquivo local): ' + ('SIM' if persiste else 'NAO'),
               'O GGUF continua o mesmo. Nenhuma ideia vira ferramenta sem a sua',
-              'aprovacao e a auditoria anti-duplicata contra as 549 registradas.', '']
+              'aprovacao e a auditoria anti-duplicata contra as ferramentas registradas.', '']
     linhas.append('[1] ROBUSTEZ - ferramentas que falharam nesta sessao:')
     falhas = _r26_ideias_robustez()
     if falhas:
@@ -9528,20 +9537,53 @@ def _r26_relatorio():
     else:
         cfg = globals().get('config')
         rejeitadas = cfg.get('ideias_rejeitadas', []) if isinstance(cfg, dict) else []
+        favoritas_brutas = cfg.get('ideias_favoritas', []) if isinstance(cfg, dict) else []
+        favoritas = {_norm_pt(str(x)) for x in favoritas_brutas} if isinstance(favoritas_brutas, list) else set()
+        apresentadas = cfg.get('fabrica_apresentadas', []) if isinstance(cfg, dict) else []
         aceitas, cortadas = _r26_filtrar_rejeitadas(propostas, rejeitadas)
-        colidindo, escolhidas = 0, []
+        vocabulario_top = []
+        for nome_top, _ in top:
+            for p in _r26_palavras(nome_top):
+                if p not in vocabulario_top:
+                    vocabulario_top.append(p)
+        colidindo, escolhidas, guardadas = 0, [], []
         for proposta in _r26_priorizar(aceitas):
             if len(escolhidas) >= 8:
                 break
-            if _r26_sem_colisao(proposta['nome']):
-                escolhidas.append(proposta)
-            else:
+            if not _r26_sem_colisao(proposta['nome']):
                 colidindo += 1
+                continue
+            if proposta['nome'] in apresentadas:
+                guardadas.append(proposta)
+            else:
+                escolhidas.append(proposta)
+        while guardadas and len(escolhidas) < 8:
+            escolhidas.append(guardadas.pop(0))
+        escolhidas.sort(key=lambda p: _norm_pt(p['nome']) not in favoritas)
+        salvar = globals().get('salvar_json')
+        if isinstance(cfg, dict) and callable(salvar):
+            try:
+                novo_cfg = dict(cfg)
+                novos_nomes = [p['nome'] for p in escolhidas]
+                novo_cfg['fabrica_apresentadas'] = (apresentadas + [n for n in novos_nomes
+                                                    if n not in apresentadas])[-50:]
+                salvar(globals().get('ARQ_CONFIG'), novo_cfg)
+                globals()['config'] = novo_cfg
+            except Exception:
+                pass
         linhas.append('[3] PROPOSTAS DO CATALOGO (' + str(len(propostas))
-                      + ' restantes no arquivo, ordenadas pelo SEU uso):')
+                      + ' restantes no arquivo, ordenadas pelo SEU uso; repetidas so se faltarem novidades):')
         for i, proposta in enumerate(escolhidas, 1):
+            motivo = ', '.join([p for p in _r26_palavras(proposta['nome'] + ' ' + proposta['descricao'])
+                                if p in vocabulario_top][:3])
+            sufixo = ''
+            if _norm_pt(proposta['nome']) in favoritas:
+                sufixo += ' [voce marcou como BOA]'
+            if motivo:
+                sufixo += ' (porque voce usa: ' + motivo + ')'
             linhas.append('  ' + str(i) + '. [' + _r26_dobrar(proposta['tema']) + '] '
-                          + proposta['nome'] + ' - ' + _r26_dobrar(proposta['descricao'])[:110])
+                          + proposta['nome'] + ' - ' + _r26_dobrar(proposta['descricao'])[:110]
+                          + _r26_dobrar(sufixo))
         if not escolhidas:
             linhas.append('  (nenhuma passou na pre-checagem agora; use mais a IA e rode de novo)')
         filtros = []
@@ -9563,6 +9605,111 @@ def _r26_comandos(comando):
     """r26: fabrica de ideias — melhorias guiadas pelos dados reais de uso."""
     if _norm_pt(comando) == 'fabricadeideias':
         print(_r26_relatorio())
+        _r28_salvar_telemetria(forcar=True)
+        return True
+    return False
+
+
+def _r28_caminho_telemetria():
+    """r28: caminho do arquivo local de telemetria (somente com PASTA_BASE real).
+    Sem base (testes AST), retorna None: fica so em memoria, sem tocar disco."""
+    base = globals().get('PASTA_BASE')
+    if not base:
+        return None
+    import os
+    try:
+        return os.path.join(str(base), 'telemetria_ferramentas.json')
+    except Exception:
+        return None
+
+
+def _r28_carregar_telemetria():
+    """r28: carrega a telemetria salva (arquivo local) na primeira leitura da
+    sessao; acumula historico entre sessoes. Nada sai do PC; arquivo apagavel.
+    Se ja existe registro em memoria (ou em teste), nao sobrescreve."""
+    atual = globals().get('_r25_uso_ferramentas')
+    if atual is not None:
+        return atual
+    import json
+    caminho = _r28_caminho_telemetria()
+    registro = {}
+    if caminho:
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+            bruto = dados.get('ferramentas', {}) if isinstance(dados, dict) else {}
+            for nome, item in list(bruto.items())[:800]:
+                if isinstance(item, dict) and 'usos' in item:
+                    registro[str(nome)[:80]] = {
+                        'usos': int(item.get('usos', 0)),
+                        'erros': int(item.get('erros', 0)),
+                        'tempo_s': float(item.get('tempo_s', 0.0)),
+                        'ultimo_erro': str(item.get('ultimo_erro', ''))[:120],
+                        'ultima_duracao_s': float(item.get('ultima_duracao_s', 0.0))}
+        except Exception:
+            registro = {}
+    globals()['_r25_uso_ferramentas'] = registro
+    return registro
+
+
+def _r28_salvar_telemetria(forcar=False):
+    """r28: grava a telemetria local (throttle de 60s; forcar=True grava agora).
+    Falha de disco NUNCA atrapalha a ferramenta que estava rodando."""
+    import time
+    caminho = _r28_caminho_telemetria()
+    if not caminho:
+        return False
+    agora = time.monotonic()
+    ultimo = globals().get('_r28_ultimo_save', 0.0)
+    if not forcar and (agora - ultimo) < 60.0:
+        return False
+    try:
+        import json
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump({'versao': 1, 'ferramentas': globals().get('_r25_uso_ferramentas', {})},
+                      f, ensure_ascii=False)
+        globals()['_r28_ultimo_save'] = agora
+        return True
+    except Exception:
+        return False
+
+
+def _r28_comandos(comando):
+    """r28: fabrica profissional — nota de ideia boa e reinicio de telemetria."""
+    n = _norm_pt(comando)
+    if n == 'zerartelemetria':
+        if input('Digite LIMPAR para zerar a telemetria de ferramentas: ').strip() != 'LIMPAR':
+            print('Cancelado; nada foi apagado.')
+            return True
+        globals()['_r25_uso_ferramentas'] = {}
+        globals()['_r28_ultimo_save'] = 0.0
+        _r28_salvar_telemetria(forcar=True)
+        print('Telemetria zerada (historico local de uso/erros). A fabrica comeca do zero.')
+        return True
+    cabeca, sep, corpo = comando.partition(':')
+    if sep and _norm_pt(cabeca) == 'ideiaboa':
+        nome = corpo.strip()[:80]
+        if not nome:
+            print('Informe o nome da ideia/ferramenta. Ex.: ideia boa: medidor_de_x')
+            return True
+        cfg = globals().get('config')
+        if not isinstance(cfg, dict):
+            cfg = {}
+        lista_bruta = cfg.get('ideias_favoritas', [])
+        lista = [str(x) for x in lista_bruta] if isinstance(lista_bruta, list) else []
+        if nome not in lista:
+            lista.append(nome)
+        novo = dict(cfg)
+        novo['ideias_favoritas'] = lista[-100:]
+        salvar = globals().get('salvar_json')
+        if callable(salvar):
+            try:
+                salvar(globals().get('ARQ_CONFIG'), novo)
+                globals()['config'] = novo
+            except Exception:
+                pass
+        print('Anotado: "' + nome + '" marcado como IDEIA BOA (dados locais). '
+              'A fabrica vai priorizar ideias desse tipo.')
         return True
     return False
 
@@ -11604,6 +11751,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r26_comandos(comando):
+        return True
+
+    if _r28_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -28460,7 +28610,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r27] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r28] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
