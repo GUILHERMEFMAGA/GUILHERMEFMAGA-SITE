@@ -7703,6 +7703,7 @@ def _menu_ajuda_local():
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
+    print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
     print("IDEIAS REJEITADAS: ideia rejeitada: <titulo> | ideias rejeitadas | limpar ideias rejeitadas")
@@ -9388,6 +9389,179 @@ def _r25_comandos(comando):
         print('[' + nome_real + ']')
         print(descricao[:1200] or '(sem descricao)')
         print("\nPara executar: usar " + nome_real + ' com {"parametro": "valor"}')
+        return True
+    return False
+
+
+def _r26_palavras(texto, minimo=4):
+    """r26: palavras significativas normalizadas (analise deterministica)."""
+    paradas = {'para', 'como', 'com', 'que', 'dos', 'das', 'uma', 'sem', 'por',
+               'mais', 'todo', 'toda', 'sobre', 'entre', 'pelo', 'pela', 'ate',
+               'isso', 'aqui', 'onde', 'qual', 'quais', 'voce', 'seu', 'sua',
+               'sendo', 'pode', 'caso', 'tipo', 'quando', 'modo', 'forma'}
+    saida = []
+    for pedaco in str(texto or '').replace('_', ' ').replace('-', ' ').replace('/', ' ').split():
+        p = _norm_pt(pedaco)
+        if len(p) >= minimo and p not in paradas and p not in saida:
+            saida.append(p)
+    return saida
+
+
+def _r26_dobrar(texto):
+    """r26: tira acentos so na hora de imprimir (console do Windows agradece)."""
+    import unicodedata
+    return unicodedata.normalize('NFKD', str(texto or '')).encode('ascii', 'ignore').decode('ascii')
+
+
+def _r26_propostas_catalogo(caminho=None):
+    """r26: le as propostas ainda nao implementadas do catalogo local
+    (docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md ao lado do agente.py).
+    Retorna (lista, caminho); lista vazia e caminho None se nao achar o arquivo."""
+    import os
+    import re as _re26
+    if not caminho:
+        base = globals().get('__file__') or ''
+        if not base:
+            return [], None
+        caminho = os.path.join(os.path.dirname(os.path.abspath(base)), 'docs',
+                               'CATALOGO_PROPOSTAS_FERRAMENTAS.md')
+    if not os.path.exists(caminho):
+        return [], None
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            linhas = f.readlines()
+    except Exception:
+        return [], None
+    tema, propostas = '', []
+    for linha in linhas:
+        t = linha.strip()
+        if t.startswith('## '):
+            tema = t[3:].strip()
+            continue
+        m = _re26.match(r'^(\d+)\.\s+Proposta\s+`([a-z0-9_]+)`\s+[—-]\s+(.+)$', t)
+        if m:
+            propostas.append({'numero': int(m.group(1)), 'tema': tema,
+                              'nome': m.group(2), 'descricao': m.group(3).strip()})
+    return propostas, caminho
+
+
+def _r26_filtrar_rejeitadas(propostas, rejeitadas=None):
+    """r26: nao reapresenta ideia que o usuario ja vetou (filtro de dados; nao treina nada)."""
+    if not isinstance(rejeitadas, list):
+        rejeitadas = []
+    vetados = [v for v in (_norm_pt(str(x)) for x in rejeitadas) if len(v) >= 8]
+    aceitas, cortadas = [], 0
+    for proposta in propostas:
+        alvo = _norm_pt(proposta['nome'] + ' ' + proposta['descricao'])
+        if any(v in alvo or _norm_pt(proposta['nome']) in v for v in vetados):
+            cortadas += 1
+            continue
+        aceitas.append(proposta)
+    return aceitas, cortadas
+
+
+def _r26_sem_colisao(nome):
+    """r26: pre-checagem contra as ferramentas registradas (nome igual ou parecido)."""
+    import difflib
+    ferramentas = globals().get('tools') or []
+    nomes = [str(getattr(t, 'name', '') or '') for t in ferramentas]
+    if not nomes:
+        return True
+    if _norm_pt(nome) in (_norm_pt(x) for x in nomes):
+        return False
+    return not difflib.get_close_matches(str(nome), nomes, n=1, cutoff=0.78)
+
+
+def _r26_ideias_robustez():
+    """r26: ferramentas que falharam nesta sessao (piores primeiro; dados da telemetria r25)."""
+    registro = globals().get('_r25_uso_ferramentas', {}) or {}
+    falhas = [(nome, item) for nome, item in registro.items() if item.get('erros')]
+    falhas.sort(key=lambda par: (-par[1]['erros'], -par[1]['usos'], par[0]))
+    return falhas
+
+
+def _r26_priorizar(propostas):
+    """r26: ordena propostas cruzando com o que o usuario MAIS usa (dados r25); empate = ordem do catalogo."""
+    registro = globals().get('_r25_uso_ferramentas', {}) or {}
+    top = sorted(registro.items(), key=lambda par: (-par[1]['usos'], par[0]))[:10]
+    vocabulario = []
+    for nome, _ in top:
+        for p in _r26_palavras(nome):
+            if p not in vocabulario:
+                vocabulario.append(p)
+    if not vocabulario:
+        return sorted(propostas, key=lambda p: p['numero'])
+    def pontuar(proposta):
+        alvo = set(_r26_palavras(proposta['nome'] + ' ' + proposta['descricao']))
+        return -len(alvo.intersection(vocabulario))
+    return sorted(propostas, key=lambda p: (pontuar(p), p['numero']))
+
+
+def _r26_relatorio():
+    """r26: relatorio da fabrica de ideias — dados locais do usuario; zero magica."""
+    linhas = ['=================== FABRICA DE IDEIAS (r26) ====================',
+              'Analise deterministica dos SEUS dados (telemetria r25 + catalogo local).',
+              'O GGUF continua o mesmo. Nenhuma ideia vira ferramenta sem a sua',
+              'aprovacao e a auditoria anti-duplicata contra as 549 registradas.', '']
+    linhas.append('[1] ROBUSTEZ - ferramentas que falharam nesta sessao:')
+    falhas = _r26_ideias_robustez()
+    if falhas:
+        for nome, item in falhas[:8]:
+            linhas.append('  - ' + nome + ': ' + str(item['erros']) + ' erro(s) em '
+                          + str(item['usos']) + ' uso(s) (ultimo: ' + str(item['ultimo_erro'])
+                          + ') -> ideia: blindar entradas e melhorar a mensagem de erro')
+    else:
+        linhas.append('  (nenhuma falha registrada; a telemetria vale por sessao)')
+    linhas.append('')
+    registro = globals().get('_r25_uso_ferramentas', {}) or {}
+    top = sorted(registro.items(), key=lambda par: (-par[1]['usos'], par[0]))[:5]
+    linhas.append('[2] SEU USO (top da sessao): '
+                  + (', '.join(nome for nome, _ in top) or '(ainda sem uso nesta sessao)'))
+    linhas.append('    As propostas da secao 3 ganham prioridade pelos temas dessas ferramentas.')
+    linhas.append('')
+    propostas, caminho = _r26_propostas_catalogo()
+    if not propostas:
+        linhas.append('[3] PROPOSTAS DO CATALOGO: arquivo nao encontrado neste PC'
+                      + (' (procurei: ' + caminho + ')' if caminho else ''))
+        linhas.append('    Sem o arquivo, a fabrica roda so com os seus dados de uso (secoes 1 e 2).')
+    else:
+        cfg = globals().get('config')
+        rejeitadas = cfg.get('ideias_rejeitadas', []) if isinstance(cfg, dict) else []
+        aceitas, cortadas = _r26_filtrar_rejeitadas(propostas, rejeitadas)
+        colidindo, escolhidas = 0, []
+        for proposta in _r26_priorizar(aceitas):
+            if len(escolhidas) >= 8:
+                break
+            if _r26_sem_colisao(proposta['nome']):
+                escolhidas.append(proposta)
+            else:
+                colidindo += 1
+        linhas.append('[3] PROPOSTAS DO CATALOGO (' + str(len(propostas))
+                      + ' restantes no arquivo, ordenadas pelo SEU uso):')
+        for i, proposta in enumerate(escolhidas, 1):
+            linhas.append('  ' + str(i) + '. [' + _r26_dobrar(proposta['tema']) + '] '
+                          + proposta['nome'] + ' - ' + _r26_dobrar(proposta['descricao'])[:110])
+        if not escolhidas:
+            linhas.append('  (nenhuma passou na pre-checagem agora; use mais a IA e rode de novo)')
+        filtros = []
+        if cortadas:
+            filtros.append(str(cortadas) + ' descartada(s) por voce ter vetado ideia parecida')
+        if colidindo:
+            filtros.append(str(colidindo) + ' com possivel colisao de nome (exigem analise manual)')
+        if filtros:
+            linhas.append('    Filtros aplicados: ' + '; '.join(filtros) + '.')
+    linhas.append('')
+    linhas.append('[4] COMO USAR: escolha uma ideia e peca a implementacao no chat do Agent Mode')
+    linhas.append('    (toda entrega passa pela auditoria das 549 + testes antes de publicar).')
+    linhas.append("    Suas proprias ideias: 'guardar ideia' salva | 'ideia rejeitada: <titulo>' veta")
+    linhas.append("    | 'ideias rejeitadas' lista | 'fabrica de ideias' reprocessa com dados novos.")
+    return '\n'.join(linhas)
+
+
+def _r26_comandos(comando):
+    """r26: fabrica de ideias — melhorias guiadas pelos dados reais de uso."""
+    if _norm_pt(comando) == 'fabricadeideias':
+        print(_r26_relatorio())
         return True
     return False
 
@@ -11426,6 +11600,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r25_comandos(comando):
+        return True
+
+    if _r26_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -27192,7 +27369,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-10-r25] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r26] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

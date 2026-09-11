@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25 **238 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26 **253 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -180,7 +180,19 @@ ou relatórios reais sem revisão e autorização.
   (ranking de uso da sessão) e **`diagnostico ferramentas`** (erros com tipo, sem repetir
   chamada). Correção de processo: o corte por ':' do roteador quebrava JSON com ':' — o
   `usar` passou a ser detectado antes, no texto cru. Loader de testes extrai `_r25_`.
-  Selo `-r25`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
+  Selo `-r25`. Não testado no Windows real.
+- **r26 (fábrica de ideias — melhoria guiada por dados reais):** comando **`fabrica de ideias`**
+  (interno, não registra ferramenta; contagem 549 mantida). `_r26_propostas_catalogo` lê sozinho
+  o `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md` ao lado do agente (itens "Proposta `nome` — descrição"
+  por tema `## G`; arquivo ausente degrada com honestidade para modo só-telemetria). O relatório
+  cruza: **[1] robustez** (ferramentas com erro na telemetria r25, piores primeiro → ideia de
+  blindagem), **[2] top de uso** da sessão, **[3] propostas do catálogo** priorizadas pelo
+  vocabulário do que o usuário MAIS usa (`_r26_priorizar`), filtradas pelas ideias rejeitadas
+  (r23; `_r26_filtrar_rejeitadas`, substring normalizada ≥8) e pré-checadas contra colisão de
+  nome (difflib corte 0.78; `_r26_sem_colisao`), **[4] como usar**. SÓ SUGERE — implementação
+  continua exigindo auditoria AST + autorização. Saída sem acento (`_r26_dobrar`) para o console
+  do Windows. Item 163 do catálogo marcado como entregue na r25 (comandos internos). Loader de
+  testes extrai `_r26_`. Selo `-r26`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar

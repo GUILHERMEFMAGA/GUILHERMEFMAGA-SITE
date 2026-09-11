@@ -11,7 +11,12 @@ ajustadas ou descartadas nessa hora. Nada é implementado sem a autorização do
 161, 162, 165, 166, 172–177 e 201–203** viraram ferramentas reais (49 no total, incluindo as
 4 capacidades internas). Nomes ajustados na implementação quando o escopo pediu (ex.: 37 virou
 `onda_periodo_frequencia_calcular`, 166 virou `fluxo_sugerido_tarefa`). **Restam 151 propostas**
-para fechar 700. O item 163 (estatísticas de uso da IA) segue pendente.
+para fechar 700. O item 163 foi entregue na r25 como comandos internos (fora da contagem de ferramentas).
+
+**Status r26:** o comando `fabrica de ideias` (agente.py) lê este arquivo sozinho e cruza as
+propostas com a telemetria de uso (r25), o filtro de ideias rejeitadas (r23) e uma
+pré-checagem de colisão contra as 549 registradas — apenas para SUGERIR; implementar
+continua exigindo auditoria AST e a autorização do usuário.
 
 ## G1. Matemática e estatística
 1. ✅ `estatisticas_descritivas` — média/mediana/moda/desvio/variância/quartis de lista direta (viz: estatisticas_csv = coluna de arquivo).
@@ -200,7 +205,7 @@ para fechar 700. O item 163 (estatísticas de uso da IA) segue pendente.
 ## G13. Meta — IA LOCAL e inventário
 161. Proposta `resumo_ferramentas_por_tema` — contagem por grupos (navegar 500+).
 162. Proposta `achar_ferramenta_para_tarefa` — busca lexical sobre nome+docstring (índice interno, offline).
-163. Proposta `estatisticas_ia_local` — agrega gerações/latências/erros locais (observabilidade r20/r21).
+163. ✅ **Entregue na r25 como comandos internos** (`estatisticas ferramentas`, `diagnostico ferramentas`, `velocidade ia local`) — observabilidade r20/r21; fora da contagem de ferramentas registradas.
 164. Proposta `exportar_inventario_ferramentas_txt` — nome+docstring para revisão humana (sem segredos).
 165. Proposta `comparar_ferramentas_similares` — quando usar A vs B (pares de maior sobreposição).
 166. Proposta `fluxo_sugerido_tarefa` — roteiro determinístico com ferramentas existentes (ex.: "limpar disco").
