@@ -134,7 +134,14 @@ ou relatórios reais sem revisão e autorização.
   sílabas PT, César, Morse, feriados BR com Páscoa por Meeus, decodificar JWT). Selo de
   abertura atualizado para `-r22` (confirmação visual no PC). Todas
   determinísticas, sem rede/IA. **Validado no PC real pelo usuário** (selo `-r22` na abertura
-  e contador dinâmico exibindo 500 ferramentas). **180 propostas de ferramentas + o lote 1 estão no catálogo
+  e contador dinâmico exibindo 500 ferramentas).
+- r22 hotfix (relato do PC real): "vc tem 500 ferramentas?" não casava com os gatilhos
+  determinísticos e caía no GGUF bruto (resposta confusa), e o detector de listas tratava a
+  menção "500 ferramentas" como pedido de lista (falso "[Aviso de completude]"). Corrigido:
+  helper `_pedido_contagem_ferramentas` rotas a pergunta de contagem para `estatisticas_poder`
+  (resposta com contagem real, sem geração do modelo) e guarda em `_quantidade_lista_local`
+  que só zera a quantidade em perguntas de existência/contagem (pedidos implícitos r12 como
+  "mais de 40 funções" preservados — a suíte pegou a primeira tentativa larga e ela foi afinada). **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar

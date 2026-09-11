@@ -180,5 +180,33 @@ class TextoDatas(unittest.TestCase):
             self.env['decodificar_jwt_token']('so-uma-parte')
 
 
+class ContagemFerramentasHotfix(unittest.TestCase):
+    """r22 hotfix: 'vc tem 500 ferramentas?' era parar no GGUF bruto e o detector
+    de listas tratava a mencao como pedido de lista (falso aviso de completude)."""
+
+    def setUp(self):
+        self.env = carregar('_pedido_contagem_ferramentas', '_quantidade_lista_local')
+
+    def test_perguntas_de_contagem_detectadas(self):
+        f = self.env['_pedido_contagem_ferramentas']
+        self.assertTrue(f('vc tem 500 ferramentas?'))
+        self.assertTrue(f('Voce possui 480 funcoes?'))
+        self.assertTrue(f('esse agente tem 500 ferramentas'))
+        self.assertFalse(f('quantas ferramentas voce tem?'))
+        self.assertFalse(f('me de 50 ideias'))
+        self.assertFalse(f('tenho 3 gatos e 2 cachorros'))
+
+    def test_mencao_sem_verbo_de_lista_nao_e_pedido_de_lista(self):
+        q = self.env['_quantidade_lista_local']
+        self.assertEqual(q('vc tem 500 ferramentas?'), 0)
+        self.assertEqual(q('esse agente tem 500 ferramentas'), 0)
+        # mencao pura preserva o comportamento anterior ao hotfix (r12)
+        self.assertEqual(q('500 ferramentas'), 500)
+        self.assertEqual(q('me de 50 ideias'), 50)
+        self.assertEqual(q('liste 30 dicas'), 30)
+        self.assertEqual(q('quero 10 exemplos'), 10)
+        self.assertEqual(q('me mostra uma lista de 100 ferramentas'), 100)
+
+
 if __name__ == '__main__':
     unittest.main()

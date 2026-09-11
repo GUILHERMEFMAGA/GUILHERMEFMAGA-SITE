@@ -8100,7 +8100,7 @@ def _processar_cerebro_local(comando: str) -> bool:
         _alvo_p = _alvo_p.strip(" :,")
         _rel(_invocar_local("central_programas_janelas", acao="fechar", valor=_alvo_p)); return True
     if any(p in cmd for p in ("contar ferramentas", "quantas funcoes", "quantas ferramentas", "seu poder", "mostra teu poder",
-                              "o que voce sabe fazer", "quais ferramentas voce tem", "lista de funcoes")):
+                              "o que voce sabe fazer", "quais ferramentas voce tem", "lista de funcoes")) or _pedido_contagem_ferramentas(cmd):
         try:
             _rel(estatisticas_poder.invoke({}))
         except Exception:
@@ -11020,6 +11020,16 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
         lock.release()
 
 
+def _pedido_contagem_ferramentas(texto: str) -> bool:
+    """r22: pergunta sobre a QUANTIDADE de ferramentas/funcoes (ex.: 'vc tem 500
+    ferramentas?'). Deve receber resposta deterministica com a contagem real,
+    sem geracao do modelo. Nao captura pedidos de lista ('me de 50 ideias')."""
+    import re
+    t = (texto or "").lower()
+    return bool(re.search(r"\b(?:vc|voce|o agente)\s+(?:tem|possui|tens)\s+\d{1,4}\s+(?:ferramentas|funcoes|ferramenats)\b", t)
+                or re.search(r"\btem\s+\d{1,4}\s+(?:ferramentas|funcoes)\b", t))
+
+
 def _quantidade_lista_local(pergunta: str) -> int:
     """Reconhece quantidades explicitas, sem confundir numeros de arquivos/IPs."""
     import re
@@ -11030,6 +11040,11 @@ def _quantidade_lista_local(pergunta: str) -> int:
     if not achado:
         lista = re.search(r"\blista\s+(?:de\s+|com\s+)?(\d{1,4})\b", texto)
         return int(lista.group(1)) if lista else 0
+    # Pergunta de existencia/contagem (r22): 'vc tem 500 ferramentas?' e pergunta,
+    # nao pedido de lista. Pedidos implicitos ('mais de 40 funcoes') permanecem.
+    _antes = texto[:achado.start()].strip()
+    if re.search(r"\b(vc|voce|o agente|isso)?\s*(tem|possui|tens|sao)\s*$", _antes) and _antes:
+        return 0
     quantidade = int(achado.group(1))
     return quantidade + 1 if re.search(r'mais de\s*$', texto[:achado.start()]) else quantidade
 
@@ -11361,9 +11376,9 @@ def processar_atalho_rapido(comando: str) -> bool:
              or "sonha" in _cl or "que voce acha" in _cl or "sua opiniao" in _cl
              or "opniao" in _cl or "opini" in _cl)
             and ("ferrament" in _cl or "fun" in _cl or "poder" in _cl or "voce" in _cl or "vc" in _cl)
-        ) or ("quantas ferramentas" in _cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
+        ) or ("quantas ferramentas" in _cl) or _pedido_contagem_ferramentas(_cl) or ("seu poder" in _cl or "teu poder" in _cl or "mostra seu poder" in _cl)
         if _eh_pergunta_do_agente:
-            _pediu_poder = ("quantas" in _cl or "poder" in _cl) and ("melhor" not in _cl and "deixa" not in _cl and "pc" not in _cl)
+            _pediu_poder = (("quantas" in _cl or "poder" in _cl or _pedido_contagem_ferramentas(_cl)) and ("melhor" not in _cl and "deixa" not in _cl and "pc" not in _cl))
             _pediu_ideias = ("gostaria" in _cl or "quer ter" in _cl or "sonha" in _cl or "colocar" in _cl
                              or "opini" in _cl or "opniao" in _cl or "que voce acha" in _cl or "ideia" in _cl)
             _r = (estatisticas_poder.invoke({}) if _pediu_poder and not _pediu_ideias else (
