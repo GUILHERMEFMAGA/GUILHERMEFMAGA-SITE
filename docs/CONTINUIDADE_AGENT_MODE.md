@@ -1,7 +1,9 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 10/09/2026. Este documento descreve a **r20**, posterior à base r19 (494482a).
-Consulte `git log` e o PR #3 para o hash mais recente.
+Atualizado em 10/09/2026. Este documento descreve a **r21** (confiabilidade das respostas
+locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
+continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
+que permanece aberto e intacto).
 Ele não substitui a inspeção do código, do histórico Git e dos comentários posteriores.
 
 ## Onde continuar
@@ -9,7 +11,12 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 - Repositório: https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE
 - PR ativo **#3**: https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/pull/3
 - Título: **Super Agente PC: atualização completa — substitui o PR #2**.
-- Branch desta sessão: `arena/01a082fd-guilhermefmaga-site`, base `main`.
+- Branch da entrega r21: `arena/01a08d8e-guilhermefmaga-site`, base `main` — PR de
+  continuação do PR #3 (título "Super Agente PC r21: confiabilidade das respostas locais").
+- A branch autorizada MUDA a cada sessão Arena: confira `git branch --show-current` e o PR
+  mais recente. Se o git da sessão estiver na base antiga (67079ef) com a árvore suja apenas
+  pelo conteúdo idêntico da entrega, confira os hashes (`git hash-object`) e refaça o
+  fast-forward (`git stash push -u && git merge --ff-only <ponta> && git stash drop`).
 - PR #2 é o anterior: não fechar, não retomar como destino das alterações.
 - Não fazer merge na main, force push ou trocar de branch sem uma decisão explícita
   compatível com as regras do ambiente. Nesta sessão Arena a branch é fixa.
@@ -44,7 +51,8 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 
 ## Arquivos que devem ser inspecionados em Files changed / View all changes
 
-- `agente.py`: implementação principal; 479 ferramentas registradas na r20.
+- `agente.py`: implementação principal; 480 ferramentas registradas na r21 (as 479 da r20
+  preservadas em nomes, ordem e assinaturas; nova: `parar_geracao_local`).
   Contém motor local, provedores, histórico, roteamento, ferramentas, painel e
   autoedição. **Não importar o monólito para testes:** há efeitos no topo.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch do
@@ -74,6 +82,8 @@ ou relatórios reais sem revisão e autorização.
 | `oficina local` | Menu das 14 análises offline adicionadas na r18. |
 | `avaliar precisao local` | Exige AVALIAR; quatro gerações brutas locais, sem ferramentas. |
 | `ver ultima avaliacao local` | Exibe o relatório já salvo, sem reescrevê-lo. |
+| `parar geracao local` | Cancela a geração local em andamento no cliente; servidor pode seguir computando. Ferramenta `parar_geracao_local` (480ª). |
+| `refazer com penalidade` | Refaz 1x a geração marcada com colapso de repetição, com repeat_penalty maior; só existe após o aviso transparente. |
 
 ## Estado entregue e comprovado
 
@@ -88,8 +98,16 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19 foram 121 testes; na r20 **150 testes isolados passaram**; 479 ferramentas antigas preservadas.
+- Na r19 foram 121 testes; na r20, 150; na r21 **175 testes isolados passaram**; as 479
+  ferramentas antigas preservadas (nomes/ordem/assinaturas conferidas por AST). Matriz e limites
+  da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
+- r21 (confiabilidade das respostas locais): sugestão de comando com erro de digitação
+  (difflib + confirmação "sim", só no modo local), detecção de colapso de repetição com aviso
+  transparente (texto bruto preservado), `refazer com penalidade` confirmado (1x, +0,15),
+  cancelamento `parar geracao local` (estado `cancelada`; servidor pode continuar brevemente)
+  e `response_format` JSON no modo ideias com fallback controlado em rejeição 4xx. Não houve
+  teste com GGUF/Windows reais nesta etapa.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
@@ -117,7 +135,8 @@ antes de declarar qualquer problema resolvido universalmente.
 **31–70 não foram implementadas neste lote.** A próxima seleção depende do usuário.
 
 A meta anterior de 100 ideias e 700 ferramentas também não foi concluída: r18
-entregou 14 capacidades da expansão; total 479, faltando 221 para 700. Não inflar
+entregou 14 capacidades da expansão; total 480 na r21 (ferramenta `parar_geracao_local`),
+faltando 220 para 700. Não inflar
 contagem com helpers, aliases ou variantes repetitivas. Melhorias internas não
 precisam virar ferramentas novas. Código/projetos têm prioridade, com distribuição
 para documentos/dados. Alterações confirmadas foram autorizadas, não autonomia irrestrita.
@@ -161,7 +180,10 @@ para documentos/dados. Alterações confirmadas foram autorizadas, não autonomi
 > Python; não foi treinada do zero. Preserve meu modelo e priorize correção.
 > IA nuvem é o rodízio de provedores/cotas disponíveis, especialmente Groq e
 > GitHub Models; preserve-o sem ativação silenciosa ou substituição por API paga.
-> Na r20 existem 479 ferramentas e 150 testes isolados aprovados. Confirme
+> Na r21 existem 480 ferramentas e 175 testes isolados aprovados; a r21 acrescentou
+> confiabilidade às respostas locais (sugestão de comando com typo, aviso de colapso com
+> "refazer com penalidade", "parar geracao local" e JSON garantido quando a build suporta;
+> veja docs/CONFIABILIDADE_RESPOSTAS_R21.md). Confirme
 > se houve versões posteriores e leia docs/MELHORIAS_1_30_R20.md. A proteção r19 responde alguns comandos e
 > conceitos sem o modelo; a avaliação do GGUF permanece bruta e pode errar.
 > Selecionei as melhorias 1–30, implementadas com limites na r20. As propostas

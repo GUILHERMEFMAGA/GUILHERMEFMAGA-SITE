@@ -7637,6 +7637,7 @@ def _menu_ajuda_local():
     print("FEEDBACK: corrija sua resposta: <correcao> | minhas correcoes | apagar correcoes da conversa")
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
+    print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("MENU AVANCADO: menu avancado — analises de imports/dependencias de projetos")
     print("HISTORICO DE IDEIAS: ideias ja sugeridas | limpar historico de ideias")
     print("IDEIAS COM REFERENCIAS: ideias para o agente | me de 3 ideias para melhorar seu codigo")
@@ -8725,7 +8726,7 @@ def _r20_opcoes():
 def _r20_estado(estado=None, motivo=''):
     import time
     if estado is not None:
-        if estado not in ('parado', 'iniciando', 'pronto', 'ocupado', 'falhou'):
+        if estado not in ('parado', 'iniciando', 'pronto', 'ocupado', 'falhou', 'cancelada'):
             raise ValueError('Estado local invalido.')
         globals()['_estado_motor_local'] = {'estado':estado, 'motivo':motivo[:200], 'desde':time.monotonic()}
     return dict(globals().get('_estado_motor_local', {'estado':'parado', 'motivo':'ainda nao verificado'}))
@@ -8915,13 +8916,24 @@ def _r20_cobertura_consulta(pergunta, achados):
     return len(consulta & evidencias) / max(1, len(consulta))
 
 
-def _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream=False, callback=None, seed=None):
-    """HTTP limitado, opcao SSE, metadados preservados. Nunca repete geracao em falha."""
+def _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream=False, callback=None,
+                    seed=None, repeat_penalty=None, formato_json=False, id_geracao=None):
+    """HTTP limitado, opcao SSE, metadados preservados. Nunca repete geracao concluida;
+    unica excecao (r21): pedido com response_format rejeitado em 4xx nao chegou a
+    concluir geracao e e reenviado UMA vez sem o campo, com registro no meta."""
     import json
     import time
+    import urllib.error
     import urllib.request
+    usar_formato_json = bool(formato_json) and globals().get('_r21_suporte_json', True)
     corpo = {'model':'local', 'messages':msgs, 'temperature':temperatura, 'max_tokens':max_tokens,
-             'stream':stream, 'top_p':0.9, 'repeat_penalty':1.05, 'cache_prompt':True}
+             'stream':stream, 'top_p':0.9,
+             'repeat_penalty':1.05 if repeat_penalty is None else max(1.0, min(2.0, float(repeat_penalty))),
+             'cache_prompt':True}
+    if usar_formato_json:
+        corpo['response_format'] = {'type': 'json_object'}
+    if id_geracao is not None and globals().get('_r21_cancelar_id') == id_geracao:
+        raise RuntimeError('Geracao cancelada a pedido; nada foi enviado.')
     if seed is not None:
         corpo['seed'] = seed
     if stream:
@@ -8929,53 +8941,71 @@ def _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream=Fals
     req = urllib.request.Request(_url_ia_local + '/v1/chat/completions', data=json.dumps(corpo).encode(),
                                  headers={'Content-Type':'application/json', 'User-Agent':'SuperAgentePC'})
     inicio = time.monotonic(); meta = {'finish_reason':None, 'usage':{}, 'timings':{}, 'stream':stream}
-    with urllib.request.urlopen(req, timeout=timeout_segundos) as resposta:
-        if not stream:
-            bruto = resposta.read(2_000_001)
-            if len(bruto) > 2_000_000:
-                raise ValueError('Resposta excessiva.')
-            dados = json.loads(bruto)
-            escolha = dados['choices'][0]
-            texto = escolha['message'].get('content') or ''
-            if not isinstance(texto, str):
-                raise ValueError('Conteudo de resposta invalido.')
-            meta['finish_reason'] = escolha.get('finish_reason')
-            meta['usage'] = dados.get('usage') or {}
-            meta['timings'] = dados.get('timings') or {}
-        else:
-            partes, tamanho, concluido = [], 0, False
-            while True:
-                if time.monotonic() - inicio > timeout_segundos:
-                    raise TimeoutError('Prazo do stream excedido.')
-                linha = resposta.readline(65537)
-                if not linha:
-                    break
-                tamanho += len(linha)
-                if len(linha) > 65536 or tamanho > 2_000_000:
-                    raise ValueError('Stream excessivo.')
-                if not linha.startswith(b'data:'):
-                    continue
-                carga = linha[5:].strip()
-                if carga == b'[DONE]':
-                    concluido = True; break
-                dados = json.loads(carga)
-                if dados.get('usage'):
-                    meta['usage'] = dados['usage']
-                if dados.get('timings'):
-                    meta['timings'] = dados['timings']
-                for escolha in dados.get('choices', []):
-                    trecho = escolha.get('delta', {}).get('content') or ''
-                    if not isinstance(trecho, str):
-                        raise ValueError('Delta invalido.')
-                    if trecho:
-                        partes.append(trecho)
-                        if callback is not None:
-                            callback(trecho)
-                    if escolha.get('finish_reason') is not None:
-                        meta['finish_reason'] = escolha['finish_reason']
-            if not concluido:
-                raise ValueError('Stream incompleto; nao sera repetido automaticamente.')
-            texto = ''.join(partes)
+    if usar_formato_json:
+        meta['formato_json'] = 'response_format solicitado; garantia depende da build do servidor'
+    try:
+        with urllib.request.urlopen(req, timeout=timeout_segundos) as resposta:
+            globals()['_r21_ativa'] = resposta
+            if not stream:
+                bruto = resposta.read(2_000_001)
+                if len(bruto) > 2_000_000:
+                    raise ValueError('Resposta excessiva.')
+                dados = json.loads(bruto)
+                escolha = dados['choices'][0]
+                texto = escolha['message'].get('content') or ''
+                if not isinstance(texto, str):
+                    raise ValueError('Conteudo de resposta invalido.')
+                meta['finish_reason'] = escolha.get('finish_reason')
+                meta['usage'] = dados.get('usage') or {}
+                meta['timings'] = dados.get('timings') or {}
+            else:
+                partes, tamanho, concluido = [], 0, False
+                while True:
+                    if id_geracao is not None and globals().get('_r21_cancelar_id') == id_geracao:
+                        raise RuntimeError('Geracao cancelada a pedido.')
+                    if time.monotonic() - inicio > timeout_segundos:
+                        raise TimeoutError('Prazo do stream excedido.')
+                    linha = resposta.readline(65537)
+                    if not linha:
+                        break
+                    tamanho += len(linha)
+                    if len(linha) > 65536 or tamanho > 2_000_000:
+                        raise ValueError('Stream excessivo.')
+                    if not linha.startswith(b'data:'):
+                        continue
+                    carga = linha[5:].strip()
+                    if carga == b'[DONE]':
+                        concluido = True; break
+                    dados = json.loads(carga)
+                    if dados.get('usage'):
+                        meta['usage'] = dados['usage']
+                    if dados.get('timings'):
+                        meta['timings'] = dados['timings']
+                    for escolha in dados.get('choices', []):
+                        trecho = escolha.get('delta', {}).get('content') or ''
+                        if not isinstance(trecho, str):
+                            raise ValueError('Delta invalido.')
+                        if trecho:
+                            partes.append(trecho)
+                            if callback is not None:
+                                callback(trecho)
+                        if escolha.get('finish_reason') is not None:
+                            meta['finish_reason'] = escolha['finish_reason']
+                if not concluido:
+                    raise ValueError('Stream incompleto; nao sera repetido automaticamente.')
+                texto = ''.join(partes)
+        globals()['_r21_ativa'] = None
+    except urllib.error.HTTPError as erro:
+        globals()['_r21_ativa'] = None
+        if not usar_formato_json or getattr(erro, 'code', 0) not in (400, 404, 422):
+            raise
+        # Rejeicao de protocolo (nenhuma geracao concluida): 1 reenvio sem o campo,
+        # com cache do suporte para nao repetir nas proximas chamadas.
+        globals()['_r21_suporte_json'] = False
+        texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos,
+                                      stream, callback, seed, repeat_penalty, False, id_geracao)
+        meta['formato_json'] = 'response_format rejeitado por esta build; reenviado 1x sem o campo'
+        return texto, meta
     meta['segundos'] = round(time.monotonic() - inicio, 3)
     return texto.strip(), meta
 
@@ -9184,6 +9214,136 @@ def _r20_julgar(dados):
         raise ValueError('Caso/variante nao encontrado.')
     finally:
         lock.release()
+
+
+def _r21_comandos_conhecidos():
+    """Fonte unica r21 de comandos com sugestao por erro de digitacao."""
+    return tuple(_r20_catalogo_comandos()) + (
+        'ajustes ia local', 'diagnostico ia local', 'origem da resposta local',
+        'referencias ia local', 'configurar ia local', 'calibrar evidencia local',
+        'julgar avaliacao local', 'avaliar precisao local', 'ver ultima avaliacao local',
+        'oficina local', 'parar geracao local', 'refazer com penalidade')
+
+
+def _r21_sugerir_comando_proximo(comando):
+    """Erro de digitacao (difflib sobre comandos canonicos): sugere no maximo 1
+    candidato e so executa apos 'sim'. Nao sugere linhas com payload (:) nem
+    acoes fora do catalogo; recusa consome o comando sem enviar typo ao modelo."""
+    import difflib
+    if not isinstance(comando, str) or ':' in comando:
+        return False
+    n = _norm_pt(comando)
+    if len(n) < 5:
+        return False
+    conhecidos = list(_r21_comandos_conhecidos())
+    normais = [_norm_pt(c) for c in conhecidos]
+    if n in normais:
+        return False
+    proximo = difflib.get_close_matches(n, normais, n=1, cutoff=0.78)
+    if not proximo:
+        return False
+    candidato = conhecidos[normais.index(proximo[0])]
+    try:
+        resposta = input("Comando nao reconhecido. Voce quis dizer '" + candidato + "'? (sim/nao): ")
+    except (EOFError, OSError):
+        return False
+    if resposta.strip().lower() not in ('sim', 's'):
+        print('Ok, nada foi executado. Digite o comando correto ou reformule a pergunta.')
+        return True
+    for despacho in (_r20_comandos, _r21_comandos, _processar_cerebro_local,
+                     _comandos_oficina_local, _comandos_precisao_local):
+        try:
+            if despacho(candidato):
+                return True
+        except Exception as erro:
+            print('Comando sugerido falhou sem repetir: ' + type(erro).__name__)
+            return True
+    print('Nao consegui despachar o comando sugerido; nada foi executado.')
+    return True
+
+
+def _r21_detectar_colapso(texto):
+    """Heuristica de saude (r21): n-grama de palavras repetido 3+ vezes ou mesma
+    linha 4+ vezes. Diagnostico apenas; nunca altera o texto gerado."""
+    import re
+    if not isinstance(texto, str) or len(texto) < 80:
+        return False, ''
+    limpo = re.sub(r'\s+', ' ', texto.strip())
+    palavras = limpo.split(' ')
+    for janela in (16, 10):
+        if len(palavras) >= janela * 3:
+            contagem = {}
+            for i in range(len(palavras) - janela + 1):
+                chave = ' '.join(palavras[i:i + janela]).lower()
+                contagem[chave] = contagem.get(chave, 0) + 1
+                if contagem[chave] >= 3:
+                    return True, 'sequencia de ~' + str(janela) + ' palavras repetida 3+ vezes'
+    linhas = [l.strip().lower() for l in texto.splitlines() if len(l.strip()) >= 12]
+    if linhas:
+        contagem = {}
+        for l in linhas:
+            contagem[l] = contagem.get(l, 0) + 1
+        pior = max(contagem.values())
+        if pior >= 4:
+            return True, 'mesma linha repetida ' + str(pior) + ' vezes'
+    return False, ''
+
+
+def _r21_parar_geracao():
+    """Cancela a geracao local em andamento no cliente (r21). O servidor pode
+    continuar computando alguns segundos; nao encerra processos nem reinicia motor."""
+    if _r20_lock('geracao').acquire(blocking=False):
+        _r20_lock('geracao').release()
+        return ('Nenhuma geracao local em andamento agora. Estado do motor: '
+                + _r20_estado()['estado'] + '.')
+    atual = globals().get('_r21_geracao_seq', 0)
+    globals()['_r21_cancelar_id'] = atual
+    ativa = globals().get('_r21_ativa')
+    if ativa is not None:
+        try:
+            ativa.close()
+        except Exception:
+            pass
+    return ('Cancelamento pedido para a geracao ' + str(atual) + ': fechei a resposta em '
+            'andamento no cliente. O servidor pode seguir computando alguns segundos; '
+            'nenhuma nova geracao sera enviada por este pedido.')
+
+
+def parar_geracao_local() -> str:
+    """Ferramenta r21: pede cancelamento da geracao local em andamento. Nao encerra
+    processos, nao reinicia o motor, nao afeta a nuvem e nao repete a geracao."""
+    return _r21_parar_geracao()
+
+
+def _r21_refazer_com_penalidade():
+    """Refaz UMA vez a ultima geracao marcada com colapso, com penalidade maior.
+    Nao roda em loop, nao reescreve a resposta anterior e exige motor disponivel."""
+    registro = globals().get('_r21_ultimo_colapso')
+    if not isinstance(registro, dict) or not isinstance(registro.get('pergunta'), str):
+        return 'Nao ha geracao com colapso recente para refazer.'
+    pergunta = registro['pergunta']
+    globals()['_r21_ultimo_colapso'] = None
+    if not ia_local_disponivel():
+        return 'Motor local indisponivel agora; nada foi refeito. Confira status ia.'
+    try:
+        resposta = perguntar_ia_local(pergunta, historico_conversas, penalidade_extra=0.15)
+    except Exception as erro:
+        return 'Refazer falhou sem repetir a geracao: ' + type(erro).__name__ + '.'
+    historico_conversas.append({'role': 'user', 'content': 'refazer com penalidade'})
+    historico_conversas.append({'role': 'assistant', 'content': str(resposta)[:2000]})
+    salvar_historico()
+    return resposta
+
+
+def _r21_comandos(comando):
+    """Comandos r21: cancelar geracao local e refazer com penalidade.
+    Retorna True somente quando consumiu o comando."""
+    n = _norm_pt(comando)
+    if n == 'parargeracaolocal':
+        print(_r21_parar_geracao()); return True
+    if n == 'refazercompenalidade':
+        print('\n[Conversa local]: ' + str(_r21_refazer_com_penalidade())); return True
+    return False
 
 
 def _ram_livre_gb() -> float:
@@ -9879,7 +10039,8 @@ def _sugerir_ideias_do_codigo(pedido: str) -> str:
              json.dumps(evidencias, ensure_ascii=False) + '\nTitulos recentes a NAO repetir (dados): ' + json.dumps(anteriores[-8:], ensure_ascii=False) + '\nPEDIDO ORIGINAL (somente tema):\n' + pedido[:1200] +
              f'\nESCOPO DESTA RESPOSTA: apenas {quantidade} propostas de software para este agente. Nao completar a quantidade original maior.'}]
     try:
-        resposta = _chamar_neural(msgs, max_tokens=min(1800, quantidade * 300 + 100), temperatura=0.2)
+        resposta = _chamar_neural(msgs, max_tokens=min(1800, quantidade * 300 + 100), temperatura=0.2,
+                                  formato_json=True)
         novos_titulos = []
         resultado = _formatar_ideias_verificadas(resposta, inventario, evidencias, quantidade,
                                                 anteriores, novos_titulos)
@@ -10816,23 +10977,31 @@ def _montar_contexto_local(pergunta: str, historico=None):
 
 
 def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
-                   stream=False, callback=None, seed=None) -> str:
-    """Uma geracao por vez, retorno textual compatível e telemetria por thread."""
+                   stream=False, callback=None, seed=None,
+                   repeat_penalty=None, formato_json=False) -> str:
+    """Uma geracao por vez, retorno textual compatível e telemetria por thread.
+    Cancelamento (r21) marca estado 'cancelada' sem reenviar nem reiniciar nada."""
     import threading
     lock = _r20_lock('geracao')
     if not lock.acquire(blocking=False):
         raise RuntimeError('Motor ocupado; pedido nao enviado nem repetido.')
+    id_geracao = globals().get('_r21_geracao_seq', 0) + 1
+    globals()['_r21_geracao_seq'] = id_geracao
     tls = globals().setdefault('_r20_telemetria', threading.local())
     tls.ultima = {}
     try:
         _r20_estado('ocupado', 'Geracao em andamento')
-        texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream, callback, seed)
+        texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream,
+                                      callback, seed, repeat_penalty, formato_json, id_geracao)
         tls.ultima = meta
         _r20_estado('pronto', 'Ultima geracao concluida')
         return texto
     except BaseException as erro:
         tls.ultima = {'erro':type(erro).__name__}
-        _r20_estado('falhou', 'Geracao interrompida/falhou; sem repeticao automatica')
+        if isinstance(erro, KeyboardInterrupt) or globals().get('_r21_cancelar_id') == id_geracao:
+            _r20_estado('cancelada', 'Geracao cancelada a pedido; nenhuma nova geracao enviada')
+        else:
+            _r20_estado('falhou', 'Geracao interrompida/falhou; sem repeticao automatica')
         raise
     finally:
         lock.release()
@@ -10888,8 +11057,9 @@ def _contar_itens_lista_local(resposta: str) -> int:
     return esperado - 1
 
 
-def perguntar_ia_local(pergunta: str, historico=None) -> str:
-    """Uma geracao por pedido, sem forcar o modelo a alegar acesso/admin."""
+def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 0.0) -> str:
+    """Uma geracao por pedido, sem forcar o modelo a alegar acesso/admin.
+    penalidade_extra (r21) eleva repeat_penalty apenas em refazer confirmado."""
     if not isinstance(pergunta, str) or not pergunta.strip():
         raise ValueError("A pergunta nao pode estar vazia.")
     msgs = _montar_contexto_local(pergunta, historico)
@@ -10918,7 +11088,8 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
         print('[Previa da geracao; texto ainda nao verificado]: ', end='', flush=True)
         callback = lambda trecho: print(trecho, end='', flush=True)
     try:
-        resposta = _chamar_neural(msgs, max_tokens=tokens, temperatura=0.3, stream=streaming, callback=callback)
+        resposta = _chamar_neural(msgs, max_tokens=tokens, temperatura=0.3, stream=streaming, callback=callback,
+                                  repeat_penalty=1.05 + max(0.0, min(0.6, float(penalidade_extra))))
     finally:
         if streaming:
             print('\n[Fim da previa; a resposta final aparece abaixo.]')
@@ -10939,6 +11110,12 @@ def perguntar_ia_local(pergunta: str, historico=None) -> str:
                          f"numerados em sequencia; voce pediu {quantidade}. "
                          "A quantidade solicitada nao foi confirmada. "
                          "O limite por resposta e 50 itens; voce pode pedir os restantes em partes.")
+    colapso, detalhe = _r21_detectar_colapso(resposta)
+    if colapso:
+        globals()['_r21_ultimo_colapso'] = {'pergunta': pergunta}
+        resposta += ('\n\n[Aviso de saude da geracao]: detectei repeticao em loop (' + detalhe
+                     + '); o texto bruto foi preservado e nada foi corrigido. '
+                       'Para tentar 1 nova geracao com penalidade de repeticao maior, envie: refazer com penalidade')
     return resposta
 
 
@@ -11009,6 +11186,9 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r20_comandos(comando):
         return True
 
+    if _r21_comandos(comando):
+        return True
+
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
     contextual = _resposta_contextual_curta(comando, config)
     if contextual is not None:
@@ -11050,6 +11230,11 @@ def processar_atalho_rapido(comando: str) -> bool:
     # CEREBRO LOCAL (sem API/cota/limite): tenta resolver por regra antes de
     # qualquer chamada de nuvem. Funciona 100% offline e instantaneo.
     if _processar_cerebro_local(comando):
+        return True
+
+    # r21: erro de digitacao em comando canonico - sugere 1 candidato com
+    # confirmacao 'sim'. Somente no modo local; no modo nuvem o fluxo segue.
+    if not globals().get('config', {}).get('usar_ia_nuvem', False) and _r21_sugerir_comando_proximo(comando):
         return True
 
     # Explicacoes tambem pulam atalhos secundarios de midia/energia/cache.
@@ -23739,7 +23924,7 @@ def converter_tempo(valor: str) -> str:
     """Converte tempo de um jeito pro outro: '3600 segundos', '2.5 horas',
     '90 minutos' - devolve em todas as unidades."""
     import re as _re
-    m = _re.search(r"(\d+\.?\d*)\s*(seg|segundo|min|minuto|hora|h|dia|semana)", 
+    m = _re.search(r"(\d+\.?\d*)\s*(seg|segundo|min|minuto|hora|h|dia|semana)",
                    valor.lower().replace(",", "."))
     if not m:
         return "Exemplos: '3600 segundos', '2.5 horas', '90 minutos', '3 dias'."
@@ -25138,6 +25323,8 @@ tools = [
     gravar_memoria_core,
     consultar_memoria_core,
     listar_ferramentas,
+    # --- r21: confiabilidade das respostas locais ---
+    parar_geracao_local,
 ]
 
 # ======================================================================
