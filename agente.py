@@ -7707,6 +7707,7 @@ def _menu_ajuda_local():
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
+    print("ESQUELETOS (r29): 'esqueleto de ideia: <nome>' cria o codigo base .py na pasta esqueletos_ideias/ | 'listar esqueletos' | 'abrir esqueleto: <nome>'")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
@@ -9606,6 +9607,149 @@ def _r26_comandos(comando):
     if _norm_pt(comando) == 'fabricadeideias':
         print(_r26_relatorio())
         _r28_salvar_telemetria(forcar=True)
+        return True
+    return False
+
+
+def _r29_pasta_esqueletos():
+    """r29: pasta dos esqueletos de codigo (dentro da pasta real do agente).
+    Sem PASTA_BASE (teste AST), retorna None: nada e escrito em disco."""
+    base = globals().get('PASTA_BASE')
+    if not base:
+        return None
+    import os
+    try:
+        return os.path.join(str(base), 'esqueletos_ideias')
+    except Exception:
+        return None
+
+
+def _r29_nome_seguro(nome_ideia):
+    """r29: transforma texto da ideia em nome de arquivo/modulo python."""
+    import re as _re29
+    import unicodedata as _ud29
+    bruto = ''.join(c for c in _ud29.normalize('NFD', str(nome_ideia or '').lower())
+                    if _ud29.category(c) != 'Mn')
+    limpo = _re29.sub(r'[^a-z0-9_]+', '_', bruto).strip('_')
+    if not limpo:
+        return None
+    if limpo[0].isdigit():
+        limpo = 'ideia_' + limpo
+    return limpo[:60]
+
+
+def _r29_gerar_esqueleto(nome_ideia):
+    """r29: transforma uma ideia em esqueleto de codigo .py na pasta
+    esqueletos_ideias/. Arquivo NOVO; nunca sobrescreve; nunca toca no
+    agente.py (a integracao oficial passa pela esteira: chat + testes +
+    auditoria + aprovacao do usuario)."""
+    import os
+    import datetime as _dt
+    nome_seguro = _r29_nome_seguro(nome_ideia)
+    if not nome_seguro:
+        return ("Nao consegui transformar '" + str(nome_ideia or '').strip()
+                + "' em nome de arquivo. Ex.: esqueleto de ideia: medidor de agua")
+    pasta = _r29_pasta_esqueletos()
+    if not pasta:
+        return ('Esqueletos precisam da pasta real do agente; no modo de teste '
+                'isolado nada e escrito. Rode no Super Agente no PC.')
+    caminho = os.path.join(pasta, nome_seguro + '.py')
+    if os.path.exists(caminho):
+        return ('Ja existe um esqueleto com esse nome: ' + caminho
+                + '\nEscolha outro nome ou apague o antigo antes (eu nunca sobrescrevo por cima).')
+    os.makedirs(pasta, exist_ok=True)
+    data = _dt.date.today().isoformat()
+    codigo = (
+        '# ============================================================\n'
+        '# ESQUELETO DE IDEIA gerado pelo Super Agente (r29) em ' + data + '\n'
+        '# Ideia original: ' + str(nome_ideia).strip()[:120] + '\n'
+        '# Este arquivo NAO e o agente: fica em esqueletos_ideias/ e\n'
+        '# sobrevive ao atualizador (que so troca agente.py e afins).\n'
+        '# Para virar ferramenta REAL: cole este arquivo no chat do Agent\n'
+        '# Mode e peca a integracao - passa por testes, auditoria anti-\n'
+        '# duplicata e a sua aprovacao antes de entrar no agente oficial.\n'
+        '# ============================================================\n'
+        '\n\n'
+        'def ' + nome_seguro + '(entrada: str = "") -> str:\n'
+        '    """' + str(nome_ideia).strip()[:100] + ' (esqueleto r29).\n\n'
+        '    Complete o algoritmo no corpo (ou cole este arquivo no chat do\n'
+        '    Agent Mode e peca a integracao com testes de verdade).\n'
+        '    """\n'
+        '    raise NotImplementedError("Esqueleto ainda sem algoritmo.")\n'
+        '\n\n'
+        'if __name__ == "__main__":\n'
+        '    # Exemplo de como seria o uso da ideia:\n'
+        '    try:\n'
+        '        print(' + nome_seguro + '("exemplo"))\n'
+        '    except NotImplementedError as erro:\n'
+        '        print("Ideia ainda em esqueleto:", erro)\n')
+    with open(caminho, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(codigo)
+    return ('Esqueleto criado: ' + caminho + '\n'
+            'Contem a funcao ' + nome_seguro + '() com docstring, aviso de pendencia e exemplo de uso.\n'
+            'Ele NAO entra no agente sozinho: para virar ferramenta de verdade, cole no chat do '
+            'Agent Mode e peca a integracao (testes + auditoria + sua aprovacao).')
+
+
+def _r29_listar():
+    """r29: lista os esqueletos ja gerados na pasta local."""
+    import os
+    pasta = _r29_pasta_esqueletos()
+    if not pasta:
+        return 'Sem pasta real do agente (modo de teste); nada listado.'
+    if not os.path.isdir(pasta):
+        return ('Nenhum esqueleto ainda. Gere o primeiro com: '
+                'esqueleto de ideia: <nome da ideia>')
+    arquivos = sorted(a for a in os.listdir(pasta) if a.endswith('.py'))
+    if not arquivos:
+        return 'A pasta existe mas ainda nao tem esqueletos (.py).'
+    linhas = ['Esqueletos em ' + pasta + ' (' + str(len(arquivos)) + '):']
+    for a in arquivos:
+        try:
+            tamanho = os.path.getsize(os.path.join(pasta, a))
+        except OSError:
+            tamanho = -1
+        linhas.append('  ' + a + ' (' + str(tamanho) + ' bytes)')
+    linhas.append('Para integrar algum: cole o arquivo no chat do Agent Mode e peca a integracao.')
+    return '\n'.join(linhas)
+
+
+def _r29_abrir(nome_ideia):
+    """r29: abre o esqueleto no editor (Notepad no Windows). Se nao der,
+    informa o caminho — nunca quebra."""
+    import os
+    nome_seguro = _r29_nome_seguro(nome_ideia)
+    pasta = _r29_pasta_esqueletos()
+    if not nome_seguro or not pasta:
+        return 'Informe o nome. Ex.: abrir esqueleto: medidor de agua'
+    caminho = os.path.join(pasta, nome_seguro + '.py')
+    if not os.path.exists(caminho):
+        return ('Ainda nao existe esqueleto com esse nome. Crie com: '
+                'esqueleto de ideia: ' + str(nome_ideia).strip())
+    try:
+        import subprocess
+        if os.name == 'nt':
+            subprocess.Popen(['notepad', caminho])
+        else:
+            subprocess.Popen(['xdg-open', caminho])
+        return 'Abrindo esqueleto: ' + caminho
+    except Exception:
+        return ('Nao consegui abrir o editor aqui; o arquivo esta em: ' + caminho)
+
+
+def _r29_comandos(comando):
+    """r29: esqueletos de ideia — o agente materializa ideias em codigo base
+    na propria pasta; a integracao real segue pela esteira oficial."""
+    cabeca, sep, corpo = comando.partition(':')
+    alvo = _norm_pt(cabeca)
+    if sep and alvo == 'esqueletodeideia':
+        print(_r29_gerar_esqueleto(corpo))
+        return True
+    if sep and alvo == 'abriresqueleto':
+        print(_r29_abrir(corpo))
+        return True
+    if _norm_pt(comando) == 'listaresqueletos':
+        print(_r29_listar())
         return True
     return False
 
@@ -11754,6 +11898,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r28_comandos(comando):
+        return True
+
+    if _r29_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -28610,7 +28757,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r28] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r29] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

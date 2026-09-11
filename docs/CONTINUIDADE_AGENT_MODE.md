@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28 **301 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29 **316 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -222,6 +222,15 @@ ou relatórios reais sem revisão e autorização.
   veto continua pelo `ideia rejeitada` da r23. Cabeçalho da fábrica diz se os dados são
   acumulados entre sessões. Loader de testes extrai `_r28_`. Selo `-r28`. Não testado no
   Windows real.
+- **r29 (ESQUELETOS DE IDEIA — o agente materializa ideias em código):** nada novo na lista
+  (589 mantidas; interno). Comandos: **`esqueleto de ideia: <nome>`** gera `esqueletos_ideias/<nome>.py`
+  (função com docstring, `NotImplementedError` de pendência, exemplo de uso e cabeçalho explicando
+  que o arquivo NÃO é o agente e sobrevive ao atualizador), **`listar esqueletos`** e
+  **`abrir esqueleto: <nome>`** (Notepad no Windows; fallback honesto com o caminho). Regras:
+  nome sanitizado (acentos→sem acento, espaços→`_`, ≤60, dígito inicial ganha prefixo `ideia_`),
+  NUNCA sobrescreve esqueleto existente, NUNCA toca no `agente.py`, sem `PASTA_BASE` (testes AST)
+  nada é escrito. Integração real segue a esteira: colar no chat → testes → auditoria → aprovação.
+  Loader extrai `_r29_`. Selo `-r29`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
