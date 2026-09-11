@@ -10,8 +10,14 @@ ajustadas ou descartadas nessa hora. Nada é implementado sem a autorização do
 **Status r23 (implementado, total 549):** itens **11–22, 29–45, 90, 93, 95, 99–102,
 161, 162, 165, 166, 172–177 e 201–203** viraram ferramentas reais (49 no total, incluindo as
 4 capacidades internas). Nomes ajustados na implementação quando o escopo pediu (ex.: 37 virou
-`onda_periodo_frequencia_calcular`, 166 virou `fluxo_sugerido_tarefa`). **Restam 151 propostas**
-para fechar 700. O item 163 foi entregue na r25 como comandos internos (fora da contagem de ferramentas).
+`onda_periodo_frequencia_calcular`, 166 virou `fluxo_sugerido_tarefa`). A reconciliacao de r27 marcou 47 itens de lotes anteriores que estavam sem check
+(40 com nome exato, 7 com nome ajustado na implementacao) e recusou 11 semelhancas falsas
+(ex.: cifra de Vigenere NAO e cifra de Cesar; DDD estatico NAO e configurar IP).
+
+**Status r27 (lote 4):** itens **10, 49–66 e 68–88** viraram ferramentas reais (40 no total;
+total geral **589**). **Restam 110 propostas** no catalogo (589 + 110 = 699; a proxima ideia
+nova — do usuario ou da fabrica de ideias — fecha 700). O item 163 foi entregue na r25 como
+comandos internos (fora da contagem de ferramentas).
 
 **Status r26:** o comando `fabrica de ideias` (agente.py) lê este arquivo sozinho e cruza as
 propostas com a telemetria de uso (r25), o filtro de ideias rejeitadas (r23) e uma
@@ -28,19 +34,19 @@ continua exigindo auditoria AST e a autorização do usuário.
 7. ✅ `permutacoes_combinacoes_calcular` — nPk, nCk, n!.
 8. ✅ `geometria_plana_calcular` — área/perímetro (círculo, quadrado, retângulo, triângulo, losango).
 9. ✅ `teorema_pitagoras_resolver` — resolve o terceiro lado.
-10. Proposta `gerar_tabuada` — tabuada com faixa e intervalo.
-11. Proposta `listar_primos_intervalo` — primos até N por crivo (viz: fatorar = um número só).
-12. Proposta `regressao_linear_simples` — y=ax+b por mínimos quadrados com r².
-13. Proposta `correlacao_pearson_calcular` — correlação de duas séries.
-14. Proposta `progressao_pa_pg_calcular` — termo geral e soma (PA/PG).
-15. Proposta `calcular_trigonometria_basica` — seno/cosseno/tangente de ângulo.
-16. Proposta `converter_angulos_graus_radianos`.
-17. Proposta `logaritmo_exponencial_calcular` — log em qualquer base, e^x, 10^x.
-18. Proposta `operacoes_bitwise_explicadas` — AND/OR/XOR/shifts com binário lado a lado.
-19. Proposta `media_ponderada_calcular` — valores × pesos.
-20. Proposta `simplificar_fracao` — fração irredutível + decimal exata.
-21. Proposta `geometria_espacial_calcular` — volume/área de esfera, cilindro, cone, prisma.
-22. Proposta `tabela_verdade_logica` — AND/OR/NOT/XOR para A,B.
+10. ✅ `gerar_tabuada` — tabuada com faixa e intervalo.
+11. ✅ `listar_primos_intervalo` — primos até N por crivo (viz: fatorar = um número só).
+12. ✅ `regressao_linear_simples` — y=ax+b por mínimos quadrados com r².
+13. ✅ `correlacao_pearson_calcular` — correlação de duas séries.
+14. ✅ `progressao_pa_pg_calcular` — termo geral e soma (PA/PG).
+15. ✅ `calcular_trigonometria_basica` — seno/cosseno/tangente de ângulo.
+16. ✅ `converter_angulos_graus_radianos`.
+17. ✅ `logaritmo_exponencial_calcular` — log em qualquer base, e^x, 10^x.
+18. ✅ `operacoes_bitwise_explicadas` — AND/OR/XOR/shifts com binário lado a lado.
+19. ✅ `media_ponderada_calcular` — valores × pesos.
+20. ✅ `simplificar_fracao` — fração irredutível + decimal exata.
+21. ✅ `geometria_espacial_calcular` — volume/área de esfera, cilindro, cone, prisma.
+22. ✅ `tabela_verdade_logica` — AND/OR/NOT/XOR para A,B.
 
 ## G2. Física e eletricidade
 23. ✅ `lei_de_ohm_calcular` — V/I/R + potência.
@@ -49,86 +55,86 @@ continua exigindo auditoria AST e a autorização do usuário.
 26. ✅ `energia_mecanica_calcular` — cinética/potencial/mecânica.
 27. ✅ `velocidade_media_calcular` — km/h e m/s.
 28. ✅ `densidade_calcular` — com tabela de materiais comuns.
-29. Proposta `queda_livre_calcular` — tempo/velocidade/final por altura.
-30. Proposta `mru_mruv_calcular` — posição/velocidade no tempo.
-31. Proposta `forca_newton_calcular` — F=ma, peso P=mg.
-32. Proposta `trabalho_potencia_calcular` — W=F·d, P=W/t.
-33. Proposta `calor_sensivel_calcular` — Q=m·c·ΔT (tabela de calor específico comum).
-34. Proposta `dilatacao_termica_calcular` — linear ΔL=L·α·ΔT.
-35. Proposta `pressao_hidrostatica_calcular` — P=ρ·g·h.
-36. Proposta `empuxo_calcular` — princípio de Arquimedes.
-37. Proposta `periodo_frequencia_onda_calcular` — v=λ·f, T=1/f.
-38. Proposta `capacitor_carga_rc_calcular` — constante de tempo τ=RC.
-39. Proposta `divisores_de_tensao_calcular` — dois resistores em série.
-40. Proposta `consumo_energia_kwh_calcular` — W × horas × tarifa → R$ (conta de luz).
-41. Proposta `rendimento_maquina_calcular` — η = útil/total.
-42. Proposta `momento_torque_calcular` — τ=F·d.
-43. Proposta `lei_coulomb_calcular` — força entre cargas.
-44. Proposta `pressao_forca_area_calcular` — P=F/A.
-45. Proposta `energia_potencial_elastica_calcular` — k·x²/2.
+29. ✅ `queda_livre_calcular` — tempo/velocidade/final por altura.
+30. ✅ `mru_mruv_calcular` — posição/velocidade no tempo.
+31. ✅ `forca_newton_calcular` — F=ma, peso P=mg.
+32. ✅ `trabalho_potencia_calcular` — W=F·d, P=W/t.
+33. ✅ `calor_sensivel_calcular` — Q=m·c·ΔT (tabela de calor específico comum).
+34. ✅ `dilatacao_termica_calcular` — linear ΔL=L·α·ΔT.
+35. ✅ `pressao_hidrostatica_calcular` — P=ρ·g·h.
+36. ✅ `empuxo_calcular` — princípio de Arquimedes.
+37. ✅ `onda_periodo_frequencia_calcular` — v=λ·f, T=1/f.
+38. ✅ `capacitor_rc_calcular` — constante de tempo τ=RC.
+39. ✅ `divisor_de_tensao_calcular` — dois resistores em série.
+40. ✅ `consumo_energia_kwh_calcular` — W × horas × tarifa → R$ (conta de luz).
+41. ✅ `rendimento_maquina_calcular` — η = útil/total.
+42. ✅ `momento_torque_calcular` — τ=F·d.
+43. ✅ `lei_coulomb_calcular` — força entre cargas.
+44. ✅ `pressao_forca_area_calcular` — P=F/A.
+45. ✅ `energia_elastica_calcular` — k·x²/2.
 
 ## G3. Texto e idioma PT
 46. ✅ `contar_silabas_texto` — sílabas aproximadas por linha (métrica de poesia).
 47. ✅ `cifra_de_cesar_converter` — cifrar/decifrar/força bruta.
 48. ✅ `morse_converter` — texto ↔ Morse.
-49. Proposta `anagrama_verificar` — duas palavras/frases são anagramas.
-50. Proposta `palindromo_verificar` — ignora acento/espaço/pontuação.
-51. Proposta `alfabeto_fonetico_ortografico` — "B de Bola" PT + NATO.
-52. Proposta `cifra_vigenere_converter` — cifra por palavra-chave.
-53. Proposta `xor_cifrar_texto` — com chave, saída hex.
-54. Proposta `numerar_linhas_texto` — prefixo 1., 2., … configurável.
-55. Proposta `quebrar_texto_largura` — wrap na coluna N.
-56. Proposta `abreviar_nome_iniciais` — "Maria S. Silva".
-57. Proposta `inverter_ordem_palavras` — última palavra primeiro.
-58. Proposta `colunas_alinhar_texto` — linhas separadas por ; → colunas alinhadas.
-59. Proposta `ordenar_linhas_pt` — ordenação com acentos PT correta (viz: central_texto ordena simples).
-60. Proposta `contar_vogais_consoantes` — frequência de letras.
-61. Proposta `caixa_alternada` — AuGuStO (viz: transformar_texto tem maiúsculas/título; alternada não).
-62. Proposta `contar_repeticoes_palavra` — ocorrências de UMA palavra específica.
-63. Proposta `remover_tags_html_para_texto` — HTML → texto puro.
-64. Proposta `pluralizacao_simples_pt` — plural de palavras -ão/-al/-el/-ol/-ul com exceções marcadas.
-65. Proposta `conjugacao_regular_pt` — presente/pretérito/futuro dos 3 grupos.
-66. Proposta `ordinal_por_extenso` — 1º→primeiro… até 1000º.
+49. ✅ `anagrama_verificar` — duas palavras/frases são anagramas.
+50. ✅ `palindromo_verificar` — ignora acento/espaço/pontuação.
+51. ✅ `alfabeto_fonetico_ortografico` — "B de Bola" PT + NATO.
+52. ✅ `cifra_vigenere_converter` — cifra por palavra-chave.
+53. ✅ `xor_cifrar_texto` — com chave, saída hex.
+54. ✅ `numerar_linhas_texto` — prefixo 1., 2., … configurável.
+55. ✅ `quebrar_texto_largura` — wrap na coluna N.
+56. ✅ `abreviar_nome_iniciais` — "Maria S. Silva".
+57. ✅ `inverter_ordem_palavras` — última palavra primeiro.
+58. ✅ `colunas_alinhar_texto` — linhas separadas por ; → colunas alinhadas.
+59. ✅ `ordenar_linhas_pt` — ordenação com acentos PT correta (viz: central_texto ordena simples).
+60. ✅ `contar_vogais_consoantes` — frequência de letras.
+61. ✅ `caixa_alternada` — AuGuStO (viz: transformar_texto tem maiúsculas/título; alternada não).
+62. ✅ `contar_repeticoes_palavra` — ocorrências de UMA palavra específica.
+63. ✅ `remover_tags_html_para_texto` — HTML → texto puro.
+64. ✅ `pluralizacao_simples_pt` — plural de palavras -ão/-al/-el/-ol/-ul com exceções marcadas.
+65. ✅ `conjugacao_regular_pt` — presente/pretérito/futuro dos 3 grupos.
+66. ✅ `ordinal_por_extenso` — 1º→primeiro… até 1000º.
 
 ## G4. Dev e referência técnica
 67. ✅ `decodificar_jwt_token` — header/payload sem verificar assinatura (com avisos).
-68. Proposta `explicar_cron_expressao` — "*/5 * * *" em português (viz: agendar_tarefa executa).
-69. Proposta `consulta_codigo_http` — significado de status 100–511.
-70. Proposta `consulta_mime_extensao` — extensão → MIME.
-71. Proposta `comparar_semver_versoes` — maior/menor/compatível.
-72. Proposta `contraste_cores_wcag` — razão de contraste e aprovação AA/AAA (viz: central_cores converte/paleta, não mede contraste).
-73. Proposta `escapar_texto_programacao` — modos JSON/regex/HTML/cmd.
-74. Proposta `comparar_json_valores` — diff profundo de valores com caminhos (viz: comparar_estrutura_json compara forma/estrutura).
-75. Proposta `aplanar_json_dados` — flatten/unflatten por chaves pontuadas.
-76. Proposta `testar_regex_padrao` — matches/grupos de um padrão sobre amostra (viz: achar_todos_no_codigo busca em arquivos).
-77. Proposta `gerar_editorconfig` — conteúdo sugerido por linguagem.
-78. Proposta `gerar_pre_commit_esqueleto` — hook básico comentado.
-79. Proposta `gerar_licenca_texto` — MIT/Apache-2.0/ISC com ano/autor.
-80. Proposta `gerar_changelog_esqueleto` — Keep a Changelog vazio.
-81. Proposta `gerar_readme_esqueleto` — seções padrão (viz: gerar_documentacao_projeto documenta código existente).
-82. Proposta `gerar_dotenv_exemplo` — .env.example com placeholders (nunca valores reais).
-83. Proposta `ordenar_requirements_dedup` — sort/dedup/marcar duplicadas de requirements.txt.
-84. Proposta `gerar_massa_dados_teste_ptbr` — N registros fake (nomes, CPFs válidos de teste, e-mails .test).
-85. Proposta `url_encode_decode` — percent-encoding (viz: transformar_texto 'slug' é só slug).
-86. Proposta `gerar_sumario_markdown` — índice a partir dos títulos # (viz: verificar_links_markdown_locais).
-87. Proposta `tokens_estimativa_texto` — estimativa chars/4 com aviso (apoia o orçamento r20).
-88. Proposta `markdown_tabela_gerar` — linhas → tabela MD alinhada.
+68. ✅ `explicar_cron_expressao` — "*/5 * * *" em português (viz: agendar_tarefa executa).
+69. ✅ `consulta_codigo_http` — significado de status 100–511.
+70. ✅ `consulta_mime_extensao` — extensão → MIME.
+71. ✅ `comparar_semver_versoes` — maior/menor/compatível.
+72. ✅ `contraste_cores_wcag` — razão de contraste e aprovação AA/AAA (viz: central_cores converte/paleta, não mede contraste).
+73. ✅ `escapar_texto_programacao` — modos JSON/regex/HTML/cmd.
+74. ✅ `comparar_json_valores` — diff profundo de valores com caminhos (viz: comparar_estrutura_json compara forma/estrutura).
+75. ✅ `aplanar_json_dados` — flatten/unflatten por chaves pontuadas.
+76. ✅ `testar_regex_padrao` — matches/grupos de um padrão sobre amostra (viz: achar_todos_no_codigo busca em arquivos).
+77. ✅ `gerar_editorconfig` — conteúdo sugerido por linguagem.
+78. ✅ `gerar_pre_commit_esqueleto` — hook básico comentado.
+79. ✅ `gerar_licenca_texto` — MIT/Apache-2.0/ISC com ano/autor.
+80. ✅ `gerar_changelog_esqueleto` — Keep a Changelog vazio.
+81. ✅ `gerar_readme_esqueleto` — seções padrão (viz: gerar_documentacao_projeto documenta código existente).
+82. ✅ `gerar_dotenv_exemplo` — .env.example com placeholders (nunca valores reais).
+83. ✅ `ordenar_requirements_dedup` — sort/dedup/marcar duplicadas de requirements.txt.
+84. ✅ `gerar_massa_dados_teste_ptbr` — N registros fake (nomes, CPFs válidos de teste, e-mails .test).
+85. ✅ `url_encode_decode` — percent-encoding (viz: transformar_texto 'slug' é só slug).
+86. ✅ `gerar_sumario_markdown` — índice a partir dos títulos # (viz: verificar_links_markdown_locais).
+87. ✅ `tokens_estimativa_texto` — estimativa chars/4 com aviso (apoia o orçamento r20).
+88. ✅ `markdown_tabela_gerar` — linhas → tabela MD alinhada.
 
 ## G5. Datas e hora
 89. ✅ `feriados_brasil_ano` — nacionais fixos + móveis (Páscoa/Carnaval/Corpus Christi offline).
-90. Proposta `semana_do_ano_info` — ISO week, trimestre, dias restantes.
+90. ✅ `semana_do_ano_info` — ISO week, trimestre, dias restantes.
 91. Proposta `proximo_dia_util` — primeira data útil a partir de uma data (viz: dias_uteis_entre_datas conta intervalo).
 92. Proposta `contagem_regressiva_data` — dias até evento anual (aniversário/vencimento).
-93. Proposta `bissexto_dias_mes_info` — ano bissexto? dias do mês.
+93. ✅ `bissexto_dias_mes_info` — ano bissexto? dias do mês.
 94. Proposta `fusos_brasil_referencia` — os 4 fusos e offsets (viz: relogio_mundial mostra hora agora).
-95. Proposta `calendario_mes_console` — mês/ano em grade ASCII.
+95. ✅ `calendario_mes_console` — mês/ano em grade ASCII.
 96. Proposta `proximo_feriado` — próximo nacionais a partir de hoje (usa lógica de feriados).
-97. Proposta `soma_dias_uteis` — data + N dias úteis.
+97. ✅ `soma_dias_uteis` — data + N dias úteis.
 98. Proposta `texto_para_data_parse` — texto flexível → ISO (viz: calculadora_datas exige DD/MM/AAAA).
 99. Proposta `dias_uteis_do_mes` — quantos dias úteis tem um mês.
-100. Proposta `datas_recorrentes_lista` — "todo dia 5 por N meses".
-101. Proposta `timestamp_converter_iso` — epoch ↔ ISO 8601 (viz: converter_tempo = unidades de duração).
-102. Proposta `data_juliana_converter` — dia juliano ↔ calendário.
+100. ✅ `datas_recorrentes_lista` — "todo dia 5 por N meses".
+101. ✅ `timestamp_converter_iso` — epoch ↔ ISO 8601 (viz: converter_tempo = unidades de duração).
+102. ✅ `data_juliana_converter` — dia juliano ↔ calendário.
 
 ## G6. Brasil — documentos e dados estáticos
 103. Proposta `consultar_ddd_estatico` — tabela offline DDD→UF/região (viz: central_dados_brasil valida/formata).
@@ -203,12 +209,12 @@ continua exigindo auditoria AST e a autorização do usuário.
 160. Proposta `cartas_mao_sortear` — 5 cartas de 52 + ranking da mão.
 
 ## G13. Meta — IA LOCAL e inventário
-161. Proposta `resumo_ferramentas_por_tema` — contagem por grupos (navegar 500+).
-162. Proposta `achar_ferramenta_para_tarefa` — busca lexical sobre nome+docstring (índice interno, offline).
+161. ✅ `resumo_ferramentas_por_tema` — contagem por grupos (navegar 500+).
+162. ✅ `achar_ferramenta_para_tarefa` — busca lexical sobre nome+docstring (índice interno, offline).
 163. ✅ **Entregue na r25 como comandos internos** (`estatisticas ferramentas`, `diagnostico ferramentas`, `velocidade ia local`) — observabilidade r20/r21; fora da contagem de ferramentas registradas.
 164. Proposta `exportar_inventario_ferramentas_txt` — nome+docstring para revisão humana (sem segredos).
-165. Proposta `comparar_ferramentas_similares` — quando usar A vs B (pares de maior sobreposição).
-166. Proposta `fluxo_sugerido_tarefa` — roteiro determinístico com ferramentas existentes (ex.: "limpar disco").
+165. ✅ `comparar_ferramentas_similares` — quando usar A vs B (pares de maior sobreposição).
+166. ✅ `fluxo_sugerido_tarefa` — roteiro determinístico com ferramentas existentes (ex.: "limpar disco").
 
 ## G14. Segurança pessoal — offline
 167. Proposta `pin_numerico_gerar` — 4–8 dígitos com aviso de força baixa.
@@ -218,12 +224,12 @@ continua exigindo auditoria AST e a autorização do usuário.
 171. Proposta `gerar_totp_codigo` — RFC6238 offline (segredo Base32 do usuário; hmac stdlib).
 
 ## G15. Números e formatação
-172. Proposta `numero_brl_formatar` — R$ 1.234,56 (formatação, sem conversão).
-173. Proposta `porcentagem_de_variacao` — a→b: aumento/redução %.
-174. Proposta `algarismos_significativos_arredondar`.
-175. Proposta `notacao_cientifica_converter` — a×10^n ↔ decimal.
-176. Proposta `fracoes_decimais_converter` — 0,375 ↔ 3/8 exato.
-177. Proposta `horario_decimal_converter` — 8h45 ↔ 8,75h (folha de ponto).
+172. ✅ `numero_brl_formatar` — R$ 1.234,56 (formatação, sem conversão).
+173. ✅ `porcentagem_variacao_calcular` — a→b: aumento/redução %.
+174. ✅ `algarismos_significativos_arredondar`.
+175. ✅ `notacao_cientifica_converter` — a×10^n ↔ decimal.
+176. ✅ `fracoes_decimais_converter` — 0,375 ↔ 3/8 exato.
+177. ✅ `horario_decimal_converter` — 8h45 ↔ 8,75h (folha de ponto).
 
 ## G16. Geografia e astronomia
 178. Proposta `distancia_coordenadas_haversine` — km entre dois pontos.
@@ -257,9 +263,9 @@ continua exigindo auditoria AST e a autorização do usuário.
 200. Proposta `mac_vendor_prefix_consulta` — fabricante por prefixo MAC (tabela estática comum).
 
 ## G20. Finanças — cálculo offline (sem cotação)
-201. Proposta `converter_taxa_periodo` — mensal ↔ anual composta.
-202. Proposta `meta_poupanca_aporte` — alvo → aporte mensal a juros i.
-203. Proposta `preco_por_unidade_comparar` — produto A vs B: melhor compra.
+201. ✅ `converter_taxa_periodo_calcular` — mensal ↔ anual composta.
+202. ✅ `meta_poupanca_calcular` — alvo → aporte mensal a juros i.
+203. ✅ `preco_por_unidade_comparar` — produto A vs B: melhor compra.
 
 ## G21. Complementos diversos
 204. Proposta `relacao_aspecto_calcular` — largura×altura → aspecto (16:9…) e diagonal.

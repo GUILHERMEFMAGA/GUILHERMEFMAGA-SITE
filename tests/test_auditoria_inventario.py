@@ -24,7 +24,7 @@ tools = [primeira, segunda, primeira, ausente]
     def test_registro_atual_sem_nomes_repetidos_ou_ausentes(self):
         nomes, funcoes, _, _ = auditar(SOURCE.read_text())
         # r21: +1; r22 lote 1: +20; r23: +49 (matematica/fisica/datas/numeros/financas/capacidades).
-        self.assertEqual(len(nomes), 549)
+        self.assertEqual(len(nomes), 589)
         self.assertEqual(len(nomes), len(set(nomes)))
         self.assertFalse(set(nomes) - set(funcoes))
 

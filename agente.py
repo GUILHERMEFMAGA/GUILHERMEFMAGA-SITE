@@ -7704,6 +7704,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
+    print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
     print("IDEIAS REJEITADAS: ideia rejeitada: <titulo> | ideias rejeitadas | limpar ideias rejeitadas")
@@ -25309,6 +25310,1056 @@ def estatisticas_descritivas(numeros: str = "") -> str:
     return 'Estatisticas descritivas:\n  ' + '\n  '.join(linhas)
 
 
+def gerar_tabuada(numero: str = "", inicio: str = "1", fim: str = "10") -> str:
+    """Tabuada de um numero inteiro com faixa configuravel (padrao 1 a 10).
+    Calculo local instantaneo, sem internet nem IA."""
+    import re as _re
+    t = _re.sub(r'[^0-9+-]', '', str(numero))
+    if t in ('', '+', '-'):
+        raise ValueError('Envie o numero da tabuada. Ex.: {"numero": 7, "inicio": 1, "fim": 10}.')
+    n = int(t)
+    if not -9999 <= n <= 9999:
+        raise ValueError('Use um numero entre -9999 e 9999.')
+    i, f = int(str(inicio) or 1), int(str(fim) or 10)
+    if not (1 <= i <= f <= 100):
+        raise ValueError('Faixa invalida: precisa 1 <= inicio <= fim <= 100.')
+    linhas = ['Tabuada do ' + str(n) + ' (de ' + str(i) + ' a ' + str(f) + '):']
+    linhas += [str(n) + ' x ' + str(k) + ' = ' + str(n * k) for k in range(i, f + 1)]
+    return '\n'.join(linhas)
+
+
+def anagrama_verificar(texto_a: str = "", texto_b: str = "") -> str:
+    """Verifica se dois textos sao anagramas (ignora acento, espaco, pontuacao
+    e maiusculas). Analise local instantanea, sem internet nem IA."""
+    import unicodedata as _ud
+    def chave(s):
+        return ''.join(sorted(c for c in _ud.normalize('NFD', str(s).lower()) if c.isalnum()))
+    if not str(texto_a).strip() or not str(texto_b).strip():
+        raise ValueError('Envie os dois textos. Ex.: {"texto_a": "iracema", "texto_b": "america"}.')
+    ka, kb = chave(texto_a), chave(texto_b)
+    if ka == kb:
+        return ('SIM: "' + texto_a + '" e "' + texto_b + '" sao anagramas (' + str(len(ka)) + ' letras/digitos).')
+    return ('NAO sao anagramas. Letras ordenadas de A: ' + ka[:60] + ' | de B: ' + kb[:60] + '.')
+
+
+def palindromo_verificar(texto: str = "") -> str:
+    """Verifica se a frase/palavra e palindromo ignorando acento, espaco e
+    pontuacao (ex.: 'A grama e amarga'). Analise local, sem internet nem IA."""
+    import unicodedata as _ud
+    if not str(texto).strip():
+        raise ValueError('Envie o texto. Ex.: {"texto": "A grama e amarga"}.')
+    limpo = ''.join(c for c in _ud.normalize('NFD', str(texto).lower())
+                    if c.isalnum() and _ud.category(c) != 'Mn')
+    if not limpo:
+        raise ValueError('Depois de limpar acentos/espacos nao sobrou letra ou numero.')
+    ok = limpo == limpo[::-1]
+    r = 'SIM: "' + texto + '" e palindromo (' + limpo + ' ao contrario e igual).' if ok \
+        else 'NAO: "' + texto + '" vira "' + limpo + '" e ao contrario e "' + limpo[::-1] + '".'
+    return r + ' Analise sem acentos, espacos e pontuacao; ' + str(len(limpo)) + ' caracteres lidos.'
+
+
+def alfabeto_fonetico_ortografico(texto: str = "") -> str:
+    """Soletra um texto no alfabeto fonetico portatil 'X de Y' (A de Aguia,
+    B de Bola...) e mostra tambem o alfabeto OTAN/NATO. Local, sem internet."""
+    mapa = {'A': 'Aguia', 'B': 'Bola', 'C': 'Casa', 'D': 'Dado', 'E': 'Elefante', 'F': 'Faca',
+            'G': 'Gato', 'H': 'Hotel', 'I': 'Iglu', 'J': 'Jacare', 'K': 'Kilo', 'L': 'Lua',
+            'M': 'Mala', 'N': 'Nave', 'O': 'Ovo', 'P': 'Pato', 'Q': 'Queda', 'R': 'Rato',
+            'S': 'Sapo', 'T': 'Tatu', 'U': 'Uva', 'V': 'Vaca', 'W': 'Watt', 'X': 'Xicara',
+            'Y': 'Yak', 'Z': 'Zebra'}
+    if not str(texto).strip():
+        raise ValueError('Envie o texto para soletrar. Ex.: {"texto": "CPF 123"}.')
+
+    letras = [c.upper() for c in str(texto).upper() if c.isalpha()]
+    if not letras:
+        raise ValueError('Nao achei letras no texto informado.')
+    soletrado = []
+    for c in letras:
+        if c in mapa:
+            soletrado.append(c + ' de ' + mapa[c])
+        else:
+            soletrado.append(c + ' (sem palavra no alfabeto PT)')
+    nato = ('OTAN/NATO: ' + ' '.join(w for w in ['Alfa', 'Bravo', 'Charlie', 'Delta', 'Echo',
+            'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliett', 'Kilo', 'Lima', 'Mike', 'November',
+            'Oscar', 'Papa', 'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor',
+            'Whiskey', 'X-ray', 'Yankee', 'Zulu']))
+    return 'Soletracao de "' + str(texto).strip() + '":\n  ' + '\n  '.join(soletrado) + '\n' + nato
+
+
+def cifra_vigenere_converter(texto: str = "", chave: str = "", modo: str = "cifrar") -> str:
+    """Cifra de Vigenere (cifrar/decifrar) com chave alfabetica; mantem maiusculas
+    e nao altera sinais. Diferente da cifra de Cesar (chave de 1 letra). Local."""
+    import re as _re
+    chave_limpa = _re.sub(r'[^A-Za-z]', '', str(chave)).lower()
+    if not str(texto) or not chave_limpa:
+        raise ValueError('Envie texto e chave (letras). Ex.: {"texto": "atacar", "chave": "limao", "modo": "cifrar"}.')
+    m = str(modo).strip().lower()
+    if m not in ('cifrar', 'decifrar'):
+        raise ValueError('Modo precisa ser "cifrar" ou "decifrar".')
+    desloc = -1 if m == 'decifrar' else 1
+    saida, ki = [], 0
+    for c in str(texto):
+        if c.isalpha():
+            base = ord('A') if c.isupper() else ord('a')
+            passo = ord(chave_limpa[ki % len(chave_limpa)]) - ord('a')
+            saida.append(chr((ord(c) - base + desloc * passo) % 26 + base))
+            ki += 1
+        else:
+            saida.append(c)
+    return ('Resultado (' + m + ' com chave "' + chave_limpa + '"):\n' + ''.join(saida)
+            + '\nSo letras mudam; numeros e sinais ficam como estao.')
+
+
+def xor_cifrar_texto(texto: str = "", chave: str = "", modo: str = "cifrar") -> str:
+    """XOR com chave e saida em hexadecimal (cifrar) ou volta do hex (decifrar).
+    Nao e criptografia forte; serve para estudo e ofuscar texto localmente."""
+    if not str(texto) or not str(chave):
+        raise ValueError('Envie texto e chave. Ex.: {"texto": "segredo", "chave": "chave123", "modo": "cifrar"}.')
+    m = str(modo).strip().lower()
+    if m not in ('cifrar', 'decifrar'):
+        raise ValueError('Modo precisa ser "cifrar" ou "decifrar".')
+    ch = str(chave).encode('utf-8')
+    if m == 'cifrar':
+        dados = str(texto).encode('utf-8')
+        cifrado = bytes(b ^ ch[i % len(ch)] for i, b in enumerate(dados))
+        return 'HEX cifrado:\n' + cifrado.hex()
+    try:
+        dados = bytes.fromhex(_limpa_hex(str(texto)))
+    except ValueError:
+        raise ValueError('O texto cifrado precisa ser hexadecimal (0-9, a-f).')
+    try:
+        return 'Texto decifrado:\n' + bytes(b ^ ch[i % len(ch)] for i, b in enumerate(dados)).decode('utf-8')
+    except UnicodeDecodeError:
+        raise ValueError('Chave errada ou hex invalido: nao voltou texto UTF-8.')
+
+
+def _limpa_hex(s):
+    return ''.join(c for c in str(s).strip().lower() if c in '0123456789abcdef') or 'zz'
+
+
+def numerar_linhas_texto(texto: str = "", prefixo: str = "1.") -> str:
+    """Numera as linhas de um texto (1., 1), a) ou A)); uma linha por entrada.
+    Organizacao de texto local, sem internet nem IA."""
+    linhas = str(texto).splitlines()
+    if not linhas or (len(linhas) == 1 and not linhas[0].strip()):
+        raise ValueError('Envie o texto com pelo menos uma linha. Ex.: {"texto": "arroz\\nfeijao"}.')
+    p = str(prefixo).strip() or '1.'
+    if p in ('1.', '1)'):
+        fim, inicio = p[1], 1
+        def rotulo(k, _f=fim):
+            return str(k) + _f
+    elif p in ('a)', 'a.', 'A)', 'A.'):
+        maiuscula = p[0].isupper()
+        fim, inicio = p[1], 0
+        def rotulo(k, _f=fim, _m=maiuscula):
+            letra = ''
+            k2 = k
+            while k2 > 0:
+                k2, resto = divmod(k2 - 1, 26)
+                letra = chr(97 + resto) + letra
+            letra = letra or 'a'
+            return (letra.upper() if _m else letra) + _f
+    else:
+        raise ValueError('Prefixo suportados: "1.", "1)", "a)", "a.", "A)", "A.". Envie o ponto/parentese junto.')
+    saida = []
+    for i, linha in enumerate(linhas, 1):
+        saida.append(rotulo(i) + ' ' + linha)
+    return '\n'.join(saida)
+
+
+def quebrar_texto_largura(texto: str = "", largura: str = "72") -> str:
+    """Quebra o texto em linhas de no maximo N colunas sem cortar palavras
+    (wrap). Util para console, e-mail e codigo. Local, sem internet."""
+    import textwrap as _tw
+    try:
+        n = int(str(largura))
+    except ValueError:
+        raise ValueError('A largura precisa ser um numero inteiro de colunas (10 a 200).')
+    if not 10 <= n <= 200:
+        raise ValueError('Use largura entre 10 e 200 colunas.')
+    if not str(texto).strip():
+        raise ValueError('Envie o texto a quebrar. Ex.: {"texto": "frase longa...", "largura": 40}.')
+    quebrado = _tw.fill(str(texto).strip(), width=n, break_long_words=False,
+                        break_on_hyphens=False)
+    linhas = quebrado.count('\n') + 1
+    return quebrado + '\n(' + str(linhas) + ' linha(s) com no maximo ' + str(n) + ' colunas)'
+
+
+def abreviar_nome_iniciais(nome: str = "") -> str:
+    """Abrevia o nome do meio com iniciais: 'Maria S. Silva'. Preposicoes
+    (de, da, do, das, dos, e) nao ganham sigla. Local, sem internet nem IA."""
+    partes = [p for p in str(nome).strip().split() if p]
+    ligacoes = {'de', 'da', 'do', 'das', 'dos', 'e'}
+    if not partes:
+        raise ValueError('Envie o nome completo. Ex.: {"nome": "Maria Souza Silva"}.')
+    if len(partes) == 1:
+        return 'Nome curto, nada a abreviar: ' + partes[0]
+    primeira, ultima = partes[0], partes[-1]
+    meio = []
+    for p in partes[1:-1]:
+        if p.lower().strip('.') in ligacoes:
+            meio.append(p.lower())
+        else:
+            meio.append(p[0].upper().rstrip('.') + '.')
+    saida = ' '.join([primeira] + meio + [ultima])
+    return 'Nome abreviado: ' + saida + ' (' + str(len(partes)) + ' partes no original)'
+
+
+def inverter_ordem_palavras(texto: str = "") -> str:
+    """Inverte a ordem das palavras do texto (a ultima fica em primeiro).
+    Util para 'sobrenome, nome'. Local, sem internet nem IA."""
+    palavras = str(texto).split()
+    if not palavras:
+        raise ValueError('Envie o texto. Ex.: {"texto": "Maria Souza"}.')
+    return 'Invertido: ' + ' '.join(reversed(palavras)) + ' (' + str(len(palavras)) + ' palavras)'
+
+
+def colunas_alinhar_texto(texto: str = "", separador: str = ";") -> str:
+    """Alinha linhas 'a;b;c' em colunas de largura igual (tabela de texto).
+    Bom para colar planilhas simples. Local, sem internet nem IA."""
+    linhas = [l for l in str(texto).splitlines() if l.strip()][:500]
+    if len(linhas) < 1:
+        raise ValueError('Envie linhas separadas por ; . Ex.: {"texto": "nome;idade\\nAna;30"}.')
+    sep = str(separador) or ';'
+    grade = [[c.strip() for c in l.split(sep)] for l in linhas]
+    ncol = max(len(g) for g in grade)
+    if ncol > 30:
+        raise ValueError('Limite de 30 colunas para nao gerar saida gigante.')
+    larguras = [max((len(g[i]) if i < len(g) else 0) for g in grade) for i in range(ncol)]
+    larguras = [min(w, 40) for w in larguras]
+    saida = []
+    for g in grade:
+        celulas = [(g[i] if i < len(g) else '').ljust(larguras[i])[:larguras[i]] for i in range(ncol)]
+        saida.append(' | '.join(celulas))
+    total = sum(larguras) + 3 * (ncol - 1)
+    return '\n'.join(saida) + '\n(' + str(len(grade)) + ' linha(s), ' + str(ncol) + ' coluna(s), largura total ' + str(total) + ')'
+
+
+def ordenar_linhas_pt(texto: str = "", reverso: str = "nao") -> str:
+    """Ordena as linhas em ordem alfabetica respeitando acentos do portugues
+    (acento nao muda a posicao). Local, sem internet nem IA."""
+    linhas = [l for l in str(texto).splitlines() if l.strip()]
+    if len(linhas) < 2:
+        raise ValueError('Envie pelo menos 2 linhas para ordenar. Ex.: {"texto": "banana\\nabacaxi"}.')
+    import unicodedata as _ud
+    def chave(s):
+        return ''.join(c for c in _ud.normalize('NFD', s.strip().casefold())
+                       if _ud.category(c) != 'Mn')
+    linhas_ordenadas = sorted(linhas, key=chave, reverse=str(reverso).strip().lower() in ('sim', 's', 'true', '1'))
+    rotulo = 'Z->A' if str(reverso).strip().lower() in ('sim', 's', 'true', '1') else 'A->Z'
+    return '\n'.join(linhas_ordenadas) + '\n(' + str(len(linhas)) + ' linha(s) ordenadas ' + rotulo + ' com acentos respeitados)'
+
+
+def contar_vogais_consoantes(texto: str = "") -> str:
+    """Conta vogais, consoantes e outros caracteres, com as letras mais
+    frequentes. Frequencia de letras local, sem internet nem IA."""
+    import unicodedata as _ud
+    if not str(texto).strip():
+        raise ValueError('Envie o texto. Ex.: {"texto": "textos de exemplo"}.')
+    vogais = 'aeiou'
+    cont_v = cont_c = cont_outro = 0
+    frequencia = {}
+    for c in _ud.normalize('NFD', str(texto).lower()):
+        if _ud.category(c) == 'Mn':
+            continue
+        if c.isalpha():
+            frequencia[c] = frequencia.get(c, 0) + 1
+            if c in vogais:
+                cont_v += 1
+            else:
+                cont_c += 1
+        elif not c.isspace():
+            cont_outro += 1
+    total_letras = cont_v + cont_c
+    topo = sorted(frequencia.items(), key=lambda par: (-par[1], par[0]))[:5]
+    return ('Vogais: ' + str(cont_v) + ' | Consoantes: ' + str(cont_c) + ' | Outros caracteres: '
+            + str(cont_outro) + ' | Total de letras: ' + str(total_letras)
+            + '\nProporcao de vogais: ' + (str(round(100 * cont_v / total_letras, 1)) + '%' if total_letras else '-')
+            + '\nLetras mais frequentes: ' + (', '.join(l + ' (' + str(n) + ')' for l, n in topo) or '-'))
+
+
+def caixa_alternada(texto: str = "") -> str:
+    """Transforma em caixa alternada tipo AuGuStO (conta so letras, nao conta
+    espacos ou numeros). Estilo de texto local, sem internet nem IA."""
+    if not str(texto).strip():
+        raise ValueError('Envie o texto. Ex.: {"texto": "augusto"}.')
+    letras = [c.upper() if i % 2 == 0 else c.lower()
+              for i, c in enumerate(''.join(ch if ch.isalpha() else '' for ch in str(texto)))]
+    return 'Caixa alternada: ' + ''.join(letras)
+
+
+def contar_repeticoes_palavra(texto: str = "", palavra: str = "") -> str:
+    """Conta quantas vezes UMA palavra aparece no texto (ignora acento,
+    maiusculas e pontuacao; casa palavra inteira). Local, sem internet."""
+    import re as _re
+    import unicodedata as _ud
+    if not str(texto).strip() or not str(palavra).strip():
+        raise ValueError('Envie o texto e a palavra. Ex.: {"texto": "casa amarela casa azul", "palavra": "casa"}.')
+    def limpar2(s):
+        return ''.join(c for c in _ud.normalize('NFD', str(s).lower())
+                       if _ud.category(c) != 'Mn' and (c.isalnum() or c.isspace()))
+    alvo = str(palavra).strip()
+    normalizado = limpar2(texto)
+    ocorrencias = _re.findall(r'(?<![a-z0-9])' + _re.escape(limpar2(alvo)) + r'(?![a-z0-9])', normalizado)
+    todas = len(normalizado.split())
+    return ('A palavra "' + alvo + '" aparece ' + str(len(ocorrencias)) + ' vez(es) no texto de '
+            + str(todas) + ' palavra(s). Casa palavra inteira, sem acento e sem diferenciar maiusculas.')
+
+
+def remover_tags_html_para_texto(texto: str = "") -> str:
+    """Remove tags HTML e converte entidades (&amp; etc) para texto puro.
+    Nao acessa internet: processa somente o texto enviado. Sem IA."""
+    import re as _re
+    import html as _html
+    if not str(texto).strip():
+        raise ValueError('Envie o HTML. Ex.: {"texto": "<p>Ola <b>mundo</b></p>"}.')
+    if len(str(texto)) > 200000:
+        raise ValueError('Texto muito grande (limite 200.000 caracteres).')
+    sem_tags = _re.sub(r'<[^>]*>', ' ', str(texto))
+    texto_puro = _html.unescape(sem_tags)
+    linhas = [_re.sub(r'[ \t]+', ' ', l).strip() for l in texto_puro.splitlines()]
+    linhas = [l for l in linhas if l]
+    if not linhas:
+        raise ValueError('Depois de remover as tags nao sobrou texto.')
+    return '\n'.join(linhas) + '\n(' + str(len(linhas)) + ' linha(s) de texto puro)'
+
+
+def pluralizacao_simples_pt(palavra: str = "", modo: str = "plural") -> str:
+    """Plural/singular SIMPLES para regras regulares do portugues
+    (-ao/-al/-el/-ol/-ul/-m/-z/-l e vogais), com aviso quando a palavra pode
+    ser excecao. Referencia de estudo; nao cobre irregulares (pai,mao...)."""
+    p = str(palavra).strip().lower()
+    m = str(modo).strip().lower()
+    if not p or not p.isalpha():
+        raise ValueError('Envie uma palavra (so letras). Ex.: {"palavra": "animal", "modo": "plural"}.')
+    if m not in ('plural', 'singular'):
+        raise ValueError('Modo precisa ser "plural" ou "singular".')
+    regra = ''
+    if m == 'plural':
+        if p.endswith('s') and len(p) > 2:
+            return '"' + p + '" ja termina em s; provavelmente ja esta no plural.'
+        if p.endswith('ão') or p.endswith('ao'):
+            resultado, regra = p[:-2] + 'ões', 'ão -> ões (ATENCAO: excecoes como mao->maos, pao->paes, cao->caes)'
+        elif p.endswith('al'):
+            resultado, regra = p[:-2] + 'ais', 'al -> ais'
+        elif p.endswith('el'):
+            resultado, regra = p[:-2] + 'eis', 'el -> eis (aviso: cesped? excecoes existem)'
+        elif p.endswith('ol'):
+            resultado, regra = p[:-2] + 'ois', 'ol -> ois'
+        elif p.endswith('ul'):
+            resultado, regra = p[:-2] + 'uis', 'ul -> uis'
+        elif p.endswith('m'):
+            resultado, regra = p[:-1] + 'ns', 'm -> ns'
+        elif p.endswith('z'):
+            resultado, regra = p + 'es', 'z -> zes'
+        elif p.endswith('l'):
+            resultado, regra = p[:-1] + 'is', 'l -> is'
+        elif p.endswith('r'):
+            resultado, regra = p + 'es', 'r -> es (flor->flores, mar->mares)'
+        elif p.endswith(('a', 'e', 'i', 'o', 'u', 'é', 'ô')):
+            resultado, regra = p + 's', 'vogal -> +s'
+        else:
+            resultado, regra = p + 's', 'regra geral: +s (confira dicionario)'
+        return 'Plural simples de "' + p + '": ' + resultado + ' (regra: ' + regra + ')'
+    if p.endswith('ões'):
+        resultado, regra = p[:-3] + 'ão', 'ões -> ão'
+    elif p.endswith('oes'):
+        resultado, regra = p[:-3] + 'ao', 'oes -> ao (pode ser mao/pao/cao: confira)'
+    elif p.endswith(('ais', 'eis', 'ois', 'uis')) and len(p) > 4:
+        volta_l = {'ais': 'al', 'eis': 'el', 'ois': 'ol', 'uis': 'ul'}
+        resultado, regra = p[:-3] + volta_l[p[-3:]], p[-3:] + ' -> ' + volta_l[p[-3:]]
+    elif p.endswith('ns'):
+        resultado, regra = p[:-2] + 'm', 'ns -> m'
+    elif p.endswith('zes'):
+        resultado, regra = p[:-2], 'zes -> z'
+    elif p.endswith('is') and len(p) > 3:
+        resultado, regra = p[:-2] + 'l', 'is -> l'
+    elif p.endswith('es'):
+        resultado, regra = p[:-1], 'es -> e'
+    elif p.endswith('s'):
+        resultado, regra = p[:-1], 's -> (vogal)'
+    else:
+        return '"' + p + '" nao parece plural regular; nada a converter.'
+    return 'Singular simples de "' + p + '": ' + resultado + ' (regra: ' + regra + '; confira dicionario)'
+
+
+def conjugacao_regular_pt(verbo: str = "") -> str:
+    """Conjuga VERBOS REGULARES dos 3 grupos (-ar/-er/-ir) no presente,
+    preterito e futuro do indicativo (eu/tu/ele/nos/vos/eles). Referencia de
+    estudo; nao cobre irregulares (ser, ir, ter, fazer...)."""
+    v = str(verbo).strip().lower()
+    if not v.isalpha():
+        raise ValueError('Envie um verbo (so letras). Ex.: {"verbo": "falar"}.')
+    if not v.endswith(('ar', 'er', 'ir')) or len(v) <= 2:
+        raise ValueError('Preciso de um verbo terminado em ar, er ou ir (ex.: falar, comer, partir). Irregulares nao sao suportados.')
+    radical, grupo = v[:-2], v[-2:]
+    fim = {'ar': [('o', 'as', 'a', 'amos', 'ais', 'am'),
+                  ('ei', 'aste', 'ou', 'amos', 'astes', 'aram'),
+                  ('arei', 'arás', 'ará', 'aremos', 'areis', 'arão')],
+           'er': [('o', 'es', 'e', 'emos', 'eis', 'em'),
+                  ('i', 'este', 'eu', 'emos', 'estes', 'eram'),
+                  ('erei', 'erás', 'erá', 'eremos', 'ereis', 'erão')],
+           'ir': [('o', 'es', 'e', 'imos', 'is', 'em'),
+                  ('i', 'este', 'iu', 'imos', 'istes', 'iram'),
+                  ('irei', 'irás', 'irá', 'iremos', 'ireis', 'irão')]}[grupo]
+    pessoas = ('eu|tu|ele/ela|nós|vós|eles/elas').split('|')
+    nomes = ('Presente|Pretérito|Futuro').split('|')
+    blocos = []
+    for gi, nome in enumerate(nomes):
+        linhas = [pessoas[pi] + ' ' + radical + fim[gi][pi] for pi in range(6)]
+        blocos.append(nome + ' do indicativo:\n  ' + '\n  '.join(linhas))
+    return 'Conjugacao regular de "' + v + '" (' + grupo + '):\n' + '\n'.join(blocos) + \
+        '\nSomente verbos regulares; irregulares podem divergir.'
+
+
+def ordinal_por_extenso(numero: str = "", genero: str = "m") -> str:
+    """Numero ordinal por extenso de 1 a 1000 (1 -> primeiro ... 1000 ->
+    milesimo), com opcao feminino. Calculo local, sem internet nem IA."""
+    try:
+        n = int(str(numero).strip())
+    except ValueError:
+        raise ValueError('Envie um numero inteiro de 1 a 1000. Ex.: {"numero": 457, "genero": "m"}.')
+    if not 1 <= n <= 1000:
+        raise ValueError('Suporte de 1 a 1000.')
+    unid = ['', 'primeiro', 'segundo', 'terceiro', 'quarto', 'quinto', 'sexto', 'sétimo', 'oitavo', 'nono']
+    dezena = {10: 'décimo', 20: 'vigésimo', 30: 'trigésimo', 40: 'quadragésimo', 50: 'quinquagésimo',
+              60: 'sexagésimo', 70: 'septuagésimo', 80: 'octogésimo', 90: 'nonagésimo'}
+    centena = {100: 'centésimo', 200: 'ducentésimo', 300: 'tricentésimo', 400: 'quadringentésimo',
+               500: 'quingentésimo', 600: 'sexcentésimo', 700: 'septingentésimo',
+               800: 'octingentésimo', 900: 'noningentésimo'}
+    partes = []
+    if n == 1000:
+        partes.append('milésimo')
+    else:
+        c = (n // 100) * 100
+        d = ((n % 100) // 10) * 10
+        u = n % 10
+        if c:
+            partes.append(centena[c])
+        if d:
+            partes.append(dezena[d])
+        if u:
+            partes.append(unid[u])
+    if str(genero).strip().lower() in ('f', 'feminino'):
+        partes = [p[:-1] + 'a' if p.endswith('o') else p for p in partes]
+    return str(n) + 'º = ' + ' '.join(partes) + (' (feminino)' if str(genero).lower().startswith('f') else ' (masculino)')
+
+
+def explicar_cron_expressao(expressao: str = "") -> str:
+    """Explica uma expressao cron de 5 campos em portugues (minuto, hora,
+    dia do mes, mes, dia da semana), com */passo, listas e faixas. So explica;
+    nao agenda nada."""
+    import re as _re
+    campos = str(expressao).split()
+    if len(campos) != 5:
+        raise ValueError('Cron precisa de 5 campos: "minuto hora dia-do-mes mes dia-da-semana". Ex.: {"expressao": "*/5 * * * *"}.')
+    nomes = ('minuto (0-59)|hora (0-23)|dia do mês (1-31)|mês (1-12)|dia da semana (0-6, 0=domingo)').split('|')
+    limites = [(0, 59), (0, 23), (1, 31), (1, 12), (0, 7)]
+    meses = ('jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez').split('|')
+    semanas = ('domingo|segunda|terça|quarta|quinta|sexta|sábado').split('|')
+    descricao = []
+    for i, campo in enumerate(campos):
+        nome = nomes[i].split(' (')[0]
+        lo, hi = limites[i]
+        c = campo.strip()
+        detalhe = ''
+        if c == '*':
+            detalhe = 'cada ' + nome
+        elif _re.fullmatch(r'\*/(\d+)', c):
+            passo = int(c[2:])
+            detalhe = 'a cada ' + str(passo) + ' ' + nome + '(s), a partir do inicio da faixa'
+        elif _re.fullmatch(r'\d+(-\d+)?(/\d+)?', c) or ',' in c or '-' in c:
+            if passo_m := _re.search(r'/(\d+)$', c):
+                detalhe = 'valores ' + c.split('/')[0] + ' com passo ' + passo_m.group(1)
+            elif ',' in c:
+                valores = c.split(',')
+                if i == 4:
+                    valores = [semanas[int(v)] if v.isdigit() and int(v) < 7 else v for v in valores]
+                detalhe = 'especificamente em ' + ', '.join(valores)
+            elif '-' in c:
+                detalhe = 'na faixa de ' + c.replace('-', ' a ')
+            else:
+                v = int(c)
+                if v < lo or v > (hi if not (i == 4 and v == 7) else 7):
+                    raise ValueError('Valor fora da faixa no campo "' + nome + '": ' + c)
+                if i == 2:
+                    detalhe = 'no dia ' + str(v) + ' do mês'
+                elif i == 3:
+                    detalhe = 'no mês ' + (meses[v - 1] if 1 <= v <= 12 else str(v))
+                elif i == 4:
+                    detalhe = 'toda ' + semanas[v % 7]
+                else:
+                    detalhe = 'no valor ' + str(v)
+        else:
+            raise ValueError('Campo "' + nome + '" nao entendi: ' + c)
+        descricao.append(nome + ': ' + detalhe)
+    return ('Cron "' + ' '.join(campos) + '" significa:\n  - ' + '\n  - '.join(descricao)
+            + '\nSo explico; nao agendo tarefa nenhuma (veja agendar_tarefa para executar).')
+
+
+def consulta_codigo_http(codigo: str = "") -> str:
+    """Significado dos codigos de status HTTP (1xx a 5xx) em portugues, com a
+    categoria da resposta. Referencia local, sem internet."""
+    mapa = {
+        100: 'Continuar (Continue)', 101: 'Mudando protocolos', 102: 'Processando', 103: 'Primeiras sugestoes',
+        200: 'OK - sucesso', 201: 'Criado', 202: 'Aceito (processando depois)', 203: 'Informacao nao-autoritativa',
+        204: 'Sem conteudo', 205: 'Redefinir conteudo', 206: 'Conteudo parcial (range)', 207: 'Multi-estado (WebDAV)',
+        208: 'Ja reportado (WebDAV)', 226: 'IM usado (WebDAV)',
+        300: 'Multiplas escolhas', 301: 'Mudou-se para sempre (redirect permanente)', 302: 'Encontrado (redirect temporario)',
+        303: 'Veja outro', 304: 'Nao modificado (cache)', 305: 'Usar proxy', 307: 'Redirect temporario (mesmo metodo)',
+        308: 'Redirect permanente (mesmo metodo)',
+        400: 'Requisicao ruim (malformada)', 401: 'Nao autenticado (falta login/token)', 402: 'Pagamento necessario (reservado)',
+        403: 'Proibido (sem permissao)', 404: 'Nao encontrado', 405: 'Metodo nao permitido', 406: 'Nao aceitavel',
+        407: 'Precisa de autenticacao no proxy', 408: 'Tempo esgotado na requisicao', 409: 'Conflito',
+        410: 'Removido para sempre', 411: 'Comprimento obrigatorio', 412: 'Pre-condicao falhou',
+        413: 'Conteudo grande demais', 414: 'URL longa demais', 415: 'Tipo de midia nao suportado',
+        416: 'Faixa nao satisfazivel', 417: 'Expectativa falhou', 418: 'Eu sou um bule de cha (piada RFC)',
+        421: 'Requisicao errada de servidor', 422: 'Entidade nao processavel (WebDAV)', 423: 'Bloqueado (WebDAV)',
+        424: 'Dependencia falhou', 425: 'Muito cedo', 426: 'Precisa de upgrade', 428: 'Pre-condicao obrigatoria',
+        429: 'Excesso de requisicoes (rate limit)', 431: 'Campos de cabecalho grandes', 451: 'Indisponivel por motivo legal',
+        500: 'Erro interno do servidor', 501: 'Nao implementado', 502: 'Gateway ruim', 503: 'Servico indisponivel',
+        504: 'Tempo esgotado do gateway', 505: 'Versao HTTP nao suportada', 506: 'Variante tambem negocia',
+        507: 'Armazenamento insuficiente (WebDAV)', 508: 'Loop detectado (WebDAV)', 510: 'Nao estendido', 511: 'Autenticacao de rede obrigatoria'}
+    try:
+        c = int(_somentenumeros(str(codigo)))
+    except ValueError:
+        raise ValueError('Envie um codigo HTTP numerico. Ex.: {"codigo": 404}.')
+    if c not in mapa:
+        raise ValueError('Codigo ' + str(c) + ' fora da tabela (use 100 a 511 dos codigos conhecidos).')
+    cats = {1: 'informativo', 2: 'sucesso', 3: 'redirecionamento', 4: 'erro do cliente', 5: 'erro do servidor'}
+    return ('HTTP ' + str(c) + ' = ' + mapa[c] + '\nCategoria: ' + str(cats[c // 100])
+            + '. Referencia local; o servidor real pode descrever diferente.')
+
+
+def _somentenumeros(s):
+    import re as _re
+    t = _re.sub(r'[^0-9]', '', str(s))
+    if not t:
+        raise ValueError('Nao achei numero no que foi enviado.')
+    return t
+
+
+def consulta_mime_extensao(extensao: str = "") -> str:
+    """Tipo MIME de uma extensao de arquivo (extensao -> MIME), tabela local
+    com ~70 tipos comuns. Sem internet."""
+    mime = {'txt': 'text/plain', 'html': 'text/html', 'htm': 'text/html', 'css': 'text/css',
+            'js': 'text/javascript', 'mjs': 'text/javascript', 'json': 'application/json',
+            'xml': 'application/xml', 'pdf': 'application/pdf', 'zip': 'application/zip',
+            'gz': 'application/gzip', 'tgz': 'application/gzip', 'tar': 'application/x-tar',
+            '7z': 'application/x-7z-compressed', 'rar': 'application/vnd.rar',
+            'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif',
+            'svg': 'image/svg+xml', 'webp': 'image/webp', 'ico': 'image/x-icon',
+            'bmp': 'image/bmp', 'tif': 'image/tiff', 'tiff': 'image/tiff',
+            'mp3': 'audio/mpeg', 'wav': 'audio/wav', 'ogg': 'audio/ogg', 'm4a': 'audio/mp4',
+            'flac': 'audio/flac', 'mid': 'audio/midi',
+            'mp4': 'video/mp4', 'webm': 'video/webm', 'avi': 'video/x-msvideo',
+            'mkv': 'video/x-matroska', 'mov': 'video/quicktime',
+            'csv': 'text/csv', 'md': 'text/markdown', 'py': 'text/x-python',
+            'c': 'text/x-c', 'cpp': 'text/x-c++', 'java': 'text/x-java-source',
+            'sh': 'application/x-sh', 'sql': 'application/sql', 'yml': 'application/yaml',
+            'yaml': 'application/yaml', 'toml': 'application/toml', 'ini': 'text/plain',
+            'doc': 'application/msword', 'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls': 'application/vnd.ms-excel', 'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt': 'application/vnd.ms-powerpoint', 'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'odt': 'application/vnd.oasis.opendocument.text', 'ods': 'application/vnd.oasis.opendocument.spreadsheet',
+            'ttf': 'font/ttf', 'otf': 'font/otf', 'woff': 'font/woff', 'woff2': 'font/woff2',
+            'exe': 'application/vnd.microsoft.portable-executable', 'dll': 'application/vnd.microsoft.portable-executable',
+            'iso': 'application/x-iso9660-image', 'epub': 'application/epub+zip',
+            'psd': 'image/vnd.adobe.photoshop', 'wasm': 'application/wasm'}
+    e = str(extensao).strip().lower().lstrip('.')
+    if not e:
+        raise ValueError('Envie a extensao. Ex.: {"extensao": "pdf"}.')
+    if e in mime:
+        return '.' + e + ' -> ' + mime[e] + '\nTabela local com ~70 tipos; servidores podem variar.'
+    raise ValueError('Extensao "' + e + '" nao esta na tabela local (~70 tipos comuns).')
+
+
+def comparar_semver_versoes(a: str = "", b: str = "") -> str:
+    """Compara duas versoes semantico (MAIOR.MENOR.PATCH com pre-release
+    opcional) e diz qual e maior, se sao iguais e se sao compatíveis (mesma
+    MAIOR). Regra de pre-release: 1.0.0-alpha < 1.0.0."""
+    import re as _re
+    def quebrar(v):
+        m = _re.fullmatch(r'(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.\-]+))?', str(v).strip().lstrip('vV'))
+        if not m:
+            raise ValueError('Versao invalida: "' + str(v) + '". Formato: 1.4.2 (opcional -alpha.1).')
+        return (int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4))
+    va, vb = quebrar(a), quebrar(b)
+    na, nb = va[:3], vb[:3]
+    if na == nb:
+        pa, pb = va[3], vb[3]
+        if pa == pb:
+            veredito = 'IGUAIS'
+        elif pa is None:
+            veredito = 'A maior (versao sem pre-release supera a com pre-release)'
+        elif pb is None:
+            veredito = 'B maior (versao sem pre-release supera a com pre-release)'
+        else:
+            veredito = 'A maior' if _ordena_pre(pa) > _ordena_pre(pb) else 'B maior'
+        compat = 'SIM'
+    else:
+        if na > nb:
+            veredito = 'A maior (' + str(na) + ' > ' + str(nb) + ')'
+        else:
+            veredito = 'B maior (' + str(nb) + ' > ' + str(na) + ')'
+        compat = 'SIM' if na[0] == nb[0] else 'NAO (mudanca que quebra: MAIOR diferente)'
+    return ('A=' + str(a) + ' vs B=' + str(b) + ' -> ' + veredito + '\nCompatíveis (mesmo MAIOR): ' + compat)
+
+
+def _ordena_pre(pre):
+    partes = []
+    for p in str(pre).split('.'):
+        partes.append((1, int(p), '') if p.isdigit() else (0, 0, p))
+    return partes
+
+
+def contraste_cores_wcag(cor1: str = "", cor2: str = "") -> str:
+    """Razao de contraste WCAG entre duas cores (#RGB ou #RRGGBB) e aprovacao
+    AA/AAA para texto normal e grande. Calculo local, sem internet."""
+    def luminancia(hexcor):
+        import re as _re
+        h = str(hexcor).strip().lstrip('#').lower()
+        if _re.fullmatch(r'[0-9a-f]{3}', h):
+            h = ''.join(ch * 2 for ch in h)
+        if not _re.fullmatch(r'[0-9a-f]{6}', h):
+            raise ValueError('Cor invalida: "' + str(hexcor) + '". Use #RGB ou #RRGGBB (ex.: #1a2b3c).')
+        canais = []
+        for i in (0, 2, 4):
+            c = int(h[i:i + 2], 16) / 255.0
+            canais.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+        return 0.2126 * canais[0] + 0.7152 * canais[1] + 0.0722 * canais[2]
+    l1, l2 = luminancia(cor1), luminancia(cor2)
+    alto, baixo = max(l1, l2), min(l1, l2)
+    razao = (alto + 0.05) / (baixo + 0.05)
+    r = round(razao, 2)
+    linhas = ['Contraste entre ' + str(cor1) + ' e ' + str(cor2) + ': ' + str(r) + ':1 (maximo possivel: 21:1)']
+    for rotulo, minimo_aa, minimo_aaa in (('Texto normal', 4.5, 7.0), ('Texto grande (18pt+ ou 14pt negrito)', 3.0, 4.5)):
+        aprov = 'PASSA' if razao >= minimo_aa else 'NAO passa'
+        aprov_aaa = 'PASSA' if razao >= minimo_aaa else 'NAO passa'
+        linhas.append('  ' + rotulo + ': AA ' + aprov + ' (min ' + str(minimo_aa) + ':1) | AAA ' + aprov_aaa + ' (min ' + str(minimo_aaa) + ':1)')
+    return '\n'.join(linhas)
+
+
+def escapar_texto_programacao(texto: str = "", modo: str = "json") -> str:
+    """Escapa um texto para JSON, regex, HTML ou linha de comando do Windows
+    (cmd). Modos: json (padrao), regex, html, cmd. Local, sem internet."""
+    import json as _json
+    import re as _re
+    import html as _html
+    if not str(texto):
+        raise ValueError('Envie o texto. Ex.: {"texto": "caminho\\novo", "modo": "json"}.')
+    m = str(modo).strip().lower()
+    if m == 'json':
+        return 'JSON: ' + _json.dumps(str(texto), ensure_ascii=False)
+    if m == 'regex':
+        return 'Regex (re.escape): ' + _re.escape(str(texto))
+    if m in ('html', 'xml'):
+        return 'HTML: ' + _html.escape(str(texto))
+    if m == 'cmd':
+        escapado = ''.join('^' + c if c in '&|<>^%!"' else c for c in str(texto))
+        return 'CMD (Windows): ' + escapado + '\nDica: dentro de aspas duplas, %% dobra o percentual em .bat.'
+    raise ValueError('Modo precisa ser json, regex, html ou cmd.')
+
+
+def comparar_json_valores(a: str = "", b: str = "") -> str:
+    """Diff profundo de VALORES entre dois JSON (objetos, listas, textos),
+    apontando caminho (ex.: usuario.telefones[1]) com o que mudou, entrou ou
+    saiu. Local, sem internet."""
+    import json as _json
+    try:
+        ja = _json.loads(str(a))
+    except Exception as e:
+        raise ValueError('JSON A invalido: ' + str(e))
+    try:
+        jb = _json.loads(str(b))
+    except Exception as e:
+        raise ValueError('JSON B invalido: ' + str(e))
+    diferencas = []
+
+    def caminho(base, pedaco):
+        return base + ('.' + str(pedaco) if isinstance(pedaco, str) else '[' + str(pedaco) + ']')
+
+    def percorrer(x, y, onde):
+        if isinstance(x, dict) and isinstance(y, dict):
+            for k in sorted(set(x) | set(y)):
+                destino = caminho(onde, k) if onde else str(k)
+                if k not in x:
+                    diferencas.append('+ ' + destino + ' entrou: ' + _json.dumps(y[k], ensure_ascii=False)[:120])
+                elif k not in y:
+                    diferencas.append('- ' + destino + ' saiu: ' + _json.dumps(x[k], ensure_ascii=False)[:120])
+                else:
+                    percorrer(x[k], y[k], destino)
+        elif isinstance(x, list) and isinstance(y, list):
+            for i in range(max(len(x), len(y))):
+                destino = caminho(onde, i) if onde else '[' + str(i) + ']'
+                if i >= len(x):
+                    diferencas.append('+ ' + destino + ' entrou: ' + _json.dumps(y[i], ensure_ascii=False)[:120])
+                elif i >= len(y):
+                    diferencas.append('- ' + destino + ' saiu: ' + _json.dumps(x[i], ensure_ascii=False)[:120])
+                else:
+                    percorrer(x[i], y[i], destino)
+        elif x != y or type(x) != type(y):
+            diferencas.append('~ ' + (onde or 'raiz') + ': ' + _json.dumps(x, ensure_ascii=False)[:80]
+                              + ' -> ' + _json.dumps(y, ensure_ascii=False)[:80])
+    percorrer(ja, jb, '')
+    if not diferencas:
+        return 'Os dois JSON tem os MESMOS valores (pode variar so a ordem de chaves).'
+    return str(len(diferencas)) + ' diferenca(s):\n' + '\n'.join(diferencas[:40])
+
+
+def aplanar_json_dados(texto: str = "", modo: str = "aplanar") -> str:
+    """Aplana JSON aninhado em chaves pontuadas (usuario.nome, lista[2]) ou
+    reconstrói o aninhado a partir do aplanado. Modos: aplanar (padrao) e
+    reconstruir. Local, sem internet."""
+    import json as _json
+    m = str(modo).strip().lower()
+    try:
+        dados = _json.loads(str(texto))
+    except Exception as e:
+        raise ValueError('JSON invalido: ' + str(e))
+    if m == 'aplanar':
+        saida = {}
+
+        def descer(x, onde):
+            if isinstance(x, dict) and x:
+                for k, v in x.items():
+                    descer(v, (onde + '.' + str(k)) if onde else str(k))
+            elif isinstance(x, list) and x:
+                for i, v in enumerate(x):
+                    descer(v, (onde or '') + '[' + str(i) + ']')
+            else:
+                saida[onde or 'raiz'] = x
+        descer(dados, '')
+        return str(len(saida)) + ' chave(s) aplanada(s):\n' + _json.dumps(saida, ensure_ascii=False, indent=1, sort_keys=True)
+    if m == 'reconstruir':
+        if not isinstance(dados, dict):
+            raise ValueError('Para reconstruir, envie o JSON aplanado (objeto de chaves pontuadas).')
+
+        def montar(chave, valor, destino):
+            if '[' in chave:
+                raise ValueError('Reconstrucao de listas ainda simplificada: use chaves pontuadas (a.b).')
+            if '.' in chave:
+                primeiro, resto = chave.split('.', 1)
+                return montar(resto, valor, destino.setdefault(primeiro, {}))
+            destino[chave] = valor
+            return destino
+        montado = {}
+        for k in sorted(dados):
+            if '[' in k:
+                raise ValueError('Reconstrucao de listas ainda simplificada; use chaves pontuadas (a.b).')
+            montar(k, dados[k], montado)
+        return 'JSON reconstruido:\n' + _json.dumps(montado, ensure_ascii=False, indent=1)
+    raise ValueError('Modo precisa ser "aplanar" ou "reconstruir".')
+
+
+def testar_regex_padrao(padrao: str = "", amostra: str = "") -> str:
+    """Testa uma expressao regular sobre um texto de amostra e mostra matches,
+    grupos e posicoes (ate 10). Ferramenta de estudo local; nada e executado
+    fora do re do Python."""
+    import re as _re
+    if str(padrao) == '':
+        raise ValueError('Envie o padrao e a amostra. Ex.: {"padrao": "\\\\d+", "amostra": "tenho 2 gatos e 3 caes"}.')
+    try:
+        compilado = _re.compile(str(padrao))
+    except _re.error as e:
+        raise ValueError('Padrao regex invalido: ' + str(e))
+    achados = list(compilado.finditer(str(amostra)))[:10]
+    total = len(list(compilado.finditer(str(amostra))))
+    if not achados:
+        return 'Padrao "' + str(padrao) + '" NAO casou nada na amostra (' + str(len(str(amostra))) + ' caracteres).'
+    linhas = ['Padrao "' + str(padrao) + '" casou ' + str(total) + ' vez(es):']
+    for m in achados:
+        grupos = (' | grupos: ' + ', '.join(
+            ('grupo ' + str(i) + '=' + repr(g)) for i, g in enumerate(m.groups()) if g is not None)) if m.groups() else ''
+        linhas.append('  "' + m.group(0)[:60] + '" na posicao ' + str(m.start()) + '-' + str(m.end()) + grupos)
+    return '\n'.join(linhas) + ('' if total <= 10 else '\n(mostrando os 10 primeiros)')
+
+
+def gerar_editorconfig(linguagem: str = "python") -> str:
+    """Gera um .editorconfig sugerido para a linguagem (python, javascript,
+    web ou generico). Modelo local pronto para colar; sem internet."""
+    l = str(linguagem).strip().lower()
+    raiz = 'root = true\n\n[*]\ncharset = utf-8\nend_of_line = lf\ninsert_final_newline = true\ntrim_trailing_whitespace = true\n'
+    if l in ('python', 'py'):
+        return raiz + '\n[*.py]\nindent_style = space\nindent_size = 4\nmax_line_length = 100'
+    if l in ('javascript', 'js', 'typescript', 'ts'):
+        return raiz + '\n[*.{js,ts,jsx,tsx}]\nindent_style = space\nindent_size = 2\nquote_type = single'
+    if l in ('web', 'html', 'css'):
+        return raiz + '\n[*.{html,css}]\nindent_style = space\nindent_size = 2'
+    if l in ('generico', 'generico', 'generic'):
+        return raiz + '\n[*]\nindent_style = space\nindent_size = 2'
+    raise ValueError('Linguagens suportadas: python, javascript/typescript, web, generico.')
+
+
+def gerar_pre_commit_esqueleto() -> str:
+    """Gera um esqueleto de .pre-commit-config.yaml com hooks basicos
+    (espacos no fim, fim de arquivo, YAML valido) comentado em portugues.
+    Modelo local; instalar deps e com voce (pip install pre-commit)."""
+    return ('# Esqueleto basico de pre-commit (rode: pre-commit install)\n'
+            'repos:\n'
+            '  - repo: https://github.com/pre-commit/pre-commit-hooks\n'
+            '    rev: v4.6.0\n'
+            '    hooks:\n'
+            '      - id: trailing-whitespace   # remove espacos no fim da linha\n'
+            '      - id: end-of-file-fixer     # garante \\n no fim do arquivo\n'
+            '      - id: check-yaml            # valida YAML\n'
+            '      - id: check-added-large-files  # evita commit de arquivo gigante\n'
+            '      - args: [--maxkb=2048]\n'
+            '\n# Dica local: adapte rev e hooks ao seu projeto; nada aqui roda sozinho.')
+
+
+def gerar_licenca_texto(tipo: str = "mit", ano: str = "", autor: str = "") -> str:
+    """Texto de licenca MIT ou ISC pronto (com ano e autor), ou o aviso
+    padronizado da Apache-2.0 (resumo; texto completo tem ~200 linhas e fica
+    em apache.org/licenses). Use com criterio; nao sou advogado."""
+    import datetime as _dt
+    a = str(ano).strip() or str(_dt.date.today().year)
+    autor_limpo = str(autor).strip() or 'SEU NOME'
+    t = str(tipo).strip().lower()
+    if t == 'mit':
+        return ('MIT License\n\nCopyright (c) ' + a + ' ' + autor_limpo
+                + '\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n'
+                'of this software and associated documentation files (the "Software"), to deal\n'
+                'in the Software without restriction, including without limitation the rights\n'
+                'to use, copy, modify, merge, publish, distribute, sublicense, and/or sell\n'
+                'copies of the Software, and to permit persons to whom the Software is\n'
+                'furnished to do so, subject to the following conditions:\n\n'
+                'The above copyright notice and this permission notice shall be included in all\n'
+                'copies or substantial portions of the Software.\n\n'
+                'THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n'
+                'IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n'
+                'FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n'
+                'AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\n'
+                'LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\n'
+                'OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\n'
+                'SOFTWARE.')
+    if t == 'isc':
+        return ('ISC License\n\nCopyright (c) ' + a + ' ' + autor_limpo
+                + '\n\nPermission to use, copy, modify, and/or distribute this software for any\n'
+                'purpose with or without fee is hereby granted, provided that the above\n'
+                'copyright notice and this permission notice appear in all copies.\n\n'
+                'THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\n'
+                'REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY\n'
+                'AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\n'
+                'INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM\n'
+                'LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR\n'
+                'OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n'
+                'PERFORMANCE OF THIS SOFTWARE.')
+    if t in ('apache', 'apache-2.0', 'apache2'):
+        return ('Apache License 2.0 - aviso padronizado (APENDICE do texto oficial;\n'
+                'baixe o texto completo em https://www.apache.org/licenses/LICENSE-2.0.txt):\n\n'
+                '   Copyright ' + a + ' ' + autor_limpo + '\n\n'
+                '   Licensed under the Apache License, Version 2.0 (the "License");\n'
+                '   you may not use this file except in compliance with the License.\n'
+                '   You may obtain a copy of the License at\n\n'
+                '       http://www.apache.org/licenses/LICENSE-2.0\n\n'
+                '   Unless required by applicable law or agreed to in writing, software\n'
+                '   distributed under the License is distributed on an "AS IS" BASIS,\n'
+                '   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.')
+    raise ValueError('Tipos suportados: mit, isc, apache-2.0 (resumo). Nao sou advogado: confira antes de usar.')
+
+
+def gerar_changelog_esqueleto(projeto: str = "") -> str:
+    """Esqueleto de CHANGELOG.md no formato Keep a Changelog com versao 1.0.0
+    de exemplo. Modelo local pronto para colar; sem internet."""
+    nome = str(projeto).strip() or 'MeuProjeto'
+    return ('# Changelog\n\nFormato baseado em https://keepachangelog.com/pt-BR/1.1.0/.\n'
+            'Projeto: ' + nome + '\n\n'
+            '## [Nao lancado]\n\n### Planejado\n- \n\n### Adicionado\n- \n\n### Modificado\n- \n\n'
+            '### Corrigido\n- \n\n## [1.0.0] - ' + _hoje_iso() + '\n\n### Adicionado\n- Primeira versao estavel.')
+
+
+def _hoje_iso():
+    import datetime as _dt
+    return _dt.date.today().isoformat()
+
+
+def gerar_readme_esqueleto(nome: str = "") -> str:
+    """Esqueleto de README.md com secoes padrao (o que e, como instalar, como
+    usar, licenca) para voce preencher. Modelo local; sem internet."""
+    n = str(nome).strip() or 'MeuProjeto'
+    return ('# ' + n + '\n\n'
+            'O que este projeto faz (escreva 2 linhas diretas).\n\n'
+            '## Instalacao\n\n```bash\n# comandos de instalacao\n```\n\n'
+            '## Como usar\n\n```bash\n# exemplo de uso\n```\n\n'
+            '## O que ja funciona\n\n- [x] exemplo\n- [ ] a fazer\n\n'
+            '## Estrutura\n\n```\npasta/\n  arquivo.txt\n```\n\n'
+            '## Licenca\n\nDefina (MIT, ISC, Apache-2.0...).\n\n'
+            '## Aviso\n\nProjeto em desenvolvimento; comportamento pode mudar.')
+
+
+def gerar_dotenv_exemplo(servico: str = "geral") -> str:
+    """Modelo de arquivo .env de EXEMPLO (sem valores reais) para app geral,
+    banco de dados ou API. NUNCA coloque senha verdadeira em .env versionado."""
+    s = str(servico).strip().lower()
+    cabecalho = ('# .env DE EXEMPLO - troque pelos valores reais; nao suba .env com\n'
+                 '# segredo verdadeiro no Git (adicione .env no .gitignore).\n')
+    if s in ('db', 'banco', 'database'):
+        corpo = ('DB_HOST=localhost\nDB_PORT=5432\nDB_NAME=meubanco\nDB_USER=app_user\nDB_PASSWORD=TROQUE_AQUI\nDB_SSL_MODE=prefer')
+        return cabecalho + corpo
+    if s in ('api', 'rest'):
+        corpo = ('API_BASE_URL=https://api.exemplo.test/v1\nAPI_KEY=TROQUE_AQUI\nAPI_TIMEOUT_SEGUNDOS=30\nAPI_RETRIES=2')
+        return cabecalho + corpo
+    if s in ('app', 'aplicacao', 'geral'):
+        corpo = ('APP_NAME=MeuApp\nAPP_ENV=dev\nAPP_DEBUG=true\nAPP_PORT=8000\nLOG_LEVEL=info\nTZ=America/Sao_Paulo')
+        return cabecalho + corpo
+    raise ValueError('Servicos suportados: geral/app, db/banco, api.')
+
+
+def ordenar_requirements_dedup(conteudo: str = "") -> str:
+    """Ordena requirements.txt alfabeticamente, marca pacotes duplicados e
+    avisa linhas sem versao fixada. Recebe o CONTEUDO do arquivo (texto), nao
+    acessa internet nem instala nada."""
+    import re as _re
+    linhas = str(conteudo).splitlines()
+    if not [l for l in linhas if l.strip()]:
+        raise ValueError('Cole o conteudo do requirements.txt. Ex.: {"conteudo": "requests==2.9.1\\nflask==3.0.0\\nrequests==2.10"}.')
+    pacotes, comentario = [], []
+    vistos = {}
+    for linha in linhas:
+        t = linha.strip()
+        if not t or t.startswith('#'):
+            comentario.append(t)
+            continue
+        nome = _re.split(r'[=<>!~\[]', t, 1)[0].strip()
+        chave = nome.lower().replace('_', '-')
+        sem_versao = not _re.search(r'[=<>!~]', t)
+        pacotes.append((chave, t, sem_versao))
+        vistos.setdefault(chave, []).append(t)
+    duplicados = {k: v for k, v in vistos.items() if len(v) > 1}
+    soltos = sorted({t for _, t, s in pacotes if s})
+    ordenado = '\n'.join(t for _, t, _ in sorted(pacotes, key=lambda par: par[0]))
+    avisos = []
+    if duplicados:
+        avisos.append('Duplicados: ' + '; '.join(k + ' (' + str(len(v)) + 'x)' for k, v in sorted(duplicados.items())))
+    if soltos:
+        avisos.append('Sem versao fixada: ' + ', '.join(sorted({p.split('=')[0].split('>')[0].split('<')[0] for p in soltos}))[:150])
+    return ('requirements ordenado (' + str(len(pacotes)) + ' pacote(s)):\n' + ordenado
+            + '\n\nAvisos: ' + (' | '.join(avisos) if avisos else 'nenhum')
+            + '\nComentarios ignorados: ' + str(len(comentario)) + ' linha(s).')
+
+
+def gerar_massa_dados_teste_ptbr(quantidade: str = "5", seed: str = "") -> str:
+    """Gera registros FALSOS de teste no padrao brasileiro (nome, CPF VALIDO
+    porem fake para teste, e-mail .test, cidade, idade). Deterministico com
+    seed; nada e enviado a lugar nenhum."""
+    import random as _random
+    try:
+        q = int(str(quantidade))
+    except ValueError:
+        raise ValueError('Quantidade precisa ser um numero (1 a 200).')
+    if not 1 <= q <= 200:
+        raise ValueError('Gere de 1 a 200 registros por vez.')
+    seed_n = None
+    if str(seed).strip():
+        try:
+            seed_n = int(str(seed))
+        except ValueError:
+            raise ValueError('Seed precisa ser um numero inteiro (ou vazio).')
+    aleatorio = _random.Random(seed_n)
+    nomes = ('Ana|Bruno|Carla|Diego|Eduarda|Felipe|Gabriela|Henrique|Isabela|Joao|Karina|Lucas|'
+             'Mariana|Nicolas|Olivia|Pedro|Queila|Rafael|Sofia|Thiago').split('|')
+    sobrenomes = ('Almeida|Barbosa|Carvalho|Dias|Esteves|Fernandes|Garcia|Henriques|Ilha|Junior|'
+                  'Lima|Moreira|Nunes|Oliveira|Pereira|Queiroz|Ribeiro|Silva|Teixeira|Vieira').split('|')
+    cidades = ('Sao Paulo|Rio de Janeiro|Belo Horizonte|Curitiba|Porto Alegre|Salvador|Recife|Fortaleza|Manaus|Ribeirao Preto').split('|')
+
+    def cpf_fake():
+        digitos = [aleatorio.randint(0, 9) for _ in range(9)]
+        for peso_extra in ((10, 9), (11, 10)):
+            peso, quantidade = peso_extra
+            soma = sum(d * (peso - i) for i, d in enumerate(digitos[:quantidade]))
+            resto = (soma * 10 % 11) % 10
+            digitos.append(resto)
+        base = ''.join(str(d) for d in digitos)
+        return base[:3] + '.' + base[3:6] + '.' + base[6:9] + '-' + base[9:]
+    linhas = []
+    for i in range(q):
+        nome = aleatorio.choice(nomes) + ' ' + aleatorio.choice(sobrenomes)
+        usuario = nome.lower().replace(' ', '.') + str(aleatorio.randint(1, 99))
+        linhas.append(str(i + 1) + ') ' + nome + ' | CPF(teste): ' + cpf_fake()
+                      + ' | ' + usuario + '@exemplo.test | ' + aleatorio.choice(cidades)
+                      + ' | ' + str(aleatorio.randint(18, 70)) + ' anos')
+    return ('MASSA DE DADOS FALSA para teste (' + str(q) + ' registro(s)'
+            + (', seed=' + str(seed_n) if seed_n is not None else ', aleatorio') + '):\n'
+            + '\n'.join(linhas) + '\nCPFs seguem o algoritmo de digitos verificadores mas NAO pertencem a ninguem.')
+
+
+def url_encode_decode(texto: str = "", modo: str = "codificar") -> str:
+    """Codifica/decodifica texto em percent-encoding de URL (espaco vira %20
+    etc). Modos: codificar (padrao) e decodificar. Local, sem internet."""
+    import urllib.parse as _up
+    m = str(modo).strip().lower()
+    if not str(texto):
+        raise ValueError('Envie o texto. Ex.: {"texto": "busca paulo", "modo": "codificar"}.')
+    if m in ('codificar', 'encode', 'enc'):
+        return 'Codificado: ' + _up.quote(str(texto), safe='')
+    if m in ('decodificar', 'decode', 'dec'):
+        try:
+            return 'Decodificado: ' + _up.unquote(str(texto), errors='strict')
+        except UnicodeDecodeError:
+            raise ValueError('Sequencia de % invalida para decodificar.')
+    raise ValueError('Modo precisa ser "codificar" ou "decodificar".')
+
+
+def gerar_sumario_markdown(texto: str = "") -> str:
+    """Extrai os titulos (#, ##, ###) de um Markdown e monta o indice com
+    links de ancora no estilo GitHub. So le o texto enviado; sem internet."""
+    import re as _re
+    linhas = str(texto).splitlines()
+    titulos = []
+    for linha in linhas:
+        m = _re.match(r'^(#{1,3})\s+(.+?)\s*#*$', linha)
+        if m:
+            titulos.append((len(m.group(1)), m.group(2).strip()))
+    if not titulos:
+        raise ValueError('Nao achei titulos (# ## ###) no texto. Ex.: {"texto": "# Titulo\\n## Secao"}.')
+    def ancora(t):
+        return _re.sub(r'[^\w\- ]', '', t.lower().replace(' ', '-'))
+    indice = []
+    for nivel, titulo in titulos:
+        indice.append('  ' * (nivel - 1) + '- [' + titulo + '](#' + ancora(titulo) + ')')
+    return ('Indice (' + str(len(titulos)) + ' titulo(s)):\n' + '\n'.join(indice)
+            + '\nAncoras seguem o padrao GitHub; outros renderizadores podem variar.')
+
+
+def tokens_estimativa_texto(texto: str = "") -> str:
+    """Estimativa GROSSEIRA de tokens de um texto (regra chars/4, media de
+    ingles/portugues) + contagem de palavras e caracteres. Para orcamento
+    antes de chamar a IA; o numero real depende do modelo/tokenizador."""
+    t = str(texto)
+    if not t.strip():
+        raise ValueError('Envie o texto. Ex.: {"texto": "texto qualquer para estimar"}.')
+    if len(t) > 500000:
+        raise ValueError('Texto muito grande (limite 500.000 caracteres).')
+    palavras = len(t.split())
+    estimativa = max(1, round(len(t) / 4))
+    faixa_baixo = max(1, round(len(t) / 5))
+    faixa_alto = max(1, round(len(t) / 3))
+    return ('Caracteres: ' + str(len(t)) + ' | Palavras: ' + str(palavras)
+            + '\nTokens ESTIMADOS: ~' + str(estimativa)
+            + ' (faixa provavel ' + str(faixa_baixo) + '-' + str(faixa_alto) + ')'
+            + '\nRegra aproximada chars/4; o valor real depende do tokenizador do modelo.')
+
+
+def markdown_tabela_gerar(texto: str = "", separador: str = ";") -> str:
+    """Gera uma tabela Markdown alinhada a partir de linhas separadas por ;
+    (ou |). Primeira linha vira o cabecalho. Local, sem internet."""
+    linhas = [l for l in str(texto).splitlines() if l.strip()][:300]
+    if len(linhas) < 2:
+        raise ValueError('Envie cabecalho + pelo menos 1 linha. Ex.: {"texto": "nome;idade\\nAna;30"}.')
+    sep = str(separador) or ';'
+    grade = [[c.strip() for c in l.split(sep)] for l in linhas]
+    ncol = max(len(g) for g in grade)
+    if ncol > 20:
+        raise ValueError('Limite de 20 colunas.')
+    grade = [g + [''] * (ncol - len(g)) for g in grade]
+    larguras = [max(len(g[i]) for g in grade) for i in range(ncol)]
+    larguras = [min(w, 30) for w in larguras]
+    cabecalho = '| ' + ' | '.join(grade[0][i].ljust(larguras[i])[:larguras[i]] for i in range(ncol)) + ' |'
+    separador_md = '|' + '|'.join('-' * (w + 2) for w in larguras) + '|'
+    corpo = ['| ' + ' | '.join(g[i].ljust(larguras[i])[:larguras[i]] for i in range(ncol)) + ' |' for g in grade[1:]]
+    return '\n'.join([cabecalho, separador_md] + corpo) + '\n(Copie e cole direto no Markdown)'
+
+
 def mmc_mdc_calcular(numeros: str = "") -> str:
     """MMC e MDC de dois a oito numeros inteiros (separados por virgula), com a
     fatoracao do MDC. Calculo local instantaneo, sem internet nem IA."""
@@ -27136,6 +28187,46 @@ tools = [
     # --- r22 lote 1: calculo, fisica, texto e datas offline ---
     estatisticas_descritivas,
     mmc_mdc_calcular,
+    gerar_tabuada,
+    anagrama_verificar,
+    palindromo_verificar,
+    alfabeto_fonetico_ortografico,
+    cifra_vigenere_converter,
+    xor_cifrar_texto,
+    numerar_linhas_texto,
+    quebrar_texto_largura,
+    abreviar_nome_iniciais,
+    inverter_ordem_palavras,
+    colunas_alinhar_texto,
+    ordenar_linhas_pt,
+    contar_vogais_consoantes,
+    caixa_alternada,
+    contar_repeticoes_palavra,
+    remover_tags_html_para_texto,
+    pluralizacao_simples_pt,
+    conjugacao_regular_pt,
+    ordinal_por_extenso,
+    explicar_cron_expressao,
+    consulta_codigo_http,
+    consulta_mime_extensao,
+    comparar_semver_versoes,
+    contraste_cores_wcag,
+    escapar_texto_programacao,
+    comparar_json_valores,
+    aplanar_json_dados,
+    testar_regex_padrao,
+    gerar_editorconfig,
+    gerar_pre_commit_esqueleto,
+    gerar_licenca_texto,
+    gerar_changelog_esqueleto,
+    gerar_readme_esqueleto,
+    gerar_dotenv_exemplo,
+    ordenar_requirements_dedup,
+    gerar_massa_dados_teste_ptbr,
+    url_encode_decode,
+    gerar_sumario_markdown,
+    tokens_estimativa_texto,
+    markdown_tabela_gerar,
     fatorar_numero_primos,
     converter_base_numerica,
     resolver_segundo_grau,
@@ -27369,7 +28460,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r26] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r27] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

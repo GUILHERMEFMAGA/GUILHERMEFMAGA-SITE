@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26 **253 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27 **286 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -192,7 +192,23 @@ ou relatórios reais sem revisão e autorização.
   nome (difflib corte 0.78; `_r26_sem_colisao`), **[4] como usar**. SÓ SUGERE — implementação
   continua exigindo auditoria AST + autorização. Saída sem acento (`_r26_dobrar`) para o console
   do Windows. Item 163 do catálogo marcado como entregue na r25 (comandos internos). Loader de
-  testes extrai `_r26_`. Selo `-r26`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
+  testes extrai `_r26_`. Selo `-r26`. Não testado no Windows real.
+- **r27 (LOTE 4 — crescimento de ferramentas):** +40 ferramentas (**549 → 589**, auditadas 0
+  duplicatas), itens 10, 49–66 e 68–88 do catálogo (as 40 primeiras propostas restantes na ordem
+  do arquivo — texto/dev/referência): tabuada, anagrama, palíndromo, alfabeto fonético PT+NATO,
+  Vigenère (≠ César), XOR-hex, numerar/quebrar/alinhar/ordenar linhas, vogais/consoantes, caixa
+  alternada, repetições de palavra, tags HTML→texto, plural/singular regular (com mapa `ais→al`
+  — o `→l` burro gerava "animl"), conjugação regular PT, ordinal 1–1000º, cron explicado
+  (rótulos por campo inteiro, não só a 1ª palavra), códigos HTTP, MIME, semver (com pre-release),
+  contraste WCAG, escapar json/regex/html/cmd, diff profundo de JSON, aplanar/reconstruir JSON,
+  testar regex, .editorconfig, .pre-commit, licenças MIT/ISC/Apache-resumo, changelog, readme,
+  .env de exemplo, requirements ordenar/dedup, massa de dados PT-BR com CPF fake VÁLIDO
+  (determinístico por seed), URL encode, sumário markdown, estimativa de tokens, tabela Markdown.
+  **RECONCILIAÇÃO do catálogo:** 47 itens de lotes anteriores estavam sem ✅ — marcados (40 nome
+  exato + 7 nome ajustado); 11 semelhanças difusas RECUSADAS (ex.: Vigenere≠César, DDD≠IP
+  estático) e voltaram para restantes. Catálogo agora: 109 ✅ conferidos 1-a-1 contra defs,
+  110 propostas restantes (589+110=699; a próxima ideia nova fecha 700). Suíte: +48 casos
+  (test_ferramentas_lote4_r27.py). Selo `-r27`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
