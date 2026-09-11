@@ -51,8 +51,8 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 
 ## Arquivos que devem ser inspecionados em Files changed / View all changes
 
-- `agente.py`: implementação principal; 480 ferramentas registradas na r21 (as 479 da r20
-  preservadas em nomes, ordem e assinaturas; nova: `parar_geracao_local`).
+- `agente.py`: implementação principal; **500 ferramentas** (480 da r21 preservadas + 20 do
+  lote 1 da r22: cálculo/física/texto/datas offline; ver `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`).
   Contém motor local, provedores, histórico, roteamento, ferramentas, painel e
   autoedição. **Não importar o monólito para testes:** há efeitos no topo.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch da entrega atual
@@ -103,9 +103,10 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19 foram 121 testes; na r20, 150; na r21 **175 testes isolados passaram**; as 479
-  ferramentas antigas preservadas (nomes/ordem/assinaturas conferidas por AST). Matriz e limites
-  da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`.
+- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22 lote 1 **197 testes isolados
+  passaram** (auditoria: 500 nomes únicos, 0 corpos idênticos; 479 originais sempre preservados).
+  Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
+  `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
 - **Validação real no PC (usuário, Windows, 10-11/09/2026):** r21 confirmada — selo r21 na abertura,
   sugestão de erro de digitação funcionou (`sttus ia` → pergunta → `sim` → `status ia` executado),
@@ -122,8 +123,14 @@ ou relatórios reais sem revisão e autorização.
   (difflib + confirmação "sim", só no modo local), detecção de colapso de repetição com aviso
   transparente (texto bruto preservado), `refazer com penalidade` confirmado (1x, +0,15),
   cancelamento `parar geracao local` (estado `cancelada`; servidor pode continuar brevemente)
-  e `response_format` JSON no modo ideias com fallback controlado em rejeição 4xx. Não houve
-  teste com GGUF/Windows reais nesta etapa.
+  e `response_format` JSON no modo ideias com fallback controlado em rejeição 4xx. Validação
+  real no Windows confirmada pelo usuário.
+- r22 lote 1: 20 ferramentas offline de cálculo/física/texto/datas (estatísticas, MMC/MDC,
+  fatoração, bases, Bhaskara, sistema 2x2, permutações/combinações, geometria plana, Pitágoras,
+  Ohm, resistores série/paralelo, código de cores, energias, velocidade média, densidade,
+  sílabas PT, César, Morse, feriados BR com Páscoa por Meeus, decodificar JWT). Todas
+  determinísticas, sem rede/IA; **180 propostas de ferramentas + o lote 1 estão no catálogo
+  220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
@@ -150,9 +157,9 @@ não versão semântica autenticada; orçamento de tokens é aproximado. Veja li
 antes de declarar qualquer problema resolvido universalmente.
 **31–70 não foram implementadas neste lote.** A próxima seleção depende do usuário.
 
-A meta anterior de 100 ideias e 700 ferramentas também não foi concluída: r18
-entregou 14 capacidades da expansão; total 480 na r21 (ferramenta `parar_geracao_local`),
-faltando 220 para 700. Não inflar
+A meta de 700 ferramentas: r18 entregou 14 capacidades; r21 somou 1 (480); r22 lote 1 somou 20
+(**500**). O `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md` mapeia as 200 restantes (checadas contra
+o inventário; podem ser ajustadas/descartadas na hora da implementação). Não inflar
 contagem com helpers, aliases ou variantes repetitivas. Melhorias internas não
 precisam virar ferramentas novas. Código/projetos têm prioridade, com distribuição
 para documentos/dados. Alterações confirmadas foram autorizadas, não autonomia irrestrita.

@@ -9,7 +9,7 @@ TREE = ast.parse(SOURCE.read_text(encoding='utf-8'))
 
 
 def carregar(*nomes, **ambiente):
-    nos = [n for n in TREE.body if isinstance(n, ast.FunctionDef) and (n.name in nomes or n.name.startswith(('_r20_', '_r21_')))]
+    nos = [n for n in TREE.body if isinstance(n, ast.FunctionDef) and (n.name in nomes or n.name.startswith(('_r20_', '_r21_', '_r22_')))]
     exec(compile(ast.Module(body=nos, type_ignores=[]), str(SOURCE), 'exec'), ambiente)
     return ambiente
 

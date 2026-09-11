@@ -7650,6 +7650,7 @@ def _menu_ajuda_local():
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
+    print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("MENU AVANCADO: menu avancado — analises de imports/dependencias de projetos")
     print("HISTORICO DE IDEIAS: ideias ja sugeridas | limpar historico de ideias")
     print("IDEIAS COM REFERENCIAS: ideias para o agente | me de 3 ideias para melhorar seu codigo")
@@ -24847,6 +24848,581 @@ def _comandos_oficina_local(comando):
     return True
 
 
+# ====== r22 LOTE 1 — calculo, fisica, texto e datas 100% offline (sem rede/IA) ======
+# Cada ferramenta e uma capacidade distinta (checada contra o inventario de 480
+# anteriores; auditoria AST garante nomes unicos e corpos diferentes).
+def _r22_num(texto):
+    """Converte '1.234,56'/'1234.56' para float; erro honesto se nao for numero."""
+    import re
+    s = str(texto).strip().replace(' ', '')
+    if not s:
+        raise ValueError('Numero vazio.')
+    if ',' in s and '.' in s:
+        s = s.replace('.', '').replace(',', '.')
+    elif ',' in s:
+        s = s.replace(',', '.')
+    s = re.sub(r'[^0-9eE+\-.]', '', s)
+    return float(s)
+
+
+def estatisticas_descritivas(numeros: str = "") -> str:
+    """Estatisticas descritivas de uma lista de numeros (separados por virgula
+    ou espaco): media, mediana, moda, desvio padrao, variancia, quartis, minimo,
+    maximo e amplitude. Calculo local, sem internet nem IA (vizinho:
+    estatisticas_csv opera coluna de arquivo CSV; esta opera numeros diretos)."""
+    import statistics as _st
+    partes = [x for x in str(numeros).replace(';', ',').replace('  ', ' ').split(',') if x.strip()]
+    if not partes:
+        raise ValueError('Envie numeros separados por virgula, ex.: 10, 20, 30.')
+    if len(partes) > 200:
+        raise ValueError('Limite de 200 numeros por consulta.')
+    dados = [_r22_num(x) for x in partes]
+    n = len(dados)
+    media = _st.fmean(dados)
+    mediana = _st.median(dados)
+    try:
+        desvio = _st.stdev(dados) if n > 1 else 0.0
+    except Exception:
+        desvio = 0.0
+    variancia = desvio * desvio
+    contagem = {}
+    for x in dados:
+        contagem[x] = contagem.get(x, 0) + 1
+    maior_freq = max(contagem.values())
+    moda = 'sem moda (valores todos distintos)' if maior_freq == 1 else ', '.join(
+        str(x) for x in sorted(v for v, f in contagem.items() if f == maior_freq))
+    ordenados = sorted(dados)
+    def _quartil(q):
+        pos = (n - 1) * q
+        baixo = int(pos)
+        alto = min(baixo + 1, n - 1)
+        peso = pos - baixo
+        return ordenados[baixo] * (1 - peso) + ordenados[alto] * peso
+    linhas = [f'Quantidade: {n}', f'Media: {media:.4g}', f'Mediana: {mediana:.4g}',
+              f'Moda: {moda}', f'Desvio padrao: {desvio:.4g}', f'Variancia: {variancia:.4g}',
+              f'Minimo: {min(dados):.4g}', f'Maximo: {max(dados):.4g}',
+              f'Amplitude: {max(dados) - min(dados):.4g}',
+              f'Q1 (25%): {_quartil(0.25):.4g}', f'Q3 (75%): {_quartil(0.75):.4g}']
+    return 'Estatisticas descritivas:\n  ' + '\n  '.join(linhas)
+
+
+def mmc_mdc_calcular(numeros: str = "") -> str:
+    """MMC e MDC de dois a oito numeros inteiros (separados por virgula), com a
+    fatoracao do MDC. Calculo local instantaneo, sem internet nem IA."""
+    from math import gcd
+    partes = [x.strip() for x in str(numeros).replace(';', ',').split(',') if x.strip()]
+    if not 2 <= len(partes) <= 8:
+        raise ValueError('Envie de 2 a 8 numeros inteiros separados por virgula.')
+    valores = []
+    for x in partes:
+        v = float(x)
+        if not v.is_integer():
+            raise ValueError('Somente numeros inteiros: ' + x)
+        v = int(v)
+        if not 0 <= abs(v) <= 10 ** 15:
+            raise ValueError('Numero fora do limite suportado (10^15): ' + x)
+        valores.append(abs(v))
+    mdc = valores[0]
+    mmc = valores[0]
+    for v in valores[1:]:
+        mdc = gcd(mdc, v)
+        mmc = mmc * v // gcd(mmc, v) if mmc and v else 0
+    return (f'Numeros: {", ".join(str(v) for v in valores)}\n'
+            f'MDC: {mdc}\nMMC: {mmc}\nCalculo local; nao use para decisoes criticas sem conferir.')
+
+
+def fatorar_numero_primos(numero=0) -> str:
+    """Fatoracao em primos de um inteiro ate 10^12 (ex.: 360 = 2^3 * 3^2 * 5),
+    diz se o numero e primo e quantos divisores tem. Calculo local, sem internet."""
+    v = _r22_num(numero)
+    if not v.is_integer():
+        raise ValueError('Envie um numero inteiro.')
+    n = int(v)
+    if not 2 <= n <= 10 ** 12:
+        raise ValueError('Envie um inteiro entre 2 e 10^12.')
+    resto, expoentes = n, {}
+    divisor = 2
+    while divisor * divisor <= resto:
+        while resto % divisor == 0:
+            expoentes[divisor] = expoentes.get(divisor, 0) + 1
+            resto //= divisor
+        divisor += 1 if divisor == 2 else 2
+    if resto > 1:
+        expoentes[resto] = expoentes.get(resto, 0) + 1
+    fatos = ' * '.join(f'{p}^{e}' if e > 1 else str(p) for p, e in sorted(expoentes.items()))
+    total_divisores = 1
+    for e in expoentes.values():
+        total_divisores *= (e + 1)
+    primo = len(expoentes) == 1 and n in expoentes
+    return (f'{n} = {fatos}\nE primo? {"sim" if primo else "nao"}\n'
+            f'Quantidade de divisores: {total_divisores}')
+
+
+def converter_base_numerica(valor: str = "", base_entrada: int = 10, base_saida: int = 2) -> str:
+    """Converte numeros entre bases 2 a 36 (binario, octal, decimal, hexadecimal
+    e outras). Calculo local, sem internet; nao altera arquivos."""
+    digitos = '0123456789abcdefghijklmnopqrstuvwxyz'
+    if not 2 <= int(base_entrada) <= 36 or not 2 <= int(base_saida) <= 36:
+        raise ValueError('Bases validas: 2 a 36.')
+    s = str(valor).strip().lower().replace(' ', '')
+    if s.startswith('-'):
+        sinal, s = '-', s[1:]
+    else:
+        sinal = ''
+    if not s or any(c not in digitos[:int(base_entrada)] for c in s):
+        raise ValueError(f'"{valor}" nao e valido na base {base_entrada}.')
+    inteiro = int(s, int(base_entrada))
+    if inteiro == 0:
+        return f'{sinal}0 (base {base_entrada}) = 0 (base {base_saida})'
+    saida = ''
+    n = inteiro
+    while n:
+        n, resto = divmod(n, int(base_saida))
+        saida = digitos[resto] + saida
+    return (f'{sinal}{s} (base {base_entrada}) = {sinal}{saida} (base {base_saida})\n'
+            f'Decimal: {sinal}{inteiro}')
+
+
+def resolver_segundo_grau(a=0, b=0, c=0) -> str:
+    """Resolve ax^2 + bx + c = 0 (Bhaskara): raizes reais ou complexas, delta,
+    vertice da parabola e concavidade. Calculo local, sem internet."""
+    aa, bb, cc = _r22_num(a), _r22_num(b), _r22_num(c)
+    if aa == 0:
+        raise ValueError('Com a=0 a equacao nao e de segundo grau.')
+    delta = bb * bb - 4 * aa * cc
+    xv = -bb / (2 * aa)
+    yv = aa * xv * xv + bb * xv + cc
+    partes = [f'Delta: {delta:.6g}',
+              f'Vertice: ({xv:.6g}, {yv:.6g})',
+              'Concavidade: para cima' if aa > 0 else 'Concavidade: para baixo']
+    if delta > 0:
+        r1 = (-bb + delta ** 0.5) / (2 * aa)
+        r2 = (-bb - delta ** 0.5) / (2 * aa)
+        partes.append(f'Duas raizes reais: x1 = {r1:.6g}; x2 = {r2:.6g}')
+    elif delta == 0:
+        partes.append(f'Uma raiz real (dupla): x = {xv:.6g}')
+    else:
+        imag = (-delta) ** 0.5 / (2 * aa)
+        partes.append(f'Sem raizes reais. Complexas: {xv:.6g} + {imag:.6g}i e {xv:.6g} - {imag:.6g}i')
+    return 'Equacao %.6gx^2 + %.6gx + %.6g = 0\n  ' % (aa, bb, cc) + '\n  '.join(partes)
+
+
+def resolver_sistema_linear_2x2(a1=0, b1=0, c1=0, a2=0, b2=0, c2=0) -> str:
+    """Resolve o sistema a1*x + b1*y = c1 e a2*x + b2*y = c2 com fracoes exatas:
+    solucao unica, infinitas (sistemas proporcionais) ou impossivel. Sem internet."""
+    from fractions import Fraction
+    try:
+        A1, B1, C1 = Fraction(str(_r22_num(a1))), Fraction(str(_r22_num(b1))), Fraction(str(_r22_num(c1)))
+        A2, B2, C2 = Fraction(str(_r22_num(a2))), Fraction(str(_r22_num(b2))), Fraction(str(_r22_num(c2)))
+    except ValueError:
+        raise
+    det = A1 * B2 - A2 * B1
+    if det == 0:
+        if A1 * C2 == A2 * C1 and B1 * C2 == B2 * C1:
+            return 'Sistema com infinitas solucoes (equacoes proporcionais).'
+        return 'Sistema impossivel: as retas sao paralelas e nao se cruzam.'
+    x = (C1 * B2 - C2 * B1) / det
+    y = (A1 * C2 - A2 * C1) / det
+    def _txt(fr):
+        return str(fr) + (' = %.6g' % float(fr) if fr.denominator != 1 else '')
+    return (f'Solucao unica:\n  x = {_txt(x)}\n  y = {_txt(y)}\n'
+            f'Determinante: {_txt(det)}')
+
+
+def permutacoes_combinacoes_calcular(n=0, k=0) -> str:
+    """Permutacoes (nPk) e combinacoes (nCk) de n elementos tomados k a k, mais
+    o fatorial de n. Contagem exata com inteiros grandes; sem internet."""
+    import math
+    nn, kk = _r22_num(n), _r22_num(k)
+    if not nn.is_integer() or not kk.is_integer():
+        raise ValueError('n e k devem ser inteiros.')
+    n_i, k_i = int(nn), int(kk)
+    if not 0 <= n_i <= 5000 or not 0 <= k_i <= n_i:
+        raise ValueError('Exige 0 <= k <= n <= 5000.')
+    fat_n = math.factorial(n_i)
+    p = fat_n // math.factorial(n_i - k_i)
+    c = p // math.factorial(k_i)
+    return (f'n = {n_i}, k = {k_i}\nP(n,k) = {p}\nC(n,k) = {c}\n'
+            f'n! tem {len(str(fat_n))} digitos'
+            + ('' if len(str(fat_n)) <= 60 else ' (valor omitido por tamanho); calcule sob demanda'))
+
+
+def geometria_plana_calcular(forma: str = "", **medidas) -> str:
+    """Area e perimetro de figuras planas. Formas: circulo (raio), quadrado
+    (lado), retangulo (base, altura), triangulo (base, altura) e losango
+    (diagonal_maior, diagonal_menor). Calculo local, sem internet."""
+    import math
+    forma_n = str(forma).strip().lower()
+    def _pegar(nome):
+        if nome not in medidas:
+            raise ValueError(f'Informe "{nome}" para a forma {forma_n}.')
+        return _r22_num(medidas[nome])
+    if forma_n == 'circulo':
+        r = _pegar('raio')
+        return (f'Circulo (r = {r:g}):\n  Area = {math.pi * r * r:.6g}\n  Perimetro = {2 * math.pi * r:.6g}')
+    if forma_n == 'quadrado':
+        l = _pegar('lado')
+        return f'Quadrado (l = {l:g}):\n  Area = {l * l:.6g}\n  Perimetro = {4 * l:.6g}'
+    if forma_n == 'retangulo':
+        b, h = _pegar('base'), _pegar('altura')
+        return f'Retangulo ({b:g} x {h:g}):\n  Area = {b * h:.6g}\n  Perimetro = {2 * (b + h):.6g}'
+    if forma_n == 'triangulo':
+        b, h = _pegar('base'), _pegar('altura')
+        return (f'Triangulo (base {b:g}, altura {h:g}):\n  Area = {b * h / 2:.6g}\n'
+                '  Perimetro: precisa dos 3 lados (use teorema_pitagoras em retangulos).')
+    if forma_n == 'losango':
+        D, d = _pegar('diagonal_maior'), _pegar('diagonal_menor')
+        lado = ((D / 2) ** 2 + (d / 2) ** 2) ** 0.5
+        return f'Losango:\n  Area = {D * d / 2:.6g}\n  Perimetro = {4 * lado:.6g}'
+    raise ValueError('Formas: circulo, quadrado, retangulo, triangulo, losango.')
+
+
+def teorema_pitagoras_resolver(cateto1="", cateto2="", hipotenusa="") -> str:
+    """Resolve o triangulo retangulo: informe DOIS valores (cateto1, cateto2,
+    hipotenusa) e o terceiro e calculado. Valores devem ser positivos. Sem internet."""
+    preenchidos = [x for x in (cateto1, cateto2, hipotenusa) if str(x).strip() != '']
+    if len(preenchidos) != 2:
+        raise ValueError('Informe exatamente dois valores; o terceiro e calculado.')
+    def _pegar(nome, bruto):
+        if str(bruto).strip() == '':
+            return None
+        v = _r22_num(bruto)
+        if v <= 0:
+            raise ValueError(f'{nome} deve ser positivo.')
+        return v
+    a = _pegar('cateto1', cateto1)
+    b = _pegar('cateto2', cateto2)
+    c = _pegar('hipotenusa', hipotenusa)
+    if c is None:
+        r = (a * a + b * b) ** 0.5
+        return f'Hipotenusa = {r:.6g}  (catetos {a:g} e {b:g})'
+    if max(a or 0, b or 0) >= c:
+        raise ValueError('A hipotenusa deve ser MAIOR que cada cateto.')
+    if a is None:
+        r = (c * c - b * b) ** 0.5
+        return f'Cateto1 = {r:.6g}  (hipotenusa {c:g}, cateto2 {b:g})'
+    r = (c * c - a * a) ** 0.5
+    return f'Cateto2 = {r:.6g}  (hipotenusa {c:g}, cateto1 {a:g})'
+
+
+def lei_de_ohm_calcular(voltagem="", corrente="", resistencia="") -> str:
+    """Lei de Ohm: informe DOIS valores (voltagem em volts, corrente em amperes,
+    resistencia em ohms) e o terceiro e calculado, junto com a potencia em watts.
+    Calculo local; nao mede nada no PC. Valores positivos distintos de zero."""
+    pares = {'voltagem': voltagem, 'corrente': corrente, 'resistencia': resistencia}
+    informados = {k: _r22_num(v) for k, v in pares.items() if str(v).strip() != ''}
+    if len(informados) != 2 or any(v <= 0 for v in informados.values()):
+        raise ValueError('Informe exatamente dois valores positivos (voltagem, corrente, resistencia).')
+    falta = [k for k in pares if k not in informados][0]
+    if falta == 'voltagem':
+        valor = informados['corrente'] * informados['resistencia']
+    elif falta == 'corrente':
+        valor = informados['voltagem'] / informados['resistencia']
+    else:
+        valor = informados['voltagem'] / informados['corrente']
+    resumo = dict(informados)
+    resumo[falta] = valor
+    potencia = resumo['voltagem'] * resumo['corrente']
+    return (f'{falta.capitalize()} = {valor:.6g}\n'
+            f'Resumo: V = {resumo["voltagem"]:.6g} V | I = {resumo["corrente"]:.6g} A | '
+            f'R = {resumo["resistencia"]:.6g} ohms\nPotencia = {potencia:.6g} W')
+
+
+def resistores_circuitos_calcular(valores: str = "", modo: str = "serie") -> str:
+    """Resistencia equivalente de 2 a 10 resistores (em ohms; aceita '1k', '2.2M').
+    Modos: serie (soma) e paralelo (inverso dos inversos). Calculo local."""
+    partes = [x.strip() for x in str(valores).replace(';', ',').split(',') if x.strip()]
+    if not 2 <= len(partes) <= 10:
+        raise ValueError('Envie de 2 a 10 valores separados por virgula.')
+    Ohms = []
+    for x in partes:
+        s = x.lower().replace(' ', '')
+        fator = 1.0
+        if s.endswith('k'):
+            fator, s = 1000.0, s[:-1]
+        elif s.endswith('m'):
+            fator, s = 1000000.0, s[:-1]
+        v = _r22_num(s) * fator
+        if v <= 0:
+            raise ValueError('Resistencias devem ser positivas: ' + x)
+        Ohms.append(v)
+    modo_n = str(modo).strip().lower()
+    if modo_n == 'serie':
+        eq = sum(Ohms)
+        formula = 'soma direta'
+    elif modo_n == 'paralelo':
+        eq = 1.0 / sum(1.0 / r for r in Ohms)
+        formula = 'inverso do somatorio dos inversos'
+    else:
+        raise ValueError('Modo deve ser "serie" ou "paralelo".')
+    return (f'Modo {modo_n} de {len(Ohms)} resistores ({", ".join("%g" % r for r in Ohms)} ohms):\n'
+            f'Equivalente = {eq:.6g} ohms ({formula})')
+
+
+def resistor_codigo_de_cores(bandas: str = "") -> str:
+    """Converte o codigo de cores do resistor em valor: informe 3 ou 4 faixas
+    separadas por virgula (ex.: marrom, preto, vermelho, dourado). Referencia
+    padrao; calculo local, sem internet."""
+    digitos = {'preto': 0, 'marrom': 1, 'vermelho': 2, 'laranja': 3, 'amarelo': 4,
+               'verde': 5, 'azul': 6, 'violeta': 7, 'cinza': 8, 'branco': 9}
+    multiplicador = {cor: 10.0 ** dig for cor, dig in digitos.items()}
+    multiplicador.update({'dourado': 0.1, 'prata': 0.01})
+    tolerancia = {'marrom': '1%', 'vermelho': '2%', 'verde': '0.5%', 'azul': '0.25%',
+                  'violeta': '0.1%', 'cinza': '0.05%', 'dourado': '5%', 'prata': '10%'}
+    partes = [x.strip().lower() for x in str(bandas).replace(';', ',').split(',') if x.strip()]
+    if len(partes) not in (3, 4):
+        raise ValueError('Informe 3 ou 4 cores separadas por virgula.')
+    if partes[0] not in digitos or partes[1] not in digitos or partes[2] not in multiplicador:
+        raise ValueError('Cor invalida. Validas: ' + ', '.join(sorted(set(digitos) | {'dourado', 'prata'})))
+    base = (digitos[partes[0]] * 10 + digitos[partes[1]]) * multiplicador[partes[2]]
+    toler = tolerancia.get(partes[3], '20% (sem faixa informada)') if len(partes) == 4 else '20%'
+    texto = f'{base:.6g} ohms' if base < 1000 else f'{base / 1000:.6g} k-ohms'
+    return (f'Resistor {", ".join(partes)}:\n  Valor = {texto}\n  Tolerancia = {toler}\n'
+            'Faixa de valor: consultar com multimeter para medicoes reais.')
+
+
+def energia_mecanica_calcular(modo: str = "cinetica", massa: float = 0, velocidade: float = 0,
+                              altura: float = 0, gravidade: float = 9.81) -> str:
+    """Energia cinetica (m*v^2/2), potencial (m*g*h) ou mecanica total (soma),
+    em joules. Modos: cinetica, potencial, mecanica. Sem internet; g ajustavel."""
+    m = _r22_num(massa)
+    g = _r22_num(gravidade)
+    if m <= 0 or g <= 0:
+        raise ValueError('Massa e gravidade devem ser positivas.')
+    modo_n = str(modo).strip().lower()
+    if modo_n == 'cinetica':
+        v = _r22_num(velocidade)
+        ec = m * v * v / 2
+        return f'Energia cinetica = {ec:.6g} J (m = {m:g} kg, v = {v:g} m/s)'
+    if modo_n == 'potencial':
+        h = _r22_num(altura)
+        ep = m * g * h
+        return f'Energia potencial = {ep:.6g} J (m = {m:g} kg, h = {h:g} m, g = {g:g} m/s^2)'
+    if modo_n == 'mecanica':
+        v, h = _r22_num(velocidade), _r22_num(altura)
+        ec, ep = m * v * v / 2, m * g * h
+        return (f'E. cinetica = {ec:.6g} J | E. potencial = {ep:.6g} J | '
+                f'E. mecanica total = {ec + ep:.6g} J')
+    raise ValueError('Modos: cinetica, potencial, mecanica.')
+
+
+def velocidade_media_calcular(distancia_km: float = 0, tempo_horas: float = 0) -> str:
+    """Velocidade media a partir da distancia (km) e do tempo (horas): devolve
+    km/h e m/s. Calculo local, sem internet; nao usa GPS."""
+    d, tt = _r22_num(distancia_km), _r22_num(tempo_horas)
+    if d <= 0 or tt <= 0:
+        raise ValueError('Distancia e tempo devem ser positivos.')
+    kmh = d / tt
+    return (f'Velocidade media = {kmh:.6g} km/h = {kmh / 3.6:.6g} m/s\n'
+            f'({d:g} km em {tt:g} h)')
+
+
+def densidade_calcular(massa_g: float = 0, volume_cm3: float = 0) -> str:
+    """Densidade (g/cm^3 e kg/m^3) a partir de massa em gramas e volume em cm^3,
+    com sugestao de material comum proximo (tabela basica). Calculo local."""
+    tabela = {'agua (4C)': 1.0, 'gelo': 0.92, 'madeira (media)': 0.6, 'aluminio': 2.7,
+              'ferro': 7.87, 'cobre': 8.96, 'chumbo': 11.34, 'mercurio': 13.6, 'ouro': 19.3}
+    m, v = _r22_num(massa_g), _r22_num(volume_cm3)
+    if m <= 0 or v <= 0:
+        raise ValueError('Massa e volume devem ser positivos.')
+    dens = m / v
+    linhas = [f'Densidade = {dens:.6g} g/cm^3 = {dens * 1000:.6g} kg/m^3']
+    prox = min(tabela.items(), key=lambda par: abs(par[1] - dens))
+    if abs(prox[1] - dens) / prox[1] <= 0.10:
+        linhas.append(f'Material comum mais proximo: {prox[0]} ({prox[1]:g} g/cm^3)')
+    else:
+        linhas.append('Nao achei material comum proximo na tabela basica (agua, metais, gelo, madeira).')
+    return '\n'.join(linhas)
+
+
+def contar_silabas_texto(texto: str = "") -> str:
+    """Conta silabas APROXIMADAS de um texto em portugues (heuristica por nucleos
+    vocalicos; nao e analise morfologica), por linha e no total. Util para
+    metrica de poesia com verificacao humana. Sem internet."""
+    import re
+    txt = str(texto)
+    if not txt.strip():
+        raise ValueError('Envie um texto para contar silabas.')
+    if len(txt) > 20000:
+        raise ValueError('Texto excessivo; limite de 20000 caracteres.')
+    vogais = 'aeiouáéíóúâêôãõàäüAEIOUÁÉÍÓÚÂÊÔÃÕÀÄÜ'
+    linhas_res = []
+    total = 0
+    for linha in txt.splitlines():
+        if not linha.strip():
+            continue
+        palavras = re.findall(r'[\w' + vogais + ']+', linha, flags=re.UNICODE)
+        soma = 0
+        for palavra in palavras:
+            grupos = 0
+            anterior_vogal = False
+            for letra in palavra:
+                e_vogal = letra in vogais
+                if e_vogal and not anterior_vogal:
+                    grupos += 1
+                anterior_vogal = e_vogal
+            soma += max(1, grupos)
+        total += soma
+        linhas_res.append((linha.strip()[:60], soma))
+    if not linhas_res:
+        raise ValueError('Nao encontrei palavras no texto.')
+    saida = [f'Total aproximado: {total} silabas em {len(linhas_res)} linha(s)']
+    for trecho, n in linhas_res[:12]:
+        saida.append(f'  {n:>3} | {trecho}')
+    if len(linhas_res) > 12:
+        saida.append(f'  ... ({len(linhas_res) - 12} linhas restantes)')
+    saida.append('Heuristica aproximada; confira metrica critica manualmente.')
+    return '\n'.join(saida)
+
+
+def cifra_de_cesar_converter(texto: str = "", deslocamento: int = 3, modo: str = "cifrar") -> str:
+    """Cifra de Cesar: desloca letras preservando maiusculas e demais caracteres.
+    Modos: cifrar, decifrar (deslocamento negativo aplicado) e forca_bruta (mostra
+    os 25 deslocamentos para textos ate 400 caracteres). Sem internet."""
+    txt = str(texto)
+    if not txt.strip():
+        raise ValueError('Envie um texto.')
+    if len(txt) > 20000:
+        raise ValueError('Texto excessivo; limite de 20000 caracteres.')
+    modo_n = str(modo).strip().lower()
+    def _deslocar(s, k):
+        saida = []
+        for ch in s:
+            if 'a' <= ch <= 'z':
+                saida.append(chr((ord(ch) - 97 + k) % 26 + 97))
+            elif 'A' <= ch <= 'Z':
+                saida.append(chr((ord(ch) - 65 + k) % 26 + 65))
+            else:
+                saida.append(ch)
+        return ''.join(saida)
+    if modo_n == 'forca_bruta':
+        if len(txt) > 400:
+            raise ValueError('Forca bruta limitada a 400 caracteres.')
+        linhas = [f'k = {k:>2}: {_deslocar(txt, k)}' for k in range(1, 26)]
+        return 'Tentativas (procure a que faz sentido):\n' + '\n'.join(linhas)
+    k = int(_r22_num(deslocamento)) % 26
+    if modo_n == 'decifrar':
+        k = -k
+    elif modo_n != 'cifrar':
+        raise ValueError('Modos: cifrar, decifrar, forca_bruta.')
+    return f'Resultado ({modo_n}, deslocamento {int(_r22_num(deslocamento)) % 26}):\n{_deslocar(txt, k)}'
+
+
+_MORSE = {'a': '.-', 'b': '-...', 'c': '-.-.', 'd': '-..', 'e': '.', 'f': '..-.',
+          'g': '--.', 'h': '....', 'i': '..', 'j': '.---', 'k': '-.-', 'l': '.-..',
+          'm': '--', 'n': '-.', 'o': '---', 'p': '.--.', 'q': '--.-', 'r': '.-.',
+          's': '...', 't': '-', 'u': '..-', 'v': '...-', 'w': '.--', 'x': '-..-',
+          'y': '-.--', 'z': '--..', '0': '-----', '1': '.----', '2': '..---',
+          '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+          '8': '---..', '9': '----.', '.': '.-.-.-', ',': '--..--', '?': '..--..',
+          '!': '-.-.--', '-': '-....-', '/': '-..-.', ':': '---...'}
+
+
+def morse_converter(texto: str = "", modo: str = "texto_para_morse") -> str:
+    """Converte texto <-> codigo Morse internacional (letras, numeros e
+    pontuacao basica). Espacos triplos separam palavras no Morse. Sem internet."""
+    txt = str(texto).strip()
+    if not txt:
+        raise ValueError('Envie um texto ou codigo Morse.')
+    if len(txt) > 5000:
+        raise ValueError('Entrada excessiva; limite de 5000 caracteres.')
+    modo_n = str(modo).strip().lower()
+    inverso = {v: k for k, v in _MORSE.items()}
+    if modo_n == 'texto_para_morse':
+        import unicodedata
+        plano = ''.join(c for c in unicodedata.normalize('NFD', txt.lower())
+                        if unicodedata.category(c) != 'Mn')
+        grupos = []
+        for palavra in plano.split():
+            letras = []
+            for ch in palavra:
+                if ch == ' ':
+                    continue
+                if ch not in _MORSE:
+                    raise ValueError(f'Caractere sem Morse: "{ch}".')
+                letras.append(_MORSE[ch])
+            grupos.append(' '.join(letras))
+        return 'Morse:\n' + ' / '.join(grupos)
+    if modo_n == 'morse_para_texto':
+        for simbolo in txt:
+            if simbolo not in '.- /\t' and simbolo not in _MORSE:
+                raise ValueError(f'Caractere invalido em Morse: "{simbolo}".')
+        palavras = [p.strip() for p in txt.replace('\t', '   ').split(' / ')]
+        letras = []
+        for palavra in palavras:
+            pedaco = ''
+            for codigo in palavra.split():
+                if codigo not in inverso:
+                    raise ValueError(f'Codigo Morse desconhecido: "{codigo}".')
+                pedaco += inverso[codigo]
+            letras.append(pedaco)
+        return 'Texto:\n' + ' '.join(letras).upper()
+    raise ValueError('Modos: texto_para_morse, morse_para_texto.')
+
+
+def feriados_brasil_ano(ano=0) -> str:
+    """Lista os FERIADOS NACIONAIS do Brasil de um ano (fixos + moveis calculados
+    pelo algoritmo de Meeus para a Pascoa). Calculo local, sem internet; feriados
+    municipais/estaduais nao estao inclusos."""
+    from datetime import date, timedelta
+    y = int(_r22_num(ano)) if str(ano).strip() else date.today().year
+    if not 1900 <= y <= 2199:
+        raise ValueError('Anos suportados: 1900 a 2199.')
+    a, b, c = y % 19, y // 100, y % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = (h + l - 7 * m + 114) % 31 + 1
+    pascoa = date(y, mes, dia)
+    lista = [('01/01', 'Confraternizacao Universal', date(y, 1, 1)),
+             ('móvel', 'Carnaval (ponto facultativo nacional)', pascoa - timedelta(days=47)),
+             ('móvel', 'Sexta-feira da Paixao', pascoa - timedelta(days=2)),
+             ('21/04', 'Tiradentes', date(y, 4, 21)),
+             ('01/05', 'Dia do Trabalho', date(y, 5, 1)),
+             ('móvel', 'Corpus Christi (ponto facultativo nacional)', pascoa + timedelta(days=60)),
+             ('07/09', 'Independencia', date(y, 9, 7)),
+             ('12/10', 'Nossa Senhora Aparecida', date(y, 10, 12)),
+             ('02/11', 'Finados', date(y, 11, 2)),
+             ('15/11', 'Proclamacao da Republica', date(y, 11, 15)),
+             ('20/11', 'Consciencia Negra (nacional desde 2024)', date(y, 11, 20)),
+             ('25/12', 'Natal', date(y, 12, 25))]
+    lista.sort(key=lambda x: x[2])
+    linhas = [f'Feriados nacionais de {y} (Pascoa em {pascoa.strftime("%d/%m")}):']
+    for _, nome, data in lista:
+        semana = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'][data.weekday()]
+        linhas.append(f'  {data.strftime("%d/%m")} ({semana}) - {nome}')
+    linhas.append('Confira feriados municipais/estaduais e pontos facultativos do seu local.')
+    return '\n'.join(linhas)
+
+
+def decodificar_jwt_token(token: str = "") -> str:
+    """Decodifica um JWT (header e payload em JSON legivel) SEM verificar a
+    assinatura - util para debug. AVISO: um token e credencial; nao cole tokens
+    de outras pessoas nem em lugares publicos. Nao envia nada para fora do PC."""
+    import base64
+    import json
+    partes = str(token).strip().split('.')
+    if len(partes) not in (2, 3) or not all(partes[:2]):
+        raise ValueError('Formato de JWT invalido (esperado header.payload.assinatura).')
+    if len(str(token)) > 8000:
+        raise ValueError('Token excessivo; limite de 8000 caracteres.')
+    def _decodificar(parte):
+        preenchido = parte + '=' * (-len(parte) % 4)
+        bruto = base64.urlsafe_b64decode(preenchido.encode())
+        dados = json.loads(bruto.decode('utf-8'))
+        return json.dumps(dados, ensure_ascii=False, indent=2)
+    header = _decodificar(partes[0])
+    payload = _decodificar(partes[1])
+    return ('HEADER:\n' + header + '\n\nPAYLOAD:\n' + payload +
+            '\n\nAVISOS: assinatura NAO verificada (nada foi validado); payload nao e criptografado; '
+            'nao compartilhe tokens reais.')
+
+
 tools = [
     auditar_armadilhas_python,
     comparar_api_python,
@@ -25337,6 +25913,27 @@ tools = [
     listar_ferramentas,
     # --- r21: confiabilidade das respostas locais ---
     parar_geracao_local,
+    # --- r22 lote 1: calculo, fisica, texto e datas offline ---
+    estatisticas_descritivas,
+    mmc_mdc_calcular,
+    fatorar_numero_primos,
+    converter_base_numerica,
+    resolver_segundo_grau,
+    resolver_sistema_linear_2x2,
+    permutacoes_combinacoes_calcular,
+    geometria_plana_calcular,
+    teorema_pitagoras_resolver,
+    lei_de_ohm_calcular,
+    resistores_circuitos_calcular,
+    resistor_codigo_de_cores,
+    energia_mecanica_calcular,
+    velocidade_media_calcular,
+    densidade_calcular,
+    contar_silabas_texto,
+    cifra_de_cesar_converter,
+    morse_converter,
+    feriados_brasil_ano,
+    decodificar_jwt_token,
 ]
 
 # ======================================================================

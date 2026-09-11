@@ -23,8 +23,8 @@ tools = [primeira, segunda, primeira, ausente]
 
     def test_registro_atual_sem_nomes_repetidos_ou_ausentes(self):
         nomes, funcoes, _, _ = auditar(SOURCE.read_text())
-        # r21: 479 ferramentas anteriores preservadas + parar_geracao_local (nova).
-        self.assertEqual(len(nomes), 480)
+        # r21: +1 (parar_geracao_local); r22 lote 1: +20 calculo/fisica/texto/datas.
+        self.assertEqual(len(nomes), 500)
         self.assertEqual(len(nomes), len(set(nomes)))
         self.assertFalse(set(nomes) - set(funcoes))
 
