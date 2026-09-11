@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39 **381 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40 **384 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -330,6 +330,15 @@ ou relatórios reais sem revisão e autorização.
   redobrada atencao e compare com o que ja existe". Parciais vazios não disparam (têm rodapé
   próprio). Selo `-r39`. **CICLO DE VALIDAÇÃO REAL CONCLUÍDO: r34→r39, quatro relatos, quatro
   iterações, taxa 0/5 → 5/5 com honestidade preservada em todas as etapas.**
+- **r40 (0/5 por repetição = filtro VENCENDO, mas agora com conteúdo — QUINTO relato real,
+  r39 no PC):** o usuário repetiu o MESMO pedido da rodada anterior; o modelo gerou temas
+  parecidos e o filtro de histórico bloqueou 5/5 ("Titulos repetidos...: 5") — a garantia
+  anti-repetição funcionou em PRODUÇÃO, mas a resposta virava só "nenhuma validada".
+  Agora, quando aceitos==0 e houve repetições: mostra "O filtro anti-repeticao BLOQUEOU N
+  ideia(s)... sinal de que ele funciona" + até 3 títulos repetidos como prova + orientação
+  de variar tema ("3 ideias sobre X") + o bloco de 3 ideias do catálogo (helper novo
+  `_r40_bloco_catalogo_fallback`, reusado pelo parse-fail do r38, evitando duplicação).
+  Selo `-r40`. Testado parcialmente no Windows real (quinto relato; r40 aguarda reteste).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
