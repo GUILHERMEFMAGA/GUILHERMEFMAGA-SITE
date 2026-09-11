@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30 **324 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31 **328 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -239,6 +239,16 @@ ou relatórios reais sem revisão e autorização.
   para o resumo ("porque vale reaproveitar"). Palavra curta não é colisão falsa (norma exata).
   Resumo da análise na mensagem ("Analise da ideia: ..."). Loader extrai `_r30_`. Selo `-r30`.
   Não testado no Windows real.
+- **r31 (checagem dura de existência no pipeline de ideias da conversa livre):** o pipeline
+  antigo (r15/16, fundamentado no GGUF local) já avisava sobre repetidos no histórico e
+  rejeitadas; agora `_formatar_ideias_verificadas` também aplica a checagem DURO das demais
+  camadas: `_r31_ideia_ja_existe` descarta sugestão cujo título normalizado é nome de função
+  do agente (zero duplicata; contagem no resumo "Descartadas porque ja existe ferramenta...") e
+  `_r31_numero_no_catalogo` marca com "(catalogo #N)" a sugestão que corresponde a proposta do
+  catálogo local. Todos os 3 caminhos de ideia (fábrica r26, esqueleto r30, conversa livre r31)
+  agora compartilham a mesma garantia anti-repetição. Nota: a geração continua no GGUF LOCAL
+  (llama-server, `_chamar_neural`); nada na nuvem. Loader extrai `_r31_`. Selo `-r31`. Não
+  testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

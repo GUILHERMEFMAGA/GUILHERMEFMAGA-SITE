@@ -7716,6 +7716,7 @@ def _menu_ajuda_local():
     print("HISTORICO DE IDEIAS: ideias ja sugeridas | limpar historico de ideias")
     print("IDEIAS COM REFERENCIAS: ideias para o agente | me de 3 ideias para melhorar seu codigo")
     print("  Analise local somente leitura; ate 5 propostas, sem autoedicao.")
+    print("IDEIAS FUNDAMENTADAS (r31): sugestao cujo nome ja existe e descartada (zero duplicata) | ideia do catalogo vem com #N")
     print("ESTILO LOCAL: resposta rapida | resposta equilibrada | resposta analitica")
     print("HUMOR: humor desligado | humor leve | humor criativo | estilo da conversa")
     print('MODOS DE IA — comandos canonicos verificados:')
@@ -10651,6 +10652,32 @@ def _historico_ideias_local(comando):
     return True
 
 
+def _r31_ideia_ja_existe(titulo, funcoes_inventario):
+    """r31: devolve o nome real se o titulo normalizado ja e funcao do agente
+    (checagem dura, igual a da fabrica e do esqueleto); None se nao."""
+    alvo = _norm_pt(str(titulo or '')[:160])
+    if not alvo:
+        return None
+    for nome in funcoes_inventario:
+        if _norm_pt(str(nome)) == alvo:
+            return str(nome)
+    return None
+
+
+def _r31_numero_no_catalogo(titulo):
+    """r31: se a ideia corresponde a uma proposta do catalogo local, devolve
+    o numero dela (0 se nenhuma). Sem arquivo, devolve 0."""
+    propostas, _caminho = _r26_propostas_catalogo()
+    alvo = _norm_pt(str(titulo or '')[:160])
+    if not alvo:
+        return 0
+    for proposta in propostas:
+        pn = _norm_pt(proposta['nome'])
+        if alvo == pn or (min(len(alvo), len(pn)) >= 8 and (alvo in pn or pn in alvo)):
+            return int(proposta['numero'])
+    return 0
+
+
 def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
                                 anteriores=None, novos_titulos=None):
     """Valida formato/referencias, nao a verdade semantica das recomendacoes."""
@@ -10678,6 +10705,7 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     repetidas = 0
     aceitos = 0
     descartados = 0
+    existentes_r31 = 0
     for item in itens[:quantidade]:
         if not isinstance(item, dict):
             descartados += 1
@@ -10697,12 +10725,20 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
             repetidas += 1
             descartados += 1
             continue
+        nome_existente_r31 = _r31_ideia_ja_existe(item['titulo'], inventario['funcoes'])
+        if nome_existente_r31:
+            existentes_r31 += 1
+            descartados += 1
+            continue
+        numero_catalogo_r31 = _r31_numero_no_catalogo(item['titulo'])
         titulos.add(titulo)
         anteriores.append(item['titulo'][:160])
         if novos_titulos is not None:
             novos_titulos.append(item['titulo'][:160])
         aceitos += 1
-        linhas.append(f"\n{aceitos}. {item['titulo'][:160]}")
+        rotulo_catalogo_r31 = (' (catalogo #' + str(numero_catalogo_r31) + ')'
+                               if numero_catalogo_r31 else '')
+        linhas.append(f"\n{aceitos}. {item['titulo'][:160]}" + rotulo_catalogo_r31)
         for chave, rotulo in (('justificativa', 'Por que priorizar'), ('beneficio', 'Beneficio esperado'),
                               ('risco', 'Risco/custo'), ('teste', 'Como testar')):
             linhas.append(f"   {rotulo}: {item[chave][:500]}")
@@ -10714,6 +10750,9 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
                 f'{nome} (linha {linha})' for _, nome, linha in relacionadas))
             linhas.append('   Compare antes de adicionar: isso e indicio de sobreposicao, nao equivalencia comprovada.')
     linhas.append(f'\nSugestoes com formato/referencias validos: {aceitos}/{quantidade}; descartadas: {descartados}.')
+    if existentes_r31:
+        linhas.append('Descartadas porque ja existe ferramenta com esse nome (zero duplicata): '
+                      + str(existentes_r31) + '.')
     if repetidas:
         linhas.append(f'Titulos repetidos ou muito semelhantes ao historico: {repetidas}.')
     if aceitos == 0:
@@ -28819,7 +28858,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r30] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r31] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
