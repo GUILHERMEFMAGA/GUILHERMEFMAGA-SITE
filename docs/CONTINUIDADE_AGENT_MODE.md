@@ -128,7 +128,8 @@ ou relatórios reais sem revisão e autorização.
 - r22 lote 1: 20 ferramentas offline de cálculo/física/texto/datas (estatísticas, MMC/MDC,
   fatoração, bases, Bhaskara, sistema 2x2, permutações/combinações, geometria plana, Pitágoras,
   Ohm, resistores série/paralelo, código de cores, energias, velocidade média, densidade,
-  sílabas PT, César, Morse, feriados BR com Páscoa por Meeus, decodificar JWT). Todas
+  sílabas PT, César, Morse, feriados BR com Páscoa por Meeus, decodificar JWT). Selo de
+  abertura atualizado para `-r22` (confirmação visual no PC). Todas
   determinísticas, sem rede/IA; **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
