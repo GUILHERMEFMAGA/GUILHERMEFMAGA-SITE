@@ -7718,6 +7718,7 @@ def _menu_ajuda_local():
     print("  Analise local somente leitura; ate 5 propostas, sem autoedicao.")
     print("IDEIAS FUNDAMENTADAS (r31): sugestao cujo nome ja existe e descartada (zero duplicata) | ideia do catalogo vem com #N")
     print("ANALISE/CONFERENCIA (r32): 'analisar agente' = radiografia completa do codigo (so leitura) | 'conferir esqueletos' = valida o codigo das ideias")
+    print("MEMORIA (r33): 'gravar memoria: <fato>' | 'ver memorias' | 'buscar memoria: <termo>' | 'esquecer: <termo>' (pede SIM)")
     print("ESTILO LOCAL: resposta rapida | resposta equilibrada | resposta analitica")
     print("HUMOR: humor desligado | humor leve | humor criativo | estilo da conversa")
     print('MODOS DE IA — comandos canonicos verificados:')
@@ -9947,6 +9948,131 @@ def _r32_comandos(comando):
     return False
 
 
+def _r33_data_curta(iso):
+    """r33: '2026-09-11T20:31:04' -> '11/09/2026 20:31' (tolerante a falha)."""
+    import datetime as _dt
+    try:
+        momento = _dt.datetime.fromisoformat(str(iso))
+        return momento.strftime('%d/%m/%Y %H:%M')
+    except Exception:
+        return str(iso or '')[:16]
+
+
+def _r33_linhas_memoria():
+    """r33: lista em memoria longa (global do modulo; tolerante a ausencia)."""
+    lista = globals().get('memoria_longa')
+    if not isinstance(lista, list):
+        return []
+    return lista
+
+
+def _r33_gravar(texto):
+    """r33: grava um fato na memoria de longo prazo existente (engine do
+    modulo, com embedding quando disponivel). Retorna mensagem."""
+    fn = globals().get('registrar_memoria_longa')
+    limpo = str(texto or '').strip()
+    if not limpo:
+        return 'Informe o que gravar. Ex.: gravar memoria: meu cavalo se chama Trovao'
+    if len(limpo) > 400:
+        limpo = limpo[:400]
+    if callable(fn):
+        fn(limpo)
+        return 'Gravado na memoria de longo prazo: "' + limpo + '"'
+    return 'Motor de memoria indisponivel neste modo (teste isolado); nada gravado.'
+
+
+def _r33_ver(quantidade=10):
+    """r33: mostra as ultimas lembrancas com data (transparencia total)."""
+    lista = _r33_linhas_memoria()
+    if not lista:
+        return ('A memoria de longo prazo esta vazia. Grave com: '
+                'gravar memoria: <fato> (ou converse e peca pra ele lembrar).')
+    ultimas = lista[-int(quantidade):][::-1]
+    linhas = ['Memoria de longo prazo (' + str(len(lista))
+              + ' lembranca(s); mostrando as ultimas ' + str(len(ultimas)) + '):']
+    for item in ultimas:
+        if not isinstance(item, dict):
+            continue
+        rotulos = ''
+        if item.get('tags'):
+            rotulos = ' [' + ', '.join(str(t) for t in item['tags'][:4]) + ']'
+        linhas.append('  ' + _r33_data_curta(item.get('data', '')) + ' - '
+                      + str(item.get('texto', ''))[:160] + rotulos)
+    linhas.append("Buscar: 'buscar memoria: <termo>' | Esquecer: 'esquecer: <termo>' (pede SIM)")
+    return '\n'.join(linhas)
+
+
+def _r33_buscar(termo):
+    """r33: busca por texto/tags na memoria longa (normalizada; sem embedding
+    aqui: busca direta e deterministica para o usuario ver o que existe)."""
+    alvo = _norm_pt(str(termo or ''))
+    if not alvo:
+        return 'Informe o termo. Ex.: buscar memoria: cavalo'
+    achados = []
+    for item in _r33_linhas_memoria():
+        if not isinstance(item, dict):
+            continue
+        conteudo = _norm_pt(str(item.get('texto', '')) + ' ' + ' '.join(
+            str(t) for t in (item.get('tags') or [])))
+        if alvo in conteudo:
+            achados.append(item)
+    if not achados:
+        return 'Nada encontrado com "' + str(termo).strip() + '" na memoria de longo prazo.'
+    linhas = ['Achei ' + str(len(achados)) + ' lembranca(s) com "' + str(termo).strip() + '":']
+    for item in achados[-10:][::-1]:
+        linhas.append('  ' + _r33_data_curta(item.get('data', '')) + ' - '
+                      + str(item.get('texto', ''))[:160])
+    return '\n'.join(linhas)
+
+
+def _r33_esquecer(termo):
+    """r33: direito de esquecer — remove TUDO que contenha o termo (texto ou
+    tag), com confirmacao SIM. Atualiza o global e o arquivo do modulo."""
+    alvo = _norm_pt(str(termo or ''))
+    if not alvo:
+        return 'Informe o termo. Ex.: esquecer: cavalo (vai pedir confirmacao SIM).'
+    lista = _r33_linhas_memoria()
+    if not lista:
+        return 'A memoria de longo prazo esta vazia; nada a esquecer.'
+    nao_vao = [x for x in lista if alvo in _norm_pt(str(x.get('texto', '') + ' '
+               + ' '.join(str(t) for t in (x.get('tags') or []))))]
+    vao = [x for x in lista if x not in nao_vao]
+    if not nao_vao:
+        return 'Nenhuma lembranca contem "' + str(termo).strip() + '"; nada apagado.'
+    print('Vao ser esquecidas ' + str(len(nao_vao)) + ' lembranca(s) que contem "'
+          + str(termo).strip() + '". Exemplo: "'
+          + str(nao_vao[-1].get('texto', ''))[:100] + '"')
+    if input('Digite SIM para confirmar o esquecimento: ').strip() != 'SIM':
+        return 'Cancelado; nada foi apagado.'
+    globals()['memoria_longa'] = vao
+    salvar = globals().get('salvar_json')
+    caminho = globals().get('ARQ_MEMORIA_LONGA')
+    if callable(salvar) and caminho:
+        salvar(caminho, vao)
+    return ('Esquecidas: ' + str(len(nao_vao)) + ' lembranca(s). Restaram '
+            + str(len(vao)) + '. (Dados locais; nada sai do PC.)')
+
+
+def _r33_comandos(comando):
+    """r33: gestao da memoria de longo prazo existente (ver, buscar, gravar,
+    esquecer) — transparencia e controle; o motor de busca fica intacto."""
+    cabeca, sep, corpo = comando.partition(':')
+    alvo = _norm_pt(cabeca)
+    if sep and alvo == 'gravarmemoria':
+        print(_r33_gravar(corpo))
+        return True
+    if sep and alvo == 'buscarmemoria':
+        print(_r33_buscar(corpo))
+        return True
+    if sep and alvo == 'esquecer':
+        print(_r33_esquecer(corpo))
+        return True
+    if alvo in ('vermemorias', 'memoriadeconversas'):
+        print(_r33_ver())
+        return True
+    return False
+
+
 def _r28_caminho_telemetria():
     """r28: caminho do arquivo local de telemetria (somente com PASTA_BASE real).
     Sem base (testes AST), retorna None: fica so em memoria, sem tocar disco."""
@@ -12135,6 +12261,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r32_comandos(comando):
+        return True
+
+    if _r33_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -28991,7 +29120,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r32] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r33] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

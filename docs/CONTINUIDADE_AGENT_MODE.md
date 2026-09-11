@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32 **335 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33 **343 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -259,6 +259,16 @@ ou relatórios reais sem revisão e autorização.
   de topo, com/sem docstring, nomes duplicados, ferramentas registradas, camadas r2x presentes,
   esqueletos e telemetria acumulada — 100% AST, zero alteração. Loader extrai `_r32_`. Selo
   `-r32`. Não testado no Windows real.
+- **r33 (GESTÃO da memória de longo prazo — correção honesta: o motor JÁ EXISTIA):** auditoria
+  prévia pegou que o agente já tem memória longa com embeddings (`memoria_longa.json`, cap 500,
+  `buscar_memorias_relevantes` com fallback difflib) e memória central de fatos
+  (`gravar/consultar_memoria_core`) — uma proposta de "criar memória" teria sido DUPLICATA.
+  O que faltava era controle do usuário: **`gravar memoria: <fato>`** (chama o motor existente
+  `registrar_memoria_longa`), **`ver memorias`** (últimas 10 com data/tags), **`buscar memoria:
+  <termo>`** (busca determinística em texto+tags) e **`esquecer: <termo>`** (direito de
+  esquecer: remove o que contém o termo, exige SIM, atualiza global + arquivo). Lição
+  registrada: auditar ANTES vale inclusive contra as próprias ideias de melhoria. Loader
+  extrai `_r33_`. Selo `-r33`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
