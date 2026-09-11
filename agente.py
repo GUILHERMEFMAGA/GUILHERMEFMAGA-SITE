@@ -11246,6 +11246,20 @@ def _r38_tres_do_catalogo():
     return saida
 
 
+def _r40_bloco_catalogo_fallback():
+    """r40: bloco 'enquanto isso' com ate 3 ideias do catalogo ('' se vazio);
+    usado quando o modelo falha OU quando tudo repetiu o historico."""
+    extras_r40 = _r38_tres_do_catalogo()
+    if not extras_r40:
+        return ''
+    texto_r40 = ('\nEnquanto isso, ' + str(len(extras_r40))
+                 + ' ideia(s) do catalogo (definidas no programa, nao pela IA):')
+    texto_r40 += '\n' + '\n'.join(
+        '- ' + p['nome'] + ' (catalogo #' + str(p['numero']) + '): '
+        + _r26_dobrar(p['descricao'])[:100] for p in extras_r40)
+    return texto_r40
+
+
 def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
                                 anteriores=None, novos_titulos=None):
     """Valida formato/referencias, nao a verdade semantica das recomendacoes."""
@@ -11269,18 +11283,12 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
             except (ValueError, TypeError):
                 dados = None
     if not isinstance(dados, dict):
-        extras_r38 = _r38_tres_do_catalogo()
         mensagem_r38 = ('Nao consegui estruturar as sugestoes com referencias verificaveis. '
                 'Nao vou apresentar texto nao validado como analise do codigo. '
                 'Para ideias que NAO dependem do modelo local, use: fabrica de ideias '
                 '(catalogo + seu uso) ou esqueleto de ideia: <nome>. '
                 'Ou tente pedir 3 ideias sobre um tema especifico.')
-        if extras_r38:
-            mensagem_r38 += ('\nEnquanto isso, ' + str(len(extras_r38))
-                             + ' ideia(s) do catalogo (definidas no programa, nao pela IA):')
-            mensagem_r38 += '\n' + '\n'.join(
-                '- ' + p['nome'] + ' (catalogo #' + str(p['numero']) + '): '
-                + _r26_dobrar(p['descricao'])[:100] for p in extras_r38)
+        mensagem_r38 += _r40_bloco_catalogo_fallback()
         return mensagem_r38 + _roteiro_revisao_alternativo(inventario)
     itens = dados.get('ideias') if isinstance(dados, dict) else None
     if not isinstance(itens, list):
@@ -11296,6 +11304,7 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     descartados = 0
     existentes_r31 = 0
     parciais_r36 = 0
+    titulos_repetidos_r40 = []
     refs_auto_total_r37 = 0
     sem_ref_total_r37 = 0
     refs_por_item_r39 = []
@@ -11321,6 +11330,7 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
             continue
         if _titulo_ideia_repetido(item['titulo'], anteriores):
             repetidas += 1
+            titulos_repetidos_r40.append(str(item['titulo'])[:80])
             descartados += 1
             continue
         # r37: referencia em niveis — citacao falsa nunca e exibida como verificada
@@ -11402,6 +11412,14 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
         linhas.append('O modelo nao entregou propostas completas com referencias aceitas; nenhuma foi validada.')
         linhas.append('Para ideias que NAO dependem do modelo local: fabrica de ideias '
                       "(catalogo + seu uso) | esqueleto de ideia: <nome> (codigo que roda).")
+        if titulos_repetidos_r40:
+            linhas.append('O filtro anti-repeticao BLOQUEOU ' + str(repetidas)
+                          + ' ideia(s) porque os temas repetem o que eu ja sugeri antes '
+                            '(historico local) — sinal de que ele funciona:')
+            linhas.extend('- (repetida) ' + ti for ti in titulos_repetidos_r40[:3])
+            linhas.append('Para VARIAR, peca um tema especifico (ex.: "3 ideias sobre '
+                          'organizacao de arquivos") ou use:')
+            linhas.append(_r40_bloco_catalogo_fallback().lstrip('\n'))
         linhas.append(_roteiro_revisao_alternativo(inventario))
     linhas.append('Limite: nao foi feita auditoria integral. Algo nao citado pode existir em outra funcao. '
                   'Titulos repetidos sao filtrados; equivalencia entre ideias ainda precisa de revisao humana.')
@@ -29509,7 +29527,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r39] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r40] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
