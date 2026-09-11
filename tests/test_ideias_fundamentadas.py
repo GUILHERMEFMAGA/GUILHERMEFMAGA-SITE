@@ -121,7 +121,7 @@ class IdeiasFundamentadas(unittest.TestCase):
         env = carregar(*NOMES)
         inv = env['_inventario_para_ideias'](str(SOURCE))
         evidencias = env['_selecionar_evidencias_ideias'](inv, 'melhorar respostas locais')
-        self.assertLessEqual(len(evidencias), 6)
+        self.assertLessEqual(len(evidencias), 8)  # r36: recorte 6 -> 8
         self.assertLess(len(json.dumps(evidencias)), 5000)
 
 

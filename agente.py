@@ -11124,7 +11124,7 @@ def _selecionar_evidencias_ideias(inventario, pedido: str):
         texto = (item['nome'] + ' ' + item['descricao']).lower()
         return (sum(p in texto for p in palavras) * 3 + (item['nome'] in prioridades),
                 item['nome'])
-    return sorted(inventario['funcoes'].values(), key=pontuar, reverse=True)[:6]
+    return sorted(inventario['funcoes'].values(), key=pontuar, reverse=True)[:8]
 
 
 def _roteiro_revisao_alternativo(inventario):
@@ -11242,7 +11242,10 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     except (ValueError, TypeError):
         return ('Nao consegui estruturar as sugestoes com referencias verificaveis. '
                 'Nao vou apresentar texto nao validado como analise do codigo. '
-                'Tente pedir 3 ideias sobre um tema especifico.' + _roteiro_revisao_alternativo(inventario))
+                'Para ideias que NAO dependem do modelo local, use: fabrica de ideias '
+                '(catalogo + seu uso) ou esqueleto de ideia: <nome>. '
+                'Ou tente pedir 3 ideias sobre um tema especifico.'
+                + _roteiro_revisao_alternativo(inventario))
     itens = dados.get('ideias') if isinstance(dados, dict) else None
     if not isinstance(itens, list):
         return 'A IA nao devolveu a lista estruturada esperada; nenhuma sugestao foi validada.' + _roteiro_revisao_alternativo(inventario)
@@ -11256,14 +11259,22 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     aceitos = 0
     descartados = 0
     existentes_r31 = 0
+    parciais_r36 = 0
     for item in itens[:quantidade]:
         if not isinstance(item, dict):
             descartados += 1
             continue
-        campos = ('titulo', 'justificativa', 'beneficio', 'risco', 'teste')
-        if any(not isinstance(item.get(k), str) or not item[k].strip() for k in campos):
+        if any(not isinstance(item.get(k), str) or not item[k].strip()
+               for k in ('titulo', 'justificativa')):
             descartados += 1
             continue
+        parcial_r36 = False
+        for campo_opcional in ('beneficio', 'risco', 'teste'):
+            if not isinstance(item.get(campo_opcional), str) or not item[campo_opcional].strip():
+                item[campo_opcional] = '- (nao avaliado pelo modelo local)'
+                parcial_r36 = True
+        if parcial_r36:
+            parciais_r36 += 1
         refs = item.get('funcoes')
         titulo = _norm_pt(item['titulo'][:160])
         if (not isinstance(refs, list) or not refs or len(refs) > 8 or
@@ -11288,7 +11299,8 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
         aceitos += 1
         rotulo_catalogo_r31 = (' (catalogo #' + str(numero_catalogo_r31) + ')'
                                if numero_catalogo_r31 else '')
-        linhas.append(f"\n{aceitos}. {item['titulo'][:160]}" + rotulo_catalogo_r31)
+        marcador_parcial_r36 = ' [parcial: modelo nao avaliou risco/teste]' if parcial_r36 else ''
+        linhas.append(f"\n{aceitos}. {item['titulo'][:160]}" + rotulo_catalogo_r31 + marcador_parcial_r36)
         for chave, rotulo in (('justificativa', 'Por que priorizar'), ('beneficio', 'Beneficio esperado'),
                               ('risco', 'Risco/custo'), ('teste', 'Como testar')):
             linhas.append(f"   {rotulo}: {item[chave][:500]}")
@@ -11303,10 +11315,15 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     if existentes_r31:
         linhas.append('Descartadas porque ja existe ferramenta com esse nome (zero duplicata): '
                       + str(existentes_r31) + '.')
+    if parciais_r36:
+        linhas.append(str(parciais_r36) + ' sugestao(oes) vieram sem avaliacao de risco/teste: '
+                      'o modelo local nao avaliou esses campos; leia com atencao.')
     if repetidas:
         linhas.append(f'Titulos repetidos ou muito semelhantes ao historico: {repetidas}.')
     if aceitos == 0:
         linhas.append('O modelo nao entregou propostas completas com referencias aceitas; nenhuma foi validada.')
+        linhas.append('Para ideias que NAO dependem do modelo local: fabrica de ideias '
+                      "(catalogo + seu uso) | esqueleto de ideia: <nome> (codigo que roda).")
         linhas.append(_roteiro_revisao_alternativo(inventario))
     linhas.append('Limite: nao foi feita auditoria integral. Algo nao citado pode existir em outra funcao. '
                   'Titulos repetidos sao filtrados; equivalencia entre ideias ainda precisa de revisao humana.')
@@ -29414,7 +29431,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r35] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r36] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

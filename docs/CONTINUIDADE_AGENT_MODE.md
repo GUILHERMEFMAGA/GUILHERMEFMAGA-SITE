@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35 **359 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36 **365 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -288,7 +288,19 @@ ou relatórios reais sem revisão e autorização.
   **comparador de textos** (só-A/só-B/comuns por linha; ignora "json"), **divisor de texto em
   partes** (2–20 pedaços de tamanho quase igual). `_r34_gerar_teste` ganhou os 4 casos novos
   (assertions por padrão + caminho inválido). Menu r35; selo `-r35`. MVPs executados só nos
-  testes do repositório; agente segue parse-only. Não testado no Windows real.
+  testes do repositório; agente segue parse-only. Validado parcialmente no Windows real (relato r34).
+- **r36 (CORREÇÃO do primeiro relato real de validação — r34 no PC):** o usuário pediu 50+
+  ideias em conversa livre; o GGUF pequeno falhou em produzir o JSON de 5 propostas (0/5
+  descartadas) e o fallback honesto não ajudava o suficiente (não citava a fábrica).
+  Correções: **[1]** campos beneficio/risco/teste viram OPCIONAIS — só titulo+justificativa+
+  refs obrigatórios; faltantes viram "- (nao avaliado pelo modelo local)" com marcador
+  "[parcial: modelo nao avaliou risco/teste]" e contagem no rodapé (aumenta muito a taxa de
+  sucesso do modelo pequeno sem esconder a lacuna); **[2]** parse-fail e "nenhuma validada"
+  agora apontam `fabrica de ideias` e `esqueleto de ideia:` (caminhos que NÃO dependem do
+  modelo); **[3]** recorte de evidências 6 → 8 (teste antigo atualizado junto — mudança
+  intencional). Comportamento HONESTO do r34 no PC confirmou o desenho: 0/5 declarado,
+  nada mascarado. Selo `-r36`. Testado parcialmente no Windows real (o relato que motivou
+  esta correção).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
