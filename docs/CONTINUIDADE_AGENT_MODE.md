@@ -113,6 +113,11 @@ ou relatórios reais sem revisão e autorização.
   a constante `URL_AGENTE_OFICIAL` (checagem do BAT) ficou na branch antiga → falso alarme
   "endereco ANTIGO" e criação de ATUALIZAR_INICIAR.bat que reverteria a URL; corrigido com
   limpeza automática do corretor obsoleto e teste de regressão (agente e BAT na mesma branch).
+  **Validação final confirmada pelo usuário:** reabrindo o agente, o aviso não apareceu e a
+  mensagem `[Limpeza]` removeu o ATUALIZAR_INICIAR.bat obsoleto no PC real. Mensagem benigna
+  restante: "Ha uma versao nova do iniciar.bat" pode repetir se o console for fechado pelo X
+  (a troca do BAT pelo tmp acontece na última linha, depois do pause final; fechar com uma tecla
+  aplica e o aviso cessa). Cosmético: o download do agente.py funciona independentemente.
 - r21 (confiabilidade das respostas locais): sugestão de comando com erro de digitação
   (difflib + confirmação "sim", só no modo local), detecção de colapso de repetição com aviso
   transparente (texto bruto preservado), `refazer com penalidade` confirmado (1x, +0,15),
