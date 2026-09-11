@@ -11228,6 +11228,24 @@ def _r31_numero_no_catalogo(titulo):
     return 0
 
 
+def _r38_tres_do_catalogo():
+    """r38: 3 propostas do catalogo que nao colidem (priorizadas pelo uso);
+    usadas na resposta de falha do modelo para degradar com CONTEUDO real."""
+    propostas, _caminho = _r26_propostas_catalogo()
+    if not propostas:
+        return []
+    cfg = globals().get('config')
+    rejeitadas = cfg.get('ideias_rejeitadas', []) if isinstance(cfg, dict) else []
+    aceitas, _cortadas = _r26_filtrar_rejeitadas(propostas, rejeitadas)
+    saida = []
+    for proposta in _r26_priorizar(aceitas):
+        if _r26_sem_colisao(proposta['nome']):
+            saida.append(proposta)
+        if len(saida) >= 3:
+            break
+    return saida
+
+
 def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
                                 anteriores=None, novos_titulos=None):
     """Valida formato/referencias, nao a verdade semantica das recomendacoes."""
@@ -11240,12 +11258,30 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     try:
         dados = json.loads(bruto)
     except (ValueError, TypeError):
-        return ('Nao consegui estruturar as sugestoes com referencias verificaveis. '
+        dados = None
+    if not isinstance(dados, dict):
+        # r38: resgate — o modelo as vezes embrulha o JSON em prosa
+        import re as _re38
+        m_r38 = _re38.search(r'\{.*\}', str(texto), _re38.S)
+        if m_r38:
+            try:
+                dados = json.loads(m_r38.group(0))
+            except (ValueError, TypeError):
+                dados = None
+    if not isinstance(dados, dict):
+        extras_r38 = _r38_tres_do_catalogo()
+        mensagem_r38 = ('Nao consegui estruturar as sugestoes com referencias verificaveis. '
                 'Nao vou apresentar texto nao validado como analise do codigo. '
                 'Para ideias que NAO dependem do modelo local, use: fabrica de ideias '
                 '(catalogo + seu uso) ou esqueleto de ideia: <nome>. '
-                'Ou tente pedir 3 ideias sobre um tema especifico.'
-                + _roteiro_revisao_alternativo(inventario))
+                'Ou tente pedir 3 ideias sobre um tema especifico.')
+        if extras_r38:
+            mensagem_r38 += ('\nEnquanto isso, ' + str(len(extras_r38))
+                             + ' ideia(s) do catalogo (definidas no programa, nao pela IA):')
+            mensagem_r38 += '\n' + '\n'.join(
+                '- ' + p['nome'] + ' (catalogo #' + str(p['numero']) + '): '
+                + _r26_dobrar(p['descricao'])[:100] for p in extras_r38)
+        return mensagem_r38 + _roteiro_revisao_alternativo(inventario)
     itens = dados.get('ideias') if isinstance(dados, dict) else None
     if not isinstance(itens, list):
         return 'A IA nao devolveu a lista estruturada esperada; nenhuma sugestao foi validada.' + _roteiro_revisao_alternativo(inventario)
@@ -29465,7 +29501,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r37] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r38] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37 **371 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38 **376 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -312,6 +312,16 @@ ou relatórios reais sem revisão e autorização.
   justificativa continuam obrigatórios. Teste antigo do contrato atualizado
   (test_citacao_falsa...: descarte → marcação, espírito preservado). Selo `-r37`. Testado
   parcialmente no Windows real (relatos r34/r36 do usuário; r37 aguarda terceiro relato).
+- **r38 (degradação com CONTEÚDO — correção do TERCEIRO relato real, r37 no PC):** desta vez
+  o modelo nem produziu JSON (flakiness crua do GGUF pequeno; na rodada anterior produziu —
+  mesmo prompt, variância). O r37 viveu (selo + fallback citando fábrica), mas a resposta de
+  falha virava só desculpa. Agora: **[1]** RESGATE — se o modelo embrulhar o JSON em prosa,
+  o programa extrai o primeiro {...} ao último e tenta parsear (converte muitas falhas em
+  sucesso); **[2]** se falhar mesmo, a resposta inclui até 3 ideias REAIS do catálogo
+  (`_r38_tres_do_catalogo`: priorizadas pelo uso, filtradas por rejeitadas, anti-colisão
+  contra as 589) rotuladas "definidas no programa, nao pela IA" — o usuário sai com conteúdo
+  em vez de desculpa; **[3]** roteiro alternativo mantido. Loader extrai `_r38_`. Selo `-r38`.
+  Testado parcialmente no Windows real (relatos r34/r36/r37; r38 aguarda quarto relato).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
