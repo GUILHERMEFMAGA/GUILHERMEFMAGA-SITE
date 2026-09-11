@@ -16,6 +16,12 @@ duração), registrado na preparação da sessão.
 | 4 | `parar geracao local` + ferramenta `parar_geracao_local` (**480ª**): cancela no cliente a geração em andamento — fecha a resposta HTTP ativa (`_r21_ativa`), marca `_r21_cancelar_id` (identifica a geração por número sequencial, sem afetar gerações futuras) e o estado do motor passa a `cancelada` (novo valor válido em `_r20_estado`). No streaming, o laço verifica o pedido a cada chunk; no Ctrl+C, o estado também vira `cancelada`. | O **servidor pode continuar computando** alguns segundos após o cancelamento no cliente (limitação documentada desde a r20). No console o prompt fica bloqueado durante a geração: o cancelamento prático é pelo **painel web** (ferramenta registrada) ou após Ctrl+C. Se o "parar" chega quando a geração já terminou, a mensagem reflete o estado real. |
 | 5 | JSON garantido no modo ideias: `_chamar_neural(..., formato_json=True)` → transporte envia `response_format: {"type":"json_object"}` **somente se a build ainda não rejeitou o campo**. Em rejeição 4xx (400/404/422 — nenhuma geração concluída), reenvia **1 vez** sem o campo, marca `_r21_suporte_json=False` para as próximas e registra `formato_json` no meta. Erro 5xx/timeout **não** gera reenvio nem máscara. | A garantia estrutural depende da **build do llama-server** do usuário; sem suporte, o comportamento volta a ser exatamente o da r12 (falha de JSON preservada com roteiro alternativo). O reenvio 4xx é a única exceção à regra "nunca repete geracao" e se aplica apenas a pedidos com `formato_json`. |
 
+## Identificador de versão no PC
+
+O selo exibido na inicialização passou de `[Motor e avaliacao local 2026-09-10-r20]` para
+`[Motor e avaliacao local 2026-09-10-r21]` (ajuste publicado em seguida à entrega principal:
+na r21 principal esse selo ficou esquecido em r20, o que dificultaria conferir a versão no PC).
+
 ## Preservação verificada (AST, scripts/auditar_ferramentas.py)
 
 - **479 ferramentas anteriores: mesmos nomes, mesma ordem, nenhuma assinatura alterada, nenhuma removida.**
