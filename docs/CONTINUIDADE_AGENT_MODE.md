@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38 **376 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39 **381 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -322,6 +322,14 @@ ou relatórios reais sem revisão e autorização.
   contra as 589) rotuladas "definidas no programa, nao pela IA" — o usuário sai com conteúdo
   em vez de desculpa; **[3]** roteiro alternativo mantido. Loader extrai `_r38_`. Selo `-r38`.
   Testado parcialmente no Windows real (relatos r34/r36/r37; r38 aguarda quarto relato).
+- **r39 (nota de âncora única — polimento do QUARTO relato real, o 5/5):** o quarto relato
+  VALIDOU o ciclo (5/5 válidas, 0 descartadas, aviso de sobreposição funcionando). Padrão
+  observado: todas as 5 sugestões citaram a MESMA única referência (`_inventario_para_ideias`)
+  — o modelo ancorou tudo numa função só. Novo marcador de honestidade no resumo: se todos os
+  itens aceitos compartilham a mesma ref única nomeada, avisa "ATENCAO r39: ... leia com
+  redobrada atencao e compare com o que ja existe". Parciais vazios não disparam (têm rodapé
+  próprio). Selo `-r39`. **CICLO DE VALIDAÇÃO REAL CONCLUÍDO: r34→r39, quatro relatos, quatro
+  iterações, taxa 0/5 → 5/5 com honestidade preservada em todas as etapas.**
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
