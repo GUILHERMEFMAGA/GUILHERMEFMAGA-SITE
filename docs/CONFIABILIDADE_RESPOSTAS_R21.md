@@ -56,6 +56,7 @@ A sugestão por erro de digitação aparece sozinha: digitar, por exemplo,
 ## Decisões do usuário nesta etapa
 
 - Escolha do **Bloco A** (itens 1–4) a partir da lista de ideias; autorização para
-  corrigir o espaço final registrado. Publicação prevista em PR novo de continuação
-  do PR #3 (branch da sessão), sem merge na main, sem fechar PRs, sem alterar URLs
-  do `iniciar.bat` (decisão sobre a linha do BAT permanece com o usuário).
+  corrigir o espaço final registrado. Publicação em PR novo de continuação
+  do PR #3 (#4, branch da sessão), sem merge na main e sem fechar PRs. Na sequência, o usuário
+  autorizou ("aplica") a troca das URLs do `iniciar.bat` (agente e autoatualização) para a
+  branch desta entrega — incluída no mesmo PR #4.

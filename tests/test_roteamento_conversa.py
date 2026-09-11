@@ -73,9 +73,12 @@ class RoteamentoConversa(unittest.TestCase):
             self.assertFalse(config['usar_ia_nuvem'])
 
     def test_atualizador_aponta_para_correcao(self):
+        # A branch de entrega muda a cada sessao Arena: ao abrir uma entrega nova,
+        # atualizar aqui junto com as URLs do iniciar.bat.
         bat = (SOURCE.parent / 'iniciar.bat').read_text()
         self.assertNotIn('arena/01a07ce2-guilhermefmaga-site', bat)
-        self.assertIn('arena/01a082fd-guilhermefmaga-site/agente.py', bat)
+        self.assertIn('arena/01a08d8e-guilhermefmaga-site/agente.py', bat)
+        self.assertIn('arena/01a08d8e-guilhermefmaga-site/iniciar.bat', bat)
         self.assertIn('python -m py_compile agente_novo.py', bat)
         self.assertIn('SEM_ATUALIZAR.txt', bat)
 

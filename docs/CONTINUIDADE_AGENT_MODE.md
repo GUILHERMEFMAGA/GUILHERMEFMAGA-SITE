@@ -55,8 +55,10 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
   preservadas em nomes, ordem e assinaturas; nova: `parar_geracao_local`).
   Contém motor local, provedores, histórico, roteamento, ferramentas, painel e
   autoedição. **Não importar o monólito para testes:** há efeitos no topo.
-- `iniciar.bat`: inicializador Windows com elevação e atualização pela branch do
-  PR #3. Pode substituir o fonte local, faz backup e respeita `SEM_ATUALIZAR.txt`.
+- `iniciar.bat`: inicializador Windows com elevação e atualização pela branch da entrega atual
+  (r21: `arena/01a08d8e-guilhermefmaga-site`; URLs do agente e da autoatualização trocadas com
+  autorização do usuário). Pode substituir o fonte local, faz backup e respeita `SEM_ATUALIZAR.txt`.
+  **Passo permanente:** cada nova entrega, autorizada, atualiza essas URLs para a branch nova da sessão.
 - `chaves_EXEMPLO.txt`: somente modelo com placeholders, nunca credenciais reais.
   Textos de cotas/instruções de provedores podem envelhecer: validar antes de alterar.
 - `.gitignore`: exclui segredos, dados locais e relatórios privados.
@@ -174,8 +176,9 @@ para documentos/dados. Alterações confirmadas foram autorizadas, não autonomi
 > os comentários recentes do PR e o estado real do Git. Analise agente.py,
 > iniciar.bat, chaves_EXEMPLO.txt, .gitignore e tests, inclusive Files changed /
 > View all changes. Não peça nem exponha chaves reais. Confira a branch permitida
-> pela sessão antes de editar; a origem deste trabalho é
-> arena/01a082fd-guilhermefmaga-site. Não faça merge na main nem feche o PR #2.
+> pela sessão antes de editar; a origem é o PR #3 (r20, arena/01a082fd-guilhermefmaga-site) e as
+> entregas seguem em PRs de continuação — confira o PR mais recente (r21: PR #4,
+> arena/01a08d8e-guilhermefmaga-site). Não faça merge na main nem feche os PRs #2/#3/#4.
 > IA local é GGUF pré-treinado via llama.cpp no PC, mais regras e ferramentas
 > Python; não foi treinada do zero. Preserve meu modelo e priorize correção.
 > IA nuvem é o rodízio de provedores/cotas disponíveis, especialmente Groq e
