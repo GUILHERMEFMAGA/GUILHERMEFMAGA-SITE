@@ -107,8 +107,8 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24
-  **230 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
+  na r25 **238 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -168,7 +168,19 @@ ou relatórios reais sem revisão e autorização.
   {"cache_minutos":N}`, 0 desliga; perfil/humor na chave; não vale para `refazer com penalidade`);
   registro dos últimos 20 tempos de geração + comando **`velocidade ia local`** (última, média das
   10, tokens/s quando o servidor devolve usage, estado do cache e dicas honestas). Nada trocado:
-  GGUF, nuvem, ferramentas, confirmações. Selo `-r24`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
+  GGUF, nuvem, ferramentas, confirmações. Selo `-r24`. Não testado no Windows real.
+- **r25 (camada de poder para TODAS as ferramentas — pedido do usuário):** 549 ferramentas
+  mantidas (nenhuma nova na lista; contagem não inflada). Camada interna no despachante
+  `_invocar_local` (usado pelas rotas de voz/comando): **telemetria universal** (usos/erros/
+  duração por ferramenta, em memória, nada sai do PC) e **sugestão de nomes parecidos**
+  (difflib, corte 0,6) quando o nome não existe. Comandos novos: **`usar <nome> com {json}`**
+  (executor universal das 549: mostra o que a ferramenta faz, confirma sim/nao e executa com
+  parâmetros exatos — as confirmações internas de cada ferramenta continuam valendo),
+  **`ajuda ferramenta: <nome>`** (descrição + como chamar), **`estatisticas ferramentas`**
+  (ranking de uso da sessão) e **`diagnostico ferramentas`** (erros com tipo, sem repetir
+  chamada). Correção de processo: o corte por ':' do roteador quebrava JSON com ':' — o
+  `usar` passou a ser detectado antes, no texto cru. Loader de testes extrai `_r25_`.
+  Selo `-r25`. Não testado no Windows real. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar

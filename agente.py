@@ -2766,20 +2766,63 @@ def _abrir_app_ou_site(alvo: str) -> str:
     return "NAO_ACHADO"
 
 
+def _r25_registrar_uso(nome_fn, segundos, ok, tipo_erro=''):
+    """r25: telemetria local das ferramentas (memoria da sessao; nada sai do PC)."""
+    registro = globals().setdefault('_r25_uso_ferramentas', {})
+    item = registro.setdefault(str(nome_fn), {'usos': 0, 'erros': 0, 'tempo_s': 0.0,
+                                              'ultimo_erro': '', 'ultima_duracao_s': 0.0})
+    item['usos'] += 1
+    if ok:
+        item['tempo_s'] = round(item['tempo_s'] + segundos, 4)
+        item['ultima_duracao_s'] = round(segundos, 4)
+    else:
+        item['erros'] += 1
+        item['ultimo_erro'] = tipo_erro or 'erro'
+    if len(registro) > 800:
+        for chave_antiga in list(registro)[:200]:
+            del registro[chave_antiga]
+
+
+def _r25_sugerir_ferramenta(nome_fn):
+    """r25: quando o nome falha, sugere nomes reais parecidos (difflib)."""
+    import difflib
+    import unicodedata
+    alvo = ''.join(c for c in unicodedata.normalize('NFD', str(nome_fn).lower())
+                   if unicodedata.category(c) != 'Mn').replace(' ', '_')
+    nomes = []
+    for x in (globals().get('tools') or []):
+        nome = str(getattr(x, 'name', None) or getattr(x, '__name__', str(x)))
+        nomes.append(nome)
+    proximos = difflib.get_close_matches(alvo, nomes, n=3, cutoff=0.6)
+    return ('Ferramentas com nome parecido: ' + ', '.join(proximos)) if proximos else ''
+
+
 def _invocar_local(nome_fn, **params):
-    """Escolhe UM adaptador; falha nao autoriza repetir uma acao via outro."""
+    """Escolhe UM adaptador; falha nao autoriza repetir uma acao via outro.
+    r25: mede duracao e registra uso/erro de TODAS as ferramentas (beneficia
+    o diagnostico geral sem alterar nenhuma ferramenta)."""
     _r20_origem('ferramenta_local', ferramenta=nome_fn)
     fn = globals().get(nome_fn)
     if fn is None:
-        return f"(ferramenta '{nome_fn}' indisponivel)"
+        _r25_registrar_uso(nome_fn, 0.0, False, 'indisponivel')
+        sugestao = _r25_sugerir_ferramenta(nome_fn)
+        return (f"(ferramenta '{nome_fn}' indisponivel" +
+                ('; ' + sugestao + ')' if sugestao else ')'))
+    import time as _time_r25
+    inicio_r25 = _time_r25.monotonic()
     try:
         inv = getattr(fn, "invoke", None)
         if callable(inv):
-            return inv(params)
-        if callable(fn):
-            return fn(**params)
-        return f"(ferramenta '{nome_fn}' nao e executavel)"
+            resultado = inv(params)
+        elif callable(fn):
+            resultado = fn(**params)
+        else:
+            _r25_registrar_uso(nome_fn, 0.0, False, 'nao executavel')
+            return f"(ferramenta '{nome_fn}' nao e executavel)"
+        _r25_registrar_uso(nome_fn, _time_r25.monotonic() - inicio_r25, True)
+        return resultado
     except Exception as e:
+        _r25_registrar_uso(nome_fn, _time_r25.monotonic() - inicio_r25, False, type(e).__name__)
         return (f"(falha em '{nome_fn}': {type(e).__name__}; nao repeti a chamada. "
                 "Confira o resultado antes de tentar novamente: pode ter havido efeito parcial.)")
 
@@ -7659,6 +7702,7 @@ def _menu_ajuda_local():
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
+    print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
     print("IDEIAS REJEITADAS: ideia rejeitada: <titulo> | ideias rejeitadas | limpar ideias rejeitadas")
@@ -9256,6 +9300,96 @@ def _r24_resumo_velocidade():
         tps = round(ultimo['tokens'] / ultimo['segundos'], 2)
     return {'geracoes_registradas': len(tempos), 'ultimo_segundos': ultimo['segundos'],
             'media_ultimos10_segundos': round(media, 3), 'tokens_por_segundo_ultimo': tps}
+
+
+def _r25_achar_funcao(nome):
+    """Resolve o nome em uma entrada da lista tools (por atributo name ou __name__)."""
+    alvo = str(nome).strip()
+    for x in (globals().get('tools') or []):
+        nome = str(getattr(x, 'name', None) or getattr(x, '__name__', ''))
+        if nome == alvo:
+            return x, nome
+    return None, alvo
+
+
+def _r25_usar_ferramenta(corpo):
+    """Executor universal (r25): usar <nome> com {json} roda QUALQUER uma das
+    549 ferramentas com parametros exatos. Previa o que a ferramenta faz antes
+    de executar; as confirmacoes internas de cada ferramenta continuam valendo."""
+    import json
+    partes = str(corpo).partition(' com ')
+    nome_ped = partes[0].strip()
+    carga = partes[2].strip() if partes[2] else '{}'
+    if not nome_ped:
+        return "Use: usar <nome da ferramenta> com {\"parametro\": valor}"
+    entrada, nome_real = _r25_achar_funcao(nome_ped)
+    if entrada is None:
+        sugestao = _r25_sugerir_ferramenta(nome_ped)
+        return ("Nao achei a ferramenta '" + nome_ped + "'."
+                + ('\n' + sugestao + '.' if sugestao else
+                   " Use 'listar ferramentas <assunto>' para ver nomes validos."))
+    descricao = str(getattr(entrada, 'description', '') or getattr(entrada, '__doc__', '') or '').strip()
+    try:
+        parametros = json.loads(carga) if carga else {}
+        if not isinstance(parametros, dict):
+            raise ValueError('objeto')
+    except ValueError:
+        return ('Parametros precisam ser um objeto JSON, ex.: usar ' + nome_real
+                + ' com {"acao": "status"}')
+    print('[' + nome_real + '] ' + (descricao[:300] + ('...' if len(descricao) > 300 else '') or '(sem descricao)'))
+    if input('Executar esta ferramenta com esses parametros? (sim/nao): ').strip().lower() not in ('sim', 's'):
+        return 'Cancelado; nada foi executado.'
+    resultado = _invocar_local(nome_real, **parametros)
+    return str(resultado)
+
+
+def _r25_comandos(comando):
+    """r25: camada de poder para TODAS as ferramentas (uso, diagnostico, ajuda)."""
+    import json
+    n = _norm_pt(comando)
+    if n == 'estatisticasferramentas':
+        registro = globals().get('_r25_uso_ferramentas', {})
+        if not registro:
+            print('Nenhuma ferramenta foi usada nesta sessao ainda.')
+            return True
+        linhas = sorted(registro.items(), key=lambda par: (-par[1]['usos'], par[0]))
+        print('Uso de ferramentas nesta sessao (memoria local; nada sai do PC):')
+        for nome, item in linhas[:25]:
+            estado = (str(item['usos']) + ' uso(s), ' + str(item['erros']) + ' erro(s), media '
+                      + str(round(item['tempo_s'] / max(1, item['usos']), 3)) + 's')
+            print('  ' + nome + ': ' + estado)
+        print('Total de ferramentas distintas usadas: ' + str(len(registro)))
+        return True
+    if n == 'diagnosticoferramentas':
+        registro = globals().get('_r25_uso_ferramentas', {})
+        problemas = [(nome, item) for nome, item in registro.items() if item['erros']]
+        if not problemas:
+            print('Nenhum erro de ferramenta registrado nesta sessao.')
+            return True
+        print('Ferramentas com erro nesta sessao (tipo do erro; a falha NAO foi repetida):')
+        for nome, item in problemas[:25]:
+            print('  ' + nome + ': ' + str(item['erros']) + ' erro(s), ultimo: ' + str(item['ultimo_erro']))
+        return True
+    # 'usar' vem ANTES do corte por ':' porque o JSON de parametros contem ':';
+    # teste no texto CRU (o normalizado nao tem espacos).
+    if comando.strip().lower().startswith('usar '):
+        print(_r25_usar_ferramenta(comando.strip()[5:]))
+        return True
+    cabeca, sep, corpo = comando.partition(':')
+    alvo = _norm_pt(cabeca)
+    if sep and alvo.startswith('ajudaferramenta'):
+        nome_ped = corpo.strip()
+        entrada, nome_real = _r25_achar_funcao(nome_ped)
+        if entrada is None:
+            sugestao = _r25_sugerir_ferramenta(nome_ped)
+            print("Nao achei '" + nome_ped + "'." + (' ' + sugestao + '.' if sugestao else ''))
+            return True
+        descricao = str(getattr(entrada, 'description', '') or getattr(entrada, '__doc__', '') or '').strip()
+        print('[' + nome_real + ']')
+        print(descricao[:1200] or '(sem descricao)')
+        print("\nPara executar: usar " + nome_real + ' com {"parametro": "valor"}')
+        return True
+    return False
 
 
 def _r24_comandos(comando):
@@ -11289,6 +11423,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r24_comandos(comando):
+        return True
+
+    if _r25_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -27055,7 +27192,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-10-r24] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-10-r25] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
