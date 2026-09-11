@@ -133,7 +133,8 @@ ou relatórios reais sem revisão e autorização.
   Ohm, resistores série/paralelo, código de cores, energias, velocidade média, densidade,
   sílabas PT, César, Morse, feriados BR com Páscoa por Meeus, decodificar JWT). Selo de
   abertura atualizado para `-r22` (confirmação visual no PC). Todas
-  determinísticas, sem rede/IA; **180 propostas de ferramentas + o lote 1 estão no catálogo
+  determinísticas, sem rede/IA. **Validado no PC real pelo usuário** (selo `-r22` na abertura
+  e contador dinâmico exibindo 500 ferramentas). **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
