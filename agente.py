@@ -2492,14 +2492,22 @@ def mostrar_status():
 
 def _norm_pt(s: str) -> str:
     """Normaliza texto PT para casamento de regra: minusculo, sem acento, sem
-    pontuacao/espacos (fica tudo grudado, ex.: 'o que voce faz' -> 'oquevocefaz')."""
+    pontuacao/espacos (fica tudo grudado, ex.: 'o que voce faz' -> 'oquevocefaz').
+    r24: memoizacao com limite (funcao pura; acelera o roteamento repetitivo)."""
+    cache = globals().setdefault('_NORM_PT_CACHE', {})
+    if s in cache:
+        return cache[s]
     import re as _re
-    s = (s or "").lower()
+    texto = (s or "").lower()
     for a, b in (("á", "a"), ("à", "a"), ("ã", "a"), ("â", "a"), ("ä", "a"),
                  ("ç", "c"), ("é", "e"), ("ê", "e"), ("ë", "e"), ("í", "i"),
                  ("ó", "o"), ("ô", "o"), ("õ", "o"), ("ö", "o"), ("ú", "u"), ("ü", "u")):
-        s = s.replace(a, b)
-    return _re.sub(r"[^a-z0-9]", "", s)
+        texto = texto.replace(a, b)
+    resultado = _re.sub(r"[^a-z0-9]", "", texto)
+    if len(cache) > 512:
+        cache.clear()
+    cache[s] = resultado
+    return resultado
 
 
 # Sites que abrimos por nome (chute controlado so para nomes conhecidos).
@@ -7650,6 +7658,7 @@ def _menu_ajuda_local():
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
+    print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
     print("IDEIAS REJEITADAS: ideia rejeitada: <titulo> | ideias rejeitadas | limpar ideias rejeitadas")
@@ -8724,7 +8733,7 @@ def _r20_opcoes():
     import os
     padrao = {'threads':4, 'streaming':False, 'ram_min_mb':256,
               'avaliacao_ampliada':False, 'repeticoes':1, 'semente':42,
-              'cobertura_minima':0.5, 'repeticoes_maximas':3}
+              'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5}
     dados = globals().get('config', {}).get('ia_local_opcoes', {})
     if isinstance(dados, dict):
         for k in padrao:
@@ -8735,6 +8744,7 @@ def _r20_opcoes():
     padrao['repeticoes'] = max(1, min(padrao['repeticoes'], 3))
     padrao['semente'] = max(0, min(padrao['semente'], 2147483647))
     padrao['cobertura_minima'] = max(0.1, min(padrao['cobertura_minima'], 1.0))
+    padrao['cache_minutos'] = max(0, min(padrao['cache_minutos'], 120))
     return padrao
 
 
@@ -9139,7 +9149,8 @@ def _r20_comandos(comando):
             print(_r20_julgar(dados)); return True
         limites = {'threads':(int,1,16), 'ram_min_mb':(int,128,4096), 'repeticoes':(int,1,3),
                    'semente':(int,0,2147483647), 'cobertura_minima':(float,0.1,1.0),
-                   'streaming':(bool,None,None), 'avaliacao_ampliada':(bool,None,None)}
+                   'streaming':(bool,None,None), 'avaliacao_ampliada':(bool,None,None),
+                   'cache_minutos':(int,0,120)}
         for k,v in dados.items():
             if k not in limites:
                 raise ValueError('Opcao desconhecida.')
@@ -9229,6 +9240,41 @@ def _r20_julgar(dados):
         raise ValueError('Caso/variante nao encontrado.')
     finally:
         lock.release()
+
+
+def _r24_resumo_velocidade():
+    """r24: tempos reais das geracoes desta sessao (memoria; nada sai do PC)."""
+    tempos = globals().get('_r24_tempos') or []
+    if not tempos:
+        return {'geracoes_registradas': 0,
+                'nota': 'Sem geracoes nesta sessao ainda; os tempos aparecem apos a primeira resposta do modelo.'}
+    ultimos = tempos[-10:]
+    media = sum(x['segundos'] for x in ultimos) / len(ultimos)
+    ultimo = tempos[-1]
+    tps = None
+    if ultimo.get('tokens') and ultimo['segundos']:
+        tps = round(ultimo['tokens'] / ultimo['segundos'], 2)
+    return {'geracoes_registradas': len(tempos), 'ultimo_segundos': ultimo['segundos'],
+            'media_ultimos10_segundos': round(media, 3), 'tokens_por_segundo_ultimo': tps}
+
+
+def _r24_comandos(comando):
+    """r24: velocidade ia local — mede o que e real, nao promete magica."""
+    import json
+    if _norm_pt(comando) == 'velocidadeialocal':
+        resumo = _r24_resumo_velocidade()
+        opcoes = _r20_opcoes()
+        print(json.dumps(resumo, ensure_ascii=False, indent=2))
+        if opcoes['cache_minutos']:
+            print('Cache de respostas locais: LIGADO (' + str(opcoes['cache_minutos'])
+                  + ' min; so para a mesma pergunta sem historico; resposta vem rotulada [Cache local])')
+        else:
+            print('Cache de respostas locais: DESLIGADO (configurar ia local: {"cache_minutos":5})')
+        print("Dicas honestas: 'resposta rapida' encurta a geracao; streaming mostra a primeira "
+              'palavra mais cedo (configurar ia local: {"streaming":true}); threads valem no proximo '
+              'inicio do motor. Nada disso melhora a inteligencia do modelo.')
+        return True
+    return False
 
 
 def _r21_comandos_conhecidos():
@@ -11008,6 +11054,11 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
         texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream,
                                       callback, seed, repeat_penalty, formato_json, id_geracao)
         tls.ultima = meta
+        tempos_r24 = globals().setdefault('_r24_tempos', [])
+        if isinstance(meta.get('segundos'), (int, float)):
+            tempos_r24.append({'segundos': meta['segundos'],
+                               'tokens': (meta.get('usage') or {}).get('completion_tokens')})
+            del tempos_r24[:-20]
         _r20_estado('pronto', 'Ultima geracao concluida')
         return texto
     except BaseException as erro:
@@ -11091,6 +11142,18 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
     penalidade_extra (r21) eleva repeat_penalty apenas em refazer confirmado."""
     if not isinstance(pergunta, str) or not pergunta.strip():
         raise ValueError("A pergunta nao pode estar vazia.")
+    # r24: cache curto para a MESMA pergunta independente (sem historico e sem
+    # refazer por penalidade). Resposta rotulada; desliga com cache_minutos 0.
+    import time as _time_r24
+    minutos_r24 = _r20_opcoes()['cache_minutos']
+    usa_cache = minutos_r24 > 0 and not historico and not penalidade_extra
+    if usa_cache:
+        chave_r24 = (_norm_pt(pergunta) + '|' + str(config.get('resposta_local', 'equilibrada'))
+                     + '|' + str(config.get('humor_local', 'leve')))
+        cache_r24 = globals().setdefault('_r24_cache', {})
+        entrada_r24 = cache_r24.get(chave_r24)
+        if entrada_r24 and (_time_r24.monotonic() - entrada_r24[0]) <= minutos_r24 * 60:
+            return '[Cache local] ' + entrada_r24[1]
     msgs = _montar_contexto_local(pergunta, historico)
     quantidade = _quantidade_lista_local(pergunta)
     tokens, estilo = _perfil_resposta_local(pergunta, config)
@@ -11145,6 +11208,10 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
         resposta += ('\n\n[Aviso de saude da geracao]: detectei repeticao em loop (' + detalhe
                      + '); o texto bruto foi preservado e nada foi corrigido. '
                        'Para tentar 1 nova geracao com penalidade de repeticao maior, envie: refazer com penalidade')
+    if usa_cache:
+        cache_r24[chave_r24] = (_time_r24.monotonic(), resposta)
+        if len(cache_r24) > 32:
+            cache_r24.pop(min(cache_r24, key=lambda k: cache_r24[k][0]), None)
     return resposta
 
 
@@ -11219,6 +11286,9 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r23_comandos(comando):
+        return True
+
+    if _r24_comandos(comando):
         return True
 
     _r20_origem('roteamento', detalhe='sem origem especifica registrada para este pedido')
@@ -26985,7 +27055,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-10-r23] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-10-r24] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
