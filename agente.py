@@ -11298,6 +11298,7 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     parciais_r36 = 0
     refs_auto_total_r37 = 0
     sem_ref_total_r37 = 0
+    refs_por_item_r39 = []
     for item in itens[:quantidade]:
         if not isinstance(item, dict):
             descartados += 1
@@ -11359,6 +11360,7 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
             marcador_parcial_r36 += ' [parcial: sem referencia verificada no codigo]'
             sem_ref_total_r37 += 1
         linhas.append(f"\n{aceitos}. {item['titulo'][:160]}" + rotulo_catalogo_r31 + marcador_parcial_r36)
+        refs_por_item_r39.append(tuple(refs_para_exibir))
         for chave, rotulo in (('justificativa', 'Por que priorizar'), ('beneficio', 'Beneficio esperado'),
                               ('risco', 'Risco/custo'), ('teste', 'Como testar')):
             linhas.append(f"   {rotulo}: {item[chave][:500]}")
@@ -11388,6 +11390,12 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
         linhas.append(str(sem_ref_total_r37)
                       + ' sem referencia verificada: ideias validas, mas confira o que ja '
                         'existe antes de pedir integracao.')
+    if (aceitos >= 2 and refs_por_item_r39
+            and len(set(refs_por_item_r39)) == 1 and len(refs_por_item_r39[0]) == 1):
+        linhas.append('ATENCAO r39: todas as sugestoes citaram a MESMA unica referencia ('
+                      + str(refs_por_item_r39[0][0] if refs_por_item_r39[0] else '-')
+                      + ') — o modelo ancorou tudo numa funcao so; leia as ideias com redobrada '
+                        'atencao e compare com o que ja existe.')
     if repetidas:
         linhas.append(f'Titulos repetidos ou muito semelhantes ao historico: {repetidas}.')
     if aceitos == 0:
@@ -29501,7 +29509,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r38] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r39] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
