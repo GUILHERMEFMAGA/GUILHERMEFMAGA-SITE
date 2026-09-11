@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34 **351 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35 **359 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -281,6 +281,14 @@ ou relatórios reais sem revisão e autorização.
   também; resumo fala "registrada no esqueleto". Os MVPs são execução APENAS nos testes do
   repositório (corpo controlado); o agente continua não executando código gerado — parse
   somente. Loader extrai `_r34_`. Selo `-r34`. Não testado no Windows real.
+- **r35 (mais padrões MVP — 4 → 8 categorias que nascem RODANDO):** `_r34_padrao_funcional`
+  ganhou, ANTES do conversor genérico (prioridade correta): **conversor de temperatura**
+  (celsius/fahrenheit/kelvin por fórmula; dispara em "temperatura/celsius/fahrenheit/kelvin"),
+  **somador de durações** (HH:MM ou HH:MM:SS → total; precisa "horas/duração" + "soma/total"),
+  **comparador de textos** (só-A/só-B/comuns por linha; ignora "json"), **divisor de texto em
+  partes** (2–20 pedaços de tamanho quase igual). `_r34_gerar_teste` ganhou os 4 casos novos
+  (assertions por padrão + caminho inválido). Menu r35; selo `-r35`. MVPs executados só nos
+  testes do repositório; agente segue parse-only. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

@@ -7707,7 +7707,7 @@ def _menu_ajuda_local():
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
-    print("ESQUELETOS (r34): 'esqueleto de ideia: <nome>' analisa e cria o codigo em esqueletos_ideias/ (conversor/validador/gerador/medidor nascem RODANDO + teste junto) | 'listar esqueletos' | 'conferir esqueletos'")
+    print("ESQUELETOS (r35): 'esqueleto de ideia: <nome>' cria codigo que RODA (8 padroes: conversor, temperatura, validador, gerador, medidor, horas, comparador, divisor + teste junto) | 'conferir esqueletos' | 'listar esqueletos'")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
@@ -9844,6 +9844,84 @@ def _r34_padrao_funcional(nome_ideia):
     implementacao MINIMA QUE RODA. Sem padrao conhecido: ('', None) e o
     esqueleto fica de template (honesto, sem fingir funcionalidade)."""
     p = _norm_pt(str(nome_ideia or ''))
+    if any(x in p for x in ('temperatura', 'celsius', 'fahrenheit', 'kelvin')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r35: conversor de temperatura JA FUNCIONA).\n\n'
+            '    Use: "25 celsius para fahrenheit" (celsius, fahrenheit ou kelvin).\n'
+            '    """\n'
+            '    import re as _re35\n'
+            '    m = _re35.fullmatch(r"(-?[0-9]+(?:[.,][0-9]+)?)\\s*(celsius|fahrenheit|kelvin)\\s+para\\s+(celsius|fahrenheit|kelvin)",\n'
+            '                        str(entrada or "").strip().lower())\n'
+            '    if not m:\n'
+            '        raise ValueError(\'Use: <valor> <unidade> para <unidade> (ex.: "25 celsius para fahrenheit").\')\n'
+            '    valor = float(m.group(1).replace(",", "."))\n'
+            '    de, para = m.group(2), m.group(3)\n'
+            '    celsius = {"celsius": valor, "fahrenheit": (valor - 32) * 5 / 9,\n'
+            '               "kelvin": valor - 273.15}[de]\n'
+            '    resultado = {"celsius": celsius, "fahrenheit": celsius * 9 / 5 + 32,\n'
+            '                 "kelvin": celsius + 273.15}[para]\n'
+            '    return str(valor) + " " + de + " = " + str(round(resultado, 2)) + " " + para\n')
+        return 'conversor de temperatura', corpo
+    if ('horas' in p or 'duracao' in p or 'duracoes' in p) and any(
+            x in p for x in ('soma', 'somar', 'somador', 'somade', 'total', 'acumular')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r35: somador de duracoes JA FUNCIONA).\n\n'
+            '    Passe duracoes HH:MM ou HH:MM:SS separadas por espaco/virgula\n'
+            '    (ex.: "1:30 0:45 2:15"). Edite se sua ideia precisa de outra regra.\n'
+            '    """\n'
+            '    import re as _re35\n'
+            '    pedacos = _re35.findall(r"(\\d+):(\\d{1,2})(?::(\\d{1,2}))?", str(entrada or ""))\n'
+            '    if not pedacos:\n'
+            '        raise ValueError(\'Envie duracoes HH:MM (ex.: "1:30 0:45 2:15").\')\n'
+            '    total_seg = sum(int(h) * 3600 + int(mi) * 60 + int(s or 0)\n'
+            '                    for h, mi, s in pedacos)\n'
+            '    hh, resto = divmod(total_seg, 3600)\n'
+            '    mm, ss = divmod(resto, 60)\n'
+            '    return ("Total de " + str(len(pedacos)) + " duracao(oes): " + str(hh) + "h "\n'
+            '            + str(mm).zfill(2) + "min " + str(ss).zfill(2) + "s  ("\n'
+            '            + str(hh) + ":" + str(mm).zfill(2) + ":" + str(ss).zfill(2) + ")")\n')
+        return 'somador de duracoes', corpo
+    if any(x in p for x in ('comparador', 'comparar', 'diferencas', 'diff')) and 'json' not in p:
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "", outras: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r35: comparador de textos JA FUNCIONA).\n\n'
+            '    Compara duas listas de linhas: so no primeiro, so no segundo e\n'
+            '    comuns. Edite se sua ideia compara outra coisa.\n'
+            '    """\n'
+            '    linhas_a = [x.strip() for x in str(entrada or "").splitlines() if x.strip()]\n'
+            '    linhas_b = [x.strip() for x in str(outras or "").splitlines() if x.strip()]\n'
+            '    if not linhas_a or not linhas_b:\n'
+            '        raise ValueError("Envie os DOIS textos (entrada e outras) para comparar.")\n'
+            '    so_a = [x for x in linhas_a if x not in linhas_b]\n'
+            '    so_b = [x for x in linhas_b if x not in linhas_a]\n'
+            '    comuns = [x for x in linhas_a if x in linhas_b]\n'
+            '    return ("So no primeiro: " + str(len(so_a)) + " | So no segundo: "\n'
+            '            + str(len(so_b)) + " | Comuns: " + str(len(comuns))\n'
+            '            + "\\nSo no primeiro (ate 5): " + ("; ".join(so_a[:5]) or "-")\n'
+            '            + "\\nSo no segundo (ate 5): " + ("; ".join(so_b[:5]) or "-"))\n')
+        return 'comparador de textos', corpo
+    if any(x in p for x in ('divisor', 'dividir', 'fragmentar', 'empartes', 'pedacos')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "", partes: str = "2") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r35: divisor de texto em partes JA FUNCIONA).\n\n'
+            '    Divide o texto em N partes de tamanho quase igual (2 a 20).\n'
+            '    """\n'
+            '    try:\n'
+            '        n = int(str(partes) or 2)\n'
+            '    except ValueError:\n'
+            '        raise ValueError("Partes precisa ser um numero (2 a 20).")\n'
+            '    if not 2 <= n <= 20:\n'
+            '        raise ValueError("Divida em 2 a 20 partes.")\n'
+            '    texto = str(entrada or "").strip()\n'
+            '    if len(texto) < n:\n'
+            '        raise ValueError("Texto menor que o numero de partes.")\n'
+            '    tamanho = -(-len(texto) // n)\n'
+            '    blocos = [texto[i:i + tamanho] for i in range(0, len(texto), tamanho)]\n'
+            '    return (str(len(blocos)) + " parte(s) de ~" + str(tamanho) + " caracteres:\\n"\n'
+            '            + "\\n---\\n".join(blocos))\n')
+        return 'divisor de texto', corpo
     if any(x in p for x in ('conversor', 'converter', 'conversao', 'converte')):
         corpo = (
             'CONVERSOES = {\n'
@@ -9970,6 +10048,40 @@ def _r34_gerar_teste(categoria, nome_seguro, pasta):
                        '        saida = modulo.' + nome_seguro + '("2 4 6")',
                        '        self.assertIn("soma: 12.0", saida)',
                        '        self.assertIn("media: 4.0", saida)']
+        elif categoria == 'conversor de temperatura':
+            linhas += ['    def test_conversao_de_temperatura(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        self.assertIn("77.0", modulo.' + nome_seguro + '("25 celsius para fahrenheit"))',
+                       '',
+                       '    def test_unidade_invalida_explica(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        with self.assertRaises(ValueError):',
+                       '            modulo.' + nome_seguro + '("25 celsius para parsec")']
+        elif categoria == 'somador de duracoes':
+            linhas += ['    def test_soma_duracoes(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        self.assertIn("2:15:00", modulo.' + nome_seguro + '("1:30 0:45"))',
+                       '',
+                       '    def test_sem_duracao_explica(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        with self.assertRaises(ValueError):',
+                       '            modulo.' + nome_seguro + '("nada aqui")']
+        elif categoria == 'comparador de textos':
+            linhas += ['    def test_conta_diferencas(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        saida = modulo.' + nome_seguro + '("a\\nb\\nc", outras="a\\nx\\nc")',
+                       '        self.assertIn("Comuns: 2", saida)',
+                       '        self.assertIn("So no primeiro: 1", saida)']
+        elif categoria == 'divisor de texto':
+            linhas += ['    def test_divide_em_partes(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        saida = modulo.' + nome_seguro + '("abcdefghij", partes="2")',
+                       '        self.assertIn("2 parte(s)", saida)',
+                       '',
+                       '    def test_partes_invalidas_explica(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        with self.assertRaises(ValueError):',
+                       '            modulo.' + nome_seguro + '("abc", partes="99")']
         else:
             linhas += ['    def test_ainda_e_esqueleto_honesto(self):',
                        '        modulo = _carregar_esqueleto()',
@@ -29302,7 +29414,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r34] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r35] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
