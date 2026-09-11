@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41 **390 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42 **415 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -350,6 +350,20 @@ ou relatórios reais sem revisão e autorização.
   (ou "fabrica de ideias N") com N 3–20 (clamp interno; padrão 8) — para pedir volume
   auditado de uma vez. Selo `-r41`. Testado parcialmente no Windows real (sexto relato;
   r41 aguarda sétimo reteste).
+- **r42 (LOTE 5 + turbo):** +30 ferramentas (**589 → 619**; itens 91–126 do catálogo).
+  **Datas:** próximo dia útil (pula fds + feriados fixos), contagem regressiva anual, próximo
+  feriado (**Páscoa por Gauss**: carnaval/Paixão/Corpus Christi inclusos), parse flexível de
+  texto→ISO, dias úteis do mês, fusos do Brasil. **Documentos BR:** DDD estático, placa
+  antiga+Mercosul, PIS e título de eleitor (dígito), Luhn+bandeira com AVISO de privacidade,
+  máscaras extras, UF, CNPJ matriz/filial, categorias de CNH. **Referências:** moedas ISO (SEM
+  cotação), alfabeto grego, capitais com filtro. **Arquivos (leitura somente):** contagem,
+  magic bytes, nome seguro Windows, tamanho por padrão, faixas, linhas mais longas, palavras
+  frequentes, amostra aleatória, pontas, encoding/BOM, CSV no console, sugestão de renomeação
+  em lote (NÃO renomeia). **`turbo ia local`**: alterna `ia_local_opcoes.turbo` — teto de 300
+  tokens nas gerações NORMAIS (formato_json/ideias intocados): menos espera real, respostas
+  mais curtas; inteligência do modelo não muda. Auditoria 619/0 duplicatas; catálogo
+  reconciliado (30 checks; **80 propostas restantes** = 619+80=699). Selo `-r42`. Não testado
+  no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
