@@ -51,8 +51,9 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 
 ## Arquivos que devem ser inspecionados em Files changed / View all changes
 
-- `agente.py`: implementação principal; **500 ferramentas** (480 da r21 preservadas + 20 do
-  lote 1 da r22: cálculo/física/texto/datas offline; ver `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`).
+- `agente.py`: implementação principal; **549 ferramentas** (541 do caminho r20-r22 preservadas
+  + 8 do hotfix-estrutura + 49 da r23; auditoria 549/549 únicas, 0 corpos idênticos; ver
+  `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md` — restam 151 propostas para 700).
   Contém motor local, provedores, histórico, roteamento, ferramentas, painel e
   autoedição. **Não importar o monólito para testes:** há efeitos no topo.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch da entrega atual
@@ -106,8 +107,9 @@ ou relatórios reais sem revisão e autorização.
 - r19: orientação determinística de escopo estreito sobre comandos e conceitos
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
-- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22 lote 1 **197 testes isolados
-  passaram** (auditoria: 500 nomes únicos, 0 corpos idênticos; 479 originais sempre preservados).
+- Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23 **218 testes
+  isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas antigas
+  sempre preservadas em nomes/ordem/assinaturas).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -143,7 +145,21 @@ ou relatórios reais sem revisão e autorização.
   que só zera a quantidade em perguntas de existência/contagem (pedidos implícitos r12 como
   "mais de 40 funções" preservados — a suíte pegou a primeira tentativa larga e ela foi afinada).
   **Hotfix validado no PC real**: a mesma frase do relato agora recebe "EU TENHO 500 FERRAMENTAS"
-  determinístico, sem alucinação do modelo e sem aviso de completude falso. **180 propostas de ferramentas + o lote 1 estão no catálogo
+  determinístico, sem alucinação do modelo e sem aviso de completude falso.
+- **r23 (lotes 2-3 + capacidades, pedido do usuário):** 45 ferramentas novas de cálculo/física/
+  datas/números/finanças (primos, regressão, correlação, PA/PG, trigonometria, radianos, log,
+  bitwise, média ponderada, frações, sólidos, tabela verdade, queda livre, MRU/MRUV, Newton,
+  trabalho/potência, calor, dilatação, hidrostática, empuxo, ondas, RC, divisor de tensão, kWh,
+  rendimento, torque, Coulomb, pressão, elástica, BRL, variação %, algarismos significativos,
+  notação científica, frações/decimais, horas decimais, taxa composta, meta de poupança, preço
+  por unidade, semana ISO, bissexto/calendário, soma de úteis, recorrentes, timestamp, JDN) +
+  **5 capacidades internas novas**: `resumo_ferramentas_por_tema` (autocognição), 
+  `achar_ferramenta_para_tarefa` (tarefa→ferramenta com justificativa), `fluxo_sugerido_tarefa`
+  (roteiros determinísticos com ferramentas reais), `comparar_ferramentas_similares` (guia A/B) e
+  **memória de ideias rejeitadas** (`ideia rejeitada: <titulo>` / `ideias rejeitadas` /
+  `limpar ideias rejeitadas`, integrada ao modo de ideias como filtro de dados — não é treino).
+  **O GGUF em si NÃO ficou mais inteligente** (regra do usuário: sem trocar modelo/treinar);
+  o que cresceu é a capacidade determinística e o roteamento. Selo `-r23`. **180 propostas de ferramentas + o lote 1 estão no catálogo
   220 (caminho até 700)**; lotes seguintes dependem de autorização.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
@@ -171,9 +187,9 @@ não versão semântica autenticada; orçamento de tokens é aproximado. Veja li
 antes de declarar qualquer problema resolvido universalmente.
 **31–70 não foram implementadas neste lote.** A próxima seleção depende do usuário.
 
-A meta de 700 ferramentas: r18 entregou 14 capacidades; r21 somou 1 (480); r22 lote 1 somou 20
-(**500**). O `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md` mapeia as 200 restantes (checadas contra
-o inventário; podem ser ajustadas/descartadas na hora da implementação). Não inflar
+A meta de 700 ferramentas: r18 +14; r21 +1 (480); r22 +20 (500); r23 +49 (**549**). Restam
+**151 propostas** mapeadas no `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md` (ajustáveis na
+implementação). Não inflar
 contagem com helpers, aliases ou variantes repetitivas. Melhorias internas não
 precisam virar ferramentas novas. Código/projetos têm prioridade, com distribuição
 para documentos/dados. Alterações confirmadas foram autorizadas, não autonomia irrestrita.

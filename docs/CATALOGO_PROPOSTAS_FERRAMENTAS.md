@@ -7,6 +7,12 @@ ferramentas (nomes e escopos; "viz:" indica a ferramenta existente mais próxima
 (`scripts/auditar_ferramentas.py`) e por leitura dos vizinhos — propostas podem ser
 ajustadas ou descartadas nessa hora. Nada é implementado sem a autorização do usuário.
 
+**Status r23 (implementado, total 549):** itens **11–22, 29–45, 90, 93, 95, 99–102,
+161, 162, 165, 166, 172–177 e 201–203** viraram ferramentas reais (49 no total, incluindo as
+4 capacidades internas). Nomes ajustados na implementação quando o escopo pediu (ex.: 37 virou
+`onda_periodo_frequencia_calcular`, 166 virou `fluxo_sugerido_tarefa`). **Restam 151 propostas**
+para fechar 700. O item 163 (estatísticas de uso da IA) segue pendente.
+
 ## G1. Matemática e estatística
 1. ✅ `estatisticas_descritivas` — média/mediana/moda/desvio/variância/quartis de lista direta (viz: estatisticas_csv = coluna de arquivo).
 2. ✅ `mmc_mdc_calcular` — MMC/MDC de 2–8 inteiros.
