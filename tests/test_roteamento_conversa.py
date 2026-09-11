@@ -79,6 +79,7 @@ class RoteamentoConversa(unittest.TestCase):
         self.assertNotIn('arena/01a07ce2-guilhermefmaga-site', bat)
         self.assertIn('arena/01a08d8e-guilhermefmaga-site/agente.py', bat)
         self.assertIn('arena/01a08d8e-guilhermefmaga-site/iniciar.bat', bat)
+        self.assertIn('?cache=', bat)  # anti-cache CDN do raw.githubusercontent
         self.assertIn('python -m py_compile agente_novo.py', bat)
         self.assertIn('SEM_ATUALIZAR.txt', bat)
 

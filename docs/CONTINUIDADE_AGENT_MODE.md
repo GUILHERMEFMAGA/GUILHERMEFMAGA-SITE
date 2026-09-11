@@ -58,6 +58,9 @@ modelo maior ou encerrar processos de sistema para tentar acelerar a conversa.
 - `iniciar.bat`: inicializador Windows com elevação e atualização pela branch da entrega atual
   (r21: `arena/01a08d8e-guilhermefmaga-site`; URLs do agente e da autoatualização trocadas com
   autorização do usuário). Pode substituir o fonte local, faz backup e respeita `SEM_ATUALIZAR.txt`.
+  As URLs usam `?cache=%RANDOM%` para vencer o cache de ~5 minutos do
+  raw.githubusercontent (incidente r22: usuário recebeu versão de minutos atrás com
+  "Agente atualizado" — cache CDN).
   **Passo permanente:** cada nova entrega, autorizada, atualiza essas URLs **e também a constante
   `URL_AGENTE_OFICIAL` do `agente.py` (checagem do iniciar.bat, ~linha 2082)** para a branch nova
   da sessão; o teste `test_agente_e_bat_apontam_para_a_mesma_branch` falha se divergirem.
