@@ -7705,7 +7705,7 @@ def _menu_ajuda_local():
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
-    print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
+    print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
     print("ESQUELETOS (r35): 'esqueleto de ideia: <nome>' cria codigo que RODA (8 padroes: conversor, temperatura, validador, gerador, medidor, horas, comparador, divisor + teste junto) | 'conferir esqueletos' | 'listar esqueletos'")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
@@ -9508,8 +9508,9 @@ def _r26_priorizar(propostas):
     return sorted(propostas, key=lambda p: (pontuar(p), p['numero']))
 
 
-def _r26_relatorio():
-    """r26: relatorio da fabrica de ideias — dados locais do usuario; zero magica."""
+def _r26_relatorio(quantidade=8):
+    """r26/r41: relatorio da fabrica de ideias — dados locais; quantidade de
+    sugestoes configuravel (3 a 20; padrao 8). Zero magica."""
     _r28_carregar_telemetria()
     persiste = _r28_caminho_telemetria() is not None
     linhas = ['=================== FABRICA DE IDEIAS (r26) ====================',
@@ -9552,7 +9553,7 @@ def _r26_relatorio():
                     vocabulario_top.append(p)
         colidindo, escolhidas, guardadas = 0, [], []
         for proposta in _r26_priorizar(aceitas):
-            if len(escolhidas) >= 8:
+            if len(escolhidas) >= max(3, min(20, int(quantidade))):
                 break
             if not _r26_sem_colisao(proposta['nome']):
                 colidindo += 1
@@ -9607,10 +9608,17 @@ def _r26_relatorio():
 
 def _r26_comandos(comando):
     """r26: fabrica de ideias — melhorias guiadas pelos dados reais de uso."""
-    if _norm_pt(comando) == 'fabricadeideias':
+    n_fab = _norm_pt(comando)
+    if n_fab == 'fabricadeideias':
         print(_r26_relatorio())
         _r28_salvar_telemetria(forcar=True)
         return True
+    if n_fab.startswith('fabricadeideias'):
+        sufixo = n_fab[len('fabricadeideias'):]
+        if sufixo.isdigit():
+            print(_r26_relatorio(int(sufixo)))
+            _r28_salvar_telemetria(forcar=True)
+            return True
     return False
 
 
@@ -11068,13 +11076,13 @@ def _pedido_ideias_do_agente(comando: str) -> bool:
     proposta = any(x in n for x in ("ideia", "sugest", "opini", "melhoria", "melhorar", "queriater", "gostariadeter", "oquemelhoraria",
                                     "oquefalta", "oquemelhorar"))
     proprio = ("gostariadeter" in n or "queriater" in n) or any(x in n for x in ("agente", "seucodigo", "teucodigo", "emvoce",
-                                   "emvc", "dentrodevc", "dentrodevoce", "suasfuncoes"))
+                                   "emvc", "dentrodevc", "dentrodevoce", "suasfuncoes", "pratemelhorar"))
     # Uma instrucao de edicao continua no fluxo de ferramentas existente.
     editar = n.startswith(("implemente", "implementa", "adicione", "adiciona",
                             "criaumaferramenta", "criarferramenta", "edite", "altere"))
     # Perguntar o que falta nao exige usar a palavra "ideias".
     recursos = any(x in n for x in ("ferrament", "funcao", "funcoes", "recurso", "capacidade"))
-    ausencia = any(x in n for x in ("naotem", "naopossui", "faltam", "falta", "aindanaofaz"))
+    ausencia = any(x in n for x in ("naotem", "naopossui", "faltam", "falta", "aindanaofaz", "naoobtem"))
     referente = any(x in n for x in ("vc", "voce", "agente", "seucodigo", "teucodigo"))
     return ((proposta and proprio) or (recursos and ausencia and referente)) and not editar
 
@@ -12565,7 +12573,9 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
             resposta += (f"\n\n[Aviso de completude]: identifiquei {recebidos} itens "
                          f"numerados em sequencia; voce pediu {quantidade}. "
                          "A quantidade solicitada nao foi confirmada. "
-                         "O limite por resposta e 50 itens; voce pode pedir os restantes em partes.")
+                         "O limite por resposta e 50 itens; voce pode pedir os restantes em partes. "
+                         "Para ideias de ferramentas/melhorias do PROPRIO agente (auditadas "
+                         "contra o que ja existe), use: fabrica de ideias.")
     colapso, detalhe = _r21_detectar_colapso(resposta)
     if colapso:
         globals()['_r21_ultimo_colapso'] = {'pergunta': pergunta}
@@ -29527,7 +29537,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r40] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r41] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

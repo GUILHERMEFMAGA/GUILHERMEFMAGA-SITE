@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40 **384 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41 **390 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -339,6 +339,17 @@ ou relatórios reais sem revisão e autorização.
   de variar tema ("3 ideias sobre X") + o bloco de 3 ideias do catálogo (helper novo
   `_r40_bloco_catalogo_fallback`, reusado pelo parse-fail do r38, evitando duplicação).
   Selo `-r40`. Testado parcialmente no Windows real (quinto relato; r40 aguarda reteste).
+- **r41 (roteamento de ideias sem depender de UMA palavra + fábrica com quantidade — SEXTO
+  relato real, r40 no PC):** o relato mostrou 3 caminhos: "Olá" → conversa ok; **"...que
+  ainda vc não OBTEM"** ESCAPOU pro chat livre (só "não TEM" roteava!) e devolveu ideias
+  fluffy sem verificação; **"me de 50 ideias"** foi pro manipulador genérico de listas
+  (dedup -36 ✓, aviso de completude ✓, mas sem ligação com catálogo/fábrica). Correções:
+  **[1]** gatilhos: `naoobtem` entra na lista de ausência e `pratemelhorar` na de
+  "próprio" — frases equivalentes agora caem no pipeline fundamentado; **[2]** o aviso de
+  completude das listas agora aponta `fabrica de ideias`; **[3]** `fabrica de ideias: N`
+  (ou "fabrica de ideias N") com N 3–20 (clamp interno; padrão 8) — para pedir volume
+  auditado de uma vez. Selo `-r41`. Testado parcialmente no Windows real (sexto relato;
+  r41 aguarda sétimo reteste).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
