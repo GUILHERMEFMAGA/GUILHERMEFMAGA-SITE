@@ -7707,7 +7707,7 @@ def _menu_ajuda_local():
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r26): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas -> ideias ja auditadas para voce escolher")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
-    print("ESQUELETOS (r30): 'esqueleto de ideia: <nome>' analisa (colisao, catalogo, vizinhas) e cria o codigo .py em esqueletos_ideias/ | 'listar esqueletos' | 'abrir esqueleto: <nome>'")
+    print("ESQUELETOS (r34): 'esqueleto de ideia: <nome>' analisa e cria o codigo em esqueletos_ideias/ (conversor/validador/gerador/medidor nascem RODANDO + teste junto) | 'listar esqueletos' | 'conferir esqueletos'")
     print("LOTE 4 (r27): tabuada, anagrama/palindromo, vigenere/xor, cron, http/mime, semver, wcag, licencas, json diff/aplanar, regex, massa de dados PT-BR e mais | 'listar ferramentas' ve tudo")
     print("CALCULO/TEXTO OFFLINE: estatisticas, mmc/mdc, bhaskara, geometria, ohm/resistores, cifras, morse, feriados do Brasil, decodificar jwt | 'listar ferramentas' ve tudo")
     print("FISICA/DATAS/FINANCAS (r23): primos, regressao, trigonometria, queda livre, ohm, kwh da conta, feriados, calendario, juros | achar ferramenta para <tarefa> | fluxo sugerido: <tema>")
@@ -9716,38 +9716,56 @@ def _r29_gerar_esqueleto(nome_ideia):
                     + vizinhas_txt + '\n') if vizinhas_txt else ''
     extra_doc = ('    Catalogo #' + str(analise['numero_catalogo']) + ': '
                  + analise['descricao'] + '\n\n') if analise['descricao'] else ''
-    codigo = (
-        '# ============================================================\n'
-        '# ESQUELETO DE IDEIA gerado pelo Super Agente (r29/r30) em ' + data + '\n'
-        '# Ideia original: ' + str(nome_ideia).strip()[:120] + '\n'
-        + extra_header +
-        '# Este arquivo NAO e o agente: fica em esqueletos_ideias/ e\n'
-        '# sobrevive ao atualizador (que so troca agente.py e afins).\n'
-        '# Para virar ferramenta REAL: cole este arquivo no chat do Agent\n'
-        '# Mode e peca a integracao - passa por testes, auditoria anti-\n'
-        '# duplicata e a sua aprovacao antes de entrar no agente oficial.\n'
-        '# ============================================================\n'
-        '\n\n'
-        'def ' + nome_seguro + '(entrada: str = "") -> str:\n'
-        '    """' + str(nome_ideia).strip()[:100] + ' (esqueleto r29/r30).\n\n'
-        + extra_doc +
-        '    Complete o algoritmo no corpo (ou cole este arquivo no chat do\n'
-        '    Agent Mode e peca a integracao com testes de verdade).\n'
-        '    """\n'
-        '    raise NotImplementedError("Esqueleto ainda sem algoritmo.")\n'
-        '\n\n'
-        'if __name__ == "__main__":\n'
-        '    # Exemplo de como seria o uso da ideia:\n'
-        '    try:\n'
-        '        print(' + nome_seguro + '("exemplo"))\n'
-        '    except NotImplementedError as erro:\n'
-        '        print("Ideia ainda em esqueleto:", erro)\n')
+    categoria, corpo_funcional = _r34_padrao_funcional(nome_ideia)
+    if corpo_funcional:
+        corpo_funcional = corpo_funcional.replace('_NOME_', nome_seguro).replace(
+            '_IDEIA_', str(nome_ideia).strip()[:100])
+        codigo = (
+            '# ============================================================\n'
+            '# ESQUELETO FUNCIONAL (MVP r34) gerado pelo Super Agente em ' + data + '\n'
+            '# Ideia original: ' + str(nome_ideia).strip()[:120] + '\n'
+            '# Categoria: ' + categoria + ' — o corpo abaixo JA RODA; amplie e\n'
+            '# cole no chat do Agent Mode para integrar (testes, auditoria e\n'
+            '# a sua aprovacao antes de entrar no agente oficial).\n'
+            + (('# Catalogo #' + str(analise['numero_catalogo']) + ': '
+                + analise['descricao'] + '\n') if analise['descricao'] else '')
+            + extra_header +
+            '# ============================================================\n'
+            '\n\n' + corpo_funcional)
+    else:
+        codigo = (
+            '# ============================================================\n'
+            '# ESQUELETO DE IDEIA gerado pelo Super Agente (r29/r30) em ' + data + '\n'
+            '# Ideia original: ' + str(nome_ideia).strip()[:120] + '\n'
+            + extra_header +
+            '# Este arquivo NAO e o agente: fica em esqueletos_ideias/ e\n'
+            '# sobrevive ao atualizador (que so troca agente.py e afins).\n'
+            '# Para virar ferramenta REAL: cole este arquivo no chat do Agent\n'
+            '# Mode e peca a integracao - passa por testes, auditoria anti-\n'
+            '# duplicata e a sua aprovacao antes de entrar no agente oficial.\n'
+            '# ============================================================\n'
+            '\n\n'
+            'def ' + nome_seguro + '(entrada: str = "") -> str:\n'
+            '    """' + str(nome_ideia).strip()[:100] + ' (esqueleto r29/r30).\n\n'
+            + extra_doc +
+            '    Complete o algoritmo no corpo (ou cole este arquivo no chat do\n'
+            '    Agent Mode e peca a integracao com testes de verdade).\n'
+            '    """\n'
+            '    raise NotImplementedError("Esqueleto ainda sem algoritmo.")\n'
+            '\n\n'
+            'if __name__ == "__main__":\n'
+            '    # Exemplo de como seria o uso da ideia:\n'
+            '    try:\n'
+            '        print(' + nome_seguro + '("exemplo"))\n'
+            '    except NotImplementedError as erro:\n'
+            '        print("Ideia ainda em esqueleto:", erro)\n')
     with open(caminho, 'w', encoding='utf-8', newline='\n') as f:
         f.write(codigo)
+    caminho_teste = _r34_gerar_teste(categoria, nome_seguro, pasta)
     resumo = 'Analise da ideia: sem colisao com as ferramentas registradas'
     if analise['descricao']:
         resumo += (' | proposta #' + str(analise['numero_catalogo'])
-                   + ' do catalogo foi para a docstring')
+                   + ' do catalogo foi registrada no esqueleto')
     if analise['vizinhas']:
         resumo += ' | vizinhas: ' + vizinhas_txt
     verificacao = _r32_conferir_codigo(codigo, nome_seguro)
@@ -9756,9 +9774,21 @@ def _r29_gerar_esqueleto(nome_ideia):
     else:
         linha_ver = ('ATENCAO: a verificacao pos-geracao falhou (' + verificacao['motivo']
                      + '). O arquivo ficou em ' + caminho + '; nao use sem revisar e me avise no chat.')
+    if categoria:
+        linha_extra = ('O corpo JA RODA como ' + categoria + ' minimo (MVP r34): teste no python '
+                       'ou me peca a integracao.'
+                       + (' Teste de amostra: ' + caminho_teste if caminho_teste else ''))
+        linha_conteudo = ('Contem a funcao ' + nome_seguro
+                          + '() com docstring e CORPO FUNCIONAL minimo.')
+    else:
+        linha_extra = ('Corpo ainda e template honesto (sem padrao reconhecido); complete o '
+                       'algoritmo ou me peca a integracao.'
+                       + (' Teste de amostra: ' + caminho_teste if caminho_teste else ''))
+        linha_conteudo = ('Contem a funcao ' + nome_seguro
+                          + '() com docstring, aviso de pendencia e exemplo de uso.')
     return ('Esqueleto criado: ' + caminho + '\n' + resumo + '\n'
-            'Contem a funcao ' + nome_seguro + '() com docstring, aviso de pendencia e exemplo de uso.\n'
-            + linha_ver + '\n'
+            + linha_conteudo + '\n'
+            + linha_ver + '\n' + linha_extra + '\n'
             'Ele NAO entra no agente sozinho: para virar ferramenta de verdade, cole no chat do '
             'Agent Mode e peca a integracao (testes + auditoria + sua aprovacao).')
 
@@ -9808,6 +9838,148 @@ def _r29_abrir(nome_ideia):
     except Exception:
         return ('Nao consegui abrir o editor aqui; o arquivo esta em: ' + caminho)
 
+
+def _r34_padrao_funcional(nome_ideia):
+    """r34: reconhece padroes de ideia e devolve (categoria, corpo_mvp) com
+    implementacao MINIMA QUE RODA. Sem padrao conhecido: ('', None) e o
+    esqueleto fica de template (honesto, sem fingir funcionalidade)."""
+    p = _norm_pt(str(nome_ideia or ''))
+    if any(x in p for x in ('conversor', 'converter', 'conversao', 'converte')):
+        corpo = (
+            'CONVERSOES = {\n'
+            '    # exemplo pronto; adicione as suas: ("de", "para"): fator,\n'
+            '    ("metro", "centimetro"): 100.0,\n'
+            '}\n\n\n'
+            'def ' + '_NOME_' + '(entrada: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r34: conversor minimo JA FUNCIONA).\n\n'
+            '    Use: "10 metro para centimetro". Adicione pares em CONVERSOES.\n'
+            '    """\n'
+            '    import re as _re34\n'
+            '    texto = str(entrada or "").strip()\n'
+            '    m = _re34.fullmatch(r"([0-9]+(?:[.,][0-9]+)?)\\s*(\\w+)\\s+para\\s+(\\w+)", texto)\n'
+            '    if not m:\n'
+            '        raise ValueError(\'Use: <valor> <unidade> para <unidade> (ex.: "10 metro para centimetro")\')\n'
+            '    valor = float(m.group(1).replace(",", "."))\n'
+            '    chave = (m.group(2).lower(), m.group(3).lower())\n'
+            '    if chave not in CONVERSOES:\n'
+            '        raise ValueError("Conversao nao cadastrada: " + chave[0] + " para " + chave[1] + " (adicione em CONVERSOES).")\n'
+            '    resultado = valor * CONVERSOES[chave]\n'
+            '    return str(valor) + " " + chave[0] + " = " + str(resultado) + " " + chave[1]\n')
+        return 'conversor', corpo
+    if any(x in p for x in ('validador', 'validar', 'verificador', 'verificar', 'checador')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r34: validador minimo JA FUNCIONA).\n\n'
+            '    Retorna SIM/NAO conforme a REGRA (edite a expressao da regra).\n'
+            '    """\n'
+            '    import re as _re34\n'
+            '    REGRA = _re34.compile(r"^[A-Z]{3}-?[0-9]{4}$")  # exemplo: placa antiga; EDITE AQUI\n'
+            '    alvo = str(entrada or "").strip()\n'
+            '    if not alvo:\n'
+            '        raise ValueError("Envie o valor a validar.")\n'
+            '    if REGRA.fullmatch(alvo):\n'
+            '        return \'SIM: "\' + alvo + \'" passou na regra.\'\n'
+            '    return \'NAO: "\' + alvo + \'" nao passou na regra (edite REGRA dentro da funcao).\'\n')
+        return 'validador', corpo
+    if any(x in p for x in ('gerador', 'sorteador', 'gerar', 'sortear', 'criador')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "", quantidade: str = "5") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r34: gerador/sorteador minimo JA FUNCIONA).\n\n'
+            '    Gera "quantidade" itens combinando as PECAS (edite PECAS e o formato).\n'
+            '    """\n'
+            '    import random as _random34\n'
+            '    PECAS = ["a", "b", "c", "1", "2"]  # EDITE: pecas do que voce gera\n'
+            '    try:\n'
+            '        q = int(str(quantidade) or 5)\n'
+            '    except ValueError:\n'
+            '        raise ValueError("Quantidade precisa ser um numero (1 a 50).")\n'
+            '    if not 1 <= q <= 50:\n'
+            '        raise ValueError("Gere de 1 a 50 por vez.")\n'
+            '    itens = []\n'
+            '    for _ in range(q):\n'
+            '        itens.append("".join(_random34.choice(PECAS) for _ in range(8)))\n'
+            '    return "\\n".join(str(i + 1) + ") " + s for i, s in enumerate(itens))\n')
+        return 'gerador/sorteador', corpo
+    if any(x in p for x in ('contador', 'medidor', 'calculadora', 'calcular', 'somar',
+                            'soma', 'media', 'contar')):
+        corpo = (
+            'def ' + '_NOME_' + '(entrada: str = "") -> str:\n'
+            '    """' + '_IDEIA_' + ' (MVP r34: contador/medidor minimo JA FUNCIONA).\n\n'
+            '    Le todos os numeros do texto e devolve quantidade, soma e media\n'
+            '    (edite para a metrica da sua ideia).\n'
+            '    """\n'
+            '    import re as _re34\n'
+            '    numeros = [float(x.replace(",", ".")) for x in\n'
+            '               _re34.findall(r"-?[0-9]+(?:\\.[0-9]+)?", str(entrada or ""))]\n'
+            '    if not numeros:\n'
+            '        raise ValueError("Nao achei numeros no texto enviado.")\n'
+            '    return ("Numeros lidos: " + str(len(numeros)) + " | soma: "\n'
+            '            + str(round(sum(numeros), 4)) + " | media: "\n'
+            '            + str(round(sum(numeros) / len(numeros), 4)))\n')
+        return 'contador/medidor', corpo
+    return '', None
+
+
+def _r34_gerar_teste(categoria, nome_seguro, pasta):
+    """r34: gera arquivo de teste de amostra (unittest) ao lado do esqueleto,
+    em esqueletos_ideias/testes/. Sem padrao conhecido, teste generico que
+    verifica o aviso de pendencia. Retorna o caminho ou '' sem quebrar."""
+    import os
+    try:
+        pasta_testes = os.path.join(pasta, 'testes')
+        os.makedirs(pasta_testes, exist_ok=True)
+        caminho = os.path.join(pasta_testes, 'test_' + nome_seguro + '.py')
+        relativo = 'os.path.join(os.path.dirname(__file__), "..", "' + nome_seguro + '.py")'
+        linhas = ['"""Testes de amostra (r34) para o esqueleto ' + nome_seguro + '.py.',
+                  'Rode com: python -m unittest caminho/para/este/arquivo',
+                  'Nao e o teste final da integracao: esse nasce na esteira do Agent Mode."""',
+                  'import importlib.util',
+                  'import unittest',
+                  '',
+                  '',
+                  'def _carregar_esqueleto():',
+                  '    spec = importlib.util.spec_from_file_location("esqueleto", ' + relativo + ')',
+                  '    modulo = importlib.util.module_from_spec(spec)',
+                  '    spec.loader.exec_module(modulo)',
+                  '    return modulo',
+                  '',
+                  '',
+                  'class Teste' + ''.join(p.capitalize() for p in nome_seguro.split('_')[:3]) + '(unittest.TestCase):']
+        if categoria == 'conversor':
+            linhas += ['    def test_conversao_do_exemplo(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        self.assertIn("100.0", modulo.' + nome_seguro + '("10 metro para centimetro"))',
+                       '',
+                       '    def test_formato_errado_explica(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        with self.assertRaises(ValueError):',
+                       '            modulo.' + nome_seguro + '("nada a ver")']
+        elif categoria == 'validador':
+            linhas += ['    def test_casos_sim_e_nao(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        self.assertIn("SIM", modulo.' + nome_seguro + '("ABC-1234"))',
+                       '        self.assertIn("NAO", modulo.' + nome_seguro + '("xyz"))']
+        elif categoria == 'gerador/sorteador':
+            linhas += ['    def test_gera_a_quantidade_pedida(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        saida = modulo.' + nome_seguro + '("", quantidade="3")',
+                       '        self.assertEqual(len(saida.splitlines()), 3)']
+        elif categoria == 'contador/medidor':
+            linhas += ['    def test_soma_e_media(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        saida = modulo.' + nome_seguro + '("2 4 6")',
+                       '        self.assertIn("soma: 12.0", saida)',
+                       '        self.assertIn("media: 4.0", saida)']
+        else:
+            linhas += ['    def test_ainda_e_esqueleto_honesto(self):',
+                       '        modulo = _carregar_esqueleto()',
+                       '        with self.assertRaises(NotImplementedError):',
+                       '            modulo.' + nome_seguro + '("exemplo")']
+        with open(caminho, 'w', encoding='utf-8', newline='\n') as f:
+            f.write('\n'.join(linhas) + '\n')
+        return caminho
+    except Exception:
+        return ''
 
 def _r29_comandos(comando):
     """r29: esqueletos de ideia — o agente materializa ideias em codigo base
@@ -9867,6 +10039,16 @@ def _r32_conferir_esqueletos():
             ok.append(nome_arq)
         else:
             quebrados.append((nome_arq, resultado['motivo']))
+    pasta_testes = os.path.join(pasta, 'testes')
+    if os.path.isdir(pasta_testes):
+        import ast as _ast34
+        for nome_teste in sorted(a for a in os.listdir(pasta_testes) if a.endswith('.py')):
+            try:
+                with open(os.path.join(pasta_testes, nome_teste), 'r', encoding='utf-8') as f:
+                    _ast34.parse(f.read())
+                ok.append('testes/' + nome_teste)
+            except (SyntaxError, OSError, UnicodeError) as erro:
+                quebrados.append(('testes/' + nome_teste, 'erro de sintaxe: ' + str(erro)))
     linhas = ['Conferencia dos esqueletos (somente leitura): ' + str(len(ok))
               + ' OK, ' + str(len(quebrados)) + ' quebrado(s).']
     for nome_arq in ok:
@@ -29120,7 +29302,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r33] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r34] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

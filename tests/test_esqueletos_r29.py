@@ -50,13 +50,13 @@ class Geracao(unittest.TestCase):
         self.env = env_r29(PASTA_BASE=self.pasta)
 
     def test_gera_arquivo_com_funcao_docstring_e_aviso(self):
-        msg = self.env['_r29_gerar_esqueleto']('medidor de água')
-        caminho = os.path.join(self.pasta, 'esqueletos_ideias', 'medidor_de_agua.py')
+        msg = self.env['_r29_gerar_esqueleto']('cata vento azul')
+        caminho = os.path.join(self.pasta, 'esqueletos_ideias', 'cata_vento_azul.py')
         self.assertTrue(os.path.exists(caminho))
-        self.assertIn('medidor_de_agua.py', msg)
+        self.assertIn('cata_vento_azul.py', msg)
         self.assertIn('NAO entra no agente sozinho', msg)
         conteudo = io.open(caminho, encoding='utf-8').read()
-        self.assertIn('def medidor_de_agua(', conteudo)
+        self.assertIn('def cata_vento_azul(', conteudo)
         self.assertIn('NotImplementedError', conteudo)
         self.assertIn('r29', conteudo)
         self.assertIn('esqueletos_ideias', conteudo)

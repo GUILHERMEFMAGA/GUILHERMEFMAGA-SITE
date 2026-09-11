@@ -60,9 +60,9 @@ class AnaliseEnriquece(unittest.TestCase):
         msg = self.env['_r29_gerar_esqueleto']('medidor de x')
         caminho = os.path.join(self.pasta, 'esqueletos_ideias', 'medidor_de_x.py')
         self.assertTrue(os.path.exists(caminho))
-        self.assertIn('proposta #9 do catalogo foi para a docstring', msg)
+        self.assertIn('proposta #9 do catalogo foi registrada no esqueleto', msg)
         conteudo = io.open(caminho, encoding='utf-8').read()
-        self.assertIn('Catalogo #9: mede x com precisao laboratorial', conteudo)
+        self.assertIn('# Catalogo #9: mede x com precisao laboratorial', conteudo)
         self.assertIn('def medidor_de_x(', conteudo)
 
     def test_vizinhas_sao_reportadas(self):
