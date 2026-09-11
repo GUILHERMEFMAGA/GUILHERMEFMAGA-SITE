@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36 **365 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37 **371 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -301,6 +301,17 @@ ou relatórios reais sem revisão e autorização.
   intencional). Comportamento HONESTO do r34 no PC confirmou o desenho: 0/5 declarado,
   nada mascarado. Selo `-r36`. Testado parcialmente no Windows real (o relato que motivou
   esta correção).
+- **r37 (referências em níveis — correção do SEGUNDO relato real, r36 no PC):** o r36 vivou
+  (selo/recorte 8/fallback ok) mas o 0/5 persistiu: o JSON parseava e morria na exigência de
+  `funcoes` com nomes exatos das evidências (modelo pequeno não cita referências exatas).
+  Contrato atualizado: **[1]** citação falsa (`funcoes` inválidas) NUNCA é exibida como
+  verificada — os nomes inventados somem; **[2]** o PROGRAMA tenta auto-verificar: varre o
+  texto (título+justificativa) por nomes reais do inventário (norm ≥6 chars, até 3) e marca
+  "[referencia auto-verificada no codigo]"; **[3]** sem nenhuma: entra como "[parcial: sem
+  referencia verificada no codigo]" com rodapé orientando conferir duplicatas. Título+
+  justificativa continuam obrigatórios. Teste antigo do contrato atualizado
+  (test_citacao_falsa...: descarte → marcação, espírito preservado). Selo `-r37`. Testado
+  parcialmente no Windows real (relatos r34/r36 do usuário; r37 aguarda terceiro relato).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

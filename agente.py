@@ -11260,6 +11260,8 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     descartados = 0
     existentes_r31 = 0
     parciais_r36 = 0
+    refs_auto_total_r37 = 0
+    sem_ref_total_r37 = 0
     for item in itens[:quantidade]:
         if not isinstance(item, dict):
             descartados += 1
@@ -11277,15 +11279,25 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
             parciais_r36 += 1
         refs = item.get('funcoes')
         titulo = _norm_pt(item['titulo'][:160])
-        if (not isinstance(refs, list) or not refs or len(refs) > 8 or
-                any(not isinstance(r, str) or r not in conhecidas for r in refs) or
-                not titulo or titulo in titulos):
+        if not titulo or titulo in titulos:
             descartados += 1
             continue
         if _titulo_ideia_repetido(item['titulo'], anteriores):
             repetidas += 1
             descartados += 1
             continue
+        # r37: referencia em niveis — citacao falsa nunca e exibida como verificada
+        refs_validas_r37 = (isinstance(refs, list) and refs and len(refs) <= 8 and
+                            all(isinstance(r, str) and r in conhecidas for r in refs))
+        refs_auto_r37 = []
+        if not refs_validas_r37:
+            texto_item_r37 = _norm_pt(str(item['titulo']) + ' ' +
+                                      str(item.get('justificativa', '')))
+            for nome_inv in inventario['funcoes']:
+                alvo_r37 = _norm_pt(str(nome_inv))
+                if len(alvo_r37) >= 6 and alvo_r37 in texto_item_r37:
+                    refs_auto_r37.append(str(nome_inv))
+            refs_auto_r37 = refs_auto_r37[:3]
         nome_existente_r31 = _r31_ideia_ja_existe(item['titulo'], inventario['funcoes'])
         if nome_existente_r31:
             existentes_r31 += 1
@@ -11300,12 +11312,26 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
         rotulo_catalogo_r31 = (' (catalogo #' + str(numero_catalogo_r31) + ')'
                                if numero_catalogo_r31 else '')
         marcador_parcial_r36 = ' [parcial: modelo nao avaliou risco/teste]' if parcial_r36 else ''
+        if refs_validas_r37:
+            refs_para_exibir = refs
+        elif refs_auto_r37:
+            refs_para_exibir = refs_auto_r37
+            marcador_parcial_r36 += ' [referencia auto-verificada no codigo]'
+            refs_auto_total_r37 += 1
+        else:
+            refs_para_exibir = []
+            marcador_parcial_r36 += ' [parcial: sem referencia verificada no codigo]'
+            sem_ref_total_r37 += 1
         linhas.append(f"\n{aceitos}. {item['titulo'][:160]}" + rotulo_catalogo_r31 + marcador_parcial_r36)
         for chave, rotulo in (('justificativa', 'Por que priorizar'), ('beneficio', 'Beneficio esperado'),
                               ('risco', 'Risco/custo'), ('teste', 'Como testar')):
             linhas.append(f"   {rotulo}: {item[chave][:500]}")
-        linhas.append('   Referencias no fonte: ' + ', '.join(
-            f"{r} (linha {inventario['funcoes'][r]['linha']})" for r in dict.fromkeys(refs)))
+        if refs_para_exibir:
+            linhas.append('   Referencias no fonte: ' + ', '.join(
+                f"{r} (linha {inventario['funcoes'][r]['linha']})"
+                for r in dict.fromkeys(refs_para_exibir)))
+        else:
+            linhas.append('   Referencias no fonte: nenhuma verificada (parcial).')
         relacionadas = _relacionadas_no_inventario(item['titulo'], inventario)
         if relacionadas:
             linhas.append('   Recursos possivelmente relacionados ja existentes: ' + ', '.join(
@@ -11318,6 +11344,14 @@ def _formatar_ideias_verificadas(texto, inventario, evidencias, quantidade,
     if parciais_r36:
         linhas.append(str(parciais_r36) + ' sugestao(oes) vieram sem avaliacao de risco/teste: '
                       'o modelo local nao avaliou esses campos; leia com atencao.')
+    if refs_auto_total_r37:
+        linhas.append(str(refs_auto_total_r37)
+                      + ' com referencia auto-verificada pelo programa (o modelo citou o nome '
+                        'no texto e eu confirmei no codigo).')
+    if sem_ref_total_r37:
+        linhas.append(str(sem_ref_total_r37)
+                      + ' sem referencia verificada: ideias validas, mas confira o que ja '
+                        'existe antes de pedir integracao.')
     if repetidas:
         linhas.append(f'Titulos repetidos ou muito semelhantes ao historico: {repetidas}.')
     if aceitos == 0:
@@ -29431,7 +29465,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r36] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r37] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

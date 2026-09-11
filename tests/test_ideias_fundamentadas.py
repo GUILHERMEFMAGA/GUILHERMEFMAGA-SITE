@@ -55,9 +55,12 @@ class IdeiasFundamentadas(unittest.TestCase):
         itens = [ideia(), ideia(), ideia(titulo='Inventada', funcoes=['nao_existe'])]
         saida = env['_formatar_ideias_verificadas'](
             json.dumps({'ideias': itens}), inventario, [{'nome': 'ler'}], 3)
-        self.assertIn('validos: 1/3', saida)
+        # r37: citação falsa nunca é exibida como verificada; a ideia entra
+        # como parcial honesto (contrato atualizado de descarte para marcação).
+        self.assertIn('validos: 2/3', saida)
         self.assertIn('ler (linha 10)', saida)
-        self.assertNotIn('Inventada', saida)
+        self.assertNotIn('nao_existe (linha', saida)
+        self.assertIn('Inventada [parcial: sem referencia verificada no codigo]', saida)
         self.assertIn('auditoria integral', saida)
 
     def test_zero_sugestoes_oferece_roteiro_identificado(self):
