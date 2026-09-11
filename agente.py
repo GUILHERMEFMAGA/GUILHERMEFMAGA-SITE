@@ -7703,7 +7703,7 @@ def _menu_ajuda_local():
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
-    print("VELOCIDADE: velocidade ia local | 'resposta rapida' encurta geracoes | 'oi' e afins sao instantaneos")
+    print("VELOCIDADE: velocidade ia local | 'turbo ia local' alterna teto de 300 tokens (respostas mais curtas/rapidas) | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
@@ -8786,7 +8786,7 @@ def _r20_opcoes():
     import os
     padrao = {'threads':4, 'streaming':False, 'ram_min_mb':256,
               'avaliacao_ampliada':False, 'repeticoes':1, 'semente':42,
-              'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5}
+              'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5, 'turbo':False}
     dados = globals().get('config', {}).get('ia_local_opcoes', {})
     if isinstance(dados, dict):
         for k in padrao:
@@ -10482,6 +10482,27 @@ def _r28_comandos(comando):
 def _r24_comandos(comando):
     """r24: velocidade ia local — mede o que e real, nao promete magica."""
     import json
+    if _norm_pt(comando).startswith('turboialocal'):
+        cfg = globals().get('config')
+        if not isinstance(cfg, dict):
+            cfg = {}
+        opcoes_atuais = dict(cfg.get('ia_local_opcoes') or {}) if isinstance(cfg.get('ia_local_opcoes'), dict) else {}
+        ligar = not bool(opcoes_atuais.get('turbo'))
+        opcoes_atuais['turbo'] = ligar
+        cfg_novo = dict(cfg)
+        cfg_novo['ia_local_opcoes'] = opcoes_atuais
+        salvar = globals().get('salvar_json')
+        if callable(salvar):
+            try:
+                salvar(globals().get('ARQ_CONFIG'), cfg_novo)
+                globals()['config'] = cfg_novo
+            except Exception:
+                pass
+        print('TURBO ' + ('LIGADO: teto de 300 tokens nas geracoes normais (JSON/ideias intocados); '
+                         'respostas mais curtas e mais rapidas — inteligencia do modelo nao muda.'
+                         if ligar else
+                         'DESLIGADO: teto de tokens volta ao padrao do sistema.'))
+        return True
     if _norm_pt(comando) == 'velocidadeialocal':
         resumo = _r24_resumo_velocidade()
         opcoes = _r20_opcoes()
@@ -12423,6 +12444,8 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
     tls.ultima = {}
     try:
         _r20_estado('ocupado', 'Geracao em andamento')
+        if _r20_opcoes().get('turbo') and not formato_json:
+            max_tokens = min(max_tokens, 300)  # r42: menos espera; respostas mais curtas
         texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream,
                                       callback, seed, repeat_penalty, formato_json, id_geracao)
         tls.ultima = meta
@@ -27437,6 +27460,605 @@ def markdown_tabela_gerar(texto: str = "", separador: str = ";") -> str:
     return '\n'.join([cabecalho, separador_md] + corpo) + '\n(Copie e cole direto no Markdown)'
 
 
+def proximo_dia_util(data: str = "") -> str:
+    """Primeira data util a partir da data informada (ou hoje), pulando fim de
+    semana; considera feriados nacionais fixos do ano. Calculo local."""
+    import datetime as _dt
+    d = _texto_para_data_ou_hoje(data)
+    feriados = _feriados_fixos(d.year) | _feriados_fixos(d.year + 1)
+    for _ in range(0, 60):
+        d = d + _dt.timedelta(days=1)
+        if d.weekday() < 5 and d not in feriados:
+            return d.strftime('%d/%m/%Y') + ' (' + ['segunda', 'terca', 'quarta', 'quinta',
+                'sexta', 'sabado', 'domingo'][d.weekday()] + ')'
+    raise ValueError('Nao achei dia util em 60 dias; confira a data.')
+
+
+def _texto_para_data_ou_hoje(texto):
+    import datetime as _dt
+    t = str(texto or '').strip()
+    if not t:
+        return _dt.date.today()
+    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%y'):
+        try:
+            return _dt.datetime.strptime(t, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError('Data invalida: "' + t + '". Use DD/MM/AAAA (ou vazio = hoje).')
+
+
+def _feriados_fixos(ano):
+    import datetime as _dt
+    return {_dt.date(ano, 1, 1), _dt.date(ano, 4, 21), _dt.date(ano, 5, 1),
+            _dt.date(ano, 9, 7), _dt.date(ano, 10, 12), _dt.date(ano, 11, 2),
+            _dt.date(ano, 11, 15), _dt.date(ano, 11, 20), _dt.date(ano, 12, 25)}
+
+
+def contagem_regressiva_data(data: str = "") -> str:
+    """Dias ate a proxima ocorrencia de uma data anual (aniversario,
+    vencimento). Calculo local, sem internet."""
+    import datetime as _dt
+    hoje = _dt.date.today()
+    d = _texto_para_data_ou_hoje(data)
+    alvo = _dt.date(hoje.year, d.month, d.day)
+    if alvo < hoje:
+        alvo = _dt.date(hoje.year + 1, d.month, d.day)
+    dias = (alvo - hoje).days
+    rotulo = 'HOJE!' if dias == 0 else ('amanha' if dias == 1 else 'em ' + str(dias) + ' dia(s)')
+    return 'Proxima ocorrencia de ' + d.strftime('%d/%m') + ': ' + alvo.strftime('%d/%m/%Y') + ' (' + rotulo + ').'
+
+
+def fusos_brasil_referencia(mostrar: str = "sim") -> str:
+    """Os 4 fusos oficiais do Brasil e offsets UTC (referencia estatica,
+    sem consultar internet)."""
+    linhas = ['Fusos oficiais do Brasil (referencia estatica):',
+              '  UTC-5: Acre e o sudoeste do Amazonas',
+              '  UTC-4: maioria da Amazonia (Manaus), Rondonia, Mato Grosso, Roraima',
+              '  UTC-3: horario de Brasilia (SP, RJ, MG, BA, RS, DF e a maior parte)',
+              '  UTC-2: ilhas oceanicas (Fernando de Noronha, Atol das Rocas)',
+              'Nao ha horario de verao federal desde 2019.']
+    return '\n'.join(linhas)
+
+
+def proximo_feriado(data: str = "") -> str:
+    """Proximo feriado nacional (fixos + calculo de Pascoa para os moveis) a
+    partir de hoje ou da data dada. Calculo local."""
+    import datetime as _dt
+    base = _texto_para_data_ou_hoje(data)
+    ano = base.year
+    for candidato_ano in (ano, ano + 1):
+        pascoa = _domingo_pascoa(candidato_ano)
+        feriados = {
+            _dt.date(candidato_ano, 1, 1): 'Confraternizacao Universal',
+            pascoa - _dt.timedelta(days=48): 'Carnaval (segunda)',
+            pascoa - _dt.timedelta(days=47): 'Carnaval (terca)',
+            pascoa - _dt.timedelta(days=2): 'Paixao de Cristo',
+            _dt.date(candidato_ano, 4, 21): 'Tiradentes',
+            _dt.date(candidato_ano, 5, 1): 'Dia do Trabalho',
+            pascoa + _dt.timedelta(days=60): 'Corpus Christi',
+            _dt.date(candidato_ano, 9, 7): 'Independencia',
+            _dt.date(candidato_ano, 10, 12): 'Nossa Senhora Aparecida',
+            _dt.date(candidato_ano, 11, 2): 'Finados',
+            _dt.date(candidato_ano, 11, 15): 'Proclamacao da Republica',
+            _dt.date(candidato_ano, 11, 20): 'Consciencia Negra',
+            _dt.date(candidato_ano, 12, 25): 'Natal'}
+        for dia in sorted(feriados):
+            if dia >= base:
+                delta = (dia - base).days
+                return (feriados[dia] + ': ' + dia.strftime('%d/%m/%Y')
+                        + ' (' + ('hoje!' if delta == 0 else 'em ' + str(delta) + ' dia(s)') + ').')
+    raise ValueError('Nao achei feriado no intervalo.')
+
+
+def _domingo_pascoa(ano):
+    a, b, c = ano % 19, ano // 100, ano % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - g - d + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = ((h + l - 7 * m + 114) % 31) + 1
+    import datetime as _dt
+    return _dt.date(ano, mes, dia)
+
+
+def texto_para_data_parse(texto: str = "") -> str:
+    """Converte texto flexivel de data ('25/12/2026', '2026-12-25',
+    '25-12-26') para ISO AAAA-MM-DD. Parse local, sem internet."""
+    import datetime as _dt
+    t = str(texto or '').strip()
+    for fmt in ('%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d', '%d/%m/%y', '%d-%m-%y', '%d%m%Y'):
+        try:
+            return _dt.datetime.strptime(t, fmt).date().isoformat()
+        except ValueError:
+            continue
+    raise ValueError('Nao reconheci a data: "' + t + '". Formatos aceitos: DD/MM/AAAA, AAAA-MM-DD, DD-MM-AA, DDMMAAAA.')
+
+
+def dias_uteis_do_mes(mes: str = "", ano: str = "") -> str:
+    """Quantos dias uteis tem um mes (seg-sex, sem feriados nacionais fixos
+    nem moveis do mes). Calculo local."""
+    import calendar as _cal
+    import datetime as _dt
+    hoje = _dt.date.today()
+    m = int(str(mes).strip() or hoje.month)
+    a = int(str(ano).strip() or hoje.year)
+    if not 1 <= m <= 12 or not 1900 <= a <= 2200:
+        raise ValueError('Mes 1-12 e ano 1900-2200, por favor.')
+    primeiro = _dt.date(a, m, 1)
+    ultimo = _dt.date(a, m, _cal.monthrange(a, m)[1])
+    uteis = sum(1 for i in range((ultimo - primeiro).days + 1)
+                if (primeiro + _dt.timedelta(days=i)).weekday() < 5)
+    return ('Mes ' + str(m).zfill(2) + '/' + str(a) + ': ' + str(uteis)
+            + ' dias uteis (seg-sex) de ' + str((ultimo - primeiro).days + 1) + ' dias totais. '
+            'Feriados do mes, se houver, nao foram descontados.')
+
+
+def consultar_ddd_estatico(ddd: str = "") -> str:
+    """Tabela offline DDD -> estado/regiao (principais codigos). Sem
+    internet e sem consultar operadora; so o mapa fixo."""
+    mapa = {'11': 'Sao Paulo - SP (regiao Sudeste)', '12': 'Vale do Paraiba - SP', '13': 'Santos - SP',
+            '14': 'Bauru - SP', '15': 'Sorocaba - SP', '16': 'Ribeirao Preto - SP', '17': 'Sao Jose do Rio Preto - SP',
+            '19': 'Campinas - SP', '21': 'Rio de Janeiro - RJ', '22': 'Norte Fluminense - RJ',
+            '24': 'Interior do Rio - RJ', '27': 'Vitoria - ES', '31': 'Belo Horizonte - MG',
+            '32': 'Juiz de Fora - MG', '34': 'Uberlandia - MG', '35': 'Pocos de Caldas - MG',
+            '41': 'Curitiba - PR', '42': 'Ponta Grossa - PR', '44': 'Maringa - PR', '45': 'Foz do Iguacu - PR',
+            '46': 'Pato Branco - PR', '47': 'Joinville - SC', '48': 'Florianopolis - SC',
+            '49': 'Chapeco - SC', '51': 'Porto Alegre - RS', '53': 'Pelotas - RS', '54': 'Caxias do Sul - RS',
+            '55': 'Santa Maria - RS', '61': 'Brasilia - DF', '62': 'Goiania - GO', '63': 'Palmas - TO',
+            '64': 'Caldas Novas - GO', '65': 'Cuiaba - MT', '66': 'Rondonopolis - MT', '67': 'Campo Grande - MS',
+            '68': 'Rio Branco - AC', '69': 'Porto Velho - RO', '71': 'Salvador - BA', '73': 'Ilheus - BA',
+            '74': 'Juazeiro - BA', '75': 'Feira de Santana - BA', '77': 'Barreiras - BA', '81': 'Recife - PE',
+            '82': 'Maceio - AL', '83': 'Joao Pessoa - PB', '84': 'Natal - RN', '85': 'Fortaleza - CE',
+            '86': 'Teresina - PI', '87': 'Petrolina - PE', '88': 'Juazeiro do Norte - CE', '89': 'Picos - PI',
+            '91': 'Belem - PA', '92': 'Manaus - AM', '93': 'Santarem - PA', '94': 'Maraba - PA',
+            '95': 'Boa Vista - RR', '96': 'Macapa - AP', '97': 'Tefe - AM', '98': 'Sao Luis - MA',
+            '99': 'Imperatriz - MA'}
+    d = ''.join(c for c in str(ddd) if c.isdigit())
+    if d not in mapa:
+        raise ValueError('DDD "' + str(ddd) + '" nao esta na tabela local de principais codigos.')
+    return 'DDD ' + d + ' -> ' + mapa[d] + '. (Mapa estatico offline; portabilidade de operadora nao e consultada.)'
+
+
+def validar_placa_veiculo(placa: str = "") -> str:
+    """Valida formato de placa brasileira antiga (ABC1234) e Mercosul
+    (ABC1D23). Valida FORMATO, nao existencia no DETRAN."""
+    import re as _re
+    p = str(placa).strip().upper().replace('-', '').replace(' ', '')
+    if _re.fullmatch(r'[A-Z]{3}[0-9]{4}', p):
+        return 'Formato valido de placa ANTIGA: ' + p[:3] + '-' + p[3:] + '. (Formato apenas; situacao no DETRAN nao e consultada.)'
+    if _re.fullmatch(r'[A-Z]{3}[0-9][A-Z][0-9]{2}', p):
+        return 'Formato valido de placa MERCOSUL: ' + p[:3] + str(p[3]) + p[4] + p[5:] + '. (Formato apenas; situacao no DETRAN nao e consultada.)'
+    raise ValueError('Formato invalido: "' + str(placa) + '". Antiga: ABC1234 | Mercosul: ABC1D23.')
+
+
+def validar_pis_pasep(pis: str = "") -> str:
+    """Valida o digito verificador do PIS/PASEP (matematica oficial). Nao
+    consulta a Caixa; so confere o calculo."""
+    digitos = [int(c) for c in ''.join(c for c in str(pis) if c.isdigit())]
+    if len(digitos) != 11:
+        raise ValueError('PIS/PASEP precisa ter 11 digitos (recebi ' + str(len(digitos)) + ').')
+    pesos = [3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    soma = sum(d * p for d, p in zip(digitos[:10], pesos))
+    resto = soma % 11
+    dv = 0 if resto < 2 else 11 - resto
+    if dv == digitos[10]:
+        return 'PIS/PASEP com DIGITO VERIFICADOR VALIDO (matematica). Nao confirma cadastro na Caixa.'
+    raise ValueError('Digito verificador INVALIDO: esperado ' + str(dv) + ', recebido ' + str(digitos[10]) + '.')
+
+
+def validar_titulo_eleitor(numero: str = "") -> str:
+    """Valida o digito verificador do titulo de eleitor (algoritmo do TSE).
+    Nao consulta cadastro; so o calculo."""
+    d = [int(c) for c in ''.join(c for c in str(numero) if c.isdigit())]
+    if len(d) != 12:
+        raise ValueError('Titulo de eleitor precisa ter 12 digitos (recebi ' + str(len(d)) + ').')
+    def digito(pedaco, pesos):
+        soma = sum(a * b for a, b in zip(pedaco, pesos))
+        resto = soma % 11
+        return 0 if resto == 10 else resto
+    d1 = digito(d[:8], [2, 3, 4, 5, 6, 7, 8, 9])
+    d2 = digito(d[8:10] + [d1], [7, 8, 9])
+    if [d1, d2] == d[10:]:
+        return 'Titulo de eleitor com DIGITOS VERIFICADORES VALIDOS (algoritmo do TSE). Nao confirma cadastro eleitoral.'
+    raise ValueError('Digitos INVALIDOS: esperados ' + str(d1) + str(d2) + ', recebidos ' + str(d[10]) + str(d[11]) + '.')
+
+
+def validar_cartao_luhn_aviso(numero: str = "") -> str:
+    """Valida o digito de Luhn e tenta identificar a bandeira pelo prefixo.
+    AVISO: nunca envie cartao real a ninguem; use so para testar digitacao."""
+    d = [int(c) for c in ''.join(c for c in str(numero) if c.isdigit())]
+    if not 13 <= len(d) <= 19:
+        raise ValueError('Cartao tem 13 a 19 digitos (recebi ' + str(len(d)) + ').')
+    soma = 0
+    for i, dig in enumerate(reversed(d)):
+        if i % 2 == 1:
+            dig *= 2
+            if dig > 9:
+                dig -= 9
+        soma += dig
+    prefixo = ''.join(str(x) for x in d[:2])
+    bandeira = ('Visa' if d[0] == 4 else
+                'Mastercard' if prefixo in ('51', '52', '53', '54', '55') or 2221 <= int(''.join(str(x) for x in d[:4])) <= 2720 else
+                'Elo' if prefixo in ('40', '50') else
+                'American Express' if prefixo in ('34', '37') else
+                'Hipercard' if ''.join(str(x) for x in d[:6]) == '606282' else 'desconhecida')
+    if soma % 10 == 0:
+        return ('Digito de LUHN VALIDO. Bandeira provavel pelo prefixo: ' + bandeira
+                + '.\nAVISO DE PRIVACIDADE: nunca compartilhe cartao real (nem numero completo); teste so com cartoes falsos.')
+    raise ValueError('Digito de LUHN INVALIDO (a digitacao provavelmente tem erro). Bandeira provavel: ' + bandeira + '.')
+
+
+def mascaras_documentos_br_extras(documento: str = "", tipo: str = "auto") -> str:
+    """Aplica mascara de CEP, PIS, titulo de eleitor ou placa (auto-detecta
+    pelo conteudo). Formatacao local; sem validar orgaos."""
+    d = ''.join(c for c in str(documento) if c.isdigit() or c.isalpha())
+    dtipo = str(tipo).strip().lower()
+    if dtipo == 'auto':
+        if len(d) == 8 and d.isdigit():
+            dtipo = 'cep'
+        elif len(d) == 11 and d.isdigit():
+            dtipo = 'pis'
+        elif len(d) == 12 and d.isdigit():
+            dtipo = 'titulo'
+        elif len(d) == 7:
+            dtipo = 'placa'
+        else:
+            raise ValueError('Nao consegui detectar o tipo (CEP=8, PIS=11, titulo=12, placa=7).')
+    if dtipo == 'cep' and len(d) == 8:
+        return 'CEP: ' + d[:5] + '-' + d[5:]
+    if dtipo == 'pis' and len(d) == 11:
+        return 'PIS: ' + d[:3] + '.' + d[3:8] + '.' + d[8:10] + '-' + d[10]
+    if dtipo == 'titulo' and len(d) == 12:
+        return 'Titulo: ' + d[:4] + ' ' + d[4:8] + ' ' + d[8:]
+    if dtipo == 'placa' and len(d) == 7:
+        return 'Placa: ' + d[:3] + '-' + d[3:]
+    raise ValueError('Mascara "' + dtipo + '" exige a quantidade certa de caracteres.')
+
+
+def uf_info_estatica(uf: str = "") -> str:
+    """Ficha estatica da UF: capital, regiao e vizinhos (sem internet)."""
+    fichas = {'SP': ('Sao Paulo', 'Sudeste', 'MG, RJ, PR, MS'), 'RJ': ('Rio de Janeiro', 'Sudeste', 'MG, SP, ES'),
+              'MG': ('Belo Horizonte', 'Sudeste', 'SP, RJ, ES, BA, GO, DF'), 'ES': ('Vitoria', 'Sudeste', 'MG, RJ, BA'),
+              'BA': ('Salvador', 'Nordeste', 'SE, AL, PE, PI, MG, ES, GO, TO'), 'PR': ('Curitiba', 'Sul', 'SP, SC, MS'),
+              'SC': ('Florianopolis', 'Sul', 'PR, RS'), 'RS': ('Porto Alegre', 'Sul', 'SC, PR (e Argentina/Uruguai na fronteira)'),
+              'PE': ('Recife', 'Nordeste', 'BA, AL, PB, CE, PI'), 'CE': ('Fortaleza', 'Nordeste', 'RN, PB, PE, PI'),
+              'GO': ('Goiania', 'Centro-Oeste', 'MG, BA, TO, MT, DF'), 'MT': ('Cuiaba', 'Centro-Oeste', 'RO, AM, PA, TO, GO, MS, PR (e Bolivia)'),
+              'MS': ('Campo Grande', 'Centro-Oeste', 'MT, GO, MG, SP, PR (e Paraguai/Bolivia)'),
+              'DF': ('Brasilia', 'Centro-Oeste', 'GO, MG'), 'AM': ('Manaus', 'Norte', 'RO, AC, MT, PA, RR, Roraima (e Venezuela/Colombia/Peru)'),
+              'PA': ('Belem', 'Norte', 'AM, MA, TO, MT, AP, RR (e Guianas)'), 'AC': ('Rio Branco', 'Norte', 'AM, RO (e Peru/Bolivia)'),
+              'AP': ('Macapa', 'Norte', 'PA (e Guiana Francesa/Suriname)'), 'RO': ('Porto Velho', 'Norte', 'AC, AM, MT (e Bolivia)'),
+              'RR': ('Boa Vista', 'Norte', 'AM, PA (e Venezuela/Guiana)'), 'TO': ('Palmas', 'Norte', 'PA, MA, PI, BA, GO, MT, MG'),
+              'MA': ('Sao Luis', 'Nordeste', 'PA, TO, PI (e Guianas)'), 'PI': ('Teresina', 'Nordeste', 'MA, CE, PE, BA, TO'),
+              'AL': ('Maceio', 'Nordeste', 'PE, BA, SE'), 'SE': ('Aracaju', 'Nordeste', 'AL, BA'),
+              'PB': ('Joao Pessoa', 'Nordeste', 'RN, PE'), 'RN': ('Natal', 'Nordeste', 'CE, PB')}
+    chave = str(uf).strip().upper()
+    if chave not in fichas:
+        raise ValueError('UF "' + str(uf) + '" nao reconhecida (use a sigla, ex.: SP).')
+    capital, regiao, vizinhos = fichas[chave]
+    return chave + ': capital ' + capital + ' | regiao ' + regiao + ' | faz fronteira com: ' + vizinhos + '.'
+
+
+def cnpj_padrao_filial_info(cnpj: str = "") -> str:
+    """Explica o sufixo matriz/filial (0001 = matriz) de um CNPJ formatado ou
+    nao. Leitura de padrao; nao consulta Receita Federal."""
+    d = ''.join(c for c in str(cnpj) if c.isdigit())
+    if len(d) != 14:
+        raise ValueError('CNPJ tem 14 digitos (recebi ' + str(len(d)) + ').')
+    ordem = d[8:12]
+    if ordem == '0001':
+        return 'CNPJ de MATRIZ (ordem ' + ordem + '). A raiz cadastral e ' + d[:8] + '. Nao consulta a Receita Federal.'
+    if ordem.isdigit() and ordem != '0000':
+        return 'CNPJ de FILIAL nr. ' + str(int(ordem)) + ' (ordem ' + ordem + ') da raiz ' + d[:8] + '. Nao consulta a Receita Federal.'
+    raise ValueError('Ordem "' + ordem + '" nao parece matriz (0001) nem filial valida.')
+
+
+def cnh_categoria_referencia(categoria: str = "") -> str:
+    """O que cada categoria de CNH (A, B, C, D, E) autoriza a conduzir.
+    Referencia estatica; nao substitui a lei ou o DETRAN."""
+    mapa = {
+        'A': 'Veiculos de 2 rodas (motos, triciclos com ou sem carroceria), com ou sem reboque.',
+        'B': 'Veiculos de 4 rodas ate 3.500 kg (carros, pickups leves) com ate 8 passageiros + motorista; reboque ate 750 kg (ou 3.500 kg de conjunto em alguns casos).',
+        'C': 'Veiculos de carga acima de 3.500 kg (caminhoes). Exige 1 ano de categoria B.',
+        'D': 'Transporte de passageiros acima de 8 lugares (onibus, van grande). Exige 1 ano de B ou 2 anos... na pratica: 1 ano de C ou 2 anos de B.',
+        'E': 'Conjuntos com unidade tratora + reboque/carreta acima dos limites (caminhao com carreta, trailer pesado). Exige 1 ano de C ou D.'}
+    c = str(categoria).strip().upper()
+    if c not in mapa:
+        raise ValueError('Categoria precisa ser A, B, C, D ou E (recebi "' + str(categoria) + '").')
+    return 'CNH categoria ' + c + ': ' + mapa[c] + ' (resumo de estudo; a lei e o DETRAN mandam).'
+
+
+def moedas_iso_referencia(codigo: str = "") -> str:
+    """Codigo ISO, simbolo e nome das principais moedas (estatico; SEM
+    cotacao de cambio — essa precisa de internet)."""
+    moedas = {'BRL': ('Real brasileiro', 'R$'), 'USD': ('Dolar americano', 'US$'),
+              'EUR': ('Euro', 'EUR'), 'GBP': ('Libra esterlina', 'GBP'),
+              'JPY': ('Iene', 'JPY'), 'ARS': ('Peso argentino', 'ARS'),
+              'CNY': ('Yuan', 'CNY'), 'CAD': ('Dolar canadense', 'C$'),
+              'AUD': ('Dolar australiano', 'A$'), 'CHF': ('Franco suico', 'CHF'),
+              'PYG': ('Guarani', 'PYG'), 'UYU': ('Peso uruguaio', 'UYU')}
+    c = str(codigo).strip().upper()
+    if not c:
+        return 'Principais: ' + ', '.join(cod + ' (' + nome + ')' for cod, (nome, _) in sorted(moedas.items())) + '. Esta tabela NAO tem cotacao (cambio precisa de internet).'
+    if c not in moedas:
+        raise ValueError('Codigo "' + c + '" nao esta na tabela local de principais moedas.')
+    nome, simbolo = moedas[c]
+    return c + ' = ' + nome + ' (simbolo: ' + simbolo + '). Sem cotacao: cambio ao vivo precisa de internet.'
+
+
+def alfabeto_grego_referencia(mostrar: str = "sim") -> str:
+    """Letras e nomes do alfabeto grego (referencia estatica de estudo)."""
+    letras = ('Alfa A | Beta B | Gama Γ | Delta Δ | Epsilon E | Zeta Z | Eta H | Teta Θ | '
+              'Iota I | Kapa K | Lambda Λ | Mi M | Ni N | Xi Ξ | Omicron O | Pi Π | Rho P | '
+              'Sigma Σ | Tau T | Ipsilon Y | Fi Φ | Ji X | Psi Ψ | Omega Ω')
+    return 'Alfabeto grego (maiusculas): ' + letras + '.'
+
+
+def capitais_brasil_lista(filtro: str = "") -> str:
+    """Lista UF -> capital (com regiao), para consulta rapida offline."""
+    pares = [('SP', 'Sao Paulo', 'SE'), ('RJ', 'Rio de Janeiro', 'SE'), ('MG', 'Belo Horizonte', 'SE'),
+             ('ES', 'Vitoria', 'SE'), ('BA', 'Salvador', 'NE'), ('PR', 'Curitiba', 'S'),
+             ('SC', 'Florianopolis', 'S'), ('RS', 'Porto Alegre', 'S'), ('PE', 'Recife', 'NE'),
+             ('CE', 'Fortaleza', 'NE'), ('GO', 'Goiania', 'CO'), ('MT', 'Cuiaba', 'CO'),
+             ('MS', 'Campo Grande', 'CO'), ('DF', 'Brasilia', 'CO'), ('AM', 'Manaus', 'N'),
+             ('PA', 'Belem', 'N'), ('AC', 'Rio Branco', 'N'), ('AP', 'Macapa', 'N'),
+             ('RO', 'Porto Velho', 'N'), ('RR', 'Boa Vista', 'N'), ('TO', 'Palmas', 'N'),
+             ('MA', 'Sao Luis', 'NE'), ('PI', 'Teresina', 'NE'), ('AL', 'Maceio', 'NE'),
+             ('SE', 'Aracaju', 'NE'), ('PB', 'Joao Pessoa', 'NE'), ('RN', 'Natal', 'NE')]
+    mapa_regiao = {'SE': 'sudeste', 'NE': 'nordeste', 'S': 'sul', 'CO': 'centro-oeste', 'N': 'norte'}
+    f = _norm_pt(str(filtro or ''))
+    linhas = [uf + ' - ' + capital + ' (' + regiao + ')' for uf, capital, regiao in pares
+              if not f or f in _norm_pt(uf + ' ' + capital + ' ' + mapa_regiao.get(regiao, regiao))]
+    if not linhas:
+        raise ValueError('Nada casou com "' + str(filtro) + '" na lista de capitais.')
+    return '\n'.join(linhas)
+
+
+def contar_linhas_arquivo(caminho: str = "") -> str:
+    """Conta linhas, palavras e bytes de um arquivo de texto local (leitura
+    somente; limite 20 MB)."""
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    if os.path.getsize(c) > 20 * 1024 * 1024:
+        raise ValueError('Arquivo maior que 20 MB; corte em pedacos.')
+    with open(c, 'r', encoding='utf-8', errors='ignore') as f:
+        conteudo = f.read()
+    linhas = conteudo.count('\n') + (1 if conteudo and not conteudo.endswith('\n') else 0)
+    return (str(c) + ': ' + str(linhas) + ' linha(s), ' + str(len(conteudo.split()))
+            + ' palavra(s), ' + str(os.path.getsize(c)) + ' byte(s).')
+
+
+def detectar_tipo_magic_bytes(caminho: str = "") -> str:
+    """Detecta o tipo real do arquivo pelo CABEÇALHO (magic bytes): png, jpg,
+    pdf, zip e afins — nao confia na extensao. Leitura de 16 bytes."""
+    assinaturas = {(b'\x89PNG\r\n\x1a\n'): 'PNG (imagem)', (b'\xff\xd8\xff'): 'JPEG (imagem)',
+                   (b'%PDF'): 'PDF (documento)', (b'PK\x03\x04'): 'ZIP/DOCX/XLSX (compactado)',
+                   (b'\x1f\x8b'): 'GZIP', (b'7z\xbc\xaf\x27\x1c'): '7-Zip', (b'Rar!'): 'RAR',
+                   (b'BM'): 'BMP (imagem)', (b'GIF8'): 'GIF (imagem)', (b'ID3'): 'MP3 (audio ID3)',
+                   (b'OggS'): 'OGG (audio/video)', (b'\x00\x00\x00\x18ftypmp4'): 'MP4 (video)',
+                   (b'RIFX'): 'WAV alternativo (RIFX)', (b'RIFF'): 'WAV/AVI (RIFF)'}
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    with open(c, 'rb') as f:
+        cabecalho = f.read(16)
+    for assinatura, nome in assinaturas.items():
+        if cabecalho.startswith(assinatura):
+            return 'Tipo real pelo cabecalho: ' + nome + '.'
+    if cabecalho.startswith(b'RIFF'):
+        detalhe = 'WAV (audio)' if cabecalho[8:12] == b'WAVE' else 'AVI (video)'
+        return 'Tipo real pelo cabecalho: ' + detalhe + '.'
+    if all(32 <= b < 127 or b in (9, 10, 13) for b in cabecalho):
+        return 'Parece TEXTO puro (sem assinatura binaria conhecida).'
+    return 'Assinatura nao reconhecida (primeiros bytes: ' + cabecalho.hex() + ').'
+
+
+def sugerir_nome_seguro_windows(nome: str = "") -> str:
+    """Sugere versao segura de NOME de arquivo/pasta para Windows (sem
+    caracteres proibidos, sem nomes reservados). Nao renomeia nada."""
+    import re as _re
+    original = str(nome).strip()
+    if not original:
+        raise ValueError('Envie o nome a sanitizar. Ex.: {"nome": "relatorio: final?"}.')
+    limpo = _re.sub(r'[<>:"/\\\\|?*\x00-\x1f]', '_', original)
+    limpo = limpo.strip(' .')
+    reservados = {'CON', 'PRN', 'AUX', 'NUL'} | {c + str(i) for c in
+                 ('COM', 'LPT') for i in range(1, 10)}
+    if limpo.upper().split('.')[0] in reservados:
+        limpo = '_' + limpo
+    if not limpo:
+        raise ValueError('Depois de limpar nao sobrou nada util do nome.')
+    return 'Sugestao segura: "' + limpo + '" (original: "' + original + '"). Nada foi renomeado.'
+
+
+def somar_tamanho_por_padrao(padrao: str = "") -> str:
+    """Soma tamanho e quantidade de arquivos de uma pasta que casam com um
+    padrao (ex.: C:\\pasta\\*.pdf). Leitura somente; nao navega subpastas."""
+    import glob as _glob
+    import os
+    padrao_limpo = str(padrao or '').strip()
+    if not padrao_limpo:
+        raise ValueError('Envie o padrao. Ex.: {"padrao": "C:/Users/voce/Downloads/*.pdf"}.')
+    arquivos = [a for a in _glob.glob(padrao_limpo) if os.path.isfile(a)]
+    if not arquivos:
+        raise ValueError('Nenhum arquivo casou com o padrao.')
+    total = sum(os.path.getsize(a) for a in arquivos)
+    return (str(len(arquivos)) + ' arquivo(s), ' + str(round(total / 1024 / 1024, 2))
+            + ' MB no total (' + str(total) + ' bytes).')
+
+
+def arquivos_por_faixa_tamanho(padrao: str = "") -> str:
+    """Agrupa os arquivos que casam com o padrao por faixa: <1 MB, 1-100 MB,
+    >100 MB. Leitura somente."""
+    import glob as _glob
+    import os
+    arquivos = [a for a in _glob.glob(str(padrao or '').strip()) if os.path.isfile(a)]
+    if not arquivos:
+        raise ValueError('Nenhum arquivo casou com o padrao: ' + str(padrao))
+    faixas = {'<1MB': 0, '1-100MB': 0, '>100MB': 0}
+    for a in arquivos:
+        mb = os.path.getsize(a) / 1024 / 1024
+        faixas['<1MB' if mb < 1 else ('1-100MB' if mb <= 100 else '>100MB')] += 1
+    return ('De ' + str(len(arquivos)) + ' arquivo(s): ' + str(faixas['<1MB']) + ' com menos de 1 MB, '
+            + str(faixas['1-100MB']) + ' entre 1 e 100 MB, ' + str(faixas['>100MB']) + ' acima de 100 MB.')
+
+
+def linhas_mais_longas_arquivo(caminho: str = "", quantidade: str = "5") -> str:
+    """Mostra as N linhas mais longas do arquivo (para achar linhas que
+    estouram limite de linter). Leitura somente."""
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    try:
+        n = int(str(quantidade) or 5)
+    except ValueError:
+        raise ValueError('Quantidade precisa ser um numero.')
+    if not 1 <= n <= 20:
+        raise ValueError('Mostro de 1 a 20 linhas por vez.')
+    with open(c, 'r', encoding='utf-8', errors='ignore') as f:
+        candidatas = sorted(((len(linha.rstrip('\n')), i + 1, linha.rstrip('\n')[:100])
+                             for i, linha in enumerate(f)), reverse=True)[:n]
+    return '\n'.join(str(i + 1) + ') linha ' + str(num) + ' (' + str(tam) + ' car.): ' + trecho
+                     for i, (tam, num, trecho) in enumerate(candidatas))
+
+
+def palavras_frequentes_arquivo(caminho: str = "", quantidade: str = "10") -> str:
+    """Top N palavras mais frequentes de um arquivo de texto (leitura
+    somente; ignora palavras de 3 letras ou menos)."""
+    import os
+    from collections import Counter
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    try:
+        n = int(str(quantidade) or 10)
+    except ValueError:
+        raise ValueError('Quantidade precisa ser numero (1 a 50).')
+    if not 1 <= n <= 50:
+        raise ValueError('De 1 a 50 palavras por vez.')
+    with open(c, 'r', encoding='utf-8', errors='ignore') as f:
+        texto = f.read().lower()
+    palavras = [p for p in ''.join(ch if ch.isalnum() else ' ' for ch in texto).split() if len(p) > 3]
+    if not palavras:
+        raise ValueError('Nao achei palavras (mais de 3 letras) no arquivo.')
+    return 'Top ' + str(n) + ': ' + ', '.join(p + ' (' + str(q) + ')' for p, q in Counter(palavras).most_common(n))
+
+
+def linhas_aleatorias_amostra(caminho: str = "", quantidade: str = "5") -> str:
+    """Amostra de N linhas ALEATORIAS sem repeticao de um arquivo (para
+    revisao por amostragem). Leitura somente; ate 100 linhas."""
+    import os
+    import random as _random
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    try:
+        n = int(str(quantidade) or 5)
+    except ValueError:
+        raise ValueError('Quantidade precisa ser numero.')
+    if not 1 <= n <= 100:
+        raise ValueError('Amostra de 1 a 100 linhas.')
+    with open(c, 'r', encoding='utf-8', errors='ignore') as f:
+        linhas = [l.rstrip('\n') for l in f if l.strip()]
+    if not linhas:
+        raise ValueError('O arquivo nao tem linhas com conteudo.')
+    mostra = min(n, len(linhas))
+    escolhidas = _random.sample(linhas, mostra)
+    return str(mostra) + ' linha(s) aleatoria(s) de ' + str(len(linhas)) + ':\n' + '\n'.join(
+        str(i + 1) + ') ' + l[:120] for i, l in enumerate(escolhidas))
+
+
+def cabecalho_e_cauda_arquivo(caminho: str = "", quantidade: str = "10") -> str:
+    """Mostra as primeiras e as ultimas N linhas do arquivo (cabecalho e
+    cauda). Leitura somente."""
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    try:
+        n = int(str(quantidade) or 10)
+    except ValueError:
+        raise ValueError('Quantidade precisa ser numero (1 a 50).')
+    if not 1 <= n <= 50:
+        raise ValueError('Mostro de 1 a 50 linhas em cada ponta.')
+    with open(c, 'r', encoding='utf-8', errors='ignore') as f:
+        linhas = f.readlines()
+    inicio = [l.rstrip('\n')[:120] for l in linhas[:n]]
+    fim = [l.rstrip('\n')[:120] for l in linhas[-n:]]
+    return ('INICIO (' + str(min(n, len(linhas))) + ' de ' + str(len(linhas)) + ' linhas):\n'
+            + '\n'.join(inicio) + '\n...\nFIM:\n' + '\n'.join(fim))
+
+
+def encoding_bom_detectar(caminho: str = "") -> str:
+    """Detecta BOM/encoding provavel de um arquivo (UTF-8 com/sem BOM,
+    UTF-16, ANSI provavel). Leitura dos primeiros bytes; NAO converte nada."""
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    with open(c, 'rb') as f:
+        inicio = f.read(4)
+    if inicio.startswith(b'\xef\xbb\xbf'):
+        return 'UTF-8 com BOM detectado.'
+    if inicio.startswith(b'\xff\xfe') or inicio.startswith(b'\xfe\xff'):
+        return 'UTF-16 (BOM de 2 bytes) detectado.'
+    try:
+        with open(c, 'r', encoding='utf-8') as f:
+            f.read(65536)
+        return 'UTF-8 valido SEM BOM (os primeiros 64 KB decodificaram limpos).'
+    except UnicodeDecodeError:
+        return 'Nao e UTF-8 limpo: provavel ANSI/Windows-1252 ou outro. Nao converti nada (use o conversor dedicado se quiser).'
+
+
+def lista_para_csv_console(texto: str = "", separador: str = ";") -> str:
+    """Converte linhas coladas em CSV com o separador escolhido (saida no
+    console para copiar). Nao escreve arquivo."""
+    linhas = [l for l in str(texto).splitlines() if l.strip()]
+    if not linhas:
+        raise ValueError('Envie as linhas para virar CSV.')
+    sep = str(separador) or ';'
+    if sep in ('', '\n'):
+        raise ValueError('Separador invalido.')
+    convertidas = []
+    for l in linhas:
+        if '\t' in l:
+            convertidas.append(l.replace('\t', sep))
+        else:
+            import re as _re41
+            convertidas.append(_re41.sub(r'\s{2,}', sep, l))
+    return '\n'.join(convertidas) + '\n(' + str(len(linhas)) + ' linha(s); colunas separadas por "' + sep + '")'
+
+
+def sugerir_renomeacao_lote(padrao: str = "", prefixo: str = "arquivo") -> str:
+    """So SUGERE nomes sequenciais para os arquivos que casam com o padrao
+    (nao renomeia nada). Ex.: foto_001.jpg, foto_002.jpg..."""
+    import glob as _glob
+    import os
+    arquivos = sorted(a for a in _glob.glob(str(padrao or '').strip()) if os.path.isfile(a))
+    if not arquivos:
+        raise ValueError('Nenhum arquivo casou com o padrao: ' + str(padrao))
+    if len(arquivos) > 200:
+        raise ValueError('Limite de 200 arquivos por sugestao.')
+    pref = str(prefixo).strip() or 'arquivo'
+    digitos = max(2, len(str(len(arquivos))))
+    extensoes = {os.path.splitext(a)[1].lower() for a in arquivos}
+    if len(extensoes) > 1:
+        return ('Os arquivos tem extensoes variadas (' + ', '.join(sorted(extensoes))
+                + '); sugestao: mantenha a extensao de cada um ao renomear.')
+    ext = extensoes.pop()
+    return ('Sugestao de renomeacao (NAO executei nada):\n' + '\n'.join(
+        os.path.basename(a) + '  ->  ' + pref + '_' + str(i + 1).zfill(digitos) + ext
+        for i, a in enumerate(arquivos[:10]))
+        + ('\n... e mais ' + str(len(arquivos) - 10) + ' arquivo(s).' if len(arquivos) > 10 else ''))
+
+
 def mmc_mdc_calcular(numeros: str = "") -> str:
     """MMC e MDC de dois a oito numeros inteiros (separados por virgula), com a
     fatoracao do MDC. Calculo local instantaneo, sem internet nem IA."""
@@ -29264,6 +29886,36 @@ tools = [
     # --- r22 lote 1: calculo, fisica, texto e datas offline ---
     estatisticas_descritivas,
     mmc_mdc_calcular,
+    proximo_dia_util,
+    contagem_regressiva_data,
+    fusos_brasil_referencia,
+    proximo_feriado,
+    texto_para_data_parse,
+    dias_uteis_do_mes,
+    consultar_ddd_estatico,
+    validar_placa_veiculo,
+    validar_pis_pasep,
+    validar_titulo_eleitor,
+    validar_cartao_luhn_aviso,
+    mascaras_documentos_br_extras,
+    uf_info_estatica,
+    cnpj_padrao_filial_info,
+    cnh_categoria_referencia,
+    moedas_iso_referencia,
+    alfabeto_grego_referencia,
+    capitais_brasil_lista,
+    contar_linhas_arquivo,
+    detectar_tipo_magic_bytes,
+    sugerir_nome_seguro_windows,
+    somar_tamanho_por_padrao,
+    arquivos_por_faixa_tamanho,
+    linhas_mais_longas_arquivo,
+    palavras_frequentes_arquivo,
+    linhas_aleatorias_amostra,
+    cabecalho_e_cauda_arquivo,
+    encoding_bom_detectar,
+    lista_para_csv_console,
+    sugerir_renomeacao_lote,
     gerar_tabuada,
     anagrama_verificar,
     palindromo_verificar,
@@ -29537,7 +30189,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r41] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r42] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

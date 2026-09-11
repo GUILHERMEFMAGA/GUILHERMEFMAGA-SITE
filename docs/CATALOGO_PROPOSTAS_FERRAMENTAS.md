@@ -24,6 +24,10 @@ propostas com a telemetria de uso (r25), o filtro de ideias rejeitadas (r23) e u
 pré-checagem de colisão contra as 549 registradas — apenas para SUGERIR; implementar
 continua exigindo auditoria AST e a autorização do usuário.
 
+**Status r42 (lote 5):** itens **91, 92, 94, 96, 98, 99, 103–114, 115–126** (30 no total;
+total geral **619**). Novo: `turbo ia local` (teto de 300 tokens nas geracoes normais;
+JSON/ideias intocados) — menos espera, sem promessa de mais inteligencia.
+
 ## G1. Matemática e estatística
 1. ✅ `estatisticas_descritivas` — média/mediana/moda/desvio/variância/quartis de lista direta (viz: estatisticas_csv = coluna de arquivo).
 2. ✅ `mmc_mdc_calcular` — MMC/MDC de 2–8 inteiros.
@@ -123,46 +127,46 @@ continua exigindo auditoria AST e a autorização do usuário.
 ## G5. Datas e hora
 89. ✅ `feriados_brasil_ano` — nacionais fixos + móveis (Páscoa/Carnaval/Corpus Christi offline).
 90. ✅ `semana_do_ano_info` — ISO week, trimestre, dias restantes.
-91. Proposta `proximo_dia_util` — primeira data útil a partir de uma data (viz: dias_uteis_entre_datas conta intervalo).
-92. Proposta `contagem_regressiva_data` — dias até evento anual (aniversário/vencimento).
+91. ✅ `proximo_dia_util` — primeira data útil a partir de uma data (viz: dias_uteis_entre_datas conta intervalo).
+92. ✅ `contagem_regressiva_data` — dias até evento anual (aniversário/vencimento).
 93. ✅ `bissexto_dias_mes_info` — ano bissexto? dias do mês.
-94. Proposta `fusos_brasil_referencia` — os 4 fusos e offsets (viz: relogio_mundial mostra hora agora).
+94. ✅ `fusos_brasil_referencia` — os 4 fusos e offsets (viz: relogio_mundial mostra hora agora).
 95. ✅ `calendario_mes_console` — mês/ano em grade ASCII.
-96. Proposta `proximo_feriado` — próximo nacionais a partir de hoje (usa lógica de feriados).
+96. ✅ `proximo_feriado` — próximo nacionais a partir de hoje (usa lógica de feriados).
 97. ✅ `soma_dias_uteis` — data + N dias úteis.
-98. Proposta `texto_para_data_parse` — texto flexível → ISO (viz: calculadora_datas exige DD/MM/AAAA).
-99. Proposta `dias_uteis_do_mes` — quantos dias úteis tem um mês.
+98. ✅ `texto_para_data_parse` — texto flexível → ISO (viz: calculadora_datas exige DD/MM/AAAA).
+99. ✅ `dias_uteis_do_mes` — quantos dias úteis tem um mês.
 100. ✅ `datas_recorrentes_lista` — "todo dia 5 por N meses".
 101. ✅ `timestamp_converter_iso` — epoch ↔ ISO 8601 (viz: converter_tempo = unidades de duração).
 102. ✅ `data_juliana_converter` — dia juliano ↔ calendário.
 
 ## G6. Brasil — documentos e dados estáticos
-103. Proposta `consultar_ddd_estatico` — tabela offline DDD→UF/região (viz: central_dados_brasil valida/formata).
-104. Proposta `validar_placa_veiculo` — formato antigo e Mercosul.
-105. Proposta `validar_pis_pasep` — dígito verificador.
-106. Proposta `validar_titulo_eleitor` — dígito verificador oficial.
-107. Proposta `validar_cartao_luhn_aviso` — Luhn + bandeira; com aviso forte de privacidade.
-108. Proposta `mascaras_documentos_br_extras` — CEP/PIS/título/placa (viz: central_dados_brasil formata cpf/cnpj/telefone).
-109. Proposta `uf_info_estatica` — capital, região, vizinhos.
-110. Proposta `cnpj_padrao_filial_info` — significado do sufixo matriz/0001-xx.
-111. Proposta `cnh_categoria_referencia` — o que cada categoria A/B/C/D/E autoriza.
-112. Proposta `moedas_iso_referencia` — códigos e símbolos estáticos (sem cotação).
-113. Proposta `alfabeto_grego_referencia` — letras e nomes.
-114. Proposta `capitais_brasil_lista` — UF→capital/região (uso geral offline).
+103. ✅ `consultar_ddd_estatico` — tabela offline DDD→UF/região (viz: central_dados_brasil valida/formata).
+104. ✅ `validar_placa_veiculo` — formato antigo e Mercosul.
+105. ✅ `validar_pis_pasep` — dígito verificador.
+106. ✅ `validar_titulo_eleitor` — dígito verificador oficial.
+107. ✅ `validar_cartao_luhn_aviso` — Luhn + bandeira; com aviso forte de privacidade.
+108. ✅ `mascaras_documentos_br_extras` — CEP/PIS/título/placa (viz: central_dados_brasil formata cpf/cnpj/telefone).
+109. ✅ `uf_info_estatica` — capital, região, vizinhos.
+110. ✅ `cnpj_padrao_filial_info` — significado do sufixo matriz/0001-xx.
+111. ✅ `cnh_categoria_referencia` — o que cada categoria A/B/C/D/E autoriza.
+112. ✅ `moedas_iso_referencia` — códigos e símbolos estáticos (sem cotação).
+113. ✅ `alfabeto_grego_referencia` — letras e nomes.
+114. ✅ `capitais_brasil_lista` — UF→capital/região (uso geral offline).
 
 ## G7. Arquivos — leitura e análise
-115. Proposta `contar_linhas_arquivo` — linhas/palavras/bytes de um arquivo (viz: central_texto 'contar' foca texto colado).
-116. Proposta `detectar_tipo_magic_bytes` — png/jpg/pdf/zip/… pelo cabeçalho.
-117. Proposta `sugerir_nome_seguro_windows` — sanitiza um NOME (viz: limpar_nomes_arquivos renomeia arquivos reais).
-118. Proposta `somar_tamanho_por_padrao` — glob → contagem e bytes totais.
-119. Proposta `arquivos_por_faixa_tamanho` — bucket <1MB, 1–100MB, >100MB.
-120. Proposta `linhas_mais_longas_arquivo` — top N linhas por largura (limite de linter).
-121. Proposta `palavras_frequentes_arquivo` — top N palavras de um arquivo (viz: resumir_arquivo resume conteúdo).
-122. Proposta `linhas_aleatorias_amostra` — N linhas sem repetição (revisão de amostra).
-123. Proposta `cabecalho_e_cauda_arquivo` — primeiras/últimas N linhas.
-124. Proposta `encoding_bom_detectar` — BOM/heurística UTF (viz: converter_arquivo_para_utf8 converte).
-125. Proposta `lista_para_csv_console` — texto colado → CSV com separador escolhido.
-126. Proposta `sugerir_renomeacao_lote` — só SUGERE nomes sequenciais (viz: renomear_lote_avancado renomeia).
+115. ✅ `contar_linhas_arquivo` — linhas/palavras/bytes de um arquivo (viz: central_texto 'contar' foca texto colado).
+116. ✅ `detectar_tipo_magic_bytes` — png/jpg/pdf/zip/… pelo cabeçalho.
+117. ✅ `sugerir_nome_seguro_windows` — sanitiza um NOME (viz: limpar_nomes_arquivos renomeia arquivos reais).
+118. ✅ `somar_tamanho_por_padrao` — glob → contagem e bytes totais.
+119. ✅ `arquivos_por_faixa_tamanho` — bucket <1MB, 1–100MB, >100MB.
+120. ✅ `linhas_mais_longas_arquivo` — top N linhas por largura (limite de linter).
+121. ✅ `palavras_frequentes_arquivo` — top N palavras de um arquivo (viz: resumir_arquivo resume conteúdo).
+122. ✅ `linhas_aleatorias_amostra` — N linhas sem repetição (revisão de amostra).
+123. ✅ `cabecalho_e_cauda_arquivo` — primeiras/últimas N linhas.
+124. ✅ `encoding_bom_detectar` — BOM/heurística UTF (viz: converter_arquivo_para_utf8 converte).
+125. ✅ `lista_para_csv_console` — texto colado → CSV com separador escolhido.
+126. ✅ `sugerir_renomeacao_lote` — só SUGERE nomes sequenciais (viz: renomear_lote_avancado renomeia).
 
 ## G8. Rede — referência e cálculo offline
 127. Proposta `consultar_porta_conhecida` — tabela 21/22/80/443/3389/5900/…
