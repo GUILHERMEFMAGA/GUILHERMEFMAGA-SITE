@@ -7795,6 +7795,7 @@ def _menu_ajuda_local():
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
+    print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
@@ -8884,7 +8885,8 @@ def _r20_opcoes():
               'ram_min_mb':256,
               'avaliacao_ampliada':False, 'repeticoes':1, 'semente':42,
               'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5,
-              'turbo':False, 'instantaneo':False}
+              'turbo':False, 'instantaneo':False,
+              'auto_continuar':True, 'manter_quente':True}
     dados = globals().get('config', {}).get('ia_local_opcoes', {})
     if isinstance(dados, dict):
         for k in padrao:
@@ -10589,6 +10591,297 @@ def _r28_comandos(comando):
     return False
 
 
+def _r51_capturar_quadro():
+    """Um quadro da tela como imagem (r51); dep preguiçosa."""
+    return _r45_pyautogui().screenshot()
+
+
+def _r51_salvar_gif(quadros, destino, fps):
+    """Junta os quadros num GIF animado (r51)."""
+    quadros[0].save(destino, save_all=True, append_images=list(quadros[1:]),
+                    duration=int(max(40, 1000.0 / max(0.5, fps))), loop=0)
+
+
+def _r51_ytdlp_disponivel() -> bool:
+    """r51: o yt-dlp esta importavel neste Python?"""
+    import importlib.util
+    try:
+        return importlib.util.find_spec('yt_dlp') is not None
+    except Exception:
+        return False
+
+
+def _r51_python_atual() -> str:
+    """r51: executavel do Python atual."""
+    import sys
+    return sys.executable or 'python'
+
+
+def _r51_executar_processo(cmd, prazo):
+    """r51: roda um processo e devolve (codigo, stdout, stderr)."""
+    resultado = subprocess.run(cmd, capture_output=True, text=True, timeout=prazo)
+    return resultado.returncode, resultado.stdout or '', resultado.stderr or ''
+
+
+def _r51_aplicar_marca(origem, destino, texto, opacidade, posicao):
+    """Desenha a marca d'agua de texto (r51). Devolve None se ok, ou o erro."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        with Image.open(origem).convert('RGBA') as img:
+            camada = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            desenho = ImageDraw.Draw(camada)
+            tamanho = max(14, img.size[1] // 22)
+            try:
+                fonte = ImageFont.truetype('arial.ttf', tamanho)
+            except Exception:
+                fonte = ImageFont.load_default()
+            caixa = desenho.textbbox((0, 0), texto, font=fonte)
+            larg, alt = caixa[2] - caixa[0], caixa[3] - caixa[1]
+            margem = max(10, tamanho)
+            mapa = {'rodape-direito': (img.size[0] - larg - margem, img.size[1] - alt - margem),
+                    'rodape-esquerdo': (margem, img.size[1] - alt - margem),
+                    'topo-direito': (img.size[0] - larg - margem, margem),
+                    'topo-esquerdo': (margem, margem),
+                    'centro': ((img.size[0] - larg) // 2, (img.size[1] - alt) // 2)}
+            xy = mapa[posicao]
+            alfa = max(20, min(230, int(opacidade * 2.3)))
+            desenho.text(xy, texto, font=fonte, fill=(255, 255, 255, alfa),
+                         stroke_width=1, stroke_fill=(0, 0, 0, alfa))
+            saida = Image.alpha_composite(img, camada)
+            if destino.lower().endswith(('.jpg', '.jpeg')):
+                saida = saida.convert('RGB')
+            saida.save(destino)
+        return None
+    except Exception as e:
+        return type(e).__name__ + ': ' + str(e)[:120]
+
+
+def _r51_dpapi_blob(dados):
+    """r51: monta a estrutura DATA_BLOB do Windows."""
+    import ctypes
+    import ctypes.wintypes
+    class Blob(ctypes.Structure):
+        _fields_ = [('cb', ctypes.wintypes.DWORD), ('pb', ctypes.POINTER(ctypes.c_char))]
+    return Blob(len(dados), ctypes.cast(ctypes.create_string_buffer(bytes(dados), len(dados)),
+                                        ctypes.POINTER(ctypes.c_char)))
+
+
+def _r51_dpapi_proteger(dados) -> bytes:
+    """Criptografia DPAPI da CONTA do Windows (r51): so o mesmo usuario, no
+    mesmo PC, consegue reabrir. Fora do Windows: erro claro."""
+    import ctypes
+    import sys
+    if not sys.platform.startswith('win'):
+        raise RuntimeError('DPAPI so existe no Windows')
+    entrada, saida = _r51_dpapi_blob(dados), _r51_dpapi_blob(b'')
+    if not ctypes.windll.crypt32.CryptProtectData(ctypes.byref(entrada), None, None, None, None, 0, ctypes.byref(saida)):
+        raise RuntimeError('CryptProtectData falhou')
+    try:
+        return ctypes.string_at(saida.pb, saida.cb)
+    finally:
+        ctypes.windll.kernel32.LocalFree(saida.pb)
+
+
+def _r51_dpapi_revelar(dados) -> bytes:
+    """Reverte a DPAPI da conta (r51)."""
+    import ctypes
+    import sys
+    if not sys.platform.startswith('win'):
+        raise RuntimeError('DPAPI so existe no Windows')
+    entrada, saida = _r51_dpapi_blob(dados), _r51_dpapi_blob(b'')
+    if not ctypes.windll.crypt32.CryptUnprotectData(ctypes.byref(entrada), None, None, None, None, 0, ctypes.byref(saida)):
+        raise RuntimeError('CryptUnprotectData falhou (usuario/PC diferente ou dado corrompido)')
+    try:
+        return ctypes.string_at(saida.pb, saida.cb)
+    finally:
+        ctypes.windll.kernel32.LocalFree(saida.pb)
+
+
+@tool
+def gravar_tela_gif(acao: str = "iniciar", segundos: float = 8,
+                    quadros_por_segundo: float = 4, arquivo: str = "") -> str:
+    """Grava a tela num GIF animado (sem som). acao: 'iniciar' comeca a gravar
+    (para sozinho em 'segundos' ou antes se voce chamar com acao='parar');
+    'parar' encerra na hora e salva; 'status' mostra como esta. O arquivo fica
+    na pasta 'prints' dentro da pasta do agente. Nao usa IA nem internet."""
+    def _gravar():
+        estado = globals().setdefault('_r51_gravacao_tela',
+                                      {'ativa': False, 'parar': False, 'quadros': [],
+                                       'thread': None, 'ultimo_resultado': ''})
+        acao_n = (acao or 'iniciar').strip().lower()
+        if acao_n == 'status':
+            return ('Gravacao de tela: EM ANDAMENTO.' if estado['ativa']
+                    else 'Gravacao de tela: parada (nada gravando agora).')
+        if acao_n == 'parar':
+            if not estado['ativa']:
+                return 'Nao ha gravacao de tela em andamento.'
+            estado['parar'] = True
+            if estado['thread'] is not None:
+                estado['thread'].join(timeout=15)
+            return estado.get('ultimo_resultado') or 'Gravacao de tela encerrada.'
+        if estado['ativa']:
+            return 'Ja existe uma gravacao de tela em andamento; chame com acao=parar antes de comecar outra.'
+        fps = max(0.5, min(12.0, float(quadros_por_segundo or 4)))
+        duracao = max(1.0, min(60.0, float(segundos or 8)))
+        nome = (arquivo or '').strip().replace(' ', '_') or datetime.now().strftime('tela_%Y%m%d_%H%M%S')
+        if not nome.lower().endswith('.gif'):
+            nome += '.gif'
+        pasta = os.path.join(PASTA_BASE, 'prints')
+        os.makedirs(pasta, exist_ok=True)
+        destino = os.path.join(pasta, nome)
+        estado.update({'ativa': True, 'parar': False, 'quadros': [],
+                       'thread': None, 'ultimo_resultado': ''})
+
+        def _laco():
+            passo = 1.0 / fps
+            try:
+                while not estado['parar'] and len(estado['quadros']) < int(duracao * fps):
+                    try:
+                        estado['quadros'].append(_r51_capturar_quadro())
+                    except Exception:
+                        pass  # quadro falho nao mata a gravacao
+                    time.sleep(passo)
+                if not estado['quadros']:
+                    estado['ultimo_resultado'] = 'Nao consegui capturar nenhum quadro da tela; nada foi salvo.'
+                    return
+                _r51_salvar_gif(estado['quadros'], destino, fps)
+                estado['ultimo_resultado'] = ('GIF da tela salvo em: ' + destino + ' ('
+                                              + str(len(estado['quadros'])) + ' quadros).')
+            except Exception as erro:
+                estado['ultimo_resultado'] = 'Falhou ao gravar/salvar o GIF: ' + type(erro).__name__
+            finally:
+                estado['ativa'] = False
+                estado['parar'] = False
+
+        estado['thread'] = threading.Thread(target=_laco, daemon=True)
+        estado['thread'].start()
+        return ('Gravando a tela em GIF por ate ' + str(int(duracao)) + 's ('
+                + str(fps) + ' quadros/s). Para parar agora: gravar_tela_gif com acao=parar.')
+    return executar_com_autocura('gravar_tela_gif', _gravar)
+
+
+@tool
+def baixar_video(url: str, modo: str = "video", pasta: str = "") -> str:
+    """Baixa um video da internet (YouTube e similares) usando o yt-dlp.
+    modo: 'video' (mp4) ou 'audio' (so o som, em mp3). O arquivo vai para a
+    pasta 'downloads' dentro da pasta do agente (ou a 'pasta' que voce indicar).
+    Se o yt-dlp nao estiver instalado, eu NAO instalo nada sozinho: te passo o
+    comando pronto (pip install yt-dlp) para voce decidir."""
+    def _baixar():
+        endereco = (url or '').strip()
+        if not endereco.lower().startswith(('http://', 'https://')):
+            return 'Preciso de um link valido (comecando com http:// ou https://).'
+        if not _r51_ytdlp_disponivel():
+            return ('O yt-dlp nao esta instalado neste PC. Para instalar, rode no cmd:\n'
+                    '  pip install yt-dlp\n'
+                    'E me peca o video de novo. (Nao instalo nada sem voce decidir.)')
+        alvo = (pasta or '').strip() or os.path.join(PASTA_BASE, 'downloads')
+        os.makedirs(alvo, exist_ok=True)
+        modelo_saida = os.path.join(alvo, '%(title)s.%(ext)s')
+        if (modo or 'video').strip().lower() == 'audio':
+            cmd = [_r51_python_atual(), '-m', 'yt_dlp', '-x', '--audio-format', 'mp3',
+                   '-o', modelo_saida, endereco]
+        else:
+            cmd = [_r51_python_atual(), '-m', 'yt_dlp', '-f', 'mp4/best',
+                   '-o', modelo_saida, endereco]
+        codigo, saida, erro = _r51_executar_processo(cmd, 1800)
+        if codigo == 0:
+            return 'Download concluido! Arquivo salvo em: ' + alvo
+        return ('O yt-dlp retornou erro (codigo ' + str(codigo) + '). Fim da saida: '
+                + (erro or saida or '(vazia)')[-300:])
+    return executar_com_autocura('baixar_video', _baixar)
+
+
+@tool
+def marca_dagua(texto: str, caminho: str = "", pasta: str = "",
+                opacidade: int = 60, posicao: str = "rodape-direito") -> str:
+    """Adiciona marca d'agua de TEXTO em imagens. Passe o 'caminho' de uma
+    imagem (jpg/png) OU uma 'pasta' (aplica em todas as imagens de la). Cria
+    NOVOS arquivos com sufixo '_marca' — os originais ficam intactos.
+    posicao: rodape-direito (padrao), rodape-esquerdo, topo-direito,
+    topo-esquerdo ou centro. opacidade: 1 a 100."""
+    def _aplicar():
+        conteudo = (texto or '').strip()
+        if not conteudo:
+            return "Me diga o texto da marca d'agua."
+        if posicao not in ('rodape-direito', 'rodape-esquerdo', 'topo-direito', 'topo-esquerdo', 'centro'):
+            return ('Posicao invalida. Use: rodape-direito, rodape-esquerdo, '
+                    'topo-direito, topo-esquerdo ou centro.')
+        alvos = []
+        if (caminho or '').strip():
+            if not os.path.isfile(caminho.strip()):
+                return 'Nao encontrei o arquivo: ' + caminho.strip()
+            alvos = [caminho.strip()]
+        elif (pasta or '').strip():
+            if not os.path.isdir(pasta.strip()):
+                return 'Nao encontrei a pasta: ' + pasta.strip()
+            for nome in sorted(os.listdir(pasta.strip())):
+                if nome.lower().endswith(('.jpg', '.jpeg', '.png')) and '_marca' not in nome.lower():
+                    alvos.append(os.path.join(pasta.strip(), nome))
+            if not alvos:
+                return 'Nao achei imagens jpg/png nessa pasta.'
+        else:
+            return "Me diga o caminho de uma imagem ou a pasta das imagens."
+        feitas, falhas = 0, 0
+        for alvo in alvos:
+            raiz, ext = os.path.splitext(alvo)
+            destino = raiz + '_marca' + ext
+            if not _r51_aplicar_marca(alvo, destino, conteudo,
+                                      max(1, min(100, int(opacidade or 60))), posicao):
+                feitas += 1
+            else:
+                falhas += 1
+        msg = ("Marca d'agua aplicada em " + str(feitas) + ' imagem(ns) '
+               '(sufixo _marca; originais intactos).')
+        if falhas:
+            msg += ' Nao consegui aplicar em ' + str(falhas) + '.'
+        return msg
+    return executar_com_autocura('marca_dagua', _aplicar)
+
+
+@tool
+def criptografar_arquivo(caminho: str, acao: str = "criptografar") -> str:
+    """Protege um arquivo com a criptografia da SUA conta do Windows (DPAPI):
+    so o seu usuario, neste PC, consegue abrir de novo — sem senha para
+    esquecer e sem instalar nada. acao: 'criptografar' cria 'nome.cripto' (o
+    original fica intacto); 'descriptografar' recria o arquivo original a
+    partir do '.cripto'. Nada e apagado em nenhuma etapa."""
+    def _crypto():
+        alvo = (caminho or '').strip()
+        a = (acao or 'criptografar').strip().lower()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        if a not in ('criptografar', 'descriptografar'):
+            return "Acao invalida; use 'criptografar' ou 'descriptografar'."
+        with open(alvo, 'rb') as f:
+            bruto = f.read()
+        if a == 'criptografar':
+            if alvo.lower().endswith('.cripto'):
+                return 'Esse arquivo ja parece criptografado (termina em .cripto).'
+            destino = alvo + '.cripto'
+            try:
+                dados = _r51_dpapi_proteger(bruto)
+            except Exception as erro:
+                return ('Nao consegui criptografar neste sistema (' + str(erro)[:80]
+                        + '). Nada foi alterado.')
+        else:
+            if not alvo.lower().endswith('.cripto'):
+                return 'Para descriptografar, aponte para o arquivo .cripto que eu criei.'
+            destino = alvo[:-len('.cripto')]
+            if os.path.exists(destino):
+                return 'Ja existe um arquivo com o nome original; mude ele de lugar para nao sobrescrever.'
+            try:
+                dados = _r51_dpapi_revelar(bruto)
+            except Exception:
+                return ('Nao consegui descriptografar (arquivo de outro usuario/PC, ou corrompido). '
+                        'Nada foi alterado.')
+        with open(destino, 'wb') as f:
+            f.write(dados)
+        verbo = 'criptografado em' if a == 'criptografar' else 'restaurado como'
+        return 'Arquivo ' + verbo + ': ' + destino + ' (o original nunca foi apagado).'
+    return executar_com_autocura('criptografar_arquivo', _crypto)
+
+
 def _r50_caminhos_agente():
     """Caminhos (agente.py, backup) da copia RODANDO, derivados de __file__."""
     origem = os.path.abspath(globals().get('__file__') or 'agente.py')
@@ -11042,7 +11335,7 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
         print('[IA Local]: inicializacao ja em andamento.'); return False
     try:
         if _r20_servidor_confere(caminho_modelo):
-            print('[IA Local]: motor ja disponivel; nao reiniciei.'); return True
+            print('[IA Local]: motor ja disponivel; nao reiniciei.'); _r51_agendar_manter_quente(); return True
         if _proc_ia_local is not None and _proc_ia_local.poll() is None:
             print('[IA Local]: processo existente ainda nao esta pronto; nao iniciei outro.'); return False
         # Um servico HTTP desconhecido na porta nao deve ser reaproveitado.
@@ -11065,6 +11358,7 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
             if _proc_ia_local.poll() is not None:
                 _r20_estado('falhou', 'Processo saiu durante inicializacao'); return False
             if _r20_servidor_confere(caminho_modelo, prazo):
+                _r51_agendar_manter_quente()
                 return True
             time.sleep(max(0, min(0.5, prazo-time.monotonic())))
         _r20_estado('falhou', 'Prazo de inicializacao excedido; processo mantido para diagnostico')
@@ -11074,6 +11368,65 @@ def _iniciar_servidor_ia_local(caminho_modelo: str) -> bool:
         return False
     finally:
         _lock_ia_local.release()
+
+
+def _r51_manter_quente(intervalo=240, dormir=None, chamar=None, tentativas_falhas=3):
+    """r51: deixa o modelo QUENTE na RAM. Um pedido minimo agora (aquecimento:
+    carrega o GGUF na memoria, a 1a resposta do usuario sai muito mais rapida)
+    e um ping minimo a cada 'intervalo' segundos, para o llama-server nao
+    descarregar o modelo apos ~5 min de ociosidade (a causa da "primeira
+    resposta lenta" que voltava todo dia). Se o servidor cair (3 pings
+    seguidos falham), encerra e libera o flag para a proxima subida re-agendar.
+    Config 'manter_quente': false desliga tudo."""
+    import time as _time_r51
+    _dormir = dormir or _time_r51.sleep
+    _chamar = chamar or _chamar_neural
+
+    def _ping():
+        try:
+            _chamar([{'role': 'system', 'content': 'ok'},
+                     {'role': 'user', 'content': 'ping'}],
+                    max_tokens=1, temperatura=0.0, stream=False, callback=None)
+            return True
+        except Exception:
+            return False
+
+    if not _ping():
+        globals()['_r51_quente_agendada'] = False
+        return
+    falhas = 0
+    while True:
+        _dormir(intervalo)
+        if _ping():
+            falhas = 0
+            continue
+        falhas += 1
+        if falhas >= max(1, tentativas_falhas):
+            globals()['_r51_quente_agendada'] = False
+            return
+
+
+def _r51_agendar_manter_quente(agendador=None):
+    """r51: agenda (1 vez por servidor no ar) a thread que mantem o modelo
+    quente. Nada bloqueante; falha de aquecimento nunca impede o uso."""
+    try:
+        if not _r20_opcoes().get('manter_quente', True):
+            return False
+    except Exception:
+        pass
+    if globals().get('_r51_quente_agendada'):
+        return False
+    globals()['_r51_quente_agendada'] = True
+
+    def _spawn():
+        threading.Thread(target=_r51_manter_quente, daemon=True).start()
+
+    try:
+        (agendador or _spawn)()
+    except Exception:
+        globals()['_r51_quente_agendada'] = False
+        return False
+    return True
 
 
 def _acha_modelo_gguf() -> str:
@@ -12840,7 +13193,38 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
         if streaming:
             print('\n[Fim da previa; a resposta final aparece abaixo.]')
     meta = getattr(globals().get('_r20_telemetria'), 'ultima', {})
-    if meta.get('finish_reason') == 'length':
+    # r51 (IA local extrema): se o modelo cortou a resposta pelo limite de
+    # tokens, CONTINUA de onde parou (ate 2 vezes) e junta tudo — respostas
+    # longas deixam de terminar no meio da frase. Config 'auto_continuar':
+    # false volta ao comportamento antigo (so o aviso). Listas numeradas
+    # ficam de fora (tem gerenciamento proprio de completude).
+    _cortada_r51 = meta.get('finish_reason') == 'length'
+    if _cortada_r51 and quantidade == 0 and _r20_opcoes()['auto_continuar']:
+        _texto_r51 = resposta.strip()
+        _msgs_r51 = list(msgs) + [{'role': 'assistant', 'content': _texto_r51}]
+        for _i_r51 in range(2):
+            _msgs_r51.append({'role': 'user',
+                              'content': 'Continue EXATAMENTE de onde parou, sem repetir nada do que ja foi escrito.'})
+            try:
+                _parte_r51 = _chamar_neural(
+                    _r20_orcamento(_msgs_r51, tokens)[0], max_tokens=tokens,
+                    temperatura=0.3, stream=False, callback=None,
+                    repeat_penalty=1.05 + max(0.0, min(0.6, float(penalidade_extra))))
+            except Exception:
+                break
+            _parte_r51 = str(_parte_r51 or '').strip()
+            if not _parte_r51:
+                break
+            _texto_r51 += ' ' + _parte_r51
+            resposta = _texto_r51
+            _msgs_r51[-1] = {'role': 'assistant', 'content': _texto_r51}
+            _meta_r51 = getattr(globals().get('_r20_telemetria'), 'ultima', {})
+            if _meta_r51.get('finish_reason') != 'length':
+                _cortada_r51 = False
+                break
+        if _cortada_r51:
+            resposta += '\n[Aviso: geracao cortada pelo limite de tokens; nao e resposta completa.]'
+    elif _cortada_r51:
         resposta += '\n[Aviso: geracao cortada pelo limite de tokens; nao e resposta completa.]'
     if not isinstance(resposta, str) or not resposta.strip():
         raise ValueError("O motor local devolveu uma resposta vazia.")
@@ -31708,6 +32092,10 @@ def _r23_comandos(comando):
 
 
 tools = [
+    gravar_tela_gif,
+    baixar_video,
+    marca_dagua,
+    criptografar_arquivo,
     auditar_armadilhas_python,
     comparar_api_python,
     inventariar_testes_python,
@@ -32587,7 +32975,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r50] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r51] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

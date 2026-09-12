@@ -108,9 +108,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49 **516 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51 **545 testes isolados passaram** (auditoria: 703 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r24).
+  prefixos r20-r45 + r50-r51).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.

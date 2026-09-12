@@ -71,7 +71,7 @@ class AgenteArranqueSemPesados(unittest.TestCase):
 
     def test_pyautogui_totalmente_via_accessor(self):
         t = texto_agente()
-        self.assertEqual(t.count('_r45_pyautogui().'), 17)
+        self.assertEqual(t.count('_r45_pyautogui().'), 18)  # r51: +1 em _r51_capturar_quadro
         self.assertEqual(t.count('pyautogui.'), 0)  # nenhum uso direto sobrando
         self.assertIn('def _r45_pyautogui():', t)
 
@@ -87,8 +87,8 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertIn('def _r45_embeddings_model():', t)
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
-    def test_selo_r50_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r50]', texto_agente())
+    def test_selo_r51_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r51]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):

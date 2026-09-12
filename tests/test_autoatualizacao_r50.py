@@ -112,7 +112,8 @@ class ComandoERoteamento(unittest.TestCase):
     def test_rota_responde_e_comando_estranho_nao_captura(self):
         def fake_atualizar(*_a, **_k):
             return 'FAKE ATUALIZADO'
-        env = carregar('_r50_comandos', '_norm_pt', _r50_atualizar_agente=fake_atualizar)
+        env = carregar('_r50_comandos', '_norm_pt')
+        env['_r50_atualizar_agente'] = fake_atualizar  # sobrepoe o real (prefixo _r50_ auto-carrega)
         tampao = io.StringIO()
         with redirect_stdout(tampao):
             self.assertTrue(env['_r50_comandos']('atualizar agora'))
@@ -133,7 +134,7 @@ class ComandoERoteamento(unittest.TestCase):
         self.assertIn('subprocess.Popen([_sys.executable, origem])', texto)
         self.assertIn('os._exit(0)', texto)
         self.assertIn("'atualizar agora' baixa a versao oficial", texto)  # menu
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r50]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r51]', texto)
 
     def test_caminhos_derivados_de_file(self):
         env = carregar('_r50_caminhos_agente', os=os, __file__='/x/y/agente.py')
