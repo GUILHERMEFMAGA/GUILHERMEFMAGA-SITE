@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42 **415 testes isolados passaram** (auditoria: 549 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43 **467 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -364,6 +364,44 @@ ou relatórios reais sem revisão e autorização.
   mais curtas; inteligência do modelo não muda. Auditoria 619/0 duplicatas; catálogo
   reconciliado (30 checks; **80 propostas restantes** = 619+80=699). Selo `-r42`. Não testado
   no Windows real.
+- **r43 (LOTE 6 FINAL + modo instantaneo + cerebro — pedido "melhorias muito
+  melhoradas, respostas instantaneas, cerebro no nivel extremo"; usuario escolheu
+  lote COMPLETO e manteve o GGUF atual):** +80 ferramentas (**619 → 699**; itens
+  127–219 — **catalogo ESGOTADO: 219/219 itens implementados, 0 propostas**).
+  **A console/dev/texto (14):** portas conhecidas, tempo de download, classes de IP,
+  tabela de JSON, barras ASCII, histograma, barra de progresso, arvore de caminhos,
+  sparkline, diff caractere a caractere, decimais PT/EN, chave:valor → JSON,
+  minutos/HM, consolidar listas de compras. **B casa/cotidiano BR (14):** medidas
+  culinarias + forno/gas, xicara → gramas, dividir conta com gorjeta, cafeina
+  (meia-vida), tinta, combustivel, churrasco, festa, pizza, gelo, diluicao de
+  limpeza, arroz, ponto da carne, cronograma de limpeza. **C saude/sorteios (13):**
+  TMB Mifflin, gordura Navy, FC maxima/zonas Karvonen, proteina g/kg, macros, dado
+  de RPG com descarte, amigo secreto sem autopar, cor com contraste WCAG, bingo,
+  Lotofacil/Mega-Sena (honestos: mesma chance), baralho de 52 com ranking, times.
+  **D seguranca/geo/ciencia (14):** inventario de ferramentas em TXT (so nomes,
+  sem segredos), PIN, passphrase diceware PT (152 palavras, entropia real),
+  checar reuso de senha (NUNCA ecoa), forca por entropia, **TOTP RFC 6238
+  (teste com o vetor oficial: 94287082)**, Haversine, rumo/cardinal (16 setores),
+  fase da lua (aproximada), planetas, coordenada decimal/GMS, **118 elementos**,
+  massa molar simples, decada/seculo. **E sistema/rede/midia (25):** fontes,
+  pastas especiais, versao PowerShell/Windows (so leitura), fuso IANA, erros
+  Windows, atalhos, where, variaveis de ambiente (segredos OCULTOS), politica de
+  execucao, WAV, EXIF (PIL opcional, honesto), dimensoes por magic bytes,
+  exercicios de matematica com gabarito, pH, diluicao C1V1C2V2, MAC → fabricante
+  (tabela parcial, sem inventar), aspecto, PPI, idade de cachorro, tamanhos
+  roupa/calcado, faixas de internet, **MB vs Mb**, bateria, bitrate, tipografia.
+  **Modo instantaneo:** `instantaneo ia local` alterna `ia_local_opcoes.instantaneo`
+  — teto de **180 tokens** nas geracoes normais em escada com o turbo (instantaneo
+  180 > turbo 300 > padrao; `formato_json` intocado); persiste em config; o modelo
+  GGUF NAO muda e o aviso diz isso. **Cerebro (programa, honesto):**
+  `estatisticas cerebro` (geracoes neurais vs cache vs uso de ferramentas, tempo
+  medio, "o GGUF e o mesmo de sempre"); ate 2 memorias relevantes injetadas como
+  evidencia no prompt de conversa (try/except — falha de memoria nunca derruba a
+  geracao); a fabrica de ideias agora DISTINGUE "catalogo COMPLETO (r43)" de
+  "arquivo ausente" (nao mente mais quando o catalogo esgota) e o texto "549"
+  defasado saiu da saida. **467 testes OK** (+52); auditoria 699/0 duplicatas;
+  catálogo reconciliado; `consultar_porta_conhecida` levanta erro para porta <= 0;
+  selo `-r43`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
