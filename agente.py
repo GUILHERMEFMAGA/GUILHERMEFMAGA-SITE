@@ -7796,6 +7796,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
+    print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
@@ -10880,6 +10881,1446 @@ def criptografar_arquivo(caminho: str, acao: str = "criptografar") -> str:
         verbo = 'criptografado em' if a == 'criptografar' else 'restaurado como'
         return 'Arquivo ' + verbo + ': ' + destino + ' (o original nunca foi apagado).'
     return executar_com_autocura('criptografar_arquivo', _crypto)
+
+
+def _r52_estado(nome, padrao):
+    """r52: estado de modulos (guardiao/compartilhamento) com padrao."""
+    return globals().setdefault(nome, padrao)
+
+
+def _r52_json_local(nome_arquivo, valor=None, padrao=None):
+    """r52: le/escreve um JSON pequeno na pasta do agente (estado local).
+    valor=None so le; senao grava e devolve o valor gravado."""
+    caminho = os.path.join(PASTA_BASE, nome_arquivo)
+    if valor is None:
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return padrao if padrao is not None else {}
+    with open(caminho, 'w', encoding='utf-8') as f:
+        json.dump(valor, f, ensure_ascii=False, indent=1)
+    return valor
+
+
+def _r52_hash_arquivo(caminho, algoritmo='sha256'):
+    """r52: hash hex de um arquivo (leitura em blocos)."""
+    import hashlib
+    h = hashlib.new(algoritmo)
+    with open(caminho, 'rb') as f:
+        for bloco in iter(lambda: f.read(65536), b''):
+            h.update(bloco)
+    return h.hexdigest()
+
+
+def _r52_dias_uteis_depois(dias, partida=None):
+    """r52: data apos N dias UTEIS (pula sabado/domingo)."""
+    from datetime import timedelta
+    atual = partida or datetime.now()
+    restantes = max(0, int(dias))
+    while restantes > 0:
+        atual += timedelta(days=1)
+        if atual.weekday() < 5:
+            restantes -= 1
+    return atual
+
+
+def _r52_extrair_preco(texto):
+    """r52: acha o primeiro preco em BRL do texto e devolve float (ou None)."""
+    import re
+    m = re.search(r'R\$\s*([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{1,2})?|[0-9]+,[0-9]{1,2}|[0-9]+\.[0-9]{1,2}|[0-9]+)', texto or '')
+    if not m:
+        return None
+    bruto = m.group(1)
+    if ',' in bruto:
+        bruto = bruto.replace('.', '').replace(',', '.')
+    try:
+        return float(bruto)
+    except ValueError:
+        return None
+
+
+def _r52_nivel_de_risco(comando):
+    """r52: classifica um comando (cmd/powershell/shell) SEM executar nada.
+    Devolve (nivel, motivos). Ordem: CRITICO > ALTO > MEDIO > BAIXO."""
+    regras_por_gravidade = (
+        ('CRITICO', [('format ', 'FORMATA uma unidade (apaga TUDO)'),
+                     ('diskpart', 'particionamento de disco no nivel bruto'),
+                     ('del /', 'DEL recursivo/silencioso do Windows'),
+                     ('rd /s', 'remove arvores de pastas'),
+                     ('cipher /w', 'sobrescreve espaco livre (irreversivel)'),
+                     ('reg delete', 'apaga chaves do registro'),
+                     ('bcdedit', 'altera a inicializacao do Windows'),
+                     ('mkfs', 'formata filesystem (Linux)'),
+                     ('dd if=', 'copia bruta de disco (pode destruir dados)'),
+                     ('shutdown', 'desliga/reinicia o computador'),
+                     ('stop-computer', 'desliga o computador'),
+                     ('restart-computer', 'reinicia o computador'),
+                     ('reset --hard', 'descarta TODAS as mudancas do git'),
+                     ('remove-item', '-recurse e/ou -force (apagada em arvore)')]),
+        ('ALTO', [('reg add', 'escreve no registro do Windows'),
+                  ('regedit', 'editor de registro'),
+                  ('set-executionpolicy', 'afrouxa a politica de scripts'),
+                  ('invoke-expression', 'executa texto como codigo'),
+                  ('iex ', 'executa texto como codigo (alias)'),
+                  ('downloadstring', 'baixa codigo da internet para executar'),
+                  ('net user', 'administra usuarios do Windows'),
+                  ('taskkill /f', 'mata processo a forca'),
+                  ('schtasks', 'cria tarefas agendadas do sistema')]),
+        ('MEDIO', [('remove-item', 'apaga arquivos/pastas'),
+                   ('del ', 'apaga arquivos'),
+                   ('move ', 'move/renomeia arquivos'),
+                   ('pip install', 'instala pacote python'),
+                   ('start-process', 'inicia processo novo'),
+                   ('invoke-webrequest', 'acessa a internet'),
+                   ('curl ', 'acessa a internet'),
+                   ('git push', 'envia codigo para o remoto')]),
+    )
+    c = ' ' + (comando or '').strip().lower() + ' '
+    motivos, nivel = [], 'BAIXO'
+    for classe, regras in regras_por_gravidade:
+        for trecho, motivo in regras:
+            if trecho in c:
+                if nivel == 'BAIXO':
+                    nivel = classe
+                elif classe == 'CRITICO':
+                    nivel = 'CRITICO'
+                motivos.append(motivo)
+    return nivel, motivos
+
+
+def _r52_explicar_regex_tokens(expressao):
+    """r52: quebra a regex em tokens e explica cada um em portugues."""
+    tokens = (
+        ('^', 'ancora: comeca da linha/texto'),
+        ('$', 'ancora: termina na linha/texto'),
+        ('\\d', 'qualquer dígito (0-9)'),
+        ('\\D', 'qualquer coisa que NAO seja digito'),
+        ('\\w', 'letra, numero ou underline'),
+        ('\\W', 'nao e letra/numero/underline'),
+        ('\\s', 'espaco, tabulacao ou quebra de linha'),
+        ('\\S', 'qualquer coisa que NAO seja espaco'),
+        ('\\b', 'fronteira de palavra (inicio/fim de palavra)'),
+        ('.', 'qualquer caractere (menos quebra de linha)'),
+        ('*', 'repete o anterior 0 ou mais vezes'),
+        ('+', 'repete o anterior 1 ou mais vezes'),
+        ('?', 'o anterior e opcional (0 ou 1 vez)'),
+        ('|', 'OU: uma opcao ou outra'),
+        ('(', 'abre grupo (captura o trecho)'),
+        (')', 'fecha grupo'),
+        ('(?:', 'abre grupo SEM capturar'),
+        ('[', 'abre classe de caracteres (aceita qualquer um de dentro)'),
+        (']', 'fecha classe de caracteres'),
+        ('{', 'abre contador de repetição (ex.: {2,4})'),
+        ('}', 'fecha contador de repetição'),
+    )
+    explicacoes = []
+    i = 0
+    while i < len(expressao):
+        casou = False
+        for token, explicacao in tokens:
+            if expressao.startswith(token, i):
+                explicacoes.append("'" + token + "' - " + explicacao)
+                i += len(token)
+                casou = True
+                break
+        if not casou:
+            explicacoes.append("'" + expressao[i] + "' - caractere literal (e ele mesmo)")
+            i += 1
+    return explicacoes
+
+
+def _r52_agregar_logs(linhas, top=10):
+    """r52: agrupa linhas de log por padrao (sem datas/numeros) e acha hora pico."""
+    import re
+    from collections import Counter
+    padroes, horas = Counter(), Counter()
+    for linha in linhas:
+        if not linha.strip():
+            continue
+        m_hora = re.search(r'(\d{1,2}):\d{2}(:\d{2})?', linha)
+        if m_hora:
+            horas[int(m_hora.group(1))] += 1
+        chave = re.sub(r'^\[?[0-9]{4}-[0-9]{2}-[0-9]{2}[^ ]*\s*', '', linha.strip())
+        chave = re.sub(r'\d+', '#', chave)
+        chave = re.sub(r'0x[0-9a-fA-F]+', '#', chave)
+        chave = re.sub(r'"[^"]*"', '""', chave)
+        chave = chave.strip()[:150]
+        if chave:
+            padroes[chave] += 1
+    return padroes.most_common(max(1, int(top))), horas
+
+
+def _r52_imports_reorganizar(texto):
+    """r52: reordena o bloco de imports do TOPO do arquivo (stdlib primeiro).
+    Devolve (novo_texto, quantidade_movida, ''). Erro de sintaxe -> ('', 0, motivo)."""
+    import ast
+    import sys
+    try:
+        arvore = ast.parse(texto)
+    except SyntaxError as erro:
+        return '', 0, 'arquivo com erro de sintaxe: ' + str(erro)[:80]
+    stdlib = set(getattr(sys, 'stdlib_module_names', ()))
+    corpo = arvore.body
+    i = 0
+    while i < len(corpo) and isinstance(corpo[i], (ast.Import, ast.ImportFrom)):
+        i += 1
+    if i == 0:
+        return texto, 0, ''
+    bloco = corpo[:i]
+    def _chave(no):
+        modulo = (no.module or '') if isinstance(no, ast.ImportFrom) else (no.names[0].name or '')
+        raiz = (modulo.split('.')[0] or '')
+        return (0 if raiz in stdlib else 1, modulo, isinstance(no, ast.ImportFrom))
+    ordenado = sorted(bloco, key=_chave)
+    if [ast.dump(n) for n in ordenado] == [ast.dump(n) for n in bloco]:
+        return texto, 0, ''
+    linha_fim = bloco[-1].end_lineno or bloco[-1].lineno
+    linhas = texto.split('\n')
+    novos = []
+    for no in ordenado:
+        pedaco = '\n'.join(linhas[no.lineno - 1:(no.end_lineno or no.lineno)])
+        novos.append(pedaco)
+    novo_texto = '\n'.join(novos) + '\n' + '\n'.join(linhas[linha_fim:])
+    return novo_texto, len(bloco), ''
+
+
+def _r52_jpeg_sem_metadados(bruto):
+    """r52: remove segmentos APP1/APP2/COM (EXIF/GPS/XMP/comentario) de um JPEG."""
+    if bruto[:2] != b'\xff\xd8':
+        return None
+    saida = bytearray(bruto[:2])
+    i = 2
+    while i + 4 <= len(bruto):
+        if bruto[i] != 0xFF:
+            return None
+        marcador = bruto[i + 1]
+        if marcador in (0xD8, 0xD9) or 0xD0 <= marcador <= 0xD7:
+            saida += bruto[i:i + 2]
+            i += 2
+            continue
+        if marcador == 0xDA:  # comecou a imagem: copia o resto
+            saida += bruto[i:]
+            break
+        tamanho = (bruto[i + 2] << 8) + bruto[i + 3]
+        if marcador in (0xE1, 0xE2, 0xFE):  # APP1 (EXIF/XMP), APP2, COMENTARIO
+            i += 2 + tamanho
+            continue
+        saida += bruto[i:i + 2 + tamanho]
+        i += 2 + tamanho
+    return bytes(saida)
+
+
+def _r52_png_sem_metadados(bruto):
+    """r52: remove chunks de metadados de um PNG (eXIf, tEXt, zTXt, iTXt)."""
+    if bruto[:8] != b'\x89PNG\r\n\x1a\n':
+        return None
+    saida = bytearray(bruto[:8])
+    i = 8
+    while i + 8 <= len(bruto):
+        tamanho = int.from_bytes(bruto[i:i + 4], 'big')
+        tipo = bruto[i + 4:i + 8]
+        total = 12 + tamanho
+        if tipo in (b'eXIf', b'tEXt', b'zTXt', b'iTXt'):
+            i += total
+            continue
+        saida += bruto[i:i + total]
+        i += total
+        if tipo == b'IEND':
+            break
+    return bytes(saida)
+
+
+def _r52_exif_resumido(caminho):
+    """r52: lista (rotulo, valor) do EXIF via PIL, para dizer o que foi removido."""
+    try:
+        from PIL import Image
+        with Image.open(caminho) as img:
+            bruto = img.getexif()
+            return [str(v) for v in list(bruto.values())[:8]]
+    except Exception:
+        return []
+
+
+def _r52_git(pasta, *argumentos):
+    """r52: roda git na pasta e devolve (codigo, stdout)."""
+    codigo, saida, _ = _r51_executar_processo(['git', '-C', pasta or '.'] + list(argumentos), 30)
+    return codigo, saida
+
+
+@tool
+def mapa_de_ideias(tema: str, ramos: str = "") -> str:
+    """Cria um MAPA MENTAL em texto (formato Mermaid) a partir de um tema.
+    Passe os ramos principais separados por ponto-e-virula (;) e eu monto a
+    estrutura em arvore. Otimo para planejar projetos e estudar; o resultado
+    pode ser colado em editores que entendem Mermaid."""
+    def _criar():
+        tema_n = (tema or '').strip()
+        if not tema_n:
+            return 'Me diga o tema central do mapa de ideias.'
+        lista = [r.strip() for r in (ramos or '').split(';') if r.strip()]
+        if not lista:
+            return ('Me passe os ramos separados por ponto-e-virgula. '
+                    'Exemplo: mapa_de_ideias com tema "site novo" e ramos "design; conteudo; hospedagem".')
+        linhas = ['mindmap', 'root(( ' + tema_n + ' ))']
+        for ramo in lista[:40]:
+            linhas.append('  ' + ramo)
+        diagrama = '\n'.join(linhas)
+        return ('Mapa mental de "' + tema_n + '" com ' + str(len(lista)) + ' ramos:\n\n'
+                + diagrama + '\n\nCole em qualquer editor que aceite Mermaid para ver o desenho.')
+    return executar_com_autocura('mapa_de_ideias', _criar)
+
+
+@tool
+def plano_de_tarefa(objetivo: str, etapas: str = "") -> str:
+    """Transforma um OBJETIVO em um PLANO de etapas ordenadas (checklist com
+    dependencias), pronto para voce (ou eu) seguir da primeira ate a ultima.
+    Passe as etapas separadas por ponto-e-virgula (;). O plano fica em texto
+    simples e pode ser usado com 'estimar_tarefa' para prazos."""
+    def _criar():
+        objetivo_n = (objetivo or '').strip()
+        if not objetivo_n:
+            return 'Me diga o objetivo do plano.'
+        lista = [e.strip() for e in (etapas or '').replace('\n', ';').split(';') if e.strip()]
+        if not lista:
+            return ('Me passe as etapas separadas por ponto-e-virgula. '
+                    'Exemplo: plano_de_tarefa com objetivo "lançar o site" e etapas "desenhar; programar; testar; publicar".')
+        linhas = ['PLANO: ' + objetivo_n, '']
+        for indice, etapa in enumerate(lista, 1):
+            depende = ('(pode comecar junto)' if indice == 1
+                       else '(depende da etapa ' + str(indice - 1) + ')')
+            linhas.append(str(indice) + '. [ ] ' + etapa + ' ' + depende)
+        linhas.append('')
+        linhas.append('Checkpoint final: conferir se o objetivo "' + objetivo_n + '" foi atingido inteiro.')
+        linhas.append('Quer prazos? Use estimar_tarefa com o melhor/provavel/pior tempo de cada etapa.')
+        return '\n'.join(linhas)
+    return executar_com_autocura('plano_de_tarefa', _criar)
+
+
+@tool
+def timeline_do_dia(pasta: str = "", dia: str = "") -> str:
+    """Mostra a LINHA DO TEMPO dos arquivos criados/modificados num dia,
+    agrupada por hora: "o que eu fiz hoje no PC?". Passe a 'pasta' (vazia =
+    pasta do agente) e o 'dia' no formato AAAA-MM-DD (vazio = hoje)."""
+    def _montar():
+        from datetime import date, timedelta
+        base = (pasta or '').strip() or PASTA_BASE
+        if not os.path.isdir(base):
+            return 'Nao encontrei a pasta: ' + base
+        if (dia or '').strip():
+            try:
+                partes = [int(p) for p in dia.strip().split('-')]
+                alvo = date(partes[0], partes[1], partes[2])
+            except Exception:
+                return 'Formato de dia invalido; use AAAA-MM-DD (ex.: 2026-09-11).'
+        else:
+            alvo = date.today()
+        inicio = datetime.combine(alvo, datetime.min.time()).timestamp()
+        fim = inicio + timedelta(days=1).total_seconds()
+        por_hora = {}
+        vistos = 0
+        for raiz, pastas, arquivos in os.walk(base):
+            pastas[:] = [p for p in pastas if not p.startswith('.')]
+            for nome in arquivos:
+                vistos += 1
+                if vistos > 20000:
+                    break
+                caminho = os.path.join(raiz, nome)
+                try:
+                    quando = os.path.getmtime(caminho)
+                except OSError:
+                    continue
+                if inicio <= quando < fim:
+                    hora = datetime.fromtimestamp(quando).strftime('%Hh')
+                    por_hora.setdefault(hora, []).append(caminho)
+            if vistos > 20000:
+                break
+        if not por_hora:
+            return 'Nenhum arquivo modificado em ' + alvo.isoformat() + ' dentro de ' + base + '.'
+        linhas = ['Linha do tempo de ' + alvo.isoformat() + ' (' + str(sum(len(v) for v in por_hora.values())) + ' arquivos):']
+        for hora in sorted(por_hora):
+            grupos = por_hora[hora][:6]
+            linhas.append(hora + ' -> ' + str(len(por_hora[hora])) + ' arquivo(s); exemplos: '
+                          + ', '.join(os.path.basename(g) for g in grupos))
+        return '\n'.join(linhas)
+    return executar_com_autocura('timeline_do_dia', _montar)
+
+
+@tool
+def limpar_metadata_imagem(caminho: str) -> str:
+    """Remove metadados (EXIF/GPS/comentarios) de uma imagem JPEG ou PNG,
+    criando uma COPIA limpa com sufixo '_limpa' — a original fica intacta.
+    Protege sua privacidade antes de compartilhar fotos (nada de localizacao
+    ou modelo de camera vazando)."""
+    def _limpar():
+        alvo = (caminho or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        baixo = alvo.lower()
+        if not baixo.endswith(('.jpg', '.jpeg', '.png')):
+            return 'So trabalho com JPEG e PNG por aqui.'
+        with open(alvo, 'rb') as f:
+            bruto = f.read()
+        achados = _r52_exif_resumido(alvo)
+        limpo = (_r52_jpeg_sem_metadados(bruto) if baixo.endswith(('.jpg', '.jpeg'))
+                 else _r52_png_sem_metadados(bruto))
+        if limpo is None:
+            return ('Formato nao reconhecido por dentro (o arquivo pode estar corrompido). '
+                    'Nada foi escrito.')
+        if limpo == bruto:
+            return 'Essa imagem ja esta sem metadados removiveis. Nada foi trocado.'
+        raiz, ext = os.path.splitext(alvo)
+        destino = raiz + '_limpa' + ext
+        with open(destino, 'wb') as f:
+            f.write(limpo)
+        msg = ('Copia limpa salva em: ' + destino + ' (metadados EXIF/GPS/comentarios removidos; '
+               'a original continua intacta).')
+        if achados:
+            msg += ' Chegaram a existir ' + str(len(achados)) + ' campo(s) de metadado(s) nesta foto.'
+        return msg
+    return executar_com_autocura('limpar_metadata_imagem', _limpar)
+
+
+@tool
+def imagens_para_pdf(pasta: str, arquivo_pdf: str = "") -> str:
+    """Junta as imagens (JPG/PNG) de uma pasta num UNICO PDF, em ordem
+    alfabetica — perfeito para digitalizacoes e recibos. O original de cada
+    imagem nao e alterado."""
+    def _montar():
+        origem = (pasta or '').strip()
+        if not origem or not os.path.isdir(origem):
+            return 'Nao encontrei a pasta: ' + (origem or '(vazia)')
+        alvos = [n for n in sorted(os.listdir(origem))
+                 if n.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        if not alvos:
+            return 'Nao achei imagens JPG/PNG nessa pasta.'
+        try:
+            from PIL import Image
+        except Exception:
+            return 'A biblioteca Pillow (PIL) nao esta instalada; sem ela nao monto o PDF.'
+        paginas = []
+        for nome in alvos:
+            try:
+                with Image.open(os.path.join(origem, nome)) as img:
+                    paginas.append(img.convert('RGB'))
+            except Exception:
+                pass  # imagem ruim fica de fora; as boas entram
+        if not paginas:
+            return 'Nenhuma imagem consegui abrir dessa pasta.'
+        saida = (arquivo_pdf or '').strip() or os.path.join(origem, 'album_' + datetime.now().strftime('%Y%m%d_%H%M%S') + '.pdf')
+        if not saida.lower().endswith('.pdf'):
+            saida += '.pdf'
+        paginas[0].save(saida, save_all=True, append_images=paginas[1:], resolution=100.0)
+        return ('PDF criado com ' + str(len(paginas)) + ' pagina(s) (de ' + str(len(alvos))
+                + ' imagens): ' + saida)
+    return executar_com_autocura('imagens_para_pdf', _montar)
+
+
+@tool
+def sugerir_commit(pasta: str = "") -> str:
+    """Analisa as MUDANCAS do git na pasta (git status + diff) e SUGERE uma
+    mensagem de commit pronta, com o tipo certo (feat/fix/docs/test/chore).
+    Eu apenas sugiro — nao faco commit nenhum por aqui (para isso existe
+    git_commit_rapido)."""
+    def _sugerir():
+        codigo_st, saida_st = _r52_git(pasta, 'status', '--porcelain')
+        if codigo_st != 0:
+            return 'Esse diretorio nao parece ser um repositorio git (git status falhou).'
+        linhas = [l for l in saida_st.split('\n') if l.strip()]
+        if not linhas:
+            return 'Nenhuma mudanca para commitar (working tree limpo).'
+        caminhos = [l[3:].strip().strip('"') for l in linhas]
+        adicionados = sum(1 for l in linhas if l[:2].strip() in ('A', '??'))
+        modificados = len(caminhos) - adicionados
+        so_testes = all(c.lower().startswith('tests') or 'test_' in c.lower() for c in caminhos)
+        so_docs = all(c.lower().endswith('.md') or c.lower().startswith('docs') for c in caminhos)
+        tem_codigo = any(c.lower().endswith(('.py', '.js', '.bat', '.sh')) for c in caminhos)
+        if so_testes:
+            tipo = 'test'
+        elif so_docs:
+            tipo = 'docs'
+        elif tem_codigo:
+            tipo = 'feat' if adicionados >= modificados else 'fix'
+        else:
+            tipo = 'chore'
+        pastas = sorted({(c.split('/')[0] if '/' in c else '(raiz)') for c in caminhos})
+        msg = (tipo + ': atualiza ' + str(len(caminhos)) + ' arquivo(s) em '
+               + ', '.join(pastas[:4]) + (' e outras' if len(pastas) > 4 else ''))
+        resposta = ['Mudancas detectadas: ' + str(len(caminhos)) + ' arquivo(s) ('
+                    + str(adicionados) + ' novo(s), ' + str(modificados) + ' alterado(s)).',
+                    'Sugestao de mensagem:', '', '  ' + msg, '',
+                    'Confira com git diff e use git_commit_rapido quando gostar.']
+        return '\n'.join(resposta)
+    return executar_com_autocura('sugerir_commit', _sugerir)
+
+
+@tool
+def diagrama_mermaid_codigo(arquivo: str) -> str:
+    """Gera um DIAGRAMA Mermaid da estrutura de um arquivo .py: classes com
+    seus metodos e funcoes soltas, mais os modulos que ele importa. Otimo para
+    entender codigo grande antes de mexer."""
+    def _diagramar():
+        import ast as _ast
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        try:
+            with open(alvo, 'r', encoding='utf-8', errors='replace') as f:
+                arvore = _ast.parse(f.read())
+        except SyntaxError as erro:
+            return 'Esse .py tem erro de sintaxe (' + str(erro)[:80] + '); primeiro arrume ele.'
+        modulo = os.path.splitext(os.path.basename(alvo))[0].replace(' ', '_')
+        linhas = ['graph TD', '  ' + modulo + '["' + os.path.basename(alvo) + '"]']
+        imports = []
+        for no in arvore.body:
+            if isinstance(no, _ast.Import):
+                imports += [apelido.name for apelido in no.names[:4]]
+            elif isinstance(no, _ast.ImportFrom) and no.module:
+                imports.append(no.module)
+            elif isinstance(no, _ast.ClassDef):
+                metodos = [n.name for n in no.body if isinstance(n, _ast.FunctionDef)][:8]
+                no_id = modulo + '__' + no.name
+                linhas.append('  ' + no_id + '["classe ' + no.name + '"]')
+                linhas.append('  ' + modulo + ' --> ' + no_id)
+                for metodo in metodos:
+                    linhas.append('  ' + no_id + ' --> ' + no_id + '_' + metodo + '["' + metodo + '()"]')
+            elif isinstance(no, _ast.FunctionDef):
+                linhas.append('  ' + modulo + ' --> ' + modulo + '_' + no.name + '["' + no.name + '()"]')
+        for modulo_import in sorted(set(imports))[:10]:
+            no_id = 'ext_' + modulo_import.replace('.', '_')
+            linhas.append('  ' + no_id + '["import: ' + modulo_import + '"]')
+            linhas.append('  ' + modulo + ' -.-> ' + no_id)
+        return ('Diagrama Mermaid de ' + os.path.basename(alvo) + ':\n\n' + '\n'.join(linhas))
+    return executar_com_autocura('diagrama_mermaid_codigo', _diagramar)
+
+
+@tool
+def leitor_rss(url: str, palavra_chave: str = "", quantidade: int = 10) -> str:
+    """Le um feed RSS/Atom (blog, podcast, noticias) e lista as ultimas
+    publicacoes; filtra por 'palavra_chave' se voce quiser. Tudo com uma
+    unica leitura HTTP — sem login e sem javascript."""
+    def _ler():
+        import re as _re
+        import urllib.request
+        import xml.etree.ElementTree as ET
+        endereco = (url or '').strip()
+        if not endereco.lower().startswith(('http://', 'https://')):
+            return 'Me passe a URL do feed (comecando com http:// ou https://).'
+        try:
+            with urllib.request.urlopen(endereco, timeout=15) as resposta:
+                dados = resposta.read()
+        except Exception as erro:
+            return 'Nao consegui baixar o feed (' + type(erro).__name__ + '). O endereço esta certo?'
+        try:
+            raiz = ET.fromstring(dados)
+        except ET.ParseError:
+            return 'Esse endereço respondeu, mas nao e um XML de feed valido.'
+        itens = []
+        for item in raiz.iter():
+            if item.tag.rsplit('}', 1)[-1] in ('item', 'entry'):
+                titulo, link = '', ''
+                for filho in item:
+                    nome = filho.tag.rsplit('}', 1)[-1]
+                    if nome == 'title' and filho.text:
+                        titulo = filho.text.strip()
+                    if nome == 'link':
+                        link = (filho.text or '').strip() or (filho.get('href') or '')
+                if titulo:
+                    itens.append((titulo, link))
+        if not itens:
+            return 'O feed nao tem itens (ou esta vazio).'
+        filtro = (palavra_chave or '').strip().lower()
+        if filtro:
+            itens = [i for i in itens if filtro in i[0].lower()]
+        itens = itens[:max(1, min(25, int(quantidade or 10)))]
+        linhas = [str(len(itens)) + ' publicacao(oes) do feed:']
+        for titulo, link in itens:
+            titulo_limpo = _re.sub(r'<[^>]+>', '', titulo)
+            linhas.append('- ' + titulo_limpo + ((' | ' + link) if link else ''))
+        return '\n'.join(linhas)
+    return executar_com_autocura('leitor_rss', _ler)
+
+
+@tool
+def gerar_flashcards(texto: str, separador: str = "|", salvar_csv: str = "") -> str:
+    """Transforma um texto de estudo em FLASHCARDS (frente | verso). Se cada
+    linha ja tiver o separador (padrao '|'), eu uso do jeito que esta; se nao,
+    eu extraio pares do tipo 'X é Y' sozinho. Pode salvar num CSV pronto para
+    importar em apps de memorizacao (Anki etc.)."""
+    def _gerar():
+        conteudo = (texto or '').strip()
+        if not conteudo:
+            return 'Me cole o texto de estudo para eu montar os cartoes.'
+        import csv as _csv
+        import re as _re
+        sep = (separador or '|')[:3] or '|'
+        cartoes = []
+        for linha in conteudo.split('\n'):
+            linha = linha.strip().lstrip('-*•0123456789. ')
+            if not linha:
+                continue
+            if sep in linha:
+                frente, verso = linha.split(sep, 1)
+                if frente.strip() and verso.strip():
+                    cartoes.append((frente.strip(), verso.strip()))
+            else:
+                m = _re.match(r'^(.{3,80}?)\s+(?:é|e|são|significa|foi)\s+(.{3,})$', linha, _re.I)
+                if m:
+                    cartoes.append((m.group(1).strip(), m.group(2).strip()))
+        if not cartoes:
+            return ('Nao consegui montar cartoes. Use uma linha por carta no formato '
+                    '"pergunta | resposta" (ou frases do tipo "X é Y").')
+        mensagem = 'Montei ' + str(len(cartoes)) + ' cartao(oes). Exemplos:'
+        for frente, verso in cartoes[:5]:
+            mensagem += '\n- ' + frente + ' => ' + verso
+        if (salvar_csv or '').strip():
+            destino = salvar_csv.strip()
+            if not destino.lower().endswith('.csv'):
+                destino += '.csv'
+            with open(destino, 'w', encoding='utf-8-sig', newline='') as f:
+                escritor = _csv.writer(f)
+                escritor.writerow(['frente', 'verso'])
+                escritor.writerows(cartoes)
+            mensagem += '\n\nCSV salvo em: ' + destino + ' (importavel no Anki e afins).'
+        return mensagem
+    return executar_com_autocura('gerar_flashcards', _gerar)
+
+
+@tool
+def estimar_tarefa(otimista: float, provavel: float, pessimista: float,
+                   custo_por_hora: float = 0.0) -> str:
+    """Estimativa INTELIGENTE de prazo pela media ponderada PERT (triangulo
+    otimista/provavel/pessimista). Devolve o tempo esperado, a faixa de
+    incerteza e a data provavel de termino (contando dias uteis). Nao e
+    adivinhacao: e a formula usada em gerenciamento de projetos."""
+    def _estimar():
+        try:
+            o = float(otimista); m = float(provavel); p = float(pessimista)
+        except Exception:
+            return 'Preciso de 3 numeros de HORAS: otimista, provavel e pessimista.'
+        if not (0 <= o <= m <= p):
+            return 'Os valores devem seguir a ordem: otimista <= provavel <= pessimista.'
+        esperado = (o + 4 * m + p) / 6.0
+        desvio = (p - o) / 6.0
+        termino = _r52_dias_uteis_depois(max(1, int(-(-esperado // 8))))  # 8h por dia util
+        linhas = ['Estimativa PERT das ' + str(o) + 'h/' + str(m) + 'h/' + str(p) + 'h:',
+                  '- Tempo esperado: ' + ('%.1f' % esperado) + ' horas (incerteza +-' + ('%.1f' % desvio) + 'h)',
+                  '- Faixa realista: ' + str(o) + 'h a ' + str(p) + 'h']
+        if esperado > 8:
+            linhas.append('- Pode virar ' + str(int(-(-esperado // 8))) + ' dia(s) util(is) de trabalho')
+        linhas.append('- Termino provavel (dias uteis): ' + termino.strftime('%d/%m/%Y'))
+        if float(custo_por_hora or 0) > 0:
+            linhas.append('- Custo esperado: R$ ' + ('%.2f' % (esperado * float(custo_por_hora)))
+                          + ' (faixa R$ ' + ('%.2f' % (o * float(custo_por_hora))) + ' a R$ '
+                          + ('%.2f' % (p * float(custo_por_hora))) + ')')
+        linhas.append('(Estimativa de referencia: a realidade sempre pode surpreender.)')
+        return '\n'.join(linhas)
+    return executar_com_autocura('estimar_tarefa', _estimar)
+
+
+@tool
+def avaliar_risco_comando(comando: str) -> str:
+    """Analisa um comando (cmd/PowerShell/shell) e devolve o NIVEL DE RISCO
+    (BAIXO/MEDIO/ALTO/CRITICO) com os motivos, ANTES de voce rodar qualquer
+    coisa. Eu NUNCA executo o comando por aqui — sou so o detector de perigo.
+    Perfeito para checar aquele comando copiado da internet."""
+    def _avaliar():
+        texto = (comando or '').strip()
+        if not texto:
+            return 'Me cole o comando que voce quer avaliar.'
+        nivel, motivos = _r52_nivel_de_risco(texto)
+        selo = {'BAIXO': '✅ BAIXO', 'MEDIO': '⚠️ MEDIO', 'ALTO': '🟠 ALTO', 'CRITICO': '🔴 CRITICO'}[nivel]
+        resposta = ['Nivel de risco: ' + selo]
+        if motivos:
+            resposta.append('Motivos:')
+            for motivo in motivos[:8]:
+                resposta.append('- ' + motivo)
+        else:
+            resposta.append('Nao encontrei padroes perigosos conhecidos nesse comando.')
+        if nivel in ('ALTO', 'CRITICO'):
+            resposta.append('Recomendacao: NAO rode sem backup e sem entender cada parte.')
+        elif nivel == 'MEDIO':
+            resposta.append('Recomendacao: rode sabendo o que ele muda; ha ferramenta para desfazer?')
+        return '\n'.join(resposta)
+    return executar_com_autocura('avaliar_risco_comando', _avaliar)
+
+
+@tool
+def compartilhar_arquivo_qr(caminho: str, acao: str = "iniciar", porta: int = 0) -> str:
+    """Compartilha UM arquivo na sua rede local (Wi-Fi de casa) e gera um QR
+    Code no terminal: o celular aponta a camera e baixa — sem cabo, sem nuvem,
+    sem conta. acao: 'iniciar' ou 'parar'. O link so funciona em aparelhos na
+    MESMA rede (nada exposto para a internet)."""
+    def _rodar():
+        estado = _r52_estado('_r52_compartilhamento',
+                             {'servidor': None, 'thread': None, 'url': ''})
+        if (acao or 'iniciar').strip().lower() == 'parar':
+            if estado.get('servidor') is None:
+                return 'Nao ha compartilhamento ativo agora.'
+            try:
+                estado['servidor'].shutdown()
+            finally:
+                estado['servidor'] = None
+                estado['url'] = ''
+            return 'Compartilhamento encerrado.'
+        alvo = (caminho or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        if estado.get('servidor') is not None:
+            return 'Ja existe um compartilhamento ativo (' + estado['url'] + '); pare ele antes.'
+        import functools
+        import http.server
+        import socket
+        pasta = os.path.dirname(os.path.abspath(alvo)) or '.'
+        nome = os.path.basename(alvo)
+        handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=pasta)
+        try:
+            servidor = http.server.ThreadingHTTPServer(('0.0.0.0', int(porta or 0)), handler)
+        except OSError as erro:
+            return 'Nao consegui abrir a porta (' + str(erro)[:80] + '). Tente outra.'
+        servidor.daemon_threads = True
+
+        def _servir():
+            servidor.serve_forever(poll_interval=0.2)
+        thread = threading.Thread(target=_servir, daemon=True)
+        thread.start()
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            ip = '127.0.0.1'
+        url = 'http://' + ip + ':' + str(servidor.server_address[1]) + '/' + nome
+        estado.update({'servidor': servidor, 'thread': thread, 'url': url})
+        resposta = ('Compartilhado! Aponte a camera do celular (na mesma rede Wi-Fi) para:\n' + url
+                    + '\nArquivo: ' + nome)
+        try:
+            resposta += '\n\n' + str(gerar_qr_texto_ascii(url))
+        except Exception:
+            resposta += '\n(sem QR no terminal; use o link acima)'
+        resposta += '\nPara encerrar: compartilhar_arquivo_qr com acao=parar.'
+        return resposta
+    return executar_com_autocura('compartilhar_arquivo_qr', _rodar)
+
+
+@tool
+def analisador_de_logs(arquivo: str, top: int = 10) -> str:
+    """Faz a LEITURA INTELIGENTE de um arquivo de log: agrupa as linhas
+    repetidas (ignorando datas/numeros que mudam), mostra os TOP padroes,
+    conta erros e acha a hora de pico. Eu mesmo uso isso para me
+    autodiagnosticar quando algo da errado."""
+    def _analisar():
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo de log: ' + (alvo or '(vazio)')
+        try:
+            with open(alvo, 'r', encoding='utf-8', errors='replace') as f:
+                linhas = f.readlines()
+        except OSError as erro:
+            return 'Nao consegui ler o arquivo (' + str(erro)[:80] + ').'
+        if not linhas:
+            return 'O log esta vazio.'
+        mais_comuns, horas = _r52_agregar_logs(linhas, top)
+        marcadores = ('error', 'erro', 'exception', 'traceback', 'falha', 'failed', 'fatal')
+        total_erro = sum(1 for l in linhas if any(m in l.lower() for m in marcadores))
+        resposta = ['Log: ' + os.path.basename(alvo) + ' (' + str(len(linhas)) + ' linhas, '
+                    + str(total_erro) + ' com marcador de erro)']
+        if horas:
+            hora_pico = horas.most_common(1)[0]
+            resposta.append('Hora de pico de atividade: ' + str(hora_pico[0]) + 'h ('
+                            + str(hora_pico[1]) + ' linhas)')
+        resposta.append('Padroes mais frequentes:')
+        for padrao, quantidade in mais_comuns:
+            resposta.append('  x' + str(quantidade) + ' — ' + padrao)
+        return '\n'.join(resposta)
+    return executar_com_autocura('analisador_de_logs', _analisar)
+
+
+@tool
+def gerar_favicon(imagem: str, pasta_saida: str = "") -> str:
+    """Gera um FAVICON completo para site a partir de qualquer imagem: os PNGs
+    16/32/48/64/128/256 e o favicon.ico com os tamanhos principais. So precisa
+    da Pillow (que o agente ja usa para imagem)."""
+    def _gerar():
+        alvo = (imagem or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei a imagem: ' + (alvo or '(vazio)')
+        try:
+            from PIL import Image
+        except Exception:
+            return 'A Pillow (PIL) nao esta instalada; sem ela nao gero o favicon.'
+        destino = (pasta_saida or '').strip() or os.path.join(PASTA_BASE, 'favicon')
+        os.makedirs(destino, exist_ok=True)
+        try:
+            with Image.open(alvo) as img:
+                base = img.convert('RGBA')
+                base.save(os.path.join(destino, 'favicon.ico'),
+                          sizes=[(16, 16), (32, 32), (48, 48)])
+                feitos = ['favicon.ico']
+                for tamanho in (16, 32, 48, 64, 128, 256):
+                    nome = 'favicon_' + str(tamanho) + '.png'
+                    base.resize((tamanho, tamanho)).save(os.path.join(destino, nome))
+                    feitos.append(nome)
+        except Exception as erro:
+            return 'Falhou ao processar a imagem (' + type(erro).__name__ + ': ' + str(erro)[:80] + ').'
+        return 'Favicon gerado (' + str(len(feitos)) + ' arquivos) em: ' + destino
+    return executar_com_autocura('gerar_favicon', _gerar)
+
+
+@tool
+def padronizar_series(pasta: str, nome_serie: str = "") -> str:
+    """Padroniza nomes de episodios da pasta para o formato 'Serie S01E02.ext'
+    (reconhece s01e02, S1E2, 1x02...). Se 'nome_serie' ficar vazio, eu tiro o
+    nome do primeiro arquivo. Renomeia na propria pasta, sem mover nada."""
+    def _padronizar():
+        import re as _re
+        origem = (pasta or '').strip()
+        if not origem or not os.path.isdir(origem):
+            return 'Nao encontrei a pasta: ' + (origem or '(vazia)')
+        padrao = _re.compile(r'[sS](\d{1,2})[eE](\d{1,2})|(\d{1,2})x(\d{2})')
+        serie = (nome_serie or '').strip()
+        feitos, ignorados = [], 0
+        for nome in sorted(os.listdir(origem)):
+            m = padrao.search(nome)
+            if not m:
+                ignorados += 1
+                continue
+            temporada = m.group(1) or m.group(3)
+            episodio = m.group(2) or m.group(4)
+            serie_atual = serie
+            if not serie_atual:
+                serie_atual = _re.sub(padrao, '', nome)
+                serie_atual = _re.sub(r'[._\-]+', ' ', serie_atual)
+                serie_atual = _re.sub(r'\.(mp4|mkv|avi|srt|mov|wmv)$', '', serie_atual, flags=_re.I)
+                serie_atual = serie_atual.strip(' -_.') or 'Serie'
+            rotulo = serie_atual.strip() + ' S' + temporada.zfill(2) + 'E' + episodio.zfill(2)
+            ext = os.path.splitext(nome)[1]
+            novo = rotulo + ext
+            if novo == nome:
+                continue
+            destino_novo = os.path.join(origem, novo)
+            if os.path.exists(destino_novo):
+                ignorados += 1
+                continue
+            os.rename(os.path.join(origem, nome), destino_novo)
+            feitos.append(nome + '  ->  ' + novo)
+        if not feitos:
+            return ('Nada para renomear (' + str(ignorados)
+                    + ' arquivo(s) sem padrao de episodio ou com nome ja certo).')
+        return 'Renomeei ' + str(len(feitos)) + ' episodio(s):\n' + '\n'.join(feitos[:15])
+    return executar_com_autocura('padronizar_series', _padronizar)
+
+
+@tool
+def catalogar_pdfs(pasta: str = "") -> str:
+    """Cria o INDICE da biblioteca de PDFs de uma pasta: para cada arquivo,
+    titulo (ou primeira linha de texto), numero de paginas e tamanho. Ideal
+    para achar aquele documento perdido sem abrir um por um."""
+    def _catalogar():
+        origem = (pasta or '').strip() or PASTA_BASE
+        if not os.path.isdir(origem):
+            return 'Nao encontrei a pasta: ' + origem
+        alvos = [n for n in sorted(os.listdir(origem)) if n.lower().endswith('.pdf')]
+        if not alvos:
+            return 'Nenhum PDF nessa pasta.'
+        try:
+            from pypdf import PdfReader
+        except Exception:
+            return 'A biblioteca pypdf nao esta disponivel agora; sem ela nao leio os PDFs.'
+        linhas, problemas = [], 0
+        for nome in alvos[:200]:
+            caminho = os.path.join(origem, nome)
+            try:
+                leitor = PdfReader(caminho)
+                paginas = len(leitor.pages)
+                titulo = str((leitor.metadata or {}).get('/Title') or '').strip()
+                if not titulo and paginas:
+                    titulo = (leitor.pages[0].extract_text() or '').strip().split('\n')[0][:80]
+                linhas.append('- ' + nome + ' | ' + str(paginas) + ' pag. | ' + (titulo or '(sem titulo)'))
+            except Exception:
+                problemas += 1
+                linhas.append('- ' + nome + ' | (ilegivel)')
+        resposta = 'Indice de ' + str(len(linhas)) + ' PDF(s) em ' + origem + ':\n' + '\n'.join(linhas)
+        if problemas:
+            resposta += '\n(' + str(problemas) + ' arquivo(s) nao puderam ser lidos.)'
+        return resposta
+    return executar_com_autocura('catalogar_pdfs', _catalogar)
+
+
+@tool
+def prever_espaco_disco(pasta: str = "", alvo_mb: float = 0.0) -> str:
+    """PREDIZ o crescimento de uma pasta: guarda o tamanho dela no tempo e
+    extrapola (na 1a chamada ele so cria a linha de base; a partir da 2a ele
+    calcula crescimento por dia e em quantos dias dobra de tamanho)."""
+    def _prever():
+        import time as _time
+        origem = (pasta or '').strip() or PASTA_BASE
+        if not os.path.isdir(origem):
+            return 'Nao encontrei a pasta: ' + origem
+        total = 0
+        for raiz, _, arquivos in os.walk(origem):
+            for nome in arquivos:
+                try:
+                    total += os.path.getsize(os.path.join(raiz, nome))
+                except OSError:
+                    pass
+        historico = _r52_json_local('previsao_espaco.json', padrao={})
+        entradas = historico.get(origem, [])
+        entradas = [e for e in entradas if isinstance(e, list) and len(e) == 2]
+        entradas.append([_time.time(), total])
+        entradas = entradas[-60:]
+        historico[origem] = entradas
+        _r52_json_local('previsao_espaco.json', historico)
+        msg = 'Pasta: ' + origem + ' | tamanho agora: ' + ('%.1f' % (total / 1048576.0)) + ' MB'
+        if len(entradas) < 2:
+            return (msg + '\nLinha de base guardada. Me peca de novo amanha (ou depois de usar '
+                    'a pasta) e eu passo a previsao de crescimento.')
+        (t0, v0), (t1, v1) = entradas[0], entradas[-1]
+        dias = (t1 - t0) / 86400.0
+        if dias < 0.02 or v1 <= v0:
+            return msg + '\nSem crescimento mensuravel ainda (a pasta esta estavel ou o intervalo foi curto).'
+        por_dia = (v1 - v0) / dias
+        dobra = (v1 * (2 ** 0 - 1)) / por_dia if por_dia > 0 else None
+        linhas = [msg,
+                  'Crescimento medido: ' + ('%.1f' % (por_dia / 1048576.0)) + ' MB por dia ('
+                  + ('%.1f' % dias) + ' dia(s) de amostra)']
+        if por_dia > 0:
+            linhas.append('Dobra de tamanho em ~' + str(int(-(-v1 // por_dia))) + ' dia(s) nesse ritmo')
+        if float(alvo_mb or 0) > 0:
+            falta = float(alvo_mb) * 1048576.0 - total
+            if falta <= 0:
+                linhas.append('Voce JA passou do alvo de ' + str(alvo_mb) + ' MB.')
+            elif por_dia > 0:
+                linhas.append('Atinge o alvo de ' + str(alvo_mb) + ' MB em ~'
+                              + str(int(-(-falta // por_dia))) + ' dia(s)')
+        return '\n'.join(linhas)
+    return executar_com_autocura('prever_espaco_disco', _prever)
+
+
+def _r52_auditar_html(caminho):
+    """r52: le um HTML e devolve (achados_seo, achados_acessibilidade)."""
+    import re as _re
+    with open(caminho, 'r', encoding='utf-8', errors='replace') as f:
+        conteudo = f.read()
+    seo, acess = [], []
+    titulo = _re.search(r'<title[^>]*>(.*?)</title>', conteudo, _re.I | _re.S)
+    if not titulo:
+        seo.append('sem <title>')
+    elif not (15 <= len(titulo.group(1).strip()) <= 60):
+        seo.append('<title> fora da faixa ideal (15-60 caracteres)')
+    descricao = _re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']*)["\']', conteudo, _re.I)
+    if not descricao:
+        seo.append('sem meta description')
+    elif not (70 <= len(descricao.group(1)) <= 160):
+        seo.append('meta description fora da faixa ideal (70-160 caracteres)')
+    h1s = _re.findall(r'<h1[\s>]', conteudo, _re.I)
+    if len(h1s) != 1:
+        seo.append('esperado 1 <h1>, achei ' + str(len(h1s)))
+    if not _re.search(r'<link[^>]+rel=["\']canonical["\']', conteudo, _re.I):
+        seo.append('sem link canonical')
+    for propriedade in ('og:title', 'og:description', 'og:image'):
+        if propriedade not in conteudo:
+            seo.append('sem meta property ' + propriedade)
+    if not _re.search(r'<html[^>]*\blang=', conteudo, _re.I):
+        acess.append('<html> sem atributo lang')
+    imgs = _re.findall(r'<img\b[^>]*>', conteudo, _re.I)
+    sem_alt = [i for i in imgs if 'alt=' not in i.lower()]
+    if sem_alt:
+        acess.append(str(len(sem_alt)) + ' <img> sem atributo alt (de ' + str(len(imgs)) + ')')
+    entradas = _re.findall(r'<input\b[^>]*>', conteudo, _re.I)
+    sem_rotulo = [i for i in entradas
+                  if 'aria-label' not in i.lower() and 'id=' not in i.lower()
+                  and i.lower().strip().endswith('>')]
+    if sem_rotulo:
+        acess.append(str(len(sem_rotulo)) + ' <input> sem aria-label nem id (dificil ligar a um <label>)')
+    niveis = [int(n) for n in _re.findall(r'<h([1-6])[\s>]', conteudo, _re.I)]
+    saltos = [(a, b) for a, b in zip(niveis, niveis[1:]) if b > a + 1]
+    if saltos:
+        acess.append('salto(s) de hierarquia de titulos: ' + ', '.join('h' + str(a) + '->h' + str(b) for a, b in saltos[:3]))
+    links_vazios = _re.findall(r'<a\b[^>]*>\s*</a>', conteudo, _re.I)
+    if links_vazios:
+        acess.append(str(len(links_vazios)) + ' link(s) sem texto nenhum')
+    return seo, acess
+
+
+@tool
+def auditar_acessibilidade_html(arquivo: str) -> str:
+    """Audita a ACESSIBILIDADE de um HTML local: imagens sem alt, idioma
+    declarado, inputs sem rotulo, saltos de titulo e links vazios — com base
+    nas regras basicas do WCAG que da para checar sem navegador."""
+    def _auditar():
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo HTML: ' + (alvo or '(vazio)')
+        _, achados = _r52_auditar_html(alvo)
+        if not achados:
+            return 'Boa! Nenhum problema de acessibilidade basica em ' + os.path.basename(alvo) + '.'
+        return ('Acessibilidade de ' + os.path.basename(alvo) + ' — ' + str(len(achados)) + ' ponto(s):\n- '
+                + '\n- '.join(achados))
+    return executar_com_autocura('auditar_acessibilidade_html', _auditar)
+
+
+@tool
+def auditar_seo_html(arquivo: str) -> str:
+    """Audita o SEO BASICO de um HTML local: title, meta description, h1
+    unico, canonical e Open Graph — o que os buscadores olham primeiro."""
+    def _auditar():
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo HTML: ' + (alvo or '(vazio)')
+        achados, _ = _r52_auditar_html(alvo)
+        if not achados:
+            return 'SEO basico OK em ' + os.path.basename(alvo) + ' (title, description, h1, canonical, og).'
+        return ('SEO de ' + os.path.basename(alvo) + ' — ' + str(len(achados)) + ' ponto(s):\n- '
+                + '\n- '.join(achados))
+    return executar_com_autocura('auditar_seo_html', _auditar)
+
+
+@tool
+def info_executavel(caminho: str) -> str:
+    """Mostra a FICHA TECNICA de um programa .exe: empresa, versao, descricao
+    e produto (lido do VersionInfo do Windows). Util para descobrir se aquele
+    executavel estranho e de quem."""
+    def _ficha():
+        alvo = (caminho or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o executavel: ' + (alvo or '(vazio)')
+        comando = ('$i = Get-Item -LiteralPath "' + alvo.replace('"', '`"') + '"; '
+                   '$i.VersionInfo | Select-Object CompanyName,ProductName,FileDescription,'
+                   'FileVersion,ProductVersion | Format-List; '
+                   '"TAMANHO=" + $i.Length')
+        codigo, saida, erro = _r51_executar_processo(
+            ['powershell', '-NoProfile', '-Command', comando], 60)
+        if codigo != 0:
+            return 'O PowerShell nao conseguiu ler a ficha (' + (erro or saida)[:100] + ').'
+        campos = {}
+        for linha in saida.split('\n'):
+            if ':' in linha:
+                chave, valor = linha.split(':', 1)
+                campos[chave.strip()] = valor.strip()
+        if not campos:
+            return 'O executavel nao tem informacoes de versao (pode ser compilado sem ficha).'
+        linhas = ['Ficha de ' + os.path.basename(alvo) + ':']
+        for chave in ('CompanyName', 'ProductName', 'FileDescription', 'FileVersion', 'ProductVersion'):
+            if campos.get(chave):
+                rotulo = {'CompanyName': 'Empresa', 'ProductName': 'Produto',
+                          'FileDescription': 'Descricao', 'FileVersion': 'Versao do arquivo',
+                          'ProductVersion': 'Versao do produto'}[chave]
+                linhas.append('- ' + rotulo + ': ' + campos[chave])
+        return '\n'.join(linhas)
+    return executar_com_autocura('info_executavel', _ficha)
+
+
+@tool
+def doc_para_pdf(caminho: str) -> str:
+    """Converte um documento Word (.doc/.docx) em PDF usando o PROPRIO Word
+    instalado no PC (via automacao). O original fica intacto. Se o Word nao
+    estiver instalado, eu aviso — nao instalo nada sozinho."""
+    def _converter():
+        alvo = (caminho or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o documento: ' + (alvo or '(vazio)')
+        if not alvo.lower().endswith(('.doc', '.docx')):
+            return 'So converto .doc ou .docx.'
+        destino = os.path.splitext(alvo)[0] + '.pdf'
+        if os.path.exists(destino):
+            return 'Ja existe um PDF com esse nome (' + destino + '); afaste ele para nao sobrescrever.'
+        try:
+            import win32com.client
+        except Exception:
+            return ('A automacao do Office precisa do pywin32, que nao esta instalado. '
+                    'Se quiser, rode: pip install pywin32 (nao instalo nada por voce).')
+        palavra = None
+        documento = None
+        try:
+            palavra = win32com.client.Dispatch('Word.Application')
+            palavra.Visible = False
+            documento = palavra.Documents.Open(os.path.abspath(alvo), ReadOnly=True)
+            documento.SaveAs2(os.path.abspath(destino), FileFormat=17)
+            return 'Convertido para PDF: ' + destino + ' (o .doc original ficou intacto).'
+        except Exception as erro:
+            return ('Nao consegui converter (' + type(erro).__name__
+                    + '). O Microsoft Word esta instalado neste PC? Nada foi trocado.')
+        finally:
+            try:
+                if documento is not None:
+                    documento.Close(False)
+                if palavra is not None:
+                    palavra.Quit()
+            except Exception:
+                pass
+    return executar_com_autocura('doc_para_pdf', _converter)
+
+
+@tool
+def minificar_js_css(arquivo: str, arquivo_saida: str = "") -> str:
+    """Minifica um .css ou .js local (tira comentarios e espacos desnecessarios)
+    gerando um NOVO arquivo com sufixo '.min' — o original fica intacto.
+    Minificacao basica e segura; para pipelines grandes use um bundler."""
+    def _minificar():
+        import re as _re
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        baixo = alvo.lower()
+        if baixo.endswith('.css'):
+            tipo = 'css'
+        elif baixo.endswith('.js') or baixo.endswith('.mjs'):
+            tipo = 'js'
+        else:
+            return 'So minifico .css, .js ou .mjs.'
+        with open(alvo, 'r', encoding='utf-8', errors='replace') as f:
+            conteudo = f.read()
+        if not conteudo.strip():
+            return 'O arquivo esta vazio; nada a fazer.'
+        minificado = _re.sub(r'/\*.*?\*/', '', conteudo, flags=_re.S)
+        if tipo == 'js':
+            minificado = _re.sub(r'(?<!:)//[^\n]*', '', minificado)
+        minificado = _re.sub(r'\s+', ' ', minificado)
+        minificado = _re.sub(r'\s*([{}:;,>+~])\s*', r'\1', minificado)
+        if not minificado.strip():
+            return 'Depois de tirar comentarios/espacos nao sobrou nada; original mantido.'
+        saida = (arquivo_saida or '').strip() or alvo + '.min' + ('.css' if tipo == 'css' else '.js')
+        with open(saida, 'w', encoding='utf-8') as f:
+            f.write(minificado.strip())
+        antes, depois = len(conteudo), len(minificado.strip())
+        economia = 100.0 * (antes - depois) / max(1, antes)
+        return ('Minificado em: ' + saida + ' (' + str(antes) + ' -> ' + str(depois)
+                + ' caracteres, -' + ('%.1f' % economia) + '%). Original intacto.')
+    return executar_com_autocura('minificar_js_css', _minificar)
+
+
+@tool
+def cofre_de_notas(acao: str = "adicionar", texto: str = "") -> str:
+    """Cofre de notas SECRETO usando a criptografia da SUA conta do Windows
+    (DPAPI — a mesma do criptografar_arquivo): so o seu usuario, neste PC,
+    consegue ler. acao: 'adicionar' (com o 'texto'), 'ler' (tudo) ou 'listar'
+    (so as datas/contagem). Nada sai do PC."""
+    def _operar():
+        import json as _json
+        acao_n = (acao or 'adicionar').strip().lower()
+        caminho = os.path.join(PASTA_BASE, 'cofre_de_notas.cripto')
+        entradas = []
+        if os.path.isfile(caminho):
+            try:
+                with open(caminho, 'rb') as f:
+                    bruto = _r51_dpapi_revelar(f.read())
+                entradas = _json.loads(bruto.decode('utf-8'))
+            except Exception:
+                return 'Nao consegui abrir o cofre (arquivo de outro usuario/PC, ou corrompido).'
+        if acao_n == 'adicionar':
+            conteudo = (texto or '').strip()
+            if not conteudo:
+                return 'Me diga o texto da nota para guardar no cofre.'
+            entradas.append({'quando': datetime.now().strftime('%Y-%m-%d %H:%M'), 'texto': conteudo})
+            with open(caminho, 'wb') as f:
+                f.write(_r51_dpapi_proteger(_json.dumps(entradas, ensure_ascii=False).encode('utf-8')))
+            return 'Nota guardada no cofre (total: ' + str(len(entradas)) + '). Nada sai do seu PC.'
+        if acao_n == 'listar':
+            if not entradas:
+                return 'O cofre esta vazio.'
+            ultimas = ', '.join(e['quando'] for e in entradas[-3:])
+            return 'Cofre com ' + str(len(entradas)) + ' nota(s) (ultimas: ' + ultimas + ').'
+        if acao_n == 'ler':
+            if not entradas:
+                return 'O cofre esta vazio.'
+            linhas = [e['quando'] + ' — ' + e['texto'] for e in entradas[-20:]]
+            return 'Notas do cofre (mais recentes no fim):\n' + '\n'.join(linhas)
+        return "Acao invalida; use 'adicionar', 'ler' ou 'listar'."
+    return executar_com_autocura('cofre_de_notas', _operar)
+
+
+@tool
+def vigia_de_preco(url: str, acao: str = "verificar") -> str:
+    """Vigia o PRECO de um produto (pagina com 'R$ ...'): guarda o historico no
+    seu PC e te diz se o preco subiu ou caiu desde a ultima verificacao.
+    acao: 'verificar' ou 'historico'. Utimo para esperar aquela promocao."""
+    def _vigiar():
+        import time as _time
+        import urllib.request
+        endereco = (url or '').strip()
+        if not endereco.lower().startswith(('http://', 'https://')):
+            return 'Me passe o link do produto (comecando com http:// ou https://).'
+        historico = _r52_json_local('vigia_precos.json', padrao={})
+        if (acao or 'verificar').strip().lower() == 'historico':
+            entradas = historico.get(endereco, [])
+            if not entradas:
+                return 'Ainda nao tenho historico desse link; peca uma verificacao primeiro.'
+            linhas = ['Historico do produto (' + str(len(entradas)) + ' verificacoes):']
+            for quando, valor in entradas[-10:]:
+                linhas.append('- ' + quando + ' | R$ ' + ('%.2f' % valor))
+            return '\n'.join(linhas)
+        try:
+            requisicao = urllib.request.Request(endereco, headers={'User-Agent': 'Mozilla/5.0 (SuperAgente)'})
+            with urllib.request.urlopen(requisicao, timeout=20) as resposta:
+                pagina = resposta.read(500000).decode('utf-8', errors='replace')
+        except Exception as erro:
+            return 'Nao consegui abrir a pagina (' + type(erro).__name__ + ').'
+        preco = _r52_extrair_preco(pagina)
+        if preco is None:
+            return 'Abri a pagina, mas nao achei preco no formato R$ ... (lojas muito dinamicas escondem isso).'
+        entradas = historico.setdefault(endereco, [])
+        anterior = entradas[-1][1] if entradas else None
+        entradas.append([datetime.now().strftime('%Y-%m-%d %H:%M'), preco])
+        historico[endereco] = entradas[-50:]
+        _r52_json_local('vigia_precos.json', historico)
+        resposta = 'Preco agora: R$ ' + ('%.2f' % preco)
+        if anterior is not None and anterior != preco:
+            diferenca = preco - anterior
+            direcao = 'CAIU R$ ' + ('%.2f' % abs(diferenca)) if diferenca < 0 else 'SUBIU R$ ' + ('%.2f' % diferenca)
+            resposta += ' | desde a ultima verificacao: ' + direcao
+        elif anterior is not None:
+            resposta += ' | igual a ultima verificacao'
+        return resposta
+    return executar_com_autocura('vigia_de_preco', _vigiar)
+
+
+@tool
+def guardiao_de_arquivo(caminho: str = "", acao: str = "iniciar", intervalo: int = 10,
+                        max_versoes: int = 10) -> str:
+    """Guardiao: vigia UM arquivo importante e, SE ELE MUDAR, guarda copia
+    versionada automaticamente (ate 'max_versoes') na pasta 'guardiao' do
+    agente. Nunca altera o arquivo; so preserva a historia dele.
+    acao: 'iniciar', 'parar' ou 'status'."""
+    def _vigiar():
+        import time as _time
+        estado = _r52_estado('_r52_guardiao',
+                             {'ativo': False, 'parar': False, 'thread': None,
+                              'arquivo': '', 'hash': '', 'versoes': 0})
+        acao_n = (acao or 'iniciar').strip().lower()
+        if acao_n == 'status':
+            if not estado['ativo']:
+                return 'Guardiao: desligado.'
+            return ('Guardiao: ATIVO em ' + estado['arquivo'] + ' | '
+                    + str(estado['versoes']) + ' copia(s) de seguranca feita(s).')
+        if acao_n == 'parar':
+            if not estado['ativo']:
+                return 'Guardiao nao esta ativo.'
+            estado['parar'] = True
+            estado['thread'].join(timeout=15)
+            return 'Guardiao desligado (' + str(estado['versoes']) + ' copia(s) preservada(s)).'
+        alvo = (caminho or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo para vigiar: ' + (alvo or '(vazio)')
+        if estado['ativo']:
+            return 'Guardiao ja esta ativo em ' + estado['arquivo'] + '; pare ele antes.'
+        pasta_guardiao = os.path.join(PASTA_BASE, 'guardiao')
+        os.makedirs(pasta_guardiao, exist_ok=True)
+        estado.update({'ativo': True, 'parar': False, 'arquivo': alvo,
+                       'hash': _r52_hash_arquivo(alvo), 'versoes': 0})
+        limite = max(1, min(50, int(max_versoes or 10)))
+
+        def _laco():
+            try:
+                while not estado['parar']:
+                    _time.sleep(max(2, min(600, int(intervalo or 10))))
+                    if estado['parar'] or not os.path.isfile(estado['arquivo']):
+                        break
+                    atual = _r52_hash_arquivo(estado['arquivo'])
+                    if atual != estado['hash']:
+                        estado['hash'] = atual
+                        estado['versoes'] += 1
+                        if estado['versoes'] > limite:
+                            mais_antiga = None
+                            for nome in os.listdir(pasta_guardiao):
+                                caminho_versao = os.path.join(pasta_guardiao, nome)
+                                if mais_antiga is None or os.path.getmtime(caminho_versao) < os.path.getmtime(mais_antiga):
+                                    mais_antiga = caminho_versao
+                            if mais_antiga:
+                                try:
+                                    os.remove(mais_antiga)
+                                except OSError:
+                                    pass
+                            estado['versoes'] = limite
+                        raiz, ext = os.path.splitext(os.path.basename(estado['arquivo']))
+                        destino = os.path.join(pasta_guardiao, raiz + '.v' + str(estado['versoes']) + ext)
+                        try:
+                            import shutil
+                            shutil.copy2(estado['arquivo'], destino)
+                        except OSError:
+                            pass
+            finally:
+                estado['ativo'] = False
+                estado['parar'] = False
+        estado['thread'] = threading.Thread(target=_laco, daemon=True)
+        estado['thread'].start()
+        return ('Guardiao ligado em: ' + alvo + ' (confere a cada ' + str(max(2, min(600, int(intervalo or 10))))
+                + 's; ate ' + str(limite) + ' versoes na pasta guardiao).')
+    return executar_com_autocura('guardiao_de_arquivo', _vigiar)
+
+
+@tool
+def explicar_regex(expressao: str) -> str:
+    """Explica uma EXPRESSAO REGEX em portugues, pedaco por pedaco (o que cada
+    simbolo faz e o que e literal). Perfeito para entender aquela regex copiada
+    da internet antes de confiar nela."""
+    def _explicar():
+        expr = (expressao or '').strip()
+        if not expr:
+            return 'Me cole a regex (ex.: ^\\d{3}\\.\\d{3}-\\d{2}$).'
+        try:
+            import re as _re
+            _re.compile(expr)
+        except Exception as erro:
+            return ('Essa regex NAO e valida (' + str(erro)[:80]
+                    + '); conserte antes de usar em qualquer lugar.')
+        tokens = _r52_explicar_regex_tokens(expr)
+        return ('Regex valida com ' + str(len(tokens)) + ' pedaco(s):\n- ' + '\n- '.join(tokens))
+    return executar_com_autocura('explicar_regex', _explicar)
+
+
+@tool
+def csv_para_sqlite(arquivo_csv: str, nome_tabela: str = "dados", saida_db: str = "") -> str:
+    """Importa um CSV para um banco SQLite de verdade (arquivo .db): cria a
+    tabela com todas as colunas e insere as linhas. Depois da para consultar
+    com SQL (o agente ja tem ferramentas de SQLite)."""
+    def _importar():
+        import csv as _csv
+        import sqlite3
+        origem = (arquivo_csv or '').strip()
+        if not origem or not os.path.isfile(origem):
+            return 'Nao encontrei o CSV: ' + (origem or '(vazio)')
+        tabela = ''.join(c if (c.isalnum() or c == '_') else '_' for c in (nome_tabela or 'dados')) or 'dados'
+        destino = (saida_db or '').strip() or os.path.splitext(origem)[0] + '.db'
+        if os.path.abspath(destino) == os.path.abspath(origem):
+            return 'O banco nao pode ter o mesmo nome do CSV.'
+        with open(origem, 'r', encoding='utf-8-sig', errors='replace', newline='') as f:
+            leitor = _csv.reader(f)
+            try:
+                cabecalho = next(leitor)
+            except StopIteration:
+                return 'O CSV esta vazio.'
+            colunas = [((c or '').strip() or 'coluna' + str(i + 1)).replace('"', '') for i, c in enumerate(cabecalho)]
+            colunas_sql = ', '.join('"' + c + '" TEXT' for c in colunas)
+            marcadores = ', '.join('?' for _ in colunas)
+            conexao = sqlite3.connect(destino)
+            try:
+                conexao.execute('CREATE TABLE IF NOT EXISTS "' + tabela + '" (' + colunas_sql + ')')
+                total = 0
+                for linha in leitor:
+                    valores = list(linha) + [''] * (len(colunas) - len(linha))
+                    conexao.execute('INSERT INTO "' + tabela + '" VALUES (' + marcadores + ')',
+                                    valores[:len(colunas)])
+                    total += 1
+                conexao.commit()
+            finally:
+                conexao.close()
+        return ('Banco criado: ' + destino + ' | tabela "' + tabela + '" com '
+                + str(len(colunas)) + ' coluna(s) e ' + str(total) + ' linha(s).')
+    return executar_com_autocura('csv_para_sqlite', _importar)
+
+
+@tool
+def backup_diferencial_de_pasta(origem: str, destino: str) -> str:
+    """Backup INTELIGENTE da pasta: copia para o destino SO os arquivos novos
+    ou que mudaram desde o ultimo backup (hash por arquivo, inventario salvo).
+    Bem mais rapido que copiar tudo de novo a cada vez."""
+    def _rodar():
+        import json as _json
+        partida = (origem or '').strip()
+        chegada = (destino or '').strip()
+        if not partida or not os.path.isdir(partida):
+            return 'Nao encontrei a pasta de origem: ' + (partida or '(vazia)')
+        if not chegada:
+            return 'Me diga a pasta de destino do backup.'
+        os.makedirs(chegada, exist_ok=True)
+        if os.path.abspath(partida) == os.path.abspath(chegada):
+            return 'Origem e destino nao podem ser a mesma pasta.'
+        inventario_caminho = os.path.join(chegada, '.backup_inventario.json')
+        inventario = {}
+        try:
+            with open(inventario_caminho, 'r', encoding='utf-8') as f:
+                inventario = _json.load(f)
+        except Exception:
+            inventario = {}
+        copiados, mantidos, erros = 0, 0, 0
+        import shutil
+        for raiz, pastas, arquivos in os.walk(partida):
+            pastas[:] = [p for p in pastas if not p.startswith('.')]
+            for nome in arquivos:
+                caminho = os.path.join(raiz, nome)
+                relativo = os.path.relpath(caminho, partida).replace('\\', '/')
+                try:
+                    digest = _r52_hash_arquivo(caminho, 'md5')
+                except OSError:
+                    erros += 1
+                    continue
+                if inventario.get(relativo) == digest:
+                    mantidos += 1
+                    continue
+                alvo = os.path.join(chegada, relativo)
+                os.makedirs(os.path.dirname(alvo) or chegada, exist_ok=True)
+                try:
+                    shutil.copy2(caminho, alvo)
+                    inventario[relativo] = digest
+                    copiados += 1
+                except OSError:
+                    erros += 1
+        with open(inventario_caminho, 'w', encoding='utf-8') as f:
+            _json.dump(inventario, f, ensure_ascii=False, indent=1)
+        return ('Backup diferencial concluido: ' + str(copiados) + ' arquivo(s) copiado(s), '
+                + str(mantidos) + ' ja em dia, ' + str(erros) + ' falha(s). Destino: ' + chegada)
+    return executar_com_autocura('backup_diferencial_de_pasta', _rodar)
+
+
+@tool
+def organizar_imports_python(arquivo: str) -> str:
+    """Organiza os IMPORTS do topo de um .py (ordenados, padrao da biblioteca
+    do Python primeiro). Faz backup .organizado.bak antes e NAO mexe se o
+    arquivo tiver erro de sintaxe ou ja estiver organizado."""
+    def _organizar():
+        alvo = (arquivo or '').strip()
+        if not alvo or not os.path.isfile(alvo):
+            return 'Nao encontrei o arquivo: ' + (alvo or '(vazio)')
+        with open(alvo, 'r', encoding='utf-8', errors='replace') as f:
+            texto = f.read()
+        novo, movidos, motivo = _r52_imports_reorganizar(texto)
+        if motivo:
+            return 'Nao mexi: ' + motivo
+        if movidos == 0:
+            return 'Os imports ja estao organizados; nada foi trocado.'
+        with open(alvo + '.organizado.bak', 'w', encoding='utf-8', newline='') as f:
+            f.write(texto)
+        with open(alvo, 'w', encoding='utf-8', newline='') as f:
+            f.write(novo)
+        return ('Organizei ' + str(movidos) + ' import(s) de ' + os.path.basename(alvo)
+                + ' (biblioteca padrao primeiro). Backup do jeito antigo: ' + alvo + '.organizado.bak')
+    return executar_com_autocura('organizar_imports_python', _organizar)
+
+
+@tool
+def gerar_sitemap(pasta: str, dominio: str, arquivo_saida: str = "") -> str:
+    """Gera o sitemap.xml do seu site local: varre os .html da pasta e monta o
+    XML padrao com as URLs (dominio + caminho) e a data de cada pagina."""
+    def _gerar():
+        import re as _re
+        base = (pasta or '').strip()
+        site = (dominio or '').strip().rstrip('/')
+        if not base or not os.path.isdir(base):
+            return 'Nao encontrei a pasta do site: ' + (base or '(vazia)')
+        if not site.startswith(('http://', 'https://')):
+            return 'Me passe o dominio completo (ex.: https://meusite.com).'
+        paginas = []
+        for raiz, pastas, arquivos in os.walk(base):
+            pastas[:] = [p for p in pastas if not p.startswith('.')]
+            for nome in arquivos:
+                if nome.lower().endswith('.html'):
+                    caminho = os.path.join(raiz, nome)
+                    relativo = os.path.relpath(caminho, base).replace('\\', '/')
+                    caminho_url = '' if relativo.lower() == 'index.html' else relativo
+                    quando = datetime.fromtimestamp(os.path.getmtime(caminho)).strftime('%Y-%m-%d')
+                    paginas.append((caminho_url, quando))
+        if not paginas:
+            return 'Nenhum .html nessa pasta.'
+        paginas.sort()
+        xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+               '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+        for caminho_url, quando in paginas[:500]:
+            xml.append('  <url><loc>' + site + '/' + caminho_url + '</loc><lastmod>' + quando + '</lastmod></url>')
+        xml.append('</urlset>')
+        saida = (arquivo_saida or '').strip() or os.path.join(base, 'sitemap.xml')
+        with open(saida, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(xml))
+        return 'sitemap.xml gerado com ' + str(min(len(paginas), 500)) + ' URL(s): ' + saida
+    return executar_com_autocura('gerar_sitemap', _gerar)
 
 
 def _r50_caminhos_agente():
@@ -32092,6 +33533,36 @@ def _r23_comandos(comando):
 
 
 tools = [
+    mapa_de_ideias,
+    plano_de_tarefa,
+    timeline_do_dia,
+    limpar_metadata_imagem,
+    imagens_para_pdf,
+    sugerir_commit,
+    diagrama_mermaid_codigo,
+    leitor_rss,
+    gerar_flashcards,
+    estimar_tarefa,
+    avaliar_risco_comando,
+    compartilhar_arquivo_qr,
+    analisador_de_logs,
+    gerar_favicon,
+    padronizar_series,
+    catalogar_pdfs,
+    prever_espaco_disco,
+    auditar_acessibilidade_html,
+    auditar_seo_html,
+    info_executavel,
+    doc_para_pdf,
+    minificar_js_css,
+    cofre_de_notas,
+    vigia_de_preco,
+    guardiao_de_arquivo,
+    explicar_regex,
+    csv_para_sqlite,
+    backup_diferencial_de_pasta,
+    organizar_imports_python,
+    gerar_sitemap,
     gravar_tela_gif,
     baixar_video,
     marca_dagua,
@@ -32975,7 +34446,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r51] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r52] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

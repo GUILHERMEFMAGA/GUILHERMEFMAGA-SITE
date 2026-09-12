@@ -78,7 +78,7 @@ class AgenteArranqueSemPesados(unittest.TestCase):
     def test_pypdf_somente_import_local(self):
         t = texto_agente()
         self.assertNotIn('\nfrom pypdf import PdfReader', t)  # sem import no nivel 0
-        self.assertEqual(t.count('from pypdf import PdfReader'), 4)  # 4 imports locais
+        self.assertEqual(t.count('from pypdf import PdfReader'), 5)  # 4 + catalogar_pdfs (r52)
 
     def test_embeddings_somente_via_accessor(self):
         t = texto_agente()
@@ -87,8 +87,8 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertIn('def _r45_embeddings_model():', t)
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
-    def test_selo_r51_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r51]', texto_agente())
+    def test_selo_r52_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r52]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):

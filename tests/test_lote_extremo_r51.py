@@ -144,7 +144,7 @@ class EstruturaR51(unittest.TestCase):
         self.assertIn('IA LOCAL EXTREMA (r51)', texto)                      # menu
         self.assertEqual(texto.count('_r51_agendar_manter_quente()'), 2)   # 2 retornos de sucesso do servidor
         self.assertIn("'auto_continuar':True, 'manter_quente':True", texto)
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r51]', texto)   # selo
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r52]', texto)   # selo
         self.assertIn('Continue EXATAMENTE de onde parou', texto)          # continuacao no ar
 
 

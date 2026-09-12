@@ -108,9 +108,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51 **545 testes isolados passaram** (auditoria: 703 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52 **578 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r51).
+  prefixos r20-r45 + r50-r52).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -520,6 +520,52 @@ ou relatórios reais sem revisão e autorização.
   rejeitado, conteúdo igual não reinicia, sucesso faz backup+troca+reinicia,
   bytes aceitos, rota/menu/cadeia, caminhos derivados de __file__).
   Não testado no Windows real.
+- **r51 — LOTE EXTREMO: 2 melhorias profundas na IA LOCAL + 4 ferramentas novas
+  (699 → 703)**: GGUF MANTIDO. **[IA LOCAL 1 — AUTO-CONTINUAÇÃO]** quando a
+  resposta local é cortada por limite de tokens (`finish_reason == 'length'`),
+  `perguntar_ia_local` CONTINUA de onde parou (até 2 rodadas, contexto com o
+  parcial como assistant + "Continue EXATAMENTE de onde parou") e junta tudo;
+  o aviso de corte só aparece se AINDA cortar; config `auto_continuar: false`
+  volta ao antigo; listas numeradas ficam de fora. **[IA LOCAL 2 — MODELO SEMPRE
+  QUENTE]** `_r51_manter_quente` aquece o GGUF na subida (1ª resposta rápida) e
+  pinga 1 token a cada 240 s (llama-server descarrega o modelo após ~5 min de
+  ociosidade — a causa da "primeira resposta lenta" recorrente); agendado 1×
+  nos dois retornos de sucesso de `_iniciar_servidor_ia_local` (flag
+  `_r51_quente_agendada`, liberada após 3 pings falhos); config
+  `manter_quente: false` desliga. **[FERRAMENTAS]** `gravar_tela_gif`
+  (iniciar/parar/status, pasta prints), `baixar_video` (yt-dlp via
+  `python -m yt_dlp`; NÃO instala nada sozinho), `marca_dagua` (sufixo `_marca`,
+  originais intactos), `criptografar_arquivo` (DPAPI via ctypes; nunca apaga o
+  original). **545 testes OK** (+19: test_lote_extremo_r51.py; auditoria
+  699 → 703). Selo `-r51`. Não testado no Windows real.
+- **r52 — LOTE PODER: +30 ferramentas inteligentes e ajudantes do próprio agente
+  (703 → 733)**: GGUF e as 703 antigas intocados. **[PLANEJAMENTO/AJUDANTES]**
+  `plano_de_tarefa` (checklist com dependências), `estimar_tarefa` (PERT
+  (o+4m+p)/6 + incerteza + término em dias úteis + custo),
+  `avaliar_risco_comando` (CRITICO/ALTO/MEDIO/BAIXO com motivos; NUNCA executa),
+  `sugerir_commit` (tipo test/docs/feat/fix/chore pela composição do diff; só
+  sugere), `explicar_regex` (valida e explica token a token),
+  `mapa_de_ideias` (mindmap Mermaid), `diagrama_mermaid_codigo` (AST).
+  **[ARQUIVOS/DADOS]** `timeline_do_dia`, `limpar_metadata_imagem` (JPEG APP1 /
+  PNG chunks por cirurgia de bytes; cópia `_limpa`), `imagens_para_pdf`,
+  `gerar_favicon`, `padronizar_series` (SxxExx), `catalogar_pdfs` (pypdf),
+  `csv_para_sqlite`, `backup_diferencial_de_pasta` (hash + inventário),
+  `organizar_imports_python` (AST, stdlib primeiro, backup `.organizado.bak`),
+  `analisador_de_logs` (padrões mascarando números + hora pico).
+  **[MONITORAMENTO]** `guardiao_de_arquivo` (thread versiona em
+  PASTA_BASE/guardiao), `prever_espaco_disco` (baseline + extrapolação),
+  `vigia_de_preco` (R$ na página + histórico). **[CONTEÚDO/WEB]** `leitor_rss`,
+  `gerar_flashcards` (CSV utf-8-sig), `cofre_de_notas` (DPAPI, reusa helpers
+  r51), `compartilhar_arquivo_qr` (http.server com `directory=` + QR),
+  `doc_para_pdf` (Word COM lazy; não instala nada), `minificar_js_css`
+  (preserva `://`), `auditar_acessibilidade_html`, `auditar_seo_html`,
+  `gerar_sitemap`. Anti-duplicidade: candidatas descartadas por já existirem
+  (leitor EXIF, feriados BR, changelog esqueleto, licença MIT/ISC, explicador
+  cron, códigos de erro 0x, vigia de pasta). Nota: regras de risco/tokens de
+  regex ficam DENTRO das funções (o loader só extrai `def`).
+  **578 testes OK** (+33: test_lote_poder_r52.py + test_lote_poder_r52b.py;
+  2 skips condicionais de PIL/pypdf; auditoria 703 → 733). Selo `-r52`. Não
+  testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
