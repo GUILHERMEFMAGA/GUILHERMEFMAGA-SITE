@@ -30,6 +30,18 @@ def _bibliotecas_ok():
             and importlib.util.find_spec('langchain_google_genai') is not None)
 
 
+def _agente_integro():
+    """r57 (escudo de arranque): o agente.py COMPILA? Um arquivo corrompido
+    no disco (escrita interrompida, antivírus) fechava na hora e o BAT antigo
+    nao tentava reparo. Agora: saida 7 = o BAT baixa a versao oficial sozinho."""
+    try:
+        with open(os.path.join(_PASTA, 'agente.py'), 'rb') as f:
+            compile(f.read(), 'agente.py', 'exec')
+        return True
+    except (OSError, SyntaxError, ValueError):
+        return False
+
+
 if not os.path.isfile(os.path.join(_PASTA, 'SEM_ATUALIZAR.txt')):
     if not _verificacao_fresca():
         print('Verificando atualizacoes do agente (uma vez a cada 12 horas)...')
@@ -37,5 +49,8 @@ if not os.path.isfile(os.path.join(_PASTA, 'SEM_ATUALIZAR.txt')):
     if not _bibliotecas_ok():
         print('Falta uma biblioteca das IAs; o iniciar.bat instala agora...')
         sys.exit(8)
+    if not _agente_integro():
+        print('agente.py esta corrompido no disco; o iniciar.bat vai reparar sozinho...')
+        sys.exit(7)
 
 import agente

@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56 **604 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57 **610 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -628,6 +628,25 @@ ou relatórios reais sem revisão e autorização.
   (minúsculos pelo normalizador — case-insensitive no Windows).
   **604 testes OK** (+5: test_atalho_tela_r56.py; 733 ferramentas mantidas).
   Selo `-r56`. Não testado no Windows real.
+- **r57 — ESCUDO DE ARRANQUE (relato crítico: "iniciar.bat entra e sai")**: o
+  PC do usuário ficou com o agente que não abre — sintoma de agente.py
+  corrompido no disco (escrita interrompida) e o BAT r49 NÃO tentava reparo
+  nenhum em crash com código 1 (ia direto para "encerrado"; o reparo só
+  existia para os códigos 7/8). Dois furos fechados: **[main.py]** nova
+  `_agente_integro()` confere se o agente.py COMPILA antes de importar
+  (corrompido ⇒ mensagem clara + `sys.exit(7)` ⇒ o BAT baixa a versão oficial
+  e recomeça SOZINHO); `import agente` continua sendo a última instrução do
+  módulo (guarda r49 intacta). **[iniciar.bat]** novo fluxo `:quebrou`:
+  qualquer saída com erro (código 1, nos dois caminhos `:lancar` e
+  `:lancar_antigo`) tenta **1 reparo automático** (re-download oficial via
+  `:verificar_agora`, controlado pela flag `.reparo_r57`); se o erro voltar,
+  a janela **FICA ABERTA** com "ME MANDE UM PRINT" + pause — nunca mais
+  "entra e sai" sem explicação. A flag é limpa no encerramento normal e no
+  segundo erro. Estrutura r49 preservada (1× `python main.py`, códigos
+  7/8/verificar_bat, fallback, auto-aplicação do BAT). **610 testes OK**
+  (+6: test_escudo_arranque_r57.py — inclui executar `_agente_integro` real
+  contra arquivo bom/quebrado/inexistente). 733 ferramentas mantidas.
+  Selo `-r57`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

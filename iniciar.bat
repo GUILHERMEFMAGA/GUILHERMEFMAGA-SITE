@@ -53,12 +53,31 @@ if not exist "main.py" goto lancar_antigo
 python main.py
 if errorlevel 8 goto instalar_libs
 if errorlevel 7 goto verificar_agora
+if errorlevel 1 goto quebrou
 goto fim_normal
 
 :lancar_antigo
 REM Reserva de seguranca: se o main.py ainda nao chegou ao PC, roda o
 REM agente.py direto (funciona sempre; sem bytecode em cache, so isso).
 python agente.py
+if errorlevel 1 goto quebrou
+goto fim_normal
+
+:quebrou
+REM r57 (escudo de arranque): o agente fechou com erro. Antes o BAT encerrava
+REM sem reparar; agora tenta 1 reparo (re-download oficial) e, se voltar a
+REM falhar, PARA COM A JANELA ABERTA pedindo o print - nunca mais "entra e sai".
+echo.
+echo O agente fechou com um erro (o texto acima mostra o motivo).
+if exist ".reparo_r57" goto errou_de_novo
+type nul > ".reparo_r57"
+echo Tentando REPARAR sozinho: baixando a versao oficial dos arquivos...
+goto verificar_agora
+
+:errou_de_novo
+del /q ".reparo_r57" >nul 2>&1
+echo Tentei reparar e o erro voltou. ME MANDE UM PRINT desta janela.
+pause
 goto fim_normal
 
 :verificar_agora
@@ -85,6 +104,7 @@ python -m pip install -q langchain-openai langchain-google-genai
 goto lancar
 
 :fim_normal
+if exist ".reparo_r57" del /q ".reparo_r57" >nul 2>&1
 echo.
 echo O agente foi encerrado.
 pause
