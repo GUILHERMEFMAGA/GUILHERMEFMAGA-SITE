@@ -28,6 +28,8 @@ continua exigindo auditoria AST e a autorização do usuário.
 total geral **619**). Novo: `turbo ia local` (teto de 300 tokens nas geracoes normais;
 JSON/ideias intocados) — menos espera, sem promessa de mais inteligencia.
 
+**Status r43 (lote 6):** itens 127-219 (80 no total; **catalogo ESGOTADO** — 219/219 itens implementados, 0 propostas restantes; ferramentas reais: 699). Novo tambem: modo `instantaneo ia local` (teto de 180 tokens nas geracoes normais; JSON/ideias intocados), `estatisticas cerebro` (radiografia instantaneo-vs-gerado) e contexto de memorias relevantes injetado nas geracoes de conversa.
+
 ## G1. Matemática e estatística
 1. ✅ `estatisticas_descritivas` — média/mediana/moda/desvio/variância/quartis de lista direta (viz: estatisticas_csv = coluna de arquivo).
 2. ✅ `mmc_mdc_calcular` — MMC/MDC de 2–8 inteiros.
@@ -169,63 +171,63 @@ JSON/ideias intocados) — menos espera, sem promessa de mais inteligencia.
 126. ✅ `sugerir_renomeacao_lote` — só SUGERE nomes sequenciais (viz: renomear_lote_avancado renomeia).
 
 ## G8. Rede — referência e cálculo offline
-127. Proposta `consultar_porta_conhecida` — tabela 21/22/80/443/3389/5900/…
-128. Proposta `calcular_tempo_download` — GB e Mbps → minutos (cálculo, não medição).
-129. Proposta `tabela_ip_classes_referencia` — classes, RFC1918, loopback.
+127. ✅ `consultar_porta_conhecida` — tabela 21/22/80/443/3389/5900/…
+128. ✅ `calcular_tempo_download` — GB e Mbps → minutos (cálculo, não medição).
+129. ✅ `tabela_ip_classes_referencia` — classes, RFC1918, loopback.
 
 ## G9. Console e visualização
-130. Proposta `tabela_json_console` — array de objetos → tabela alinhada (viz: tabela_ascii = CSV).
-131. Proposta `ascii_barras_grafico` — série → barras ▁▂▄▆█ (viz: criar_grafico_svg = SVG).
-132. Proposta `histograma_frequencias_console` — contagens por categoria.
-133. Proposta `progresso_barra_estatica` — porcentagem → barra [████░░].
-134. Proposta `arvore_ascii_de_caminhos` — lista de caminhos → árvore └──.
-135. Proposta `sparkline_numeros` — mini-gráfico de uma linha.
-136. Proposta `destaque_diferencas_linhas` — marca os caracteres diferentes entre 2 linhas (viz: diff_arquivos_texto compara arquivos).
+130. ✅ `tabela_json_console` — array de objetos → tabela alinhada (viz: tabela_ascii = CSV).
+131. ✅ `ascii_barras_grafico` — série → barras ▁▂▄▆█ (viz: criar_grafico_svg = SVG).
+132. ✅ `histograma_frequencias_console` — contagens por categoria.
+133. ✅ `progresso_barra_estatica` — porcentagem → barra [████░░].
+134. ✅ `arvore_ascii_de_caminhos` — lista de caminhos → árvore └──.
+135. ✅ `sparkline_numeros` — mini-gráfico de uma linha.
+136. ✅ `destaque_diferencas_linhas` — marca os caracteres diferentes entre 2 linhas (viz: diff_arquivos_texto compara arquivos).
 
 ## G10. Vida diária
-137. Proposta `converter_medidas_culinarias` — xícara/colher/ml (tabela BR), forno °C/gás.
-138. Proposta `dividir_conta_restaurante` — total + gorjeta % + pessoas, arredondamentos justos.
-139. Proposta `cafeina_meia_vida` — café às X → restante às Y (com avisos).
-140. Proposta `tinta_parede_estimativa` — m², demãos, rendimento da lata → latas.
-141. Proposta `combustivel_custo_viagem` — km/l, distância, preço → custo e litros.
-142. Proposta `churrasco_calculadora` — pessoas → kg de carne, pães, carvão (padrões BR).
-143. Proposta `festa_doces_salgados` — convidados → quantidades padrão de festa.
-144. Proposta `pizza_tamanho_convidados` — área/fatias → quantas e quais tamanhos.
-145. Proposta `gelo_bebidas_estimativa` — horas, pessoas, calor → kg de gelo.
-146. Proposta `limpeza_diluicao` — proporção produto/água por volume final.
-147. Proposta `arroz_panela_receita` — pessoas → arroz/água/sal/óleo padrão.
-148. Proposta `ponto_da_carne_referencia` — temperaturas internas (malpassado a bem passado).
+137. ✅ `converter_medidas_culinarias` — xícara/colher/ml (tabela BR), forno °C/gás.
+138. ✅ `dividir_conta_restaurante` — total + gorjeta % + pessoas, arredondamentos justos.
+139. ✅ `cafeina_meia_vida` — café às X → restante às Y (com avisos).
+140. ✅ `tinta_parede_estimativa` — m², demãos, rendimento da lata → latas.
+141. ✅ `combustivel_custo_viagem` — km/l, distância, preço → custo e litros.
+142. ✅ `churrasco_calculadora` — pessoas → kg de carne, pães, carvão (padrões BR).
+143. ✅ `festa_doces_salgados` — convidados → quantidades padrão de festa.
+144. ✅ `pizza_tamanho_convidados` — área/fatias → quantas e quais tamanhos.
+145. ✅ `gelo_bebidas_estimativa` — horas, pessoas, calor → kg de gelo.
+146. ✅ `limpeza_diluicao` — proporção produto/água por volume final.
+147. ✅ `arroz_panela_receita` — pessoas → arroz/água/sal/óleo padrão.
+148. ✅ `ponto_da_carne_referencia` — temperaturas internas (malpassado a bem passado).
 
 ## G11. Saúde — cálculos com avisos
-149. Proposta `taxa_metabolica_basal_mifflin` — Mifflin-St Jeor (viz: calculadora_saude tem IMC/água/frequência).
-150. Proposta `gordura_navy_calcular` — método das dobras/circunferências.
-151. Proposta `fc_maxima_zones` — FC máx e zonas Karvonen.
-152. Proposta `proteina_diaria_sugestao` — g/kg por perfil (1,2–2,0) com aviso.
-153. Proposta `macros_calculo_calorias` — calorias alvo → proteína/carbo/gordura por %.
+149. ✅ `taxa_metabolica_basal_mifflin` — Mifflin-St Jeor (viz: calculadora_saude tem IMC/água/frequência).
+150. ✅ `gordura_navy_calcular` — método das dobras/circunferências.
+151. ✅ `fc_maxima_zones` — FC máx e zonas Karvonen.
+152. ✅ `proteina_diaria_sugestao` — g/kg por perfil (1,2–2,0) com aviso.
+153. ✅ `macros_calculo_calorias` — calorias alvo → proteína/carbo/gordura por %.
 
 ## G12. Sorteios e lazer
-154. Proposta `sortear_dado_rpg` — NdM+k, 4d6-descarta-menor (viz: sortear = escolher itens).
-155. Proposta `sortear_amigo_secreto` — pareamento válido sem autopar, com seed opcional.
-156. Proposta `sortear_cor_hex_acessivel` — cor aleatória com contraste de texto calculado.
-157. Proposta `bingo_gerar_cartela` — cartela 5×5 com colunas B-I-N-G-O.
-158. Proposta `lotofacil_sugestao` — 15 de 25, honesto: "mesma chance".
-159. Proposta `megasena_sugestao` — 6 de 60, honesto: "mesma chance".
-160. Proposta `cartas_mao_sortear` — 5 cartas de 52 + ranking da mão.
+154. ✅ `sortear_dado_rpg` — NdM+k, 4d6-descarta-menor (viz: sortear = escolher itens).
+155. ✅ `sortear_amigo_secreto` — pareamento válido sem autopar, com seed opcional.
+156. ✅ `sortear_cor_hex_acessivel` — cor aleatória com contraste de texto calculado.
+157. ✅ `bingo_gerar_cartela` — cartela 5×5 com colunas B-I-N-G-O.
+158. ✅ `lotofacil_sugestao` — 15 de 25, honesto: "mesma chance".
+159. ✅ `megasena_sugestao` — 6 de 60, honesto: "mesma chance".
+160. ✅ `cartas_mao_sortear` — 5 cartas de 52 + ranking da mão.
 
 ## G13. Meta — IA LOCAL e inventário
 161. ✅ `resumo_ferramentas_por_tema` — contagem por grupos (navegar 500+).
 162. ✅ `achar_ferramenta_para_tarefa` — busca lexical sobre nome+docstring (índice interno, offline).
 163. ✅ **Entregue na r25 como comandos internos** (`estatisticas ferramentas`, `diagnostico ferramentas`, `velocidade ia local`) — observabilidade r20/r21; fora da contagem de ferramentas registradas.
-164. Proposta `exportar_inventario_ferramentas_txt` — nome+docstring para revisão humana (sem segredos).
+164. ✅ `exportar_inventario_ferramentas_txt` — nome+docstring para revisão humana (sem segredos).
 165. ✅ `comparar_ferramentas_similares` — quando usar A vs B (pares de maior sobreposição).
 166. ✅ `fluxo_sugerido_tarefa` — roteiro determinístico com ferramentas existentes (ex.: "limpar disco").
 
 ## G14. Segurança pessoal — offline
-167. Proposta `pin_numerico_gerar` — 4–8 dígitos com aviso de força baixa.
-168. Proposta `passphrase_palavras_gerar` — diceware PT embutido + entropia calculada.
-169. Proposta `checar_reuso_senha_local` — compara nova senha com lista fornecida no comando; nada gravado.
-170. Proposta `verificar_forca_frase_senha` — entropia estimada (viz: avaliar_senha avalia padrões comuns).
-171. Proposta `gerar_totp_codigo` — RFC6238 offline (segredo Base32 do usuário; hmac stdlib).
+167. ✅ `pin_numerico_gerar` — 4–8 dígitos com aviso de força baixa.
+168. ✅ `passphrase_palavras_gerar` — diceware PT embutido + entropia calculada.
+169. ✅ `checar_reuso_senha_local` — compara nova senha com lista fornecida no comando; nada gravado.
+170. ✅ `verificar_forca_frase_senha` — entropia estimada (viz: avaliar_senha avalia padrões comuns).
+171. ✅ `gerar_totp_codigo` — RFC6238 offline (segredo Base32 do usuário; hmac stdlib).
 
 ## G15. Números e formatação
 172. ✅ `numero_brl_formatar` — R$ 1.234,56 (formatação, sem conversão).
@@ -236,35 +238,35 @@ JSON/ideias intocados) — menos espera, sem promessa de mais inteligencia.
 177. ✅ `horario_decimal_converter` — 8h45 ↔ 8,75h (folha de ponto).
 
 ## G16. Geografia e astronomia
-178. Proposta `distancia_coordenadas_haversine` — km entre dois pontos.
-179. Proposta `rumo_entre_coordenadas` — azimute/ponto cardinal.
-180. Proposta `fase_da_lua_aproximada` — algoritmo por data (aproximada).
-181. Proposta `planetas_consulta` — tabela estática (distância, diâmetro, gravidade).
-182. Proposta `coordenada_formato_converter` — graus decimais ↔ GMS D°M'S".
-183. Proposta `elementos_consulta` — 118 elementos: símbolo/massa (viz: calculadora_quimica calcula reações/valores).
+178. ✅ `distancia_coordenadas_haversine` — km entre dois pontos.
+179. ✅ `rumo_entre_coordenadas` — azimute/ponto cardinal.
+180. ✅ `fase_da_lua_aproximada` — algoritmo por data (aproximada).
+181. ✅ `planetas_consulta` — tabela estática (distância, diâmetro, gravidade).
+182. ✅ `coordenada_formato_converter` — graus decimais ↔ GMS D°M'S".
+183. ✅ `elementos_consulta` — 118 elementos: símbolo/massa (viz: calculadora_quimica calcula reações/valores).
 
 ## G17. Windows — consultas de leitura
-184. Proposta `listar_fontes_instaladas` — fontes do sistema (leitura).
-185. Proposta `pastas_especiais_usuario` — caminhos Desktop/Downloads/Documentos.
-186. Proposta `ps_build_consulta` — versão do PowerShell e do Windows (leitura).
-187. Proposta `zona_horaria_detalhe` — fuso atual, DST, offset.
-188. Proposta `codigos_erro_windows_consulta` — tabela dos erros comuns (0x80070005…).
-189. Proposta `atalhos_win_referencia` — tabela Win+…/Ctrl+…
-190. Proposta `where_comando_consulta` — qual executável resolve um comando (leitura via where).
-191. Proposta `variaveis_ambiente_resumo` — listar/contar por grupo (viz: gerenciar_variavel_ambiente cria/altera).
-192. Proposta `politica_execucao_atual` — consulta (viz: politica_execucao_powershell define).
+184. ✅ `listar_fontes_instaladas` — fontes do sistema (leitura).
+185. ✅ `pastas_especiais_usuario` — caminhos Desktop/Downloads/Documentos.
+186. ✅ `ps_build_consulta` — versão do PowerShell e do Windows (leitura).
+187. ✅ `zona_horaria_detalhe` — fuso atual, DST, offset.
+188. ✅ `codigos_erro_windows_consulta` — tabela dos erros comuns (0x80070005…).
+189. ✅ `atalhos_win_referencia` — tabela Win+…/Ctrl+…
+190. ✅ `where_comando_consulta` — qual executável resolve um comando (leitura via where).
+191. ✅ `variaveis_ambiente_resumo` — listar/contar por grupo (viz: gerenciar_variavel_ambiente cria/altera).
+192. ✅ `politica_execucao_atual` — consulta (viz: politica_execucao_powershell define).
 
 ## G18. Mídia — metadados
-193. Proposta `duracao_audio_wav` — duração do cabeçalho WAV (stdlib).
-194. Proposta `exif_resumo_imagem` — PIL opcional; sem a lib, aviso honesto.
-195. Proposta `dimensoes_imagem_resumo` — largura×altura/formato (PIL opcional).
+193. ✅ `duracao_audio_wav` — duração do cabeçalho WAV (stdlib).
+194. ✅ `exif_resumo_imagem` — PIL opcional; sem a lib, aviso honesto.
+195. ✅ `dimensoes_imagem_resumo` — largura×altura/formato (PIL opcional).
 
 ## G19. Educação
-196. Proposta `gerar_exercicios_matematica` — operação, faixa, N questões + gabarito.
-197. Proposta `ph_concentracao_calcular` — pH ↔ [H+].
-198. Proposta `diluicao_c1v1c2v2_calcular` — diluição de soluções.
-199. Proposta `massa_molar_simples` — tabela ~40 elementos, fórmulas simples (H2O, CO2, NaCl).
-200. Proposta `mac_vendor_prefix_consulta` — fabricante por prefixo MAC (tabela estática comum).
+196. ✅ `gerar_exercicios_matematica` — operação, faixa, N questões + gabarito.
+197. ✅ `ph_concentracao_calcular` — pH ↔ [H+].
+198. ✅ `diluicao_c1v1c2v2_calcular` — diluição de soluções.
+199. ✅ `massa_molar_simples` — tabela ~40 elementos, fórmulas simples (H2O, CO2, NaCl).
+200. ✅ `mac_vendor_prefix_consulta` — fabricante por prefixo MAC (tabela estática comum).
 
 ## G20. Finanças — cálculo offline (sem cotação)
 201. ✅ `converter_taxa_periodo_calcular` — mensal ↔ anual composta.
@@ -272,23 +274,23 @@ JSON/ideias intocados) — menos espera, sem promessa de mais inteligencia.
 203. ✅ `preco_por_unidade_comparar` — produto A vs B: melhor compra.
 
 ## G21. Complementos diversos
-204. Proposta `relacao_aspecto_calcular` — largura×altura → aspecto (16:9…) e diagonal.
-205. Proposta `ppi_monitor_calcular` — densidade de pixels de um monitor.
-206. Proposta `sortear_times_equilibrados` — 2 times aleatórios a partir de uma lista.
-207. Proposta `decada_seculo_info` — 1929 → século XX, década de 20.
-208. Proposta `padronizar_decimais_texto` — vírgula/ponto PT↔EN em um texto.
-209. Proposta `extrair_chaves_valores_texto` — "chave: valor" colado → JSON.
-210. Proposta `minutos_hhmm_converter` — 90 ↔ 01:30 (planilhas e pontos).
-211. Proposta `lista_compras_consolidar` — várias listas → somadas por item.
-212. Proposta `conversao_tamanhos_referencia` — roupa/calçado BR↔EU↔US (estático).
-213. Proposta `idade_cachorro_aproximada` — porte × idade (estimativa, com aviso).
-214. Proposta `qualidade_internet_referencia` — X Mbps dá para o quê (tabela honesta).
-215. Proposta `bytes_bits_esclarecer` — MB vs Mb, bytes→bits (confusão comum em planos).
-216. Proposta `cronograma_limpeza_gerar` — tarefas e frequências → semana tipo.
-217. Proposta `duracao_bateria_estimativa` — Wh e consumo W → horas (com avisos).
-218. Proposta `bitrate_video_tamanho` — bitrate × duração → tamanho do arquivo.
-219. Proposta `unidades_tipografia_referencia` — px/pt/em/rem (front-end).
-220. Proposta `gramas_xicara_por_ingrediente` — farinha/açúcar/água: xícara → gramas.
+204. ✅ `relacao_aspecto_calcular` — largura×altura → aspecto (16:9…) e diagonal.
+205. ✅ `ppi_monitor_calcular` — densidade de pixels de um monitor.
+206. ✅ `sortear_times_equilibrados` — 2 times aleatórios a partir de uma lista.
+207. ✅ `decada_seculo_info` — 1929 → século XX, década de 20.
+208. ✅ `padronizar_decimais_texto` — vírgula/ponto PT↔EN em um texto.
+209. ✅ `extrair_chaves_valores_texto` — "chave: valor" colado → JSON.
+210. ✅ `minutos_hhmm_converter` — 90 ↔ 01:30 (planilhas e pontos).
+211. ✅ `lista_compras_consolidar` — várias listas → somadas por item.
+212. ✅ `conversao_tamanhos_referencia` — roupa/calçado BR↔EU↔US (estático).
+213. ✅ `idade_cachorro_aproximada` — porte × idade (estimativa, com aviso).
+214. ✅ `qualidade_internet_referencia` — X Mbps dá para o quê (tabela honesta).
+215. ✅ `bytes_bits_esclarecer` — MB vs Mb, bytes→bits (confusão comum em planos).
+216. ✅ `cronograma_limpeza_gerar` — tarefas e frequências → semana tipo.
+217. ✅ `duracao_bateria_estimativa` — Wh e consumo W → horas (com avisos).
+218. ✅ `bitrate_video_tamanho` — bitrate × duração → tamanho do arquivo.
+219. ✅ `unidades_tipografia_referencia` — px/pt/em/rem (front-end).
+220. ✅ `gramas_xicara_por_ingrediente` — farinha/açúcar/água: xícara → gramas.
 
 ## Contagem e caminho para 700
 - Implementadas no lote 1 (r22): itens 1–9, 23–28, 46–48, 67, 89 → **20 ferramentas** (total 500).

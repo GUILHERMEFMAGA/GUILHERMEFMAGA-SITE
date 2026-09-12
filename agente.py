@@ -7703,7 +7703,7 @@ def _menu_ajuda_local():
     print("FOCO: plano de foco 60: estudar; revisar; praticar (somente planejamento)")
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
-    print("VELOCIDADE: velocidade ia local | 'turbo ia local' alterna teto de 300 tokens (respostas mais curtas/rapidas) | 'oi' e afins sao instantaneos")
+    print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
@@ -8786,7 +8786,8 @@ def _r20_opcoes():
     import os
     padrao = {'threads':4, 'streaming':False, 'ram_min_mb':256,
               'avaliacao_ampliada':False, 'repeticoes':1, 'semente':42,
-              'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5, 'turbo':False}
+              'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5,
+              'turbo':False, 'instantaneo':False}
     dados = globals().get('config', {}).get('ia_local_opcoes', {})
     if isinstance(dados, dict):
         for k in padrao:
@@ -9536,9 +9537,21 @@ def _r26_relatorio(quantidade=8):
     linhas.append('')
     propostas, caminho = _r26_propostas_catalogo()
     if not propostas:
-        linhas.append('[3] PROPOSTAS DO CATALOGO: arquivo nao encontrado neste PC'
-                      + (' (procurei: ' + caminho + ')' if caminho else ''))
-        linhas.append('    Sem o arquivo, a fabrica roda so com os seus dados de uso (secoes 1 e 2).')
+        arquivo_existe = False
+        if caminho:
+            try:
+                with open(caminho, 'r', encoding='utf-8') as _f_r26b:
+                    arquivo_existe = True
+            except Exception:
+                arquivo_existe = False
+        if arquivo_existe:
+            linhas.append('[3] PROPOSTAS DO CATALOGO: CATALOGO COMPLETO (r43) — as ultimas 80')
+            linhas.append('    propostas viraram ferramentas (0 restantes); a fabrica segue com')
+            linhas.append('    os SEUS dados de uso (secoes 1 e 2) e novas ideias vao pro chat.')
+        else:
+            linhas.append('[3] PROPOSTAS DO CATALOGO: arquivo nao encontrado neste PC'
+                          + (' (procurei: ' + caminho + ')' if caminho else ''))
+            linhas.append('    Sem o arquivo, a fabrica roda so com os seus dados de uso (secoes 1 e 2).')
     else:
         cfg = globals().get('config')
         rejeitadas = cfg.get('ideias_rejeitadas', []) if isinstance(cfg, dict) else []
@@ -9600,7 +9613,7 @@ def _r26_relatorio(quantidade=8):
             linhas.append('    Filtros aplicados: ' + '; '.join(filtros) + '.')
     linhas.append('')
     linhas.append('[4] COMO USAR: escolha uma ideia e peca a implementacao no chat do Agent Mode')
-    linhas.append('    (toda entrega passa pela auditoria das 549 + testes antes de publicar).')
+    linhas.append('    (toda entrega passa pela auditoria das ferramentas registradas + testes antes de publicar).')
     linhas.append("    Suas proprias ideias: 'guardar ideia' salva | 'ideia rejeitada: <titulo>' veta")
     linhas.append("    | 'ideias rejeitadas' lista | 'fabrica de ideias' reprocessa com dados novos.")
     return '\n'.join(linhas)
@@ -10475,6 +10488,59 @@ def _r28_comandos(comando):
                 pass
         print('Anotado: "' + nome + '" marcado como IDEIA BOA (dados locais). '
               'A fabrica vai priorizar ideias desse tipo.')
+        return True
+    return False
+
+
+def _r43_comandos(comando):
+    """r43: 'instantaneo ia local' (teto de 180 tokens nas geracoes normais,
+    JSON/ideias intocados) e 'estatisticas cerebro' (radiografia honesta do que
+    foi instantaneo vs gerado). O modelo GGUF em si NAO muda."""
+    if _norm_pt(comando).startswith('instantaneoialocal'):
+        cfg = globals().get('config')
+        if not isinstance(cfg, dict):
+            cfg = {}
+        opcoes_atuais = dict(cfg.get('ia_local_opcoes') or {}) if isinstance(cfg.get('ia_local_opcoes'), dict) else {}
+        ligar = not bool(opcoes_atuais.get('instantaneo'))
+        opcoes_atuais['instantaneo'] = ligar
+        cfg_novo = dict(cfg)
+        cfg_novo['ia_local_opcoes'] = opcoes_atuais
+        salvar = globals().get('salvar_json')
+        if callable(salvar):
+            try:
+                salvar(globals().get('ARQ_CONFIG'), cfg_novo)
+                globals()['config'] = cfg_novo
+            except Exception:
+                pass
+        if ligar:
+            print('INSTANTANEO LIGADO: teto de 180 tokens nas geracoes normais '
+                  '(JSON/ideias intocados). Rotas deterministicas (oi, status, '
+                  'calculos, ferramentas) ja eram instantaneas. O modelo GGUF '
+                  'continua o mesmo — as respostas geradas e que ficam mais curtas.')
+        else:
+            print('INSTANTANEO DESLIGADO: teto volta para o turbo (300) ou para o '
+                  'padrao do sistema.')
+        return True
+    if _norm_pt(comando).startswith('estatisticascerebro'):
+        neural = globals().get('_r43_neural', 0)
+        cache = globals().get('_r43_cache', 0)
+        registro = globals().get('_r25_uso_ferramentas') or {}
+        usos = sum(int(v.get('usos', 0)) for v in registro.values() if isinstance(v, dict))
+        erros = sum(int(v.get('erros', 0)) for v in registro.values() if isinstance(v, dict))
+        tempos = globals().get('_r24_tempos') or []
+        media = (sum(tempos) / float(len(tempos))) if tempos else 0.0
+        opcoes = _r20_opcoes()
+        print('CEREBRO (radiografia honesta da sessao, tudo local):')
+        print('- geracoes neurais: ' + str(neural) + ' | respostas servidas do cache: '
+              + str(cache))
+        print('- rotas deterministicas (oi, status, contagens, ferramentas) respondem '
+              'SEM geracao; uso de ferramenta fica na telemetria abaixo.')
+        print('- ferramentas: ' + str(usos) + ' uso(s), ' + str(erros) + ' erro(s) | '
+              'tempo medio de geracao: ' + ((str(round(media, 2)) + ' s') if tempos else 'sem dados ainda'))
+        print('- turbo ' + ('LIGADO' if opcoes.get('turbo') else 'desligado')
+              + ' | instantaneo ' + ('LIGADO (teto 180)' if opcoes.get('instantaneo') else 'desligado'))
+        print('- honestidade: o GGUF e o mesmo de sempre; cerebro aqui = roteamento, '
+              'ferramentas, memoria e teto de tokens.')
         return True
     return False
 
@@ -12444,7 +12510,10 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
     tls.ultima = {}
     try:
         _r20_estado('ocupado', 'Geracao em andamento')
-        if _r20_opcoes().get('turbo') and not formato_json:
+        globals()['_r43_neural'] = globals().get('_r43_neural', 0) + 1  # r43: contador
+        if not formato_json and _r20_opcoes().get('instantaneo'):
+            max_tokens = min(max_tokens, 180)  # r43: instantaneo — degrau abaixo do turbo
+        elif not formato_json and _r20_opcoes().get('turbo'):
             max_tokens = min(max_tokens, 300)  # r42: menos espera; respostas mais curtas
         texto, meta = _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream,
                                       callback, seed, repeat_penalty, formato_json, id_geracao)
@@ -12548,8 +12617,23 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
         cache_r24 = globals().setdefault('_r24_cache', {})
         entrada_r24 = cache_r24.get(chave_r24)
         if entrada_r24 and (_time_r24.monotonic() - entrada_r24[0]) <= minutos_r24 * 60:
+            globals()['_r43_cache'] = globals().get('_r43_cache', 0) + 1  # r43
             return '[Cache local] ' + entrada_r24[1]
     msgs = _montar_contexto_local(pergunta, historico)
+    # r43 (cerebro): ate 2 memorias relevantes entram como evidencia no prompt;
+    # falha de memoria NUNCA derruba a geracao.
+    try:
+        _memorias_r43 = buscar_memorias_relevantes(pergunta, 2)
+        _pedacos_r43 = []
+        for _m in (_memorias_r43 or [])[:2]:
+            _txt = str(_m.get('texto', '') if isinstance(_m, dict) else _m).strip()
+            if _txt:
+                _pedacos_r43.append(_txt[:150])
+        if _pedacos_r43:
+            msgs[0]['content'] += (' Contexto local relevante (memoria do usuario; '
+                                   'use se ajudar): ' + ' | '.join(_pedacos_r43))
+    except Exception:
+        pass
     quantidade = _quantidade_lista_local(pergunta)
     tokens, estilo = _perfil_resposta_local(pergunta, config)
     msgs[0]["content"] += " " + estilo
@@ -12685,6 +12769,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r43_comandos(comando):
+        return True
     if _r24_comandos(comando):
         return True
 
@@ -28059,6 +28145,2048 @@ def sugerir_renomeacao_lote(padrao: str = "", prefixo: str = "arquivo") -> str:
         + ('\n... e mais ' + str(len(arquivos) - 10) + ' arquivo(s).' if len(arquivos) > 10 else ''))
 
 
+# --- r43 lote 6 (bloco A): console, dev, texto e rede offline -----------------
+
+def consultar_porta_conhecida(porta=0) -> str:
+    """Tabela estatica de portas TCP/UDP comuns (21 FTP ate 25565 Minecraft).
+    Referencia offline: nao testa conexao nem promete que o servico esta ativo."""
+    porta = int(porta or 0)
+    if porta <= 0:
+        raise ValueError('Informe o numero da porta (1 a 65535).')
+    tabela = {
+        20: 'FTP (dados)', 21: 'FTP (controle)', 22: 'SSH', 23: 'Telnet',
+        25: 'SMTP (envio de e-mail)', 53: 'DNS', 67: 'DHCP (servidor)',
+        68: 'DHCP (cliente)', 80: 'HTTP', 110: 'POP3', 143: 'IMAP',
+        443: 'HTTPS', 445: 'SMB (compartilhamento Windows)', 465: 'SMTPS',
+        587: 'SMTP com STARTTLS', 993: 'IMAPS', 995: 'POP3S',
+        1433: 'SQL Server', 3306: 'MySQL/MariaDB', 3389: 'RDP (Area Remota)',
+        5432: 'PostgreSQL', 5900: 'VNC', 6379: 'Redis', 8080: 'HTTP alternativo',
+        9100: 'Impressao (JetDirect)', 25565: 'Minecraft',
+    }
+    if porta not in tabela:
+        lista = ', '.join(str(p) for p in sorted(tabela))
+        return ('Sem registro da porta ' + str(porta) + ' na tabela local. '
+                'Cadastradas: ' + lista + '.')
+    aviso = {
+        23: ' Atencao: texto puro; prefira SSH (22).',
+        80: ' Sem cifragem.',
+        445: ' Atencao: alvo classico de ataque; nao exponha na internet.',
+    }.get(porta, '')
+    return 'Porta ' + str(porta) + ' = ' + tabela[porta] + '.' + aviso
+
+
+def calcular_tempo_download(tamanho_gb=0.0, velocidade_mbps=0.0) -> str:
+    """Tamanho (GB) + velocidade (Mbps) -> tempo estimado (GB x 8192 = Mb).
+    Calculo puro; a velocidade real varia com rede, wifi e servidor."""
+    import math
+    tamanho_gb = float(str(tamanho_gb).replace(',', '.'))
+    velocidade_mbps = float(str(velocidade_mbps).replace(',', '.'))
+    if tamanho_gb <= 0 or velocidade_mbps <= 0:
+        raise ValueError('Informe tamanho em GB e velocidade em Mbps (ex.: 2 e 100).')
+    total_seg = int(math.ceil(tamanho_gb * 8192.0 / velocidade_mbps))
+    minutos, seg = divmod(total_seg, 60)
+    horas, minutos = divmod(minutos, 60)
+    partes = []
+    if horas:
+        partes.append(str(horas) + 'h')
+    partes.append(str(minutos) + ' min ' + str(seg) + ' s')
+    return (str(tamanho_gb) + ' GB a ' + str(velocidade_mbps) + ' Mbps ~ '
+            + ' '.join(partes) + ' (calculo teorico; real depende da rede).')
+
+
+def tabela_ip_classes_referencia() -> str:
+    """Tabela estatica das classes de IP, faixas privadas (RFC1918), loopback
+    e APIPA. Somente referencia offline; nao configura nada."""
+    return (
+        'CLASSES DE IP (referencia estatica):\n'
+        '- Classe A: 1.0.0.0 a 127.255.255.255 | mascara padrao 255.0.0.0 | '
+        'privada 10.0.0.0/8\n'
+        '- Classe B: 128.0.0.0 a 191.255.255.255 | mascara padrao 255.255.0.0 | '
+        'privada 172.16.0.0/12 (172.16-172.31)\n'
+        '- Classe C: 192.0.0.0 a 223.255.255.255 | mascara padrao 255.255.255.0 | '
+        'privada 192.168.0.0/16\n'
+        '- Loopback: 127.0.0.0/8 (voce mesmo)\n'
+        '- APIPA/link-local: 169.254.0.0/16 (DHCP nao respondeu)\n'
+        '- Multicast: 224.0.0.0/4 | reservado: 240.0.0.0/4\n'
+        'Hoje as classes importam pouco: roteadores usam CIDR (ex.: /24).'
+    )
+
+
+def tabela_json_console(dados=None, limite_linhas=20) -> str:
+    """Array de objetos (lista Python ou texto JSON) -> tabela alinhada para o
+    console. Devolve o texto; nao imprime. Colunas na ordem em que aparecem."""
+    import json
+    if isinstance(dados, str):
+        dados = json.loads(dados)
+    if not isinstance(dados, list) or not dados:
+        raise ValueError('Passe uma lista de objetos, ex.: [{"nome":"Ana","idade":30}].')
+    linhas = [l for l in dados if isinstance(l, dict)]
+    if not linhas:
+        raise ValueError('Nenhum objeto (dict) encontrado na lista.')
+    colunas = []
+    for l in linhas:
+        for k in l:
+            if k not in colunas:
+                colunas.append(k)
+
+    def _celda(v):
+        s = '' if v is None else str(v)
+        return (s[:37] + '...') if len(s) > 40 else s
+
+    larguras = {k: min(40, max(len(k), max(len(_celda(l.get(k))) for l in linhas)))
+                for k in colunas}
+    separador = '+' + '+'.join('-' * (larguras[k] + 2) for k in colunas) + '+'
+    saida = [separador,
+             '|' + '|'.join(' ' + k.ljust(larguras[k]) + ' ' for k in colunas) + '|',
+             separador]
+    exibidas = linhas[:max(1, int(limite_linhas or 20))]
+    for l in exibidas:
+        saida.append('|' + '|'.join(
+            ' ' + _celda(l.get(k)).ljust(larguras[k]) + ' ' for k in colunas) + '|')
+    saida.append(separador)
+    if len(linhas) > len(exibidas):
+        saida.append('(mostrando ' + str(len(exibidas)) + ' de ' + str(len(linhas))
+                     + ' linhas; aumente limite_linhas para ver mais)')
+    return '\n'.join(saida)
+
+
+def ascii_barras_grafico(valores=None, largura_max=8) -> str:
+    """Serie de numeros (lista ou texto separado por virgula) -> grafico de
+    barras vertical com blocos cp850 (altura normalizada). Ilustrativo."""
+    import math
+    if isinstance(valores, str):
+        valores = [v for v in valores.replace(';', ',').split(',') if v.strip()]
+    if not valores:
+        raise ValueError('Passe numeros, ex.: 3,7,2,9 (lista ou texto CSV).')
+    nums = [float(str(v).replace(',', '.')) for v in valores]
+    largura_max = max(2, min(int(largura_max or 8), 40))
+    baixo, alto = min(nums), max(nums)
+    faixa = (alto - baixo) or 1.0
+    degraus = ['░', '▒', '▓', '█']
+    barras = []
+    for n in nums:
+        altura = max(1, int(math.ceil((n - baixo) / faixa * largura_max)))
+        nivel = degraus[min(3, (altura - 1) * 4 // largura_max)]
+        barras.append(nivel * altura)
+    return ('grafico (altura max ' + str(largura_max) + '):\n' + '\n'.join(barras)
+            + '\nmin ' + str(baixo) + ' | max ' + str(alto) + ' | n ' + str(len(nums))
+            + ' (ilustrativo; blocos compativeis com console do Windows)')
+
+
+def histograma_frequencias_console(itens=None) -> str:
+    """Conta ocorrencias por categoria (lista ou texto CSV/linhas) e desenha
+    barras horizontais com bloco cheio. Ordenado do mais frequente pro menos."""
+    from collections import Counter
+    if isinstance(itens, str):
+        partes = [p.strip() for p in itens.replace(';', ',').replace('\n', ',').split(',') if p.strip()]
+    else:
+        partes = [str(p).strip() for p in (itens or []) if str(p).strip()]
+    if not partes:
+        raise ValueError('Passe categorias, ex.: futebol,volei,futebol (lista ou texto).')
+    contagem = Counter(partes)
+    maior = max(contagem.values())
+    linhas = []
+    for nome, qtd in sorted(contagem.items(), key=lambda par: (-par[1], par[0])):
+        barra = '█' * max(1, int(round(qtd * 20 / maior)))
+        linhas.append(nome[:24].ljust(24) + ' ' + str(qtd).rjust(4) + '  ' + barra)
+    return (str(len(contagem)) + ' categoria(s), ' + str(len(partes)) + ' item(ns):\n'
+            + '\n'.join(linhas))
+
+
+def progresso_barra_estatica(porcento=0.0, largura=20) -> str:
+    """Porcentagem -> barra estatica [████░░░░] para usar em relatorios/telas.
+    Nao mede nada: so desenha o numero que voce passar."""
+    try:
+        valor = float(str(porcento).replace('%', '').replace(',', '.').strip())
+    except Exception:
+        raise ValueError('Passe a porcentagem (0 a 100), ex.: 30.')
+    largura = max(4, min(int(largura or 20), 60))
+    valor = max(0.0, min(100.0, valor))
+    cheios = int(round(valor / 100.0 * largura))
+    barra = '█' * cheios + '░' * (largura - cheios)
+    rotulo = '%g' % round(valor, 1)
+    return '[' + barra + '] ' + rotulo + '% (barra estatica; nao mede nada)'
+
+
+def arvore_ascii_de_caminhos(caminhos=None) -> str:
+    """Lista de caminhos (lista ou texto, um por linha) -> arvore de pastas em
+    ASCII/cp850. Somente desenha; nao toca no disco."""
+    if isinstance(caminhos, str):
+        partes = [p.strip().replace('\\', '/').strip('/') for p in caminhos.splitlines() if p.strip()]
+    else:
+        partes = [str(p).strip().replace('\\', '/').strip('/') for p in (caminhos or []) if str(p).strip()]
+    if not partes:
+        raise ValueError('Passe caminhos, um por linha, ex.: docs/relatorios/a.pdf')
+    raiz = {}
+    for caminho in partes:
+        no = raiz
+        for pedaco in caminho.split('/'):
+            if pedaco:
+                no = no.setdefault(pedaco, {})
+    linhas = ['.']
+
+    def _desenhar(no, prefixo):
+        chaves = sorted(no, key=lambda k: (len(no[k]) == 0, k.lower()))
+        for i, chave in enumerate(chaves):
+            ultimo = (i == len(chaves) - 1)
+            conector = '`-- ' if ultimo else '|-- '
+            linhas.append(prefixo + conector + chave)
+            if no[chave]:
+                _desenhar(no[chave], prefixo + ('    ' if ultimo else '|   '))
+
+    _desenhar(raiz, '')
+    return '\n'.join(linhas)
+
+
+def sparkline_numeros(valores=None) -> str:
+    """Mini-grafico de UMA linha para series pequenas, com 4 niveis cp850
+    (_-*=#) e resumo min/med/max. Ilustrativo, nao substitui grafico real."""
+    if isinstance(valores, str):
+        valores = [v for v in valores.replace(';', ',').split(',') if v.strip()]
+    if not valores:
+        raise ValueError('Passe numeros, ex.: 2,5,3,9 (lista ou texto CSV).')
+    nums = [float(str(v).replace(',', '.')) for v in valores]
+    baixo, alto = min(nums), max(nums)
+    faixa = (alto - baixo) or 1.0
+    degraus = '_-=#'
+    linha = ''.join(degraus[min(3, int((n - baixo) / faixa * 3.999))] for n in nums)
+    media = sum(nums) / len(nums)
+    return (linha + ' | min ' + str(baixo) + ' | media ' + str(round(media, 2))
+            + ' | max ' + str(alto) + ' | n ' + str(len(nums))
+            + ' (sparkline ilustrativa)')
+
+
+def destaque_diferencas_linhas(linha1='', linha2='') -> str:
+    """Compara DUAS linhas caractere a caractere e marca com ^ onde diferem.
+    Nao substitui diff completo (para arquivos use diff_arquivos_texto)."""
+    a, b = str(linha1 or ''), str(linha2 or '')
+    if a == b:
+        return 'As duas linhas sao IGUAIS (' + str(len(a)) + ' caractere(s)).'
+    limite = min(len(a), len(b))
+    marcas = []
+    primeiro = ultimo = None
+    for i in range(limite):
+        if a[i] != b[i]:
+            marcas.append('^')
+            primeiro = primeiro if primeiro is not None else i
+            ultimo = i
+        else:
+            marcas.append(' ')
+    if len(a) != len(b):
+        fim = max(len(a), len(b))
+        marcas.extend('^' * (fim - limite))
+        ultimo = fim - 1
+    difs = sum(1 for m in marcas if m == '^')
+    maior = max(len(a), len(b))
+    linha_a = a.ljust(maior)
+    linha_b = b.ljust(maior)
+    return ('L1: ' + linha_a + '\nL2: ' + linha_b + '\n    ' + ''.join(marcas)
+            + '\n' + str(difs) + ' posicao(oes) diferente(s)'
+            + (' (primeira na posicao ' + str(primeiro) + ')' if primeiro is not None else '')
+            + '; para comparar arquivos inteiros use diff_arquivos_texto.')
+
+
+def padronizar_decimais_texto(texto='', estilo='pt') -> str:
+    """Converte numeros decimais de um texto entre padrao PT (1.234,56) e EN
+    (1,234.56). Numeros ambiguos (ex.: 1.234 em PT pode ser mil e duzentos e
+    trinta e quatro) ficam como estao — honestidade acima de chute."""
+    import re
+    t = str(texto or '')
+    alvo = str(estilo or 'pt').strip().lower()
+    if alvo in ('en', 'us', 'ingles'):
+        t = re.sub(r'\b(\d{1,3}(?:\.\d{3})+|\d+),(\d+)\b',
+                   lambda m: m.group(1).replace('.', ',') + '.' + m.group(2), t)
+        return t
+    if alvo in ('pt', 'br', 'portugues'):
+        t = re.sub(r'\b(\d{1,3}(?:,\d{3})+|\d+)\.(\d+)\b',
+                   lambda m: m.group(1).replace(',', '.') + ',' + m.group(2), t)
+        return t
+    raise ValueError("Estilo deve ser 'pt' ou 'en'.")
+
+
+def extrair_chaves_valores_texto(texto='') -> str:
+    """Texto colado com linhas 'chave: valor' (ou chave = valor) -> JSON de dicionario.
+    Linhas sem separador sao ignoradas (e contadas); nada sai do PC."""
+    import json
+    linhas = str(texto or '').splitlines()
+    dados, ignoradas = {}, 0
+    for linha in linhas:
+        if ':' in linha:
+            chave, _, valor = linha.partition(':')
+        elif '=' in linha:
+            chave, _, valor = linha.partition('=')
+        else:
+            ignoradas += 1
+            continue
+        chave = chave.strip().strip('"\'')
+        valor = valor.strip().strip('"\'')
+        if chave:
+            dados[chave] = valor
+    if not dados:
+        raise ValueError('Nenhuma linha no formato "chave: valor" (ou chave = valor).')
+    nota = (' (' + str(ignoradas) + ' linha(s) sem separador ignorada(s))') if ignoradas else ''
+    return json.dumps(dados, ensure_ascii=False, indent=2) + nota
+
+
+def minutos_hhmm_converter(valor=0) -> str:
+    """Converte nos dois sentidos: minutos (ex.: 90) -> 01:30 e 'HH:MM'
+    (ex.: 01:30) -> 90 minutos. Util para planilhas e cartao de ponto."""
+    if isinstance(valor, str):
+        t = valor.strip().replace('h', ':').replace(',', ':')
+        partes = [p for p in t.split(':') if p != '']
+        if len(partes) == 2 and all(p.isdigit() for p in partes):
+            horas, minutos = int(partes[0]), int(partes[1])
+            if minutos > 59:
+                raise ValueError('Minutos nao podem passar de 59 em HH:MM.')
+            total = horas * 60 + minutos
+            return str(t) + ' = ' + str(total) + ' minuto(s).'
+        if partes and partes[0].lstrip('-').isdigit():
+            valor = int(partes[0])
+        else:
+            raise ValueError("Passe minutos (ex.: 90) ou 'HH:MM' (ex.: 01:30).")
+    valor = int(valor)
+    sinal = '-' if valor < 0 else ''
+    valor = abs(valor)
+    horas, minutos = divmod(valor, 60)
+    return (str(valor) + ' minuto(s) = ' + sinal + str(horas).zfill(2) + ':'
+            + str(minutos).zfill(2) + '.')
+
+
+def lista_compras_consolidar(texto='') -> str:
+    """Junta listas de compras (uma por linha, com quantidade opcional no
+    inicio: '2 arroz') somando itens repetidos. Nada e gravado."""
+    from collections import OrderedDict
+    itens = OrderedDict()
+    linhas = [l.strip() for l in str(texto or '').splitlines() if l.strip()]
+    if not linhas:
+        raise ValueError("Cole as listas, um item por linha (ex.: '2 arroz', 'leite').")
+    for linha in linhas:
+        partes = linha.split(None, 1)
+        if len(partes) == 2 and partes[0].replace(',', '.').replace('.', '', 1).isdigit():
+            qtd = float(partes[0].replace(',', '.'))
+            nome = partes[1].strip()
+        else:
+            qtd = 1.0
+            nome = linha
+        chave = ' '.join(nome.lower().split())
+        if chave in itens:
+            itens[chave][0] += qtd
+        else:
+            itens[chave] = [qtd, nome]
+    total_qtd = sum(v[0] for v in itens.values())
+
+    def _fmt(q):
+        return str(int(q)) if float(q).is_integer() else str(round(q, 2))
+
+    linhas_saida = ['- ' + _fmt(v[0]) + ' ' + v[1] for v in sorted(itens.values(), key=lambda x: x[1].lower())]
+    return (str(len(itens)) + ' item(ns) distinto(s), ' + _fmt(total_qtd)
+            + ' unidade(s) no total:\n' + '\n'.join(linhas_saida))
+
+# --- r43 lote 6 (bloco B): casa, cozinha e cotidiano BR -----------------------
+
+def converter_medidas_culinarias(valor=1.0, de='ml', para='xicara') -> str:
+    """Medidas de cozinha BR (ml, colher de sopa/chá, xícara, copo de requeijão,
+    lata, litro) e forno (graus C -> numero do gas). Tabelas aproximadas."""
+    valor = float(str(valor).replace(',', '.'))
+    tabela = {'ml': 1.0, 'colher_de_cha': 5.0, 'colher_de_sopa': 15.0,
+              'xicara': 240.0, 'copo_requeijao': 200.0, 'lata': 350.0, 'litro': 1000.0}
+    apelidos = {'colher sopa': 'colher_de_sopa', 'colher (de) sopa': 'colher_de_sopa',
+                'sopa': 'colher_de_sopa', 'colher cha': 'colher_de_cha',
+                'colher (de) cha': 'colher_de_cha', 'cha': 'colher_de_cha',
+                'xicaras': 'xicara', 'copo': 'copo_requeijao', 'l': 'litro'}
+
+    def _norma(s):
+        return ' '.join(str(s).lower().replace('ç', 'c').replace('á', 'a').replace('í', 'i').split())
+
+    de, para = _norma(de), _norma(para)
+    de, para = apelidos.get(de, de), apelidos.get(para, para)
+    if de == 'forno_c' or para == 'forno_c':
+        if de != 'forno_c':
+            raise ValueError("Para forno use: de='forno_c', para='gas'.")
+        gas = max(1, min(8, int(round((valor - 100.0) / 20.0))))
+        return ('Forno a ' + str(valor) + ' C ~ gas ' + str(gas)
+                + ' (chama baixa 1-2, media 3-4, alta 5+; cada forno e um bicho: ajuste).')
+    if de not in tabela or para not in tabela:
+        raise ValueError('Unidades conhecidas: ' + ', '.join(sorted(tabela)) + ', forno_c.')
+    resultado = valor * tabela[de] / tabela[para]
+
+    def _fmt(n):
+        return str(round(n, 2)).rstrip('0').rstrip('.') if isinstance(n, float) else str(n)
+
+    return (_fmt(valor) + ' ' + de.replace('_', ' ') + ' = ' + _fmt(resultado) + ' '
+            + para.replace('_', ' ') + ' (medidas de cozinha sao aproximadas).')
+
+
+def gramas_xicara_por_ingrediente(ingrediente='farinha', xicaras=1.0) -> str:
+    """Converte xicaras (240 ml) em gramas por ingrediente (tabela de cozinha
+    aproximada: farinha 120 g, agua 240 g etc.). Nao substitui balanca."""
+    xicaras = float(str(xicaras).replace(',', '.'))
+    tabela = {'agua': 240, 'leite': 240, 'oleo': 216, 'farinha de trigo': 120,
+              'farinha': 120, 'acucar refinado': 190, 'acucar': 190,
+              'acucar cristal': 180, 'acucar mascavo': 160, 'chocolate em po': 90,
+              'cacao': 90, 'coco ralado': 80, 'fuba': 160, 'arroz cru': 170,
+              'feijao cru': 190, 'aveia em flocos': 90, 'aveia': 90,
+              'trigo para kibe': 170, 'manteiga': 200, 'queijo ralado': 100}
+    chave = ' '.join(str(ingrediente).lower().replace('ç', 'c').replace('á', 'a').replace('ú', 'u').split())
+    if chave not in tabela:
+        return ('Sem registro de "' + str(ingrediente) + '" na tabela local. Conhecidos: '
+                + ', '.join(sorted(set(tabela))) + '. Dica: agua/leite = 240 g por xicara.')
+    gramas = tabela[chave] * xicaras
+
+    def _fmt(n):
+        return str(int(n)) if float(n).is_integer() else str(round(n, 1))
+
+    return (_fmt(xicaras) + ' xicara(s) de ' + chave + ' ~ ' + _fmt(gramas)
+            + ' g (tabela aproximada; balanca e mais precisa).')
+
+
+def dividir_conta_restaurante(total=0.0, pessoas=1, gorjeta_pct=10.0) -> str:
+    """Divide a conta com gorjeta percentual e sugere valor por pessoa
+    arredondado PARA CIMA em centavos (ninguem paga centavo a menos)."""
+    import math
+    total = float(str(total).replace(',', '.'))
+    pessoas = int(pessoas or 1)
+    gorjeta_pct = float(str(gorjeta_pct).replace(',', '.'))
+    if total <= 0 or pessoas < 1:
+        raise ValueError('Informe total (> 0) e numero de pessoas (>= 1).')
+    gorjeta = total * gorjeta_pct / 100.0
+    total_geral = total + gorjeta
+    exato = total_geral / pessoas
+    por_pessoa = math.ceil(exato * 100) / 100.0
+    sobre = round(por_pessoa * pessoas - total_geral, 2)
+    return ('Conta R$ ' + str(round(total, 2)) + ' + gorjeta ' + str(gorjeta_pct)
+            + '% (R$ ' + str(round(gorjeta, 2)) + ') = R$ ' + str(round(total_geral, 2))
+            + ' em ' + str(pessoas) + ' pessoa(s): R$ ' + str(round(exato, 2))
+            + ' exato por pessoa; sugestao R$ ' + str(round(por_pessoa, 2))
+            + ' (sobram R$ ' + str(sobre) + ' de caixinha).')
+
+
+def cafeina_meia_vida(mg=100.0, horas_decorridas=0.0) -> str:
+    """Cafeina restante no corpo depois de N horas (meia-vida media ~5 h).
+    Informacao geral; nao e conselho medico."""
+    mg = float(str(mg).replace(',', '.'))
+    horas = float(str(horas_decorridas).replace(',', '.'))
+    if mg <= 0 or horas < 0:
+        raise ValueError('Informe mg de cafeina e horas decorridas (>= 0).')
+    restante = mg * (0.5 ** (horas / 5.0))
+    return (str(round(mg, 1)) + ' mg de cafeina apos ' + str(horas) + ' h ~ '
+            + str(round(restante, 1)) + ' mg ainda no corpo (meia-vida media 5 h; '
+            'varia por pessoa). Regra geral: evite cafeina perto de dormir.')
+
+
+def tinta_parede_estimativa(area_m2=0.0, demaos=2, rendimento_m2_por_litro=10.0, lata_litros=18.0) -> str:
+    """Estima tinta: area x demaos / rendimento -> litros e latas (padrao 18 L).
+    Rendimento real varia com superficie, cor e rolo; sempre confira a lata."""
+    import math
+    area = float(str(area_m2).replace(',', '.'))
+    demaos = max(1, int(demaos or 2))
+    rend = float(str(rendimento_m2_por_litro).replace(',', '.')) or 10.0
+    lata = float(str(lata_litros).replace(',', '.')) or 18.0
+    if area <= 0:
+        raise ValueError('Informe a area em m2 (ex.: 40).')
+    litros = area * demaos / rend
+    latas = math.ceil(litros / lata)
+    return (str(area) + ' m2 com ' + str(demaos) + ' demao(s) ~ ' + str(round(litros, 1))
+            + ' L (rendimento ' + str(rend) + ' m2/L). Comprar: ' + str(latas)
+            + ' lata(s) de ' + str(lata) + ' L. Compre um pouco a mais: tinta de '
+            'lote diferente pode variar de tom.')
+
+
+def combustivel_custo_viagem(km=0.0, km_por_litro=0.0, preco_litro=0.0) -> str:
+    """Viagem: distancia + consumo + preco do combustivel -> litros e custo.
+    Calculo puro; nao consulta preco de bomba."""
+    km = float(str(km).replace(',', '.'))
+    kmpl = float(str(km_por_litro).replace(',', '.'))
+    preco = float(str(preco_litro).replace(',', '.'))
+    if km <= 0 or kmpl <= 0 or preco <= 0:
+        raise ValueError('Informe km da viagem, km/l do carro e preco por litro.')
+    litros = km / kmpl
+    custo = litros * preco
+    return (str(km) + ' km a ' + str(kmpl) + ' km/l = ' + str(round(litros, 2))
+            + ' L; a R$ ' + str(round(preco, 2)) + '/L custa R$ ' + str(round(custo, 2))
+            + ' (R$ ' + str(round(km and custo / km, 3)) + ' por km). Ida e volta? Dobre a distancia.')
+
+
+def churrasco_calculadora(pessoas=10) -> str:
+    """Calculo de churrasco com padroes medios BR por pessoa adulta (carne 400 g,
+    linguiça 150 g, pao de alho 1, queijo coalho 100 g, carvao 0,5 kg, gelo 0,25 kg,
+    refrigerante 600 ml). Nao e receita de mestre do churrasco: e ponto de partida."""
+    import math
+    pessoas = int(pessoas or 1)
+    if pessoas < 1:
+        raise ValueError('Informe o numero de pessoas (>= 1).')
+    itens = [('carne (kg)', 0.4 * pessoas), ('linguiça (kg)', 0.15 * pessoas),
+             ('pao de alho (un)', 1 * pessoas), ('queijo coalho (kg)', 0.1 * pessoas),
+             ('carvao (kg)', 0.5 * pessoas), ('gelo (kg)', 0.25 * pessoas),
+             ('refrigerante/cerveja (ml)', 600 * pessoas)]
+    linhas = []
+    for nome, qtd in itens:
+        valor = math.ceil(qtd * 10) / 10.0
+        txt = str(int(valor)) if valor.is_integer() else str(valor)
+        linhas.append('- ' + nome + ': ' + txt)
+    return ('CHURRASCO para ' + str(pessoas) + ' pessoa(s) (padroes medios):\n'
+            + '\n'.join(linhas) + '\nAjuste pela turma: crianca come metade; '
+            'das 4h em diante o carvao agradece refis.')
+
+
+def festa_doces_salgados(convidados=30) -> str:
+    """Festa infantil/adulto com padroes BR por convidado: 6 salgados, 3 doces,
+    100 g de bolo, 600 ml de bebida. Ponto de partida, nao regra absoluta."""
+    import math
+    convidados = int(convidados or 1)
+    if convidados < 1:
+        raise ValueError('Informe o numero de convidados (>= 1).')
+    salgados = math.ceil(convidados * 6 / 100.0) * 100
+    doces = math.ceil(convidados * 3 / 25.0) * 25
+    bolo_kg = math.ceil(convidados * 100 / 1000.0 * 10) / 10.0
+    litros = math.ceil(convidados * 600 / 1000.0)
+    return ('FESTA para ' + str(convidados) + ' convidado(s) (padrao BR):\n'
+            '- salgados: ~' + str(salgados) + ' unidades (6 por pessoa)\n'
+            '- doces: ~' + str(doces) + ' unidades (3 por pessoa)\n'
+            '- bolo: ~' + str(bolo_kg) + ' kg (100 g por pessoa)\n'
+            '- bebida: ~' + str(litros) + ' L (600 ml por pessoa)\n'
+            'Festa longa (4h+) ou dia quente: some 20-30%.')
+
+
+def pizza_tamanho_convidados(pessoas=4, fatias_por_pessoa=3) -> str:
+    """Convida dos x fatias -> quantas pizzas. Fatias medias: broto 4, media 6,
+    grande 8, familia 12. Contagem simples; apetite varia."""
+    import math
+    pessoas = int(pessoas or 1)
+    fatias = max(1, min(int(fatias_por_pessoa or 3), 8))
+    if pessoas < 1:
+        raise ValueError('Informe o numero de pessoas (>= 1).')
+    necessarias = pessoas * fatias
+    grandes = math.ceil(necessarias / 8.0)
+    familia = math.ceil(necessarias / 12.0)
+    brotos = math.ceil(necessarias / 4.0)
+    return ('Para ' + str(pessoas) + ' pessoa(s) com ' + str(fatias)
+            + ' fatia(s) cada: ' + str(necessarias) + ' fatias ~ '
+            + str(grandes) + ' pizza(s) GRANDE (8) ou ' + str(familia)
+            + ' familia (12) ou ' + str(brotos) + ' broto (4). Misturar sabores resolve briga.')
+
+
+def gelo_bebidas_estimativa(pessoas=10, horas=4, calor='normal') -> str:
+    """Estimativa de gelo para bebidas: 0,5 kg por pessoa + 0,1 kg por pessoa a
+    cada 2 h extras; fator 1,3 no calor forte. Estimativa, nao garantia."""
+    import math
+    pessoas = int(pessoas or 1)
+    horas = max(1, int(horas or 4))
+    fator = 1.3 if str(calor).lower().strip() in ('forte', 'calor forte', 'muito', 'verao') else 1.0
+    if pessoas < 1:
+        raise ValueError('Informe o numero de pessoas (>= 1).')
+    kg = pessoas * (0.5 + 0.1 * max(0, horas - 2) / 2.0) * fator
+    sacos = math.ceil(kg / 5.0)
+    return ('Para ' + str(pessoas) + ' pessoa(s) em ' + str(horas)
+            + ' h (' + ('calor forte' if fator > 1 else 'clima normal') + '): ~'
+            + str(round(kg, 1)) + ' kg de gelo ~ ' + str(sacos)
+            + ' saco(s) de 5 kg. Caixa termica segura melhor que freezer lotado.')
+
+
+def limpeza_diluicao(volume_final_ml=1000.0, proporcao='1:100') -> str:
+    """Diluicao de produto de limpeza: volume final + proporcao (ex.: 1:100) ->
+    quanto de produto e quanto de agua. Sempre confirme no rotulo; NUNCA misture
+    agua sanitaria com alcool, amaciante ou produtos acidos."""
+    import re as _re
+    volume = float(str(volume_final_ml).replace(',', '.'))
+    m = _re.match(r'^\s*(\d+(?:[.,]\d+)?)\s*:\s*(\d+(?:[.,]\d+)?)\s*$', str(proporcao or ''))
+    if volume <= 0 or not m:
+        raise ValueError("Informe volume (ml) e proporcao 'a:b' (ex.: 1:100).")
+    a, b = float(m.group(1).replace(',', '.')), float(m.group(2).replace(',', '.'))
+    produto = volume * a / (a + b)
+    agua = volume - produto
+    pct = round(100.0 * a / (a + b), 2)
+    return ('%g' % round(volume, 1) + ' ml na proporcao ' + ('%g' % a) + ':'
+            + ('%g' % b) + ' = ' + ('%g' % round(produto, 1)) + ' ml de PRODUTO + '
+            + ('%g' % round(agua, 1)) + ' ml de agua (' + str(pct)
+            + '% de produto). Confirme no rotulo; nunca misture quimicos.')
+
+
+def arroz_panela_receita(pessoas=4) -> str:
+    """Receita-base de arroz BR por pessoa: 100 g de arroz, ~250 ml de agua,
+    e temperos proporcionais. Ponto de partida; panela e fogo variam."""
+    pessoas = max(1, int(pessoas or 4))
+    arroz_g = 100 * pessoas
+    agua_ml = 250 * pessoas
+    oleo = max(1, pessoas // 2)
+    dentes = max(1, pessoas // 2)
+    meias_cebolas = max(1, pessoas // 4)
+    return ('ARROZ para ' + str(pessoas) + ' pessoa(s):\n'
+            '- ' + str(arroz_g) + ' g de arroz (~' + str(50 * pessoas) + ' ml em xicara)\n'
+            '- ' + str(agua_ml) + ' ml de agua quente\n'
+            '- ' + str(oleo) + ' colher(es) de oleo, ' + str(dentes) + ' dente(s) de alho, '
+            + str(meias_cebolas) + ' meia(s) cebola picada(s)\n'
+            '- 1 colher (cha) rasa de sal por 4 pessoas\n'
+            'Refogue cebola+alho no oleo, junte o arroz, mexa 1 min, agua, sal, '
+            'tampa em fogo baixo ~15 min apos ferver. Nao mexa mais.')
+
+
+def ponto_da_carne_referencia(carne='bovina') -> str:
+    """Temperaturas internas de referencia por ponto da carne (termometro
+    culinario). Frango e porco pedem temperatura de SEGURANCA, sem carne crua."""
+    chave = ' '.join(str(carne).lower().replace('ç', 'c').replace('ã', 'a').split())
+    tabelas = {
+        'bovina': '- malpassada (rare): 48-52 C\n- ao ponto para menos: 53-57 C\n'
+                  '- ao ponto: 58-62 C\n- bem passada: 70 C+',
+        'porco': '- suina moderna: 63 C + 3 min de descanso (suco claro)\n'
+                 '- costela e corte duro: 85-95 C em fogo lento (desfiar)',
+        'frango': '- inteiro ou pedacos: 74 C no centro (SEGURANCA; sem rosa)\n'
+                  '- coxa/sobrecoxa lenta: 85 C fica macia',
+        'peixe': '- firme (salmao/atum): 50-55 C (malpassado) a 60 C (firme)\n'
+                 '- branco delicado: 55-60 C; esfolado em fogo alto e rapido',
+    }
+    if chave not in tabelas:
+        return ('Carnes na tabela: bovina, porco, frango, peixe. Regra geral de '
+                'seguranca: aves 74 C; porco 63 C com descanso; termometro vale '
+                'mais que olho.')
+    return ('PONTOS DA CARNE ' + chave.upper() + ' (temperatura INTERNA, termometro):\n'
+            + tabelas[chave] + '\nAviso: temperatura de seguranca protege; nao e '
+            'conselho medico e nao substitui bom senso.')
+
+
+def cronograma_limpeza_gerar(pessoas_casa=2) -> str:
+    """Gera uma semana-tipo de limpeza domestica com tarefas diarias, semanais
+    e mensais. Template generico; adapte a sua rotina."""
+    semana = [('Segunda', 'Loucas em dia, lixo das cozinhas, arrumar camas'),
+              ('Terca', 'Banheiros: vaso, box, pia e chao'),
+              ('Quarta', 'Poeira de moveis e eletronicos, espelhos'),
+              ('Quinta', 'Pisos: aspirar/varrer e passar pano'),
+              ('Sexta', 'Roupas: maquina, estender, dobrar; trocar toalhas'),
+              ('Sabado', 'Cozinha funda: geladeira por fora, fogao, micro-ondas'),
+              ('Domingo', 'Dia leve: planejar a semana e descansar')]
+    linhas = ['SEMANA-TIPO DE LIMPEZA (' + str(pessoas_casa) + ' pessoa(s) na casa):']
+    linhas += ['- ' + d + ': ' + t for d, t in semana]
+    linhas.append('DIARIO: louca 2x, lixo no fim do dia, 10 min de arrumacao geral.')
+    linhas.append('MENSAL: geladeira por dentro, janelas, rodapes, trocar filtro.')
+    linhas.append('Divida por pessoa: ' + str(max(1, pessoas_casa)) + ' pessoa(s) x '
+                  '1 tarefa/dia = ninguem briga no sabado.')
+    return '\n'.join(linhas)
+
+# --- r43 lote 6 (bloco C): saude estimada, jogos e sorteios -------------------
+
+def taxa_metabolica_basal_mifflin(peso_kg=70.0, altura_cm=170.0, idade=30, sexo='m') -> str:
+    """TMB pela formula de Mifflin-St Jeor (referencia atual mais usada):
+    10x peso + 6,25x altura - 5x idade (+5 homens / -161 mulheres) e exemplos
+    com fatores de atividade. Estimativa; nutricionista decide de verdade."""
+    peso = float(str(peso_kg).replace(',', '.'))
+    altura = float(str(altura_cm).replace(',', '.'))
+    anos = int(idade)
+    if peso <= 0 or altura <= 0 or anos <= 0:
+        raise ValueError('Informe peso (kg), altura (cm) e idade validos.')
+    base = 10.0 * peso + 6.25 * altura - 5.0 * anos
+    s = str(sexo).strip().lower()
+    if s in ('m', 'masculino', 'homem', 'h'):
+        tmb = base + 5.0
+        rotulo = 'homem'
+    elif s in ('f', 'feminino', 'mulher', 'm_'):
+        tmb = base - 161.0
+        rotulo = 'mulher'
+    else:
+        raise ValueError("Sexo: 'm' (masculino) ou 'f' (feminino).")
+    fator_leve = tmb * 1.375
+    fator_mod = tmb * 1.55
+    return ('TMB (Mifflin-St Jeor) para ' + rotulo + ', ' + str(peso) + ' kg, '
+            + str(altura) + ' cm, ' + str(anos) + ' anos: ' + str(round(tmb))
+            + ' kcal/dia em repouso. Sedentario ' + str(round(tmb * 1.2))
+            + ' | exercicio leve ' + str(round(fator_leve)) + ' | moderado '
+            + str(round(fator_mod)) + ' kcal/dia. Estimativa popular, nao e '
+            'prescricao: procure nutricionista.')
+
+
+def gordura_navy_calcular(sexo='m', altura_cm=175.0, cintura_cm=85.0, pescoco_cm=38.0, quadril_cm=None) -> str:
+    """Percentual de gordura pelo metodo da Marinha dos EUA (circunferencias em
+    cm, logaritmo). Estimativa com margem real de erro; nao e diagnostico."""
+    import math
+    altura = float(str(altura_cm).replace(',', '.'))
+    cintura = float(str(cintura_cm).replace(',', '.'))
+    pescoco = float(str(pescoco_cm).replace(',', '.'))
+    s = str(sexo).strip().lower()
+    if altura <= 0 or cintura <= 0 or pescoco <= 0:
+        raise ValueError('Informe altura, cintura e pescoco em cm (positivos).')
+    if s in ('m', 'masculino', 'homem'):
+        if cintura - pescoco <= 0:
+            raise ValueError('Para homens, cintura precisa ser MAIOR que o pescoco.')
+        pct = 495.0 / (1.0324 - 0.19077 * math.log10(cintura - pescoco)
+                       + 0.15456 * math.log10(altura)) - 450.0
+        detalhe = 'cintura ' + str(cintura) + ' - pescoco ' + str(pescoco)
+    elif s in ('f', 'feminino', 'mulher'):
+        if quadril_cm is None:
+            raise ValueError("Para mulheres informe tambem quadril_cm (metodo Navy feminino usa cintura+quadril-pescoco).")
+        quadril = float(str(quadril_cm).replace(',', '.'))
+        if quadril <= 0 or cintura + quadril - pescoco <= 0:
+            raise ValueError('Informe quadril (cm) valido; cintura+quadril-pescoco precisa ser positivo.')
+        pct = 495.0 / (1.29579 - 0.35004 * math.log10(cintura + quadril - pescoco)
+                       + 0.22100 * math.log10(altura)) - 450.0
+        detalhe = 'cintura ' + str(cintura) + ' + quadril ' + str(quadril) + ' - pescoco ' + str(pescoco)
+    else:
+        raise ValueError("Sexo: 'm' (masculino) ou 'f' (feminino).")
+    pct = max(0.0, round(pct, 1))
+    faixas = ('Homens: essencial 2-5%, atleta 6-13%, saudavel 14-17%, aceitavel 18-24%.'
+              if s in ('m', 'masculino', 'homem') else
+              'Mulheres: essencial 10-13%, atleta 14-20%, saudavel 21-24%, aceitavel 25-31%.')
+    return ('Gordura corporal estimada (US Navy, ' + detalhe + '): ' + str(pct)
+            + '%. ' + faixas + ' Estimativa com margem de erro; nao e diagnostico.')
+
+
+def fc_maxima_zones(idade=30, fc_repouso=70) -> str:
+    """FC maxima (220 - idade, formula popular) e zonas de Karvonen usando a FC
+    de repouso. Referencia educacional; nao e prescricao de treino."""
+    anos = int(idade)
+    repouso = int(fc_repouso or 70)
+    if anos <= 0 or anos > 120 or repouso <= 0:
+        raise ValueError('Informe idade (1-120) e FC de repouso validas.')
+    fcmax = 220 - anos
+    reserva = fcmax - repouso
+
+    def _zona(p):
+        return int(round(reserva * p + repouso))
+
+    return ('Idade ' + str(anos) + ': FC maxima ~ ' + str(fcmax) + ' bpm (formula '
+            'popular 220-idade). Zonas de Karvonen (repouso ' + str(repouso) + '):\n'
+            '- Z1 recuperacao 50-60%: ' + str(_zona(0.5)) + '-' + str(_zona(0.6)) + ' bpm\n'
+            '- Z2 leve/aerobico 60-70%: ' + str(_zona(0.6)) + '-' + str(_zona(0.7)) + ' bpm\n'
+            '- Z3 moderado 70-80%: ' + str(_zona(0.7)) + '-' + str(_zona(0.8)) + ' bpm\n'
+            '- Z4 intenso 80-90%: ' + str(_zona(0.8)) + '-' + str(_zona(0.9)) + ' bpm\n'
+            '- Z5 maximo 90-100%: ' + str(_zona(0.9)) + '-' + str(fcmax) + ' bpm\n'
+            'Formula popular erra por ate ~10 bpm; use como faixa, nao como alvo.')
+
+
+def proteina_diaria_sugestao(peso_kg=70.0, objetivo='manter') -> str:
+    """Faixa de proteina por kg de peso (g/kg) para o objetivo informado, com
+    aviso de que nutricionista e quem decide. Nao e prescricao."""
+    peso = float(str(peso_kg).replace(',', '.'))
+    if peso <= 0:
+        raise ValueError('Informe o peso em kg (> 0).')
+    faixas = {'sedentario': (0.8, 1.0), 'manter': (0.8, 1.0), 'saude': (0.8, 1.0),
+              'ativo': (1.2, 1.6), 'esporte': (1.2, 1.6), 'corrida': (1.2, 1.6),
+              'musculacao': (1.6, 2.2), 'hipertrofia': (1.6, 2.2),
+              'definicao': (1.8, 2.4), 'emagrecimento': (1.6, 2.2)}
+    chave = str(objetivo).strip().lower()
+    if chave not in faixas:
+        return ('Objetivos conhecidos: ' + ', '.join(sorted(faixas))
+                + ". Passe um deles (ex.: 'musculacao').")
+    baixo, alto = faixas[chave]
+    return ('Proteina para ' + chave + ' em ' + str(peso) + ' kg: ~'
+            + str(round(peso * baixo)) + '-' + str(round(peso * alto)) + ' g por dia ('
+            + str(baixo) + '-' + str(alto) + ' g/kg). Estimativa educacional: '
+            'nutricionista ajusta por saude, rins e rotina.')
+
+
+def macros_calculo_calorias(calorias=2000, prot_pct=30.0, carb_pct=40.0, gord_pct=30.0) -> str:
+    """Divide calorias diarias em proteina/carboidrato/gordura por porcentagem
+    (proteina e carbo: 4 kcal/g; gordura: 9 kcal/g). Soma precisa fechar 100%."""
+    cal = float(str(calorias).replace(',', '.'))
+    p = float(str(prot_pct).replace(',', '.'))
+    c = float(str(carb_pct).replace(',', '.'))
+    g = float(str(gord_pct).replace(',', '.'))
+    if cal <= 0:
+        raise ValueError('Informe calorias (> 0).')
+    if abs(p + c + g - 100.0) > 0.5:
+        raise ValueError('As porcentagens precisam somar 100 (informado: '
+                         + str(round(p + c + g, 1)) + ').')
+    gp = cal * p / 100.0 / 4.0
+    gc = cal * c / 100.0 / 4.0
+    gg = cal * g / 100.0 / 9.0
+    return (str(round(cal)) + ' kcal em ' + str(round(p)) + '/' + str(round(c)) + '/'
+            + str(round(g)) + '% =\n- proteina: ' + str(round(gp)) + ' g\n'
+            '- carboidrato: ' + str(round(gc)) + ' g\n- gordura: ' + str(round(gg))
+            + ' g (estimativa educacional; nutricionista personaliza).')
+
+
+def sortear_dado_rpg(notacao='2d6', descarta_menor=False, semente=None) -> str:
+    """Sorteia dados de RPG: '2d6+1', '1d20', '4d6' com descarta_menor=True
+    (atributo D&D). Gerador local; nao substitui o dado fisico da mesa."""
+    import random, re as _re
+    m = _re.match(r'^\s*(\d*)\s*d\s*(\d+)\s*([+-]\s*\d+)?\s*$', str(notacao or '').lower())
+    if not m:
+        raise ValueError("Use a notacao NdM+K, ex.: '2d6+1' ou '1d20'.")
+    n = int(m.group(1) or 1)
+    faces = int(m.group(2))
+    bonus = int(m.group(3).replace(' ', '')) if m.group(3) else 0
+    if not (1 <= n <= 20) or not (2 <= faces <= 1000):
+        raise ValueError('Limites: 1-20 dados, 2-1000 faces.')
+    rng = random.Random(semente)
+    rolagens = [rng.randint(1, faces) for _ in range(n)]
+    usadas = list(rolagens)
+    descarte = ''
+    if descarta_menor and n >= 2:
+        menor = min(rolagens)
+        usadas.remove(menor)
+        descarte = ' (descarta o menor: ' + str(menor) + ')'
+    total = sum(usadas) + bonus
+    txt_bonus = (' ' + ('+' + str(bonus) if bonus >= 0 else str(bonus))) if bonus else ''
+    return ('d' + str(faces) + txt_bonus + ': [' + ', '.join(str(r) for r in rolagens)
+            + ']' + descarte + ' = ' + str(total) + ' (sorteio local '
+            + ('com semente ' + str(semente) if semente is not None else 'aleatorio') + ').')
+
+
+def sortear_amigo_secreto(nomes='', semente=None) -> str:
+    """Sorteia amigo secreto sem ninguem tirar a si mesmo (desarranjo valido).
+    Passe os nomes separados por linha ou virgula; nada e gravado."""
+    import random
+    if isinstance(nomes, str):
+        bruto = [p.strip() for p in nomes.replace(';', ',').replace('\n', ',').split(',') if p.strip()]
+    else:
+        bruto = [str(p).strip() for p in (nomes or []) if str(p).strip()]
+    vistos, limpos = set(), []
+    for n in bruto:
+        chave = n.casefold()
+        if chave not in vistos:
+            vistos.add(chave)
+            limpos.append(n)
+    if len(limpos) < 3:
+        raise ValueError('Amigo secreto precisa de pelo menos 3 nomes distintos (com 2 ja se sabe quem tirou quem).')
+    rng = random.Random(semente)
+    for _ in range(2000):
+        rng.shuffle(limpos)
+        if all(limpos[i] != limpos[(i + 1) % len(limpos)] for i in range(len(limpos))):
+            break
+    pares = [limpos[i] + ' tira ' + limpos[(i + 1) % len(limpos)] for i in range(len(limpos))]
+    return ('AMIGO SECRETO (' + str(len(limpos)) + ' participantes; ninguem tira a si mesmo):\n'
+            + '\n'.join('- ' + p for p in pares) + '\nNao conte pra ninguem!')
+
+
+def sortear_cor_hex_acessivel(semente=None) -> str:
+    """Gera uma cor de fundo aleatoria e calcula o contraste WCAG contra preto
+    e branco, recomendando a cor de texto acessivel. Estatica e calculada."""
+    import random
+
+    def _luminancia(r, g, b):
+        def _canal(v):
+            v = v / 255.0
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        return 0.2126 * _canal(r) + 0.7152 * _canal(g) + 0.0722 * _canal(b)
+
+    rng = random.Random(semente)
+    r, g, b = rng.randint(0, 255), rng.randint(0, 255), rng.randint(0, 255)
+    lum = _luminancia(r, g, b)
+    contra_branco = (1.05) / (lum + 0.05)
+    contra_preto = (lum + 0.05) / 0.05
+    if contra_branco >= contra_preto:
+        texto, razao, nota = 'branco (#FFFFFF)', contra_branco, 'texto branco sobre o fundo'
+    else:
+        texto, razao, nota = 'preto (#000000)', contra_preto, 'texto preto sobre o fundo'
+    nivel = 'AAA' if razao >= 7 else ('AA' if razao >= 4.5 else 'AA grande/nao-texto')
+    hexcor = '#' + ''.join('%02x' % v for v in (r, g, b))
+    return ('Fundo sorteado: ' + hexcor + ' | use ' + texto + ' por cima (contraste '
+            + str(round(razao, 2)) + ':1, ' + nivel + '). ' + nota.capitalize()
+            + ' calculado por WCAG 2.x.')
+
+
+def bingo_gerar_cartela(semente=None) -> str:
+    """Gera uma cartela de bingo 5x5 (colunas B 1-15, I 16-30, N 31-45, G 46-60,
+    O 61-75; centro LIVRE). Sorteio local; pode gerar quantas quiser."""
+    import random
+    rng = random.Random(semente)
+    colunas = [sorted(rng.sample(range(inicio, inicio + 15), 5))
+               for inicio in (1, 16, 31, 46, 61)]
+    colunas[2][2] = 'LIVRE'
+    cabecalho = ' | '.join(str(letra).center(5) for letra in 'BINGO')
+    linhas = []
+    for i in range(5):
+        linhas.append(' | '.join(str(colunas[c][i]).center(5) for c in range(5)))
+    return ('CARTELA DE BINGO\n' + cabecalho + '\n' + '-' * len(cabecalho) + '\n'
+            + '\n'.join(linhas))
+
+
+def lotofacil_sugestao(semente=None) -> str:
+    """Sugere 15 dezenas (1-25) para Lotofacil. HONESTIDADE: todas as
+    combinacoes tem exatamente a MESMA chance (1 em 3.268.760); nenhum metodo
+    aumenta probabilidade. Jogo responsavel, so maiores de 18."""
+    import random
+    rng = random.Random(semente)
+    dezenas = sorted(rng.sample(range(1, 26), 15))
+    return ('Sugestao Lotofacil: ' + '-'.join(str(d).zfill(2) for d in dezenas)
+            + '. Honestidade: cada combinacao tem 1 em 3.268.760 de chance; '
+            'nenhum metodo muda isso. Jogue com responsabilidade.')
+
+
+def megasena_sugestao(semente=None) -> str:
+    """Sugere 6 dezenas (1-60) para Mega-Sena. HONESTIDADE: 1 em 50.063.860 em
+    qualquer combinacao; nada aumenta a chance. Maiores de 18, com moderacao."""
+    import random
+    rng = random.Random(semente)
+    dezenas = sorted(rng.sample(range(1, 61), 6))
+    return ('Sugestao Mega-Sena: ' + '-'.join(str(d).zfill(2) for d in dezenas)
+            + '. Honestidade: 1 em 50.063.860 em QUALQUER combinacao; numero '
+            'atrasado ou quente nao existe estatisticamente. Jogo responsavel.')
+
+
+def cartas_mao_sortear(semente=None) -> str:
+    """Sorteia 5 cartas de um baralho de 52 e classifica a mao (par, dois pares,
+    trinca, sequencia, flush, full house, quadra, straight flush). Baralho local."""
+    import random
+    rng = random.Random(semente)
+    nomes = {2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
+             10: '10', 11: 'valete', 12: 'dama', 13: 'rei', 14: 'as'}
+    naipes = ['ouros', 'espadas', 'copas', 'paus']
+    cartas = [(rng.randint(2, 14), rng.choice(naipes)) for _ in range(5)]
+    while len(set(cartas)) < 5:
+        cartas = [(rng.randint(2, 14), rng.choice(naipes)) for _ in range(5)]
+    valores = sorted(c[0] for c in cartas)
+    contagem = {}
+    for v in valores:
+        contagem[v] = contagem.get(v, 0) + 1
+    padrao = sorted(contagem.values(), reverse=True)
+    flush = len(set(c[1] for c in cartas)) == 1
+    sequencia = (len(contagem) == 5 and max(valores) - min(valores) == 4)
+    if sequencia and flush:
+        mao = 'STRAIGHT FLUSH'
+    elif padrao[0] == 4:
+        mao = 'QUADRA'
+    elif flush:
+        mao = 'FLUSH'
+    elif padrao[:2] == [3, 2]:
+        mao = 'FULL HOUSE'
+    elif sequencia:
+        mao = 'SEQUENCIA'
+    elif padrao[0] == 3:
+        mao = 'TRINCA'
+    elif padrao[:2] == [2, 2]:
+        mao = 'DOIS PARES'
+    elif padrao[0] == 2:
+        mao = 'PAR'
+    else:
+        mao = 'CARTA ALTA'
+    texto = ', '.join(nomes[v] + ' de ' + n for v, n in cartas)
+    return ('Mao: ' + texto + '.\nResultado: ' + mao + ' (baralho local de 52; '
+            'classificacao padrao de poker).')
+
+
+def sortear_times_equilibrados(nomes='', semente=None) -> str:
+    """Divide uma lista de nomes em 2 times sorteados (por contagem; NAO avalia
+    habilidade — para equilibrar de verdade, passe notas ou faca drafts)."""
+    import random
+    if isinstance(nomes, str):
+        bruto = [p.strip() for p in nomes.replace(';', ',').replace('\n', ',').split(',') if p.strip()]
+    else:
+        bruto = [str(p).strip() for p in (nomes or []) if str(p).strip()]
+    vistos, limpos = set(), []
+    for n in bruto:
+        chave = n.casefold()
+        if chave not in vistos:
+            vistos.add(chave)
+            limpos.append(n)
+    if len(limpos) < 4:
+        raise ValueError('Informe pelo menos 4 nomes distintos para dividir em 2 times.')
+    rng = random.Random(semente)
+    rng.shuffle(limpos)
+    meio = (len(limpos) + 1) // 2
+    a, b = limpos[:meio], limpos[meio:]
+    return ('TIMES SORTEADOS (' + str(len(limpos)) + ' pessoas):\n'
+            '- Time A (' + str(len(a)) + '): ' + ', '.join(a) + '\n'
+            '- Time B (' + str(len(b)) + '): ' + ', '.join(b)
+            + '\nSorteio por contagem; nao avalia habilidade.')
+
+# --- r43 lote 6 (bloco D): seguranca, geo, espaco e ciencia -------------------
+
+def exportar_inventario_ferramentas_txt(caminho_agente='', destino='') -> str:
+    """Exporta NOME + primeira linha da docstring de cada ferramenta (defs sem
+    '_' no arquivo do agente) para um TXT de revisao humana. So nomes e
+    descricoes: nada de codigo, configuracao ou segredos."""
+    import ast, io, os
+    origem = str(caminho_agente or '').strip() or 'agente.py'
+    if not os.path.isfile(origem):
+        raise ValueError('Arquivo do agente nao encontrado: ' + origem)
+    with io.open(origem, 'r', encoding='utf-8', errors='ignore') as f:
+        arvore = ast.parse(f.read())
+    linhas, total = [], 0
+    for no in arvore.body:
+        if isinstance(no, ast.FunctionDef) and not no.name.startswith('_'):
+            doc = ast.get_docstring(no) or ''
+            primeira = doc.splitlines()[0].strip() if doc else '(sem docstring)'
+            linhas.append(no.name + ': ' + primeira)
+            total += 1
+    texto = 'INVENTARIO DE FERRAMENTAS (' + str(total) + ')\n' + '\n'.join(linhas) + '\n'
+    destino_final = str(destino or '').strip()
+    if not destino_final:
+        pasta = globals().get('PASTA_BASE')
+        if pasta:
+            destino_final = os.path.join(str(pasta), 'inventario_ferramentas.txt')
+    if destino_final:
+        with io.open(destino_final, 'w', encoding='utf-8') as f:
+            f.write(texto)
+        return ('Inventario gravado em ' + destino_final + ' (' + str(total)
+                + ' ferramentas; so nomes e descricoes, nada de segredos).')
+    return ('Inventario montado: ' + str(total) + ' ferramentas (sem PASTA_BASE e '
+            'sem destino informado, NAO gravei arquivo). Primeiras 5: '
+            + ' | '.join(linhas[:5]))
+
+
+def pin_numerico_gerar(tamanho=6, semente=None) -> str:
+    """Gera um PIN numerico de 4 a 8 digitos com aviso honesto de forca baixa.
+    Para senha de verdade use passphrase_palavras_gerar."""
+    import math, random
+    tamanho = int(tamanho or 6)
+    if not (4 <= tamanho <= 8):
+        raise ValueError('PIN tem de 4 a 8 digitos.')
+    rng = random.Random(semente)
+    pin = ''.join(str(rng.randint(0, 9)) for _ in range(tamanho))
+    bits = round(tamanho * math.log2(10), 1)
+    return ('PIN: ' + pin + ' (entropia ~' + str(bits) + ' bits; ' + str(10 ** tamanho)
+            + ' combinacoes). PIN e forca baixa POR NATUREZA: proteja com limite '
+            'de tentativas; para senha use passphrase de palavras.')
+
+
+def passphrase_palavras_gerar(qtd_palavras=5, semente=None) -> str:
+    """Gera passphrase estilo diceware com lista PT-BR embutida
+    (palavras curtas, sem acento) e entropia calculada. Sorteio local; nada sai do PC."""
+    import math, random
+    palavras = (
+        'abelha acorde agulha alface ameixa ancora apito arara '
+        'arvore asfalto azulejo bagagem baleia bambu banana barco '
+        'batata bispo bolha bolo borboleta bruxa bule cabra '
+        'cafe caldeira camelo canoa capivara caravela cartola castanha '
+        'cebola cenoura cigarra cinza coelho colmeia cometa compasso '
+        'concha coral coruja cratera cristal dedal diamante dodo '
+        'dragao duna eclipse enxada escada espelho esponja esquilo '
+        'estrela fantasma farol faisca figo flauta floresta foguete '
+        'formiga forno fogueira funil gaiola galope gato girafa '
+        'gota grilo gruta harpa hidra iate iglu ilha '
+        'indio janela jasmim javali labirinto lagoa lampada lanterna '
+        'leao leme lenda limao lince lua lupa machado '
+        'madeira magma mandioca mapa maracuja marmota medusa melancia '
+        'meteorito moinho montanha morango mosca motor mula museu '
+        'navio neblina nuvem oceano octogono olho onca orquidea '
+        'ovo panda panela parafuso passo patins pavao pedra '
+        'pinguim piranha planeta pombo porta praia palhaco prato '
+        'punho rabanete rancho raiz rede refresco relogio remanso '
+        'rosquinha rocha roda roleta roma rumo sabia sabonete'
+    ).split()
+    qtd = max(3, min(int(qtd_palavras or 5), 12))
+    rng = random.Random(semente)
+    frase = '-'.join(rng.choice(palavras) for _ in range(qtd))
+    bits = round(qtd * math.log2(len(palavras)), 1)
+    return ('Passphrase: ' + frase + '\nEntropia ~' + str(bits)
+            + ' bits (' + str(qtd) + ' palavras de uma lista de ' + str(len(palavras))
+            + '; sorteio local com semente ' + ('definida' if semente is not None else 'do tempo')
+            + '). Frases longas sao faceis de lembrar e dificeis de quebrar.')
+
+
+def checar_reuso_senha_local(nova_senha='', senhas_existentes='') -> str:
+    """Compara a senha nova com uma lista informada NO COMANDO (uma por linha):
+    avisa igualdade e semelhanca (corte 0,85 via difflib). NUNCA grava nada e
+    NUNCA ecoa as senhas na resposta."""
+    import difflib
+    nova = str(nova_senha or '')
+    if not nova:
+        raise ValueError('Informe a senha nova a checar (a comparacao e so na memoria).')
+    bruto = [l.strip() for l in str(senhas_existentes or '').splitlines() if l.strip()]
+    if not bruto:
+        raise ValueError('Passe as senhas existentes, uma por linha, para eu comparar.')
+    iguais = sum(1 for s in bruto if s == nova)
+    parecidas = [s for s in bruto if s != nova
+                 and difflib.SequenceMatcher(None, s.casefold(), nova.casefold()).ratio() >= 0.85]
+    partes = []
+    if iguais:
+        partes.append('IGUAL a ' + str(iguais) + ' senha(s) da lista — REUSE NAO')
+    if parecidas:
+        partes.append('parecida demais com ' + str(len(parecidas))
+                      + ' senha(s) existente(s) (corte 0,85)')
+    veredito = '; '.join(partes) if partes else 'sem igual e sem parecida na lista informada'
+    return ('Checagem local (nada gravado, nada exibido): a senha nova esta ' + veredito
+            + '. ' + ('Troque para uma senha bem diferente.' if partes else
+                      'Boa: pode usar com o gerenciador de senhas de sempre.'))
+
+
+def verificar_forca_frase_senha(frase='') -> str:
+    """Estima a forca por ENTROPIA (tamanho x variedade de caracteres) e aponta
+    padroes ruins obvios. Nao ecoa a senha informada; analise local."""
+    import math
+    f = str(frase or '')
+    if not f:
+        raise ValueError('Informe a senha/frase a analisar (ela nao sera exibida nem gravada).')
+    tem_min = any(c.islower() for c in f)
+    tem_mai = any(c.isupper() for c in f)
+    tem_num = any(c.isdigit() for c in f)
+    tem_sim = any(not c.isalnum() for c in f)
+    espacos = ' ' in f
+    pool = (26 if tem_min else 0) + (26 if tem_mai else 0) + (10 if tem_num else 0) \
+        + (33 if tem_sim else 0) + (1 if espacos else 0)
+    if pool == 0:
+        raise ValueError('Senha vazia ou sem caracteres validos.')
+    bits = round(len(f) * math.log2(pool), 1)
+    comuns = {'123456', '123456789', 'senha', 'senha123', 'password', '111111',
+              '12345678', 'qwerty', 'abc123', 'minhasenha', '000000', 'admin'}
+    if f.casefold() in comuns:
+        nivel, nota = 'CRITICA', 'a frase esta em listas de senhas vazadas mais comuns'
+    elif bits < 28:
+        nivel, nota = 'CRITICA', 'quebravel por forca bruta rapida'
+    elif bits < 36:
+        nivel, nota = 'FRACA', 'evite: pouca variedade ou tamanho'
+    elif bits < 60:
+        nivel, nota = 'RAZOAVEL', 'serve com cuidado; uma frase longa faria melhor'
+    elif bits < 80:
+        nivel, nota = 'FORTE', 'bom nivel para uso pessoal'
+    else:
+        nivel, nota = 'EXCELENTE', 'nivel alto mesmo contra ataque dedicado'
+    composicao = ', '.join(f for f, v in (('minusculas', tem_min), ('maiusculas', tem_mai),
+                                          ('numeros', tem_num), ('simbolos', tem_sim),
+                                          ('espacos', espacos)) if v) or 'nenhuma classe'
+    return ('Forca estimada: ' + nivel + ' (~' + str(bits) + ' bits; ' + str(len(f))
+            + ' caracteres; alfabeto de ' + str(pool) + ' simbolos: ' + composicao
+            + '). ' + nota.capitalize() + '. Analise local; a senha NAO foi exibida '
+            'nem gravada. Gerenciador de senhas + 2FA seguem sendo o padrao-ouro.')
+
+
+def gerar_totp_codigo(segredo_base32='', momento=None, digitos=6) -> str:
+    """Gera codigo TOTP (RFC 6238, SHA-1, janela de 30 s) a partir do segredo
+    Base32 do proprio usuario — offline, hmac da stdlib. Nao le QR Code."""
+    import base64, hashlib, hmac, struct, time
+    chave = str(segredo_base32 or '').strip().replace(' ', '').upper()
+    if not chave:
+        raise ValueError('Informe o segredo em Base32 (o mesmo do app autenticador).')
+    preenchimento = '=' * ((8 - len(chave) % 8) % 8)
+    try:
+        chave_bytes = base64.b32decode(chave + preenchimento)
+    except Exception:
+        raise ValueError('Segredo Base32 invalido (confira caracteres A-Z, 2-7).')
+    digitos = max(6, min(int(digitos or 6), 8))
+    t = int(momento) if momento is not None else int(time.time())
+    msg = struct.pack('>Q', t // 30)
+    digest = hmac.new(chave_bytes, msg, hashlib.sha1).digest()
+    offset = digest[19] & 0x0F
+    codigo = (struct.unpack('>I', digest[offset:offset + 4])[0] & 0x7FFFFFFF) % (10 ** digitos)
+    return ('Codigo: ' + str(codigo).zfill(digitos) + ' (janela ' + str(t // 30)
+            + '; valido ~30 s). TOTP RFC 6238 gerado OFFLINE com o seu segredo.')
+
+
+def distancia_coordenadas_haversine(lat1=0.0, lon1=0.0, lat2=0.0, lon2=0.0) -> str:
+    """Distancia em km entre dois pontos (lat/lon em graus decimais) pela
+    formula de Haversine, raio medio 6371 km. Linha reta: ignora relevo/ruas."""
+    import math
+    p1 = float(str(lat1).replace(',', '.'))
+    l1 = float(str(lon1).replace(',', '.'))
+    p2 = float(str(lat2).replace(',', '.'))
+    l2 = float(str(lon2).replace(',', '.'))
+    for v in (p1, l1, p2, l2):
+        if not (-180.0 <= v <= 180.0):
+            raise ValueError('Coordenadas em graus decimais (-180 a 180).')
+    phi1, phi2 = math.radians(p1), math.radians(p2)
+    dphi = math.radians(p2 - p1)
+    dl = math.radians(l2 - l1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dl / 2) ** 2
+    km = 2 * 6371.0088 * math.asin(math.sqrt(a))
+    return ('Distancia (linha reta, Haversine): ~' + str(round(km, 1)) + ' km entre ('
+            + str(p1) + ', ' + str(l1) + ') e (' + str(p2) + ', ' + str(l2)
+            + '). Nao e rota de estrada.')
+
+
+def rumo_entre_coordenadas(lat1=0.0, lon1=0.0, lat2=0.0, lon2=0.0) -> str:
+    """Rumo inicial (azimute em graus de 0 a 360) e ponto cardeal (16 setores)
+    de um ponto a outro. Rumo inicial: a Terra curva, o rumo muda no caminho."""
+    import math
+    p1 = float(str(lat1).replace(',', '.'))
+    l1 = float(str(lon1).replace(',', '.'))
+    p2 = float(str(lat2).replace(',', '.'))
+    l2 = float(str(lon2).replace(',', '.'))
+    phi1, phi2 = math.radians(p1), math.radians(p2)
+    dl = math.radians(l2 - l1)
+    y = math.sin(dl) * math.cos(phi2)
+    x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dl)
+    azimute = (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+    nomes = ['norte', 'norte-nordeste', 'nordeste', 'leste-nordeste', 'leste',
+             'leste-sudeste', 'sudeste', 'sul-sudeste', 'sul', 'sul-sudoeste',
+             'sudoeste', 'oeste-sudoeste', 'oeste', 'oeste-noroeste', 'noroeste',
+             'norte-noroeste']
+    cardeal = nomes[int(round(azimute / 22.5)) % 16]
+    return ('Rumo inicial: ' + str(round(azimute)) + ' graus (~' + cardeal
+            + ') de (' + str(p1) + ', ' + str(l1) + ') para (' + str(p2) + ', '
+            + str(l2) + '). Rumo INICIAL: a rota curva com a Terra.')
+
+
+def fase_da_lua_aproximada(ano=2026, mes=1, dia=1) -> str:
+    """Fase da lua pela idade lunar (ciclo medio 29,53 dias a partir da lua nova
+    de 06/01/2000). APROXIMADA: margem de ~1-2 dias; efemeride oficial para exatidao."""
+    from datetime import datetime
+    try:
+        alvo = datetime(int(ano), int(mes), int(dia), 12, 0)
+    except Exception:
+        raise ValueError('Informe ano, mes e dia validos.')
+    referencia = datetime(2000, 1, 6, 18, 14)
+    idade = ((alvo - referencia).total_seconds() / 86400.0) % 29.53058867
+    fases = [(1.85, 'Lua NOVA'), (5.54, 'Crescente cica'), (9.23, 'Quarto CRESCENTE'),
+             (12.92, 'Crescente gibosa'), (16.61, 'Lua CHEIA'), (20.30, 'Minguante gibosa'),
+             (23.99, 'Quarto MINGUANTE'), (27.68, 'Minguante cica'), (99.0, 'Lua NOVA')]
+    nome = next(nome for limite, nome in fases if idade <= limite)
+    return ('Em ' + str(alvo.date()) + ' a lua esta ~' + str(round(idade, 1))
+            + ' dias no ciclo: ' + nome + ' (APROXIMACAO por ciclo medio; margem '
+            '~1-2 dias).')
+
+
+def planetas_consulta(nome='') -> str:
+    """Tabela estatica dos 8 planetas: distancia media (UA), diametro (km),
+    gravidade (m/s2), dia e ano em dias terrestres, luas conhecidas (referencia;
+    contagem de luas muda com novas descobertas)."""
+    dados = {
+        'mercurio': (0.39, 4879, 3.7, 1408, 88, 0),
+        'venus': (0.72, 12104, 8.9, 5832, 225, 0),
+        'terra': (1.00, 12742, 9.8, 24, 365, 1),
+        'marte': (1.52, 6779, 3.7, 25, 687, 2),
+        'jupiter': (5.20, 139820, 24.8, 10, 4333, 95),
+        'saturno': (9.58, 116460, 10.4, 11, 10759, 146),
+        'urano': (19.20, 50724, 8.9, 17, 30687, 28),
+        'netuno': (30.10, 49244, 11.2, 16, 60190, 16),
+    }
+    chave = ' '.join(str(nome or '').lower().replace('ç', 'c').replace('á', 'a').replace('ú', 'u').split())
+    if chave in dados:
+        ua, diam, grav, dia, ano, luas = dados[chave]
+        return (chave.capitalize() + ': distancia media ' + str(ua) + ' UA (1 UA = '
+                '150 milhoes de km, distancia Terra-Sol), diametro ' + str(diam)
+                + ' km, gravidade ' + str(grav) + ' m/s2, dia de ' + str(dia)
+                + ' h, ano de ' + str(ano) + ' dias terrestres, ~' + str(luas)
+                + ' lua(s) conhecida(s) (referencia estatica; luas mudam com descobertas).')
+    linhas = []
+    for planeta, (ua, diam, grav, _d, _a, luas) in dados.items():
+        linhas.append('- ' + planeta.ljust(9) + str(ua).rjust(6) + ' UA | ' + str(diam).rjust(6)
+                      + ' km | ' + str(grav).rjust(5) + ' m/s2 | ~' + str(luas) + ' lua(s)')
+    return ('OS 8 PLANETAS (tabela estatica de referencia):\n' + '\n'.join(linhas)
+            + '\nPasse um nome (ex.: planetas_consulta marte) para o resumo de um.')
+
+
+def coordenada_formato_converter(valor='', eixo='lat') -> str:
+    """Converte coordenada entre graus decimais (-23.55) e GMS (23 graus 33
+    minutos 0 segundos S). Eixo: 'lat' (N/S) ou 'lon' (L/O)."""
+    import math, re as _re
+    eixo_n = str(eixo or 'lat').strip().lower()
+    norte_sul = eixo_n in ('lat', 'latitude', 'norte-sul')
+    positivos, negativos = ('N', 'S') if norte_sul else ('L', 'O')
+    limite = 90.0 if norte_sul else 180.0
+    texto = str(valor or '').strip()
+    if not texto:
+        raise ValueError("Informe a coordenada e o eixo ('lat' ou 'lon').")
+    m = _re.match(r'^\s*(-?\d+(?:[.,]\d+)?)\s*$', texto)
+    if m:
+        decimal = float(m.group(1).replace(',', '.'))
+        if abs(decimal) > limite:
+            raise ValueError('Coordenada fora do limite (' + str(limite) + ') para o eixo.')
+        sinal = positivos if decimal >= 0 else negativos
+        absoluto = abs(decimal)
+        graus = int(absoluto)
+        minutos_f = (absoluto - graus) * 60
+        minutos = int(minutos_f)
+        segundos = round((minutos_f - minutos) * 60, 1)
+        if segundos >= 60:
+            minutos += 1
+            segundos = 0.0
+        return (str(decimal) + ' = ' + str(graus) + ' graus ' + str(minutos)
+                + ' min ' + str(segundos) + ' seg ' + sinal
+                + ' (formato GMS para mapas e GPS).')
+    m2 = _re.match(r'^\s*(\d+(?:[.,]\d+)?)\s*(?:graus?|gr|\u00b0|\u00ba)?\s*(\d+(?:[.,]\d+)?)?\s*(?:min|[' + chr(39) + chr(8217) + r'\'m])?\s*(\d+(?:[.,]\d+)?)?\s*(?:seg|s|")?\s*([NnSsLlOoEeWw]?)\s*$', texto)
+    if not m2:
+        raise ValueError("Formato nao reconhecido; ex.: -23.55 ou \"23 graus 33 min 0 seg S\".")
+    graus = float(m2.group(1).replace(',', '.'))
+    minutos = float((m2.group(2) or '0').replace(',', '.'))
+    segundos = float((m2.group(3) or '0').replace(',', '.'))
+    direcao = m2.group(4).upper()
+    decimal = graus + minutos / 60.0 + segundos / 3600.0
+    if direcao in ('S', 'O', 'W'):
+        decimal = -decimal
+    elif direcao not in ('N', 'L', 'E', ''):
+        raise ValueError('Direcao desconhecida: use N/S para latitude, L/O para longitude.')
+    if abs(decimal) > limite:
+        raise ValueError('Coordenada fora do limite do eixo informado.')
+    return (texto + ' = ' + str(round(decimal, 6)) + ' (graus decimais, ' + str(limite)
+            + ' max no eixo).')
+
+
+def elementos_consulta(busca='') -> str:
+    """Consulta os 118 elementos quimicos por numero atomico, simbolo ou nome
+    (tabela estatica: numero, simbolo, nome, massa atomica em u)."""
+    tabela = [
+        (1, 'H', 'Hidrogenio', 1.008), (2, 'He', 'Helio', 4.0026), (3, 'Li', 'Litio', 6.94),
+        (4, 'Be', 'Berilio', 9.0122), (5, 'B', 'Boro', 10.81), (6, 'C', 'Carbono', 12.011),
+        (7, 'N', 'Nitrogenio', 14.007), (8, 'O', 'Oxigenio', 15.999), (9, 'F', 'Fluor', 18.998),
+        (10, 'Ne', 'Neonio', 20.180), (11, 'Na', 'Sodio', 22.990), (12, 'Mg', 'Magnesio', 24.305),
+        (13, 'Al', 'Aluminio', 26.982), (14, 'Si', 'Silicio', 28.085), (15, 'P', 'Fosforo', 30.974),
+        (16, 'S', 'Enxofre', 32.06), (17, 'Cl', 'Cloro', 35.45), (18, 'Ar', 'Argonio', 39.948),
+        (19, 'K', 'Potassio', 39.098), (20, 'Ca', 'Calcio', 40.078), (21, 'Sc', 'Escandio', 44.956),
+        (22, 'Ti', 'Titanio', 47.867), (23, 'V', 'Vanadio', 50.942), (24, 'Cr', 'Cromo', 51.996),
+        (25, 'Mn', 'Manganes', 54.938), (26, 'Fe', 'Ferro', 55.845), (27, 'Co', 'Cobalto', 58.933),
+        (28, 'Ni', 'Niquel', 58.693), (29, 'Cu', 'Cobre', 63.546), (30, 'Zn', 'Zinco', 65.38),
+        (31, 'Ga', 'Galio', 69.723), (32, 'Ge', 'Germanio', 72.630), (33, 'As', 'Arsenio', 74.922),
+        (34, 'Se', 'Selenio', 78.971), (35, 'Br', 'Bromo', 79.904), (36, 'Kr', 'Criptonio', 83.798),
+        (37, 'Rb', 'Rubidio', 85.468), (38, 'Sr', 'Estroncio', 87.62), (39, 'Y', 'Itrio', 88.906),
+        (40, 'Zr', 'Zirconio', 91.224), (41, 'Nb', 'Niobio', 92.906), (42, 'Mo', 'Molibdenio', 95.95),
+        (43, 'Tc', 'Tecnecio', 98), (44, 'Ru', 'Rutenio', 101.07),
+        (45, 'Rh', 'Rodio', 102.91), (46, 'Pd', 'Paladio', 106.42), (47, 'Ag', 'Prata', 107.87),
+        (48, 'Cd', 'Cadmio', 112.41), (49, 'In', 'Indio', 114.82), (50, 'Sn', 'Estanho', 118.71),
+        (51, 'Sb', 'Antimonio', 121.76), (52, 'Te', 'Telurio', 127.60), (53, 'I', 'Iodo', 126.90),
+        (54, 'Xe', 'Xenonio', 131.29), (55, 'Cs', 'Cesio', 132.91), (56, 'Ba', 'Bario', 137.33),
+        (57, 'La', 'Lantanio', 138.91), (58, 'Ce', 'Cerio', 140.12), (59, 'Pr', 'Praseodimio', 140.91),
+        (60, 'Nd', 'Neodimio', 144.24), (61, 'Pm', 'Promecio', 145), (62, 'Sm', 'Samario', 150.36),
+        (63, 'Eu', 'Europio', 151.96), (64, 'Gd', 'Gadolinio', 157.25), (65, 'Tb', 'Terbio', 158.93),
+        (66, 'Dy', 'Disprosio', 162.50), (67, 'Ho', 'Holmio', 164.93), (68, 'Er', 'Erbio', 167.26),
+        (69, 'Tm', 'Tulio', 168.93), (70, 'Yb', 'Iterbio', 173.05), (71, 'Lu', 'Lutecio', 174.97),
+        (72, 'Hf', 'Hafnio', 178.49), (73, 'Ta', 'Tantalo', 180.95), (74, 'W', 'Tungstenio', 183.84),
+        (75, 'Re', 'Renio', 186.21), (76, 'Os', 'Osmio', 190.23), (77, 'Ir', 'Iridio', 192.22),
+        (78, 'Pt', 'Platina', 195.08), (79, 'Au', 'Ouro', 196.97), (80, 'Hg', 'Mercurio', 200.59),
+        (81, 'Tl', 'Talio', 204.38), (82, 'Pb', 'Chumbo', 207.2), (83, 'Bi', 'Bismuto', 208.98),
+        (84, 'Po', 'Polonio', 209), (85, 'At', 'Astato', 210), (86, 'Rn', 'Radonio', 222),
+        (87, 'Fr', 'Francio', 223), (88, 'Ra', 'Radio', 226), (89, 'Ac', 'Actinio', 227),
+        (90, 'Th', 'Torio', 232.04), (91, 'Pa', 'Protactinio', 231.04), (92, 'U', 'Uranio', 238.03),
+        (93, 'Np', 'Netunio', 237), (94, 'Pu', 'Plutonio', 244), (95, 'Am', 'Americio', 243),
+        (96, 'Cm', 'Curio', 247), (97, 'Bk', 'Berquelio', 247), (98, 'Cf', 'Californio', 251),
+        (99, 'Es', 'Einstenio', 252), (100, 'Fm', 'Fermio', 257), (101, 'Md', 'Mendelevio', 258),
+        (102, 'No', 'Nobelio', 259), (103, 'Lr', 'Laurencio', 266), (104, 'Rf', 'Rutherfordio', 267),
+        (105, 'Db', 'Dubnio', 268), (106, 'Sg', 'Seaborgio', 269), (107, 'Bh', 'Bohrio', 270),
+        (108, 'Hs', 'Hassio', 277), (109, 'Mt', 'Meitnerio', 278), (110, 'Ds', 'Darmstatio', 281),
+        (111, 'Rg', 'Roentgenio', 282), (112, 'Cn', 'Copernicio', 285), (113, 'Nh', 'Nihonio', 286),
+        (114, 'Fl', 'Flerovio', 289), (115, 'Mc', 'Moscovio', 290), (116, 'Lv', 'Livermorio', 293),
+        (117, 'Ts', 'Tenesso', 294), (118, 'Og', 'Oganesson', 294),
+    ]
+
+    def _norma(s):
+        return ''.join(c for c in str(s).lower() if c.isalnum())
+
+    chave = _norma(busca)
+    if not chave:
+        return ('Tabela local com os ' + str(len(tabela)) + ' elementos quimicos (numero, '
+                'simbolo, nome, massa atomica). Passe busca: numero (79), simbolo (Au) '
+                'ou nome (ouro).')
+    for numero, simbolo, nome, massa in tabela:
+        if chave == str(numero) or chave == simbolo.lower() or chave == _norma(nome):
+            return ('Elemento ' + str(numero) + ' - ' + simbolo + ' - ' + nome
+                    + ' | massa atomica ~' + str(massa) + ' u (tabela estatica de referencia).')
+    return ('Nao achei "' + str(busca) + '" na tabela local de ' + str(len(tabela))
+            + ' elementos. Tente numero atomico, simbolo (ex.: Fe) ou nome sem acento.')
+
+
+def decada_seculo_info(ano=2026) -> str:
+    """Info de um ano: seculo (algarismos romanos) e decada (ex.: 1929 ->
+    seculo XX, decada de 20). Calculo calendario puro."""
+    ano = int(ano)
+    if not (1 <= ano <= 9999):
+        raise ValueError('Ano entre 1 e 9999.')
+    seculo = (ano + 99) // 100
+    romanos = [(1000, 'M'), (900, 'CM'), (500, 'D'), (400, 'CD'), (100, 'C'),
+               (90, 'XC'), (50, 'L'), (40, 'XL'), (10, 'X'), (9, 'IX'),
+               (5, 'V'), (4, 'IV'), (1, 'I')]
+    resto, romano = seculo, ''
+    for valor, simbolo in romanos:
+        while resto >= valor:
+            romano += simbolo
+            resto -= valor
+    decada = (ano // 10) % 10 * 10
+    inicio = (ano // 100) * 100 + decada
+    return (str(ano) + ': seculo ' + romano + ', decada de ' + str(decada)
+            + ' (anos ' + str(inicio) + '-' + str(inicio + 9) + ').')
+
+# --- r43 lote 6 (bloco E): sistema, rede, midia, estudo e varios ---------------
+
+def listar_fontes_instaladas(filtro='') -> str:
+    """Lista fontes instaladas (arquivos .ttf/.otf das pastas de fontes do
+    sistema). SOMENTE LEITURA de nomes de arquivo; filtro opcional."""
+    import os
+    pastas = []
+    if os.name == 'nt':
+        pastas.append(os.path.join(os.environ.get('WINDIR', r'C:\Windows'), 'Fonts'))
+        pastas.append(os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'Windows', 'Fonts'))
+    else:
+        pastas += ['/usr/share/fonts', '/usr/local/share/fonts', os.path.expanduser('~/.fonts')]
+    achadas = []
+    for pasta in pastas:
+        if not os.path.isdir(pasta):
+            continue
+        for raiz, _dirs, arquivos in os.walk(pasta):
+            for a in arquivos:
+                if a.lower().endswith(('.ttf', '.otf', '.ttc')):
+                    achadas.append(os.path.splitext(a)[0])
+    chave = str(filtro or '').strip().lower()
+    if chave:
+        achadas = [f for f in achadas if chave in f.lower()]
+    if not achadas:
+        return ('Nenhuma fonte encontrada' + (' com filtro "' + str(filtro) + '"' if chave else '')
+                + ' nas pastas padrao deste sistema (leitura somente).')
+    exibidas = sorted(set(achadas))
+    total = len(exibidas)
+    return (str(total) + ' fonte(s)' + (' com filtro "' + str(filtro) + '"' if chave else '')
+            + ' (mostrando ate 40):\n- ' + '\n- '.join(exibidas[:40])
+            + ('\n... e mais ' + str(total - 40) if total > 40 else ''))
+
+
+def pastas_especiais_usuario() -> str:
+    """Mostra os caminhos das pastas especiais do usuario (Area de Trabalho,
+    Downloads, Documentos, Imagens, Musicas, Videos) e se existem. So leitura."""
+    import os
+    if os.name == 'nt':
+        raiz = os.environ.get('USERPROFILE') or os.path.expanduser('~')
+    else:
+        raiz = os.path.expanduser('~')
+    nomes = [('Area de Trabalho', ['Desktop', 'Area de Trabalho']),
+             ('Downloads', ['Downloads', 'Transferencias']),
+             ('Documentos', ['Documents', 'Documentos']),
+             ('Imagens', ['Pictures', 'Imagens']),
+             ('Musicas', ['Music', 'Musicas']),
+             ('Videos', ['Videos'])]
+    linhas = []
+    for rotulo, candidatos in nomes:
+        caminho = ''
+        for c in candidatos:
+            tentativa = os.path.join(raiz, c)
+            if os.path.isdir(tentativa):
+                caminho = tentativa
+                break
+        linhas.append('- ' + rotulo + ': ' + (caminho if caminho else 'nao encontrada em ' + raiz))
+    return ('PASTAS ESPECIAIS do usuario (so leitura):\n' + '\n'.join(linhas)
+            + '\nNada foi aberto nem alterado.')
+
+
+def ps_build_consulta() -> str:
+    """Consulta versao do PowerShell e build do Windows (comando de leitura
+    Get-.../version, sem mudar nada). So funciona no Windows."""
+    import platform, subprocess
+    if platform.system() != 'Windows':
+        return ('Consulta de versao do PowerShell/Windows so funciona no Windows '
+                '(este sistema e ' + platform.system() + '). Nada foi executado.')
+    comando = ('$PSVersionTable.PSVersion.ToString() + \' | \' + '
+               '[Environment]::OSVersion.VersionString')
+    try:
+        saida = subprocess.run(['powershell', '-NoProfile', '-Command', comando],
+                               capture_output=True, text=True, timeout=20)
+        texto = (saida.stdout or '').strip()
+        if not texto:
+            return ('PowerShell respondeu vazio (stderr: '
+                    + (saida.stderr or '').strip()[:120] + ').')
+        return 'Versao PowerShell | Windows: ' + texto + ' (consulta de leitura).'
+    except Exception as e:
+        return ('Falha ao consultar (honesto): ' + str(e)[:140]
+                + '. Nada foi alterado no sistema.')
+
+
+def zona_horaria_detalhe(nome_fuso='America/Sao_Paulo') -> str:
+    """Detalhe de um fuso horario (nome IANA, ex.: America/Sao_Paulo): hora
+    local, offset UTC e se esta no horario de verao agora. Consulta offline."""
+    from datetime import datetime
+    try:
+        from zoneinfo import ZoneInfo
+    except Exception:
+        return ('Modulo zoneinfo indisponivel nesta versao do Python; nada foi '
+                'consultado (honesto).')
+    try:
+        fuso = ZoneInfo(str(nome_fuso or '').strip())
+    except Exception:
+        return ('Fuso "' + str(nome_fuso) + '" nao reconhecido. Use nome IANA, '
+                "ex.: America/Sao_Paulo, America/Manaus, UTC.")
+    agora = datetime.now(fuso)
+    offset = agora.utcoffset()
+    horas = int(offset.total_seconds() // 3600)
+    minutos = int(abs(offset.total_seconds()) % 3600 // 60)
+    sinal = '+' if horas >= 0 else '-'
+    verao = bool(agora.dst())
+    return (str(nome_fuso) + ': agora ' + agora.strftime('%d/%m/%Y %H:%M')
+            + ' (' + agora.tzname() + '), UTC' + sinal + str(abs(horas)).zfill(2) + ':'
+            + str(minutos).zfill(2) + ', horario de verao ' + ('SIM' if verao else 'NAO')
+            + ' nesta data (consulta offline).')
+
+
+def codigos_erro_windows_consulta(busca='') -> str:
+    """Tabela estatica de codigos de erro Windows comuns (0x80070005 e afins,
+    inclusive alguns BSOD). Busca por codigo (com ou sem 0x) ou palavra."""
+    tabela = [
+        ('0x80070005', 'Acesso negado (permissao)'),
+        ('0x80070002', 'Arquivo ou programa nao encontrado'),
+        ('0x80070003', 'Caminho nao encontrado'),
+        ('0x8007000E', 'Sem memoria suficiente'),
+        ('0x80070020', 'Arquivo em uso por outro processo'),
+        ('0x8007007E', 'Modulo (DLL) nao encontrado'),
+        ('0x80070570', 'Arquivo ou diretorio corrompido'),
+        ('0x80004005', 'Erro nao especificado (E_FAIL)'),
+        ('0x800704CF', 'Rede indisponivel (adaptador/conexao)'),
+        ('0x800B0100', 'Assinatura digital invalida/ausente'),
+        ('0x8024402C', 'Windows Update: conexao/servidor (proxy, DNS)'),
+        ('0xC0000135', 'DLL nao encontrada na inicializacao'),
+        ('0x0000007B', 'Tela azul: dispositivo de boot inacessivel'),
+        ('0x00000050', 'Tela azul: PAGE_FAULT (memoria/driver)'),
+        ('0x0000007E', 'Tela azul: excecao de thread do sistema (driver)'),
+        ('0x00000124', 'Tela azul: WHEA erro de hardware'),
+    ]
+    chave = str(busca or '').strip().lower().replace(' ', '')
+    numero = chave[2:] if chave.startswith('0x') else chave
+    if not chave:
+        return ('Tabela local de ' + str(len(tabela)) + ' codigos de erro Windows comuns. '
+                'Passe o codigo (ex.: 0x80070005 ou 80070005) ou uma palavra (ex.: boot).')
+    for codigo, texto in tabela:
+        if numero == codigo[2:] or codigo == chave:
+            return codigo + ' = ' + texto + ' (tabela estatica; o significado oficial '
+            'vale sempre).'
+    por_palavra = [(c, t) for c, t in tabela if chave in t.lower()]
+    if por_palavra:
+        return '\n'.join('- ' + c + ': ' + t for c, t in por_palavra[:10])
+    return ('Codigo "' + str(busca) + '" fora da tabela local de erros comuns. '
+            'A tabela cobre os frequentes; erros raros pedem a documentacao oficial.')
+
+
+def atalhos_win_referencia(filtro='') -> str:
+    """Tabela estatica de atalhos de teclado do Windows 10/11 (Win+D, Win+E,
+    Win+Shift+S...). Filtro opcional por palavra."""
+    tabela = [
+        ('Win + D', 'Mostrar a area de trabalho'),
+        ('Win + E', 'Abrir Explorador de Arquivos'),
+        ('Win + I', 'Abrir Configuracoes'),
+        ('Win + L', 'Bloquear a tela'),
+        ('Win + A', 'Central de acoes'),
+        ('Win + X', 'Menu do usuario avancado'),
+        ('Win + Shift + S', 'Captura de area da tela'),
+        ('Win + V', 'Historico de area de transferencia (ativar na 1a vez)'),
+        ('Win + P', 'Projetar tela (segundo monitor)'),
+        ('Win + .', 'Painel de emojis'),
+        ('Win + Tab', 'Visao de tarefas'),
+        ('Alt + Tab', 'Alternar entre janelas'),
+        ('Alt + F4', 'Fechar a janela ativa'),
+        ('Ctrl + Shift + Esc', 'Gerenciador de Tarefas direto'),
+        ('Ctrl + C / Ctrl + V', 'Copiar / colar (em quase tudo)'),
+        ('Ctrl + Z', 'Desfazer'),
+        ('Ctrl + Shift + N', 'Nova pasta no Explorador'),
+        ('F2', 'Renomear item selecionado'),
+        ('Win + Seta (esq/dir)', 'Encaixar janela na metade da tela'),
+        ('Win + M', 'Minimizar todas as janelas'),
+        ('Win + Pause', 'Informacoes do sistema'),
+        ('PrtScn / Win + PrtScn', 'Captura de tela (a 2a salva em Imagens)'),
+        ('Ctrl + Shift + T', 'Reabrir aba fechada (navegador)'),
+        ('Ctrl + L / F6', 'Focar a barra de endereco (navegador)'),
+    ]
+    chave = str(filtro or '').strip().lower()
+    if chave:
+        tabela = [t for t in tabela if chave in t[0].lower() or chave in t[1].lower()]
+    if not tabela:
+        return 'Nenhum atalho casou com "' + str(filtro) + '" na tabela local.'
+    return (str(len(tabela)) + ' atalho(s) de teclado (tabela estatica Win10/11):\n'
+            + '\n'.join('- ' + c.ljust(24) + t for c, t in tabela[:24]))
+
+
+def where_comando_consulta(comando='') -> str:
+    """Descobre qual executavel resolve um comando no PATH (leitura via
+    shutil.which, cross-platform; nao executa o comando)."""
+    import os, shutil
+    nome = str(comando or '').strip()
+    if not nome:
+        raise ValueError('Informe o nome do comando (ex.: python, notepad, git).')
+    caminho = shutil.which(nome)
+    entradas = [e for e in os.environ.get('PATH', '').split(os.pathsep) if e.strip()]
+    if caminho:
+        return ('"' + nome + '" resolve para: ' + caminho + ' (procurado em '
+                + str(len(entradas)) + ' pasta(s) do PATH; apenas consulta, '
+                'nada foi executado).')
+    return ('"' + nome + '" NAO foi encontrado no PATH (' + str(len(entradas))
+            + ' pasta(s) vasculhadas). Se instalou agora, reabra o console; '
+            'no Windows confira a extensao (.exe/.bat/.ps1).')
+
+
+def variaveis_ambiente_resumo(grupo='') -> str:
+    """Resumo das variaveis de ambiente POR GRUPO (sistema, usuario, caminhos,
+    proxy, todas). Valores que parecem segredo (chave/token/senha) aparecem
+    como OCULTOS — a ferramenta nunca imprime segredo."""
+    import os
+    g = str(grupo or '').strip().lower()
+    grupos = {
+        'sistema': ['OS', 'PROCESSOR_ARCHITECTURE', 'PROCESSOR_IDENTIFIER',
+                    'NUMBER_OF_PROCESSORS', 'WINDIR', 'COMPUTERNAME', 'SYSTEMROOT'],
+        'usuario': ['USERNAME', 'USER', 'USERPROFILE', 'HOME', 'HOMEPATH',
+                    'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP'],
+        'caminhos': ['PATH', 'PATHEXT'],
+        'proxy': ['HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy',
+                  'https_proxy', 'no_proxy'],
+    }
+    def _eh_segredo(nome):
+        n = nome.upper()
+        return any(p in n for p in ('KEY', 'TOKEN', 'SECRET', 'SENHA', 'PASS', 'CRED'))
+    if g in ('todas', 'tudo'):
+        nomes = sorted(os.environ)
+        ocultas = sum(1 for n in nomes if _eh_segredo(n))
+        return ('Ambiente: ' + str(len(nomes)) + ' variaveis no total ('
+                + str(ocultas) + ' pareceriam segredo e seriam OCULTAS). Nomes: '
+                + ', '.join(nomes[:40]) + ('...' if len(nomes) > 40 else ''))
+    if g not in grupos:
+        return ('Grupos disponiveis: ' + ', '.join(sorted(grupos)) + ', todas. '
+                "Ex.: variaveis_ambiente_resumo('usuario').")
+    linhas = []
+    for nome in grupos[g]:
+        valor = os.environ.get(nome)
+        if valor is None:
+            linhas.append('- ' + nome + ': (nao definida neste sistema)')
+        elif _eh_segredo(nome):
+            linhas.append('- ' + nome + ': OCULTO (parece segredo; nao imprimo)')
+        elif nome == 'PATH':
+            partes = [p for p in valor.split(os.pathsep) if p.strip()]
+            linhas.append('- PATH: ' + str(len(partes)) + ' pastas; primeiras 3: '
+                          + ' | '.join(partes[:3]))
+        else:
+            linhas.append('- ' + nome + ': ' + (valor[:60] + '...' if len(valor) > 60 else valor))
+    return ('Variaveis (' + g + '; valores curtos, segredos ocultos):\n' + '\n'.join(linhas))
+
+
+def politica_execucao_atual() -> str:
+    """Consulta a politica de execucao do PowerShell (Get-ExecutionPolicy -List,
+    leitura). Nao altera nada; so funciona no Windows."""
+    import platform, subprocess
+    if platform.system() != 'Windows':
+        return ('Politica de execucao e assunto do PowerShell/Windows (este '
+                'sistema e ' + platform.system() + '). Nada foi executado.')
+    try:
+        saida = subprocess.run(['powershell', '-NoProfile', '-Command',
+                                'Get-ExecutionPolicy -List | Out-String'],
+                               capture_output=True, text=True, timeout=20)
+        texto = (saida.stdout or '').strip()
+        if not texto:
+            return 'PowerShell respondeu vazio; nada foi alterado (honesto).'
+        return 'Politica de execucao (consulta de leitura):\n' + texto
+    except Exception as e:
+        return ('Falha ao consultar (honesto): ' + str(e)[:140] + '.')
+
+
+def duracao_audio_wav(caminho='') -> str:
+    """Duracao e formato de um arquivo .WAV lendo o CABECALHO (modulo wave da
+    stdlib; leitura somente). Nao converte nem toca nada."""
+    import os, wave
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    if os.path.getsize(c) > 100 * 1024 * 1024:
+        raise ValueError('Arquivo maior que 100 MB; corte em pedacos.')
+    try:
+        with wave.open(c, 'rb') as w:
+            frames = w.getnframes()
+            taxa = w.getframerate()
+            canais = w.getnchannels()
+            bits = w.getsampwidth() * 8
+    except Exception as e:
+        return ('Nao parece um WAV valido (honesto): ' + str(e)[:120] + '.')
+    segundos = frames / float(taxa or 1)
+    return (os.path.basename(c) + ': ' + str(round(segundos, 2)) + ' s, ' + str(canais)
+            + ' canal(is), ' + str(taxa) + ' Hz, ' + str(bits) + ' bits, '
+            + str(os.path.getsize(c)) + ' bytes (leitura de cabecalho).')
+
+
+def exif_resumo_imagem(caminho='') -> str:
+    """Resumo de metadados EXIF de uma imagem (PIL/pillow OPCIONAL). Sem a
+    biblioteca, responde com honestidade em vez de inventar nada."""
+    import os
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    try:
+        from PIL import Image
+    except Exception:
+        return ('A biblioteca PIL (pillow) NAO esta instalada neste PC, entao nao '
+                'leio EXIF (honesto, sem inventar). Se quiser, instale com: pip '
+                'install pillow — eu mesmo nao instalo nada.')
+    try:
+        with Image.open(c) as img:
+            base = ('Arquivo: ' + os.path.basename(c) + ' | formato ' + str(img.format)
+                    + ' | ' + str(img.width) + 'x' + str(img.height) + ' px | modo '
+                    + str(img.mode))
+            exif = img.getexif()
+            if not exif:
+                return base + ' | sem tags EXIF.'
+            rotulos = {271: 'fabricante', 272: 'modelo', 306: 'data/hora', 305: 'software'}
+            partes = [rotulos[k] + ': ' + str(exif[k]) for k in rotulos if k in exif]
+            return (base + ' | ' + str(len(exif)) + ' tags EXIF'
+                    + ('; principais: ' + '; '.join(partes) if partes else '') + '.')
+    except Exception as e:
+        return ('Nao consegui ler como imagem (honesto): ' + str(e)[:120] + '.')
+
+
+def dimensoes_imagem_resumo(caminho='') -> str:
+    """Largura x altura x formato lendo o CABECALHO com a stdlib (PNG, GIF, BMP
+    e JPEG). Leitura de poucos bytes; nao usa biblioteca externa."""
+    import os, struct
+    c = str(caminho or '').strip()
+    if not os.path.isfile(c):
+        raise ValueError('Arquivo nao encontrado: ' + c)
+    with open(c, 'rb') as f:
+        cab = f.read(64 * 1024)
+    if cab[:8] == b'\x89PNG\r\n\x1a\n':
+        w, h = struct.unpack('>II', cab[16:24])
+        formato = 'PNG'
+    elif cab[:4] == b'GIF8':
+        w, h = struct.unpack('<HH', cab[6:10])
+        formato = 'GIF'
+    elif cab[:2] == b'BM':
+        w, h = struct.unpack('<ii', cab[18:26])
+        formato = 'BMP'
+    elif cab[:2] == b'\xff\xd8':
+        w = h = 0
+        formato = 'JPEG'
+        i = 2
+        while i + 9 < len(cab):
+            if cab[i] != 0xFF:
+                i += 1
+                continue
+            marcador = cab[i + 1]
+            if marcador in (0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9,
+                            0xCA, 0xCB, 0xCD, 0xCE, 0xCF):
+                h, w = struct.unpack('>HH', cab[i + 5:i + 9])
+                break
+            if marcador in (0xD8, 0x01) or 0xD0 <= marcador <= 0xD7:
+                i += 2
+                continue
+            tamanho = struct.unpack('>H', cab[i + 2:i + 4])[0]
+            i += 2 + tamanho
+        if not (w and h):
+            return ('JPEG sem cabecalho de quadro nos primeiros bytes (honesto); '
+                    'nao consegui dimensoes com a stdlib.')
+    else:
+        return ('Formato nao reconhecido pelo leitor local (suporto PNG, GIF, BMP '
+                'e JPEG). Nada foi inventado.')
+    return (os.path.basename(c) + ': ' + str(abs(w)) + 'x' + str(abs(h)) + ' px, '
+            'formato ' + formato + ', ' + str(os.path.getsize(c))
+            + ' bytes (leitura de cabecalho).')
+
+
+def gerar_exercicios_matematica(operacao='soma', quantidade=10, nivel='facil', semente=None) -> str:
+    """Gera uma lista de contas com gabarito (soma, subtracao, multiplicacao ou
+    divisao exata; niveis facil/medio/dificil). Com semente, a lista repete."""
+    import random
+    faixas = {'facil': (1, 10), 'medio': (10, 100), 'dificil': (100, 1000)}
+    niv = str(nivel or 'facil').strip().lower()
+    if niv not in faixas:
+        raise ValueError("Nivel: 'facil', 'medio' ou 'dificil'.")
+    qtd = max(1, min(int(quantidade or 10), 50))
+    ops = {'soma': '+', 'subtracao': '-', 'multiplicacao': 'x', 'divisao': '/'}
+    chave = str(operacao or 'soma').strip().lower()
+    if chave not in ops:
+        raise ValueError("Operacao: 'soma', 'subtracao', 'multiplicacao' ou 'divisao'.")
+    rng = random.Random(semente)
+    baixo, alto = faixas[niv]
+    questoes, respostas = [], []
+    for _ in range(qtd):
+        if chave == 'divisao':
+            b = rng.randint(max(2, baixo), alto)
+            quociente = rng.randint(baixo, max(baixo + 1, alto))
+            a = b * quociente
+            questoes.append(str(a) + ' / ' + str(b) + ' = ?')
+            respostas.append(str(quociente))
+        else:
+            a = rng.randint(baixo, alto)
+            b = rng.randint(baixo, alto)
+            if chave == 'soma':
+                questoes.append(str(a) + ' + ' + str(b) + ' = ?')
+                respostas.append(str(a + b))
+            elif chave == 'subtracao':
+                if b > a:
+                    a, b = b, a
+                questoes.append(str(a) + ' - ' + str(b) + ' = ?')
+                respostas.append(str(a - b))
+            else:
+                questoes.append(str(a) + ' x ' + str(b) + ' = ?')
+                respostas.append(str(a * b))
+    corpo = '\n'.join(str(i + 1) + ') ' + q for i, q in enumerate(questoes))
+    gabarito = '\n'.join(str(i + 1) + ') ' + r for i, r in enumerate(respostas))
+    return ('EXERCICIOS de ' + chave + ' (' + str(qtd) + ' contas, nivel ' + niv
+            + ')\n' + corpo + '\n\nGABARITO (nao espie antes!):\n' + gabarito)
+
+
+def ph_concentracao_calcular(valor=7.0, modo='ph') -> str:
+    """Converte pH <-> concentracao de ions H+ (pH = -log10[H+]). Agua a 25 C
+    tem pH 7; valores < 0 ou > 14 sao possiveis porem fora da escala usual."""
+    import math
+    v = float(str(valor).replace(',', '.'))
+    m = str(modo or 'ph').strip().lower()
+    if m in ('ph', 'de_ph'):
+        if v < 0:
+            raise ValueError('pH negativo? Confirme; a escala usual vai de 0 a 14.')
+        h = 10 ** (-v)
+        return ('pH ' + str(v) + ' => [H+] = 10^-' + str(v) + ' = ' + ('%.3e' % h)
+                + ' mol/L (pH = -log10[H+]; 25 C).')
+    if m in ('h', 'concentracao', 'de_h'):
+        if v <= 0:
+            raise ValueError('A concentracao [H+] precisa ser positiva.')
+        ph = -math.log10(v)
+        nota = (' (fora da escala usual de 0 a 14)' if not (0.0 <= ph <= 14.0) else '')
+        return ('[H+] = ' + ('%.3e' % v) + ' mol/L => pH = ' + str(round(ph, 2)) + nota + '.')
+    raise ValueError("Modo: 'ph' ou 'concentracao'.")
+
+
+def diluicao_c1v1c2v2_calcular(c1=None, v1=None, c2=None, v2=None) -> str:
+    """Resolve C1 x V1 = C2 x V2 deixando exatamente UM valor de fora (None).
+    Laboratorio caseiro: confirmar no rotulo e usar equipamento de medicao."""
+    def _f(x):
+        return None if x is None else float(str(x).replace(',', '.'))
+    c1, v1, c2, v2 = _f(c1), _f(v1), _f(c2), _f(v2)
+    dados = {'c1': c1, 'v1': v1, 'c2': c2, 'v2': v2}
+    faltando = [k for k, v in dados.items() if v is None]
+    if len(faltando) != 1:
+        raise ValueError('Deixe exatamente UM valor de fora (None) e informe os outros tres.')
+    for k, v in dados.items():
+        if v is not None and v <= 0:
+            raise ValueError('Os valores informados precisam ser positivos (' + k + ').')
+    alvo = faltando[0]
+    if alvo == 'c1':
+        resultado = c2 * v2 / v1
+    elif alvo == 'v1':
+        resultado = c2 * v2 / c1
+    elif alvo == 'c2':
+        resultado = c1 * v1 / v2
+    else:
+        resultado = c1 * v1 / c2
+    return ('C1 x V1 = C2 x V2 => ' + alvo.upper() + ' = ' + str(round(resultado, 4))
+            + ' (informados: ' + ', '.join(k + '=' + str(v) for k, v in dados.items()
+                                           if v is not None)
+            + '). Use a mesma unidade nos pares C e V; confirme no rotulo.')
+
+
+def massa_molar_simples(formula='H2O') -> str:
+    """Massa molar de formulas SIMPLES (sem parenteses) com massa atomica da
+    tabela embutida (~45 elementos mais comuns). Ex.: H2O, CO2, NaCl, C6H12O6."""
+    import re as _re
+    massas = {'H': 1.008, 'C': 12.011, 'N': 14.007, 'O': 15.999, 'Na': 22.990,
+              'Mg': 24.305, 'Al': 26.982, 'Si': 28.085, 'P': 30.974, 'S': 32.06,
+              'Cl': 35.45, 'K': 39.098, 'Ca': 40.078, 'Ti': 47.867, 'Cr': 51.996,
+              'Mn': 54.938, 'Fe': 55.845, 'Co': 58.933, 'Ni': 58.693, 'Cu': 63.546,
+              'Zn': 65.38, 'Br': 79.904, 'Ag': 107.87, 'I': 126.90, 'Ba': 137.33,
+              'W': 183.84, 'Pt': 195.08, 'Au': 196.97, 'Hg': 200.59, 'Pb': 207.2,
+              'Sn': 118.71, 'F': 18.998, 'Li': 6.94, 'Be': 9.0122, 'B': 10.81,
+              'He': 4.0026, 'Ne': 20.180, 'Ar': 39.948, 'Kr': 83.798, 'Xe': 131.29,
+              'Sr': 87.62, 'Cs': 132.91, 'Bi': 208.98, 'U': 238.03, 'Zr': 91.224}
+    f = str(formula or '').strip()
+    if not f:
+        raise ValueError('Informe a formula, ex.: H2O.')
+    if '(' in f or ')' in f:
+        return ('Parenteses ainda nao sao suportados nesta versao SIMPLES '
+                '(ex.: Ca(OH)2). Abra os parenteses manualmente: Ca(OH)2 = CaO2H2.')
+    pecas = _re.findall(r'([A-Z][a-z]?)(\d*)', f)
+    if ''.join(s + n for s, n in pecas) != f:
+        return ('Formula nao reconhecida: "' + f + '". Use notacao padrao com '
+                'iniciais maiusculas (H2O, CO2, NaCl, C6H12O6).')
+    total, detalhes, desconhecidos = 0.0, [], []
+    for simbolo, n in pecas:
+        if not simbolo:
+            continue
+        if simbolo not in massas:
+            desconhecidos.append(simbolo)
+            continue
+        qtd = int(n) if n else 1
+        total += massas[simbolo] * qtd
+        detalhes.append(simbolo + ('x' + str(qtd) if qtd > 1 else '') + ' (' + str(massas[simbolo]) + ')')
+    if desconhecidos:
+        return ('Elemento(s) fora da tabela local de ~45: ' + ', '.join(desconhecidos)
+                + '. Tente a formula com elementos comuns (H, C, N, O, Na, Ca, Fe...).')
+    return ('Massa molar de ' + f + ' ~ ' + str(round(total, 2)) + ' g/mol ('
+            + '; '.join(detalhes) + '). Tabela estatica; arredondado.')
+
+
+def mac_vendor_prefix_consulta(mac='') -> str:
+    """Fabricante pelo prefixo MAC (primeiros 3 octetos, OUI). Tabela local
+    PARCIAL de fabricantes comuns; a lista oficial completa e publica (IEEE)."""
+    tabela = {
+        '00000C': 'Cisco', '000C29': 'VMware', '00155D': 'Microsoft (Hyper-V/Azure)',
+        '001B21': 'Intel', '001B63': 'Apple', '080027': 'Oracle VirtualBox',
+        '525400': 'QEMU/KVM', 'B827EB': 'Raspberry Pi', 'DCA632': 'Raspberry Pi',
+        '3C5AB4': 'Google', '00188B': 'Dell', '000F20': 'Hewlett-Packard (HP)',
+        '50C7BF': 'TP-Link', 'A42BB0': 'TP-Link', '005056': 'VMware',
+        '002590': 'Ubiquiti', '24A43C': 'Ubiquiti',
+        '00E04C': 'Realtek',
+        '6CB311': 'Huawei',
+    }
+    bruto = ''.join(c for c in str(mac or '').upper() if c.isalnum())
+    if len(bruto) < 6 or not all(c in '0123456789ABCDEF' for c in bruto[:6]):
+        raise ValueError('Informe um MAC valido, ex.: B8:27:EB:12:34:56.')
+    prefixo = bruto[:6]
+    fabricante = tabela.get(prefixo)
+    if fabricante:
+        return ('Prefixo ' + ':'.join(bruto[i:i + 2] for i in (0, 2, 4)) + ' = '
+                + fabricante + ' (tabela local parcial; lista oficial completa: '
+                'base OUI publica do IEEE — aqui nao navego na internet).')
+    return ('Prefixo ' + ':'.join(bruto[i:i + 2] for i in (0, 2, 4)) + ' nao esta na '
+            'minha tabela LOCAL PARCIAL (' + str(len(tabela)) + ' fabricantes comuns). '
+            'Nao invento fabricante: consulte a base OUI do IEEE.')
+
+
+def relacao_aspecto_calcular(largura=1920, altura=1080) -> str:
+    """Largura x altura -> relacao de aspecto reduzida (16:9, 4:3...), razao
+    decimal e o padrao mais proximo conhecido. Calculo puro."""
+    import math
+    w = int(largura or 0)
+    h = int(altura or 0)
+    if w <= 0 or h <= 0:
+        raise ValueError('Informe largura e altura em pixels (> 0).')
+    divisor = math.gcd(w, h)
+    rw, rh = w // divisor, h // divisor
+    razao = w / float(h)
+    comuns = [(16, 9, 'widescreen padrao'), (16, 10, 'monitor de escritorio'),
+              (4, 3, 'classico/antigo'), (5, 4, 'quase quadrado'),
+              (21, 9, 'ultrawide'), (3, 2, 'fotografia clasica'), (1, 1, 'quadrado')]
+    melhor = min(comuns, key=lambda t: abs(razao - t[0] / float(t[1])))
+    diferenca = abs(razao - melhor[0] / float(melhor[1]))
+    texto_comum = (melhor[2] if diferenca / razao < 0.03 else 'nao e um padrao comum')
+    sufixo = (' ~ ' + str(melhor[0]) + ':' + str(melhor[1]) + ' (' + texto_comum + ')'
+              if diferenca / razao < 0.03 else '')
+    return (str(w) + 'x' + str(h) + ' = ' + str(rw) + ':' + str(rh)
+            + ' (razao ' + str(round(razao, 4)) + ')' + sufixo + '. Calculo por MDC.')
+
+
+def ppi_monitor_calcular(largura_px=1920, altura_px=1080, polegadas=24) -> str:
+    """Densidade de pixels (PPI) de uma tela: resolucao + diagonal em polegadas.
+    Calculo puro; a classificacao e de referencia."""
+    import math
+    w = int(largura_px or 0)
+    h = int(altura_px or 0)
+    pol = float(str(polegadas).replace(',', '.'))
+    if w <= 0 or h <= 0 or pol <= 0:
+        raise ValueError('Informe resolucao (px) e diagonal em polegadas (> 0).')
+    diagonal_px = math.sqrt(w * w + h * h)
+    ppi = diagonal_px / pol
+    mm = 25.4 / ppi
+    if ppi < 100:
+        classe = 'baixa densidade (monitor grande/distante)'
+    elif ppi < 150:
+        classe = 'densidade padrao de monitor'
+    elif ppi < 300:
+        classe = 'alta densidade (notebook bom)'
+    else:
+        classe = 'densidade muito alta (celular/retina)'
+    return ('Tela ' + str(w) + 'x' + str(h) + ' em ' + str(pol) + '": ' + str(round(ppi, 1))
+            + ' PPI (1 pixel ~ ' + str(round(mm, 3)) + ' mm; ' + classe
+            + '). Calculo de diagonal; densidade real depende do painel.')
+
+
+def idade_cachorro_aproximada(idade_anos=1.0, porte='medio') -> str:
+    """Idade humana APROXIMADA de um cachorro (popular: 1o ano ~15, 2o ~+9,
+    seguintes +4 a +7 conforme porte). Estimativa popular, nao e veterinaria."""
+    idade = float(str(idade_anos).replace(',', '.'))
+    p = str(porte or 'medio').strip().lower()
+    incremento = {'pequeno': 4.0, 'mini': 4.0, 'medio': 5.0, 'grande': 6.0,
+                  'gigante': 7.0}
+    if p not in incremento:
+        return ('Porte: pequeno, medio, grande ou gigante (afeta o ritmo de '
+                'envelhecimento).')
+    if idade <= 0 or idade > 40:
+        raise ValueError('Informe a idade do cachorro em anos (0 < idade <= 40).')
+    if idade <= 1:
+        humana = 15.0 * idade
+    elif idade <= 2:
+        humana = 15.0 + 9.0 * (idade - 1.0)
+    else:
+        humana = 24.0 + incremento[p] * (idade - 2.0)
+    return ('Cao de ' + str(idade) + ' ano(s), porte ' + p + ': ~' + str(round(humana))
+            + ' anos humanos (escala popular; NAO e ciencia exata — veterinario '
+            'avalia por peso, dentes e exames).')
+
+
+def conversao_tamanhos_referencia(tipo='roupa', valor='') -> str:
+    """Tabelas estaticas de conversao de tamanho BR <-> EU/US para ROUPA e
+    CALCADO. Aproximadas: cada fabricante varia, meca sempre que puder."""
+    chave = str(tipo or 'roupa').strip().lower()
+    if chave in ('roupa', 'roupas', 'camisa'):
+        tabela = [('PP', '36-38', 'XS'), ('P', '38-40', 'S'), ('M', '40-42', 'M'),
+                  ('G', '42-44', 'L'), ('GG', '44-46', 'XL'), ('XGG', '46-48', 'XXL')]
+        alvo = str(valor or '').strip().upper()
+        if alvo:
+            for br, eu, letra in tabela:
+                if alvo in (br, letra):
+                    return ('Roupa BR ' + br + ' ~ EU ' + eu + ' / tamanho ' + letra
+                            + ' (tabela aproximada; fabricantes variam MUITO).')
+            return ('Tamanho "' + str(valor) + '" fora da tabela local (PP, P, M, G, GG, XGG).')
+        return ('ROUPAS BR <-> EU (aproximado):\n' + '\n'.join(
+            '- ' + br.ljust(4) + ' ~ EU ' + eu + ' (' + letra + ')' for br, eu, letra in tabela)
+            + '\nCada fabricante varia; meca e provador valem mais que tabela.')
+    if chave in ('calcado', 'sapato', 'sapatos'):
+        tabela = [(34, 35.5, 4), (35, 36.5, 4.5), (36, 37.5, 5), (37, 38.5, 5.5),
+                  (38, 39.5, 6), (39, 40.5, 6.5), (40, 41.5, 7), (41, 42.5, 8),
+                  (42, 43.5, 9), (43, 44.5, 10), (44, 45.5, 11)]
+        alvo = int(valor) if str(valor or '').strip().isdigit() else None
+        if alvo:
+            for br, eu, us in tabela:
+                if br == alvo:
+                    return ('Calcado BR ' + str(br) + ' ~ EU ' + str(eu) + ' / US '
+                            + str(us) + ' (tabela aproximada unissex; meca o pe em cm '
+                            'a noite: fabricantes variam).')
+            return ('BR ' + str(alvo) + ' fora da tabela local (34 a 44).')
+        return ('CALCADOS BR <-> EU/US (aproximado):\n' + '\n'.join(
+            '- BR ' + str(br).ljust(3) + '~ EU ' + str(eu).ljust(5) + 'US ' + str(us)
+            for br, eu, us in tabela) + '\nAproximado; fabricante manda mais que tabela.')
+    raise ValueError("Tipo: 'roupa' ou 'calcado'.")
+
+
+def qualidade_internet_referencia(mbps=0.0) -> str:
+    """Referencia honesta do que uma velocidade (Mbps) permite fazer, com o
+    aviso de que ping e estabilidade importam tanto quanto velocidade."""
+    v = float(str(mbps).replace(',', '.'))
+    if v <= 0:
+        return ('Passe a velocidade em Mbps (ex.: 100). Referencia por faixa:\n'
+                '- 1-5 Mbps: texto, e-mail, audio\n- 5-15: video SD, chamadas com sobresaltos\n'
+                '- 15-30: HD 1080p 1 tela\n- 30-60: Full HD + jogo online tranquilo\n'
+                '- 60-150: 4K em 1-2 telas\n- 150+: varias telas 4K ao mesmo tempo')
+    if v < 5:
+        classe = 'texto, e-mail e audio; video sofre'
+    elif v < 15:
+        classe = 'video SD e chamadas de voz ok; 1080p oscila'
+    elif v < 30:
+        classe = 'HD 1080p em 1 tela + navegaçao fluida'
+    elif v < 60:
+        classe = 'Full HD multiuso + jogo online com ping bom'
+    elif v < 150:
+        classe = '4K em 1-2 telas + downloads rapidos'
+    else:
+        classe = 'varias telas 4K; acima disso e conforto, nao necessidade'
+    return (str(v) + ' Mbps serve para: ' + classe + '. HONESTIDADE: ping, '
+            'jitter e perda de pacotes importam tanto quanto a velocidade; '
+            'velocidade anunciada nao e a que chega (wifi incluido).')
+
+
+def bytes_bits_esclarecer(valor=100.0, unidade='MB') -> str:
+    """Esclarece MB vs Mb (o clasico mal-entendido de plano de internet):
+    1 byte = 8 bits, e mostra o tamanho real em MB/s. Tambem cobre MB vs MiB."""
+    v = float(str(valor).replace(',', '.'))
+    u = str(unidade or 'MB').strip().upper().replace('IB', 'B')
+    if u not in ('MB', 'GB', 'KB'):
+        raise ValueError("Unidade de ARQUIVO: 'KB', 'MB' ou 'GB' (Mb com i minusculo e bit!).")
+    fator = {'KB': 1e3, 'MB': 1e6, 'GB': 1e9}[u]
+    megabits = v * fator * 8 / 1e6
+    segundos = megabits / 100.0  # exemplo de referencia: plano de 100 Mbps
+    return (str(v) + ' ' + u + ' de arquivo = ' + ('%g' % megabits)
+            + ' Mb (megabits). Em um plano de 100 Mbps (12.5 MB/s teorico): ~'
+            + ('%g' % round(segundos, 1)) + ' s de download. Regra do mal-entendido: '
+            '1 byte = 8 bits — plano usa Mb (bits), arquivo usa MB (bytes). E '
+            'decimal (1 GB = 1000 MB); o Windows mostra GiB (1 GiB = 1024 MiB), '
+            'por isso o disco "parece" menor.')
+
+
+def duracao_bateria_estimativa(capacity_wh=0.0, consumo_w=0.0) -> str:
+    """Autonomia teorica: energia (Wh) / consumo (W). Real cai 10-30% por
+    eficiencia, idade e picos; powerbank de mAh vira Wh com x3,7V/1000."""
+    wh = float(str(capacity_wh).replace(',', '.'))
+    w = float(str(consumo_w).replace(',', '.'))
+    if wh <= 0 or w <= 0:
+        raise ValueError('Informe energia em Wh e consumo em W (positivos).')
+    horas = wh / w
+    return ('Bateria de ' + str(wh) + ' Wh alimentando ' + str(w)
+            + ' W: ~' + str(round(horas, 2)) + ' h TEORICAS. Real: 10-30% menos '
+            '(idade, temperatura, picos). Dica: powerbank de X mAh tem X*3,7/1000 Wh.')
+
+
+def bitrate_video_tamanho(bitrate_mbps=0.0, minutos=0.0) -> str:
+    """Tamanho estimado de video: bitrate (Mbps) x duracao (min) -> MB/GB
+    (audio incluso se o bitrate ja for total). Estimativa, codecs variam."""
+    import math
+    bps = float(str(bitrate_mbps).replace(',', '.'))
+    mins = float(str(minutos).replace(',', '.'))
+    if bps <= 0 or mins <= 0:
+        raise ValueError('Informe o bitrate em Mbps e a duracao em minutos (> 0).')
+    mb = bps * 60 * mins / 8.0
+    gb = mb / 1000.0
+    texto = (str(round(gb, 2)) + ' GB' if gb >= 1 else str(round(mb, 1)) + ' MB')
+    return ('Video a ' + str(bps) + ' Mbps por ' + str(mins)
+            + ' min ~ ' + texto + ' (bitrate total incl. audio; estimativa — '
+            'VBR varia por cena). Ex.: 1 h a 8 Mbps ~ 3,6 GB.')
+
+
+def unidades_tipografia_referencia(px=16.0) -> str:
+    """Referencia de unidades tipograficas para front-end: px, pt, em/rem
+    (base 16 px) e %, com a conversao do valor informado."""
+    v = float(str(px).replace(',', '.'))
+    if v <= 0:
+        raise ValueError('Informe um valor em px (> 0).')
+    tabela = ('- 1 pt = 1,333 px (impressao -> tela)\n'
+              '- 1 rem = tamanho raiz (padrao 16 px); 1 em = tamanho do pai\n'
+              '- 62.5% na raiz (10 px) facilita: 1.4rem = 14 px\n'
+              '- % segue o container; vh/vw seguem a janela')
+    return (str(v) + ' px = ' + str(round(v * 0.75, 2)) + ' pt = '
+            + str(round(v / 16.0, 3)) + ' rem (raiz 16 px) = '
+            + str(round(v / 16.0 * 100, 2)) + '% de 1rem. Notas:\n' + tabela)
+
+
 def mmc_mdc_calcular(numeros: str = "") -> str:
     """MMC e MDC de dois a oito numeros inteiros (separados por virgula), com a
     fatoracao do MDC. Calculo local instantaneo, sem internet nem IA."""
@@ -29916,6 +32044,87 @@ tools = [
     encoding_bom_detectar,
     lista_para_csv_console,
     sugerir_renomeacao_lote,
+    # --- r43 lote 6: mais 80 ferramentas (619 -> 699) ---
+    consultar_porta_conhecida,
+    calcular_tempo_download,
+    tabela_ip_classes_referencia,
+    tabela_json_console,
+    ascii_barras_grafico,
+    histograma_frequencias_console,
+    progresso_barra_estatica,
+    arvore_ascii_de_caminhos,
+    sparkline_numeros,
+    destaque_diferencas_linhas,
+    converter_medidas_culinarias,
+    dividir_conta_restaurante,
+    cafeina_meia_vida,
+    tinta_parede_estimativa,
+    combustivel_custo_viagem,
+    churrasco_calculadora,
+    festa_doces_salgados,
+    pizza_tamanho_convidados,
+    gelo_bebidas_estimativa,
+    limpeza_diluicao,
+    arroz_panela_receita,
+    ponto_da_carne_referencia,
+    taxa_metabolica_basal_mifflin,
+    gordura_navy_calcular,
+    fc_maxima_zones,
+    proteina_diaria_sugestao,
+    macros_calculo_calorias,
+    sortear_dado_rpg,
+    sortear_amigo_secreto,
+    sortear_cor_hex_acessivel,
+    bingo_gerar_cartela,
+    lotofacil_sugestao,
+    megasena_sugestao,
+    cartas_mao_sortear,
+    exportar_inventario_ferramentas_txt,
+    pin_numerico_gerar,
+    passphrase_palavras_gerar,
+    checar_reuso_senha_local,
+    verificar_forca_frase_senha,
+    gerar_totp_codigo,
+    distancia_coordenadas_haversine,
+    rumo_entre_coordenadas,
+    fase_da_lua_aproximada,
+    planetas_consulta,
+    coordenada_formato_converter,
+    elementos_consulta,
+    listar_fontes_instaladas,
+    pastas_especiais_usuario,
+    ps_build_consulta,
+    zona_horaria_detalhe,
+    codigos_erro_windows_consulta,
+    atalhos_win_referencia,
+    where_comando_consulta,
+    variaveis_ambiente_resumo,
+    politica_execucao_atual,
+    duracao_audio_wav,
+    exif_resumo_imagem,
+    dimensoes_imagem_resumo,
+    gerar_exercicios_matematica,
+    ph_concentracao_calcular,
+    diluicao_c1v1c2v2_calcular,
+    massa_molar_simples,
+    mac_vendor_prefix_consulta,
+    relacao_aspecto_calcular,
+    ppi_monitor_calcular,
+    sortear_times_equilibrados,
+    decada_seculo_info,
+    padronizar_decimais_texto,
+    extrair_chaves_valores_texto,
+    minutos_hhmm_converter,
+    lista_compras_consolidar,
+    conversao_tamanhos_referencia,
+    idade_cachorro_aproximada,
+    qualidade_internet_referencia,
+    bytes_bits_esclarecer,
+    cronograma_limpeza_gerar,
+    duracao_bateria_estimativa,
+    bitrate_video_tamanho,
+    unidades_tipografia_referencia,
+    gramas_xicara_por_ingrediente,
     gerar_tabuada,
     anagrama_verificar,
     palindromo_verificar,
@@ -30189,7 +32398,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r42] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r43] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -3,6 +3,7 @@ sem rede, sem GGUF, sem acoes reais; arquivos de catalogo so em pasta temporaria
 (excecao: leitura do catalogo real do repositorio, somente leitura)."""
 import io
 import os
+import re
 import contextlib
 import tempfile
 import types
@@ -65,14 +66,16 @@ class PropostasDoCatalogo(unittest.TestCase):
         self.assertEqual(propostas, [])
         self.assertIsNone(caminho)
 
-    def test_catalogo_real_tem_mais_de_cem_propostas_sem_repetir(self):
+    def test_catalogo_completo_sem_propostas_restantes(self):
         env = base_env(__file__=os.path.abspath('agente.py'))
         propostas, caminho = env['_r26_propostas_catalogo']()
         self.assertTrue(caminho and os.path.exists(caminho))
-        self.assertGreater(len(propostas), 100)
-        nomes = [p['nome'] for p in propostas]
-        self.assertEqual(len(nomes), len(set(nomes)))
-        self.assertNotIn('estatisticas_ia_local', nomes)  # item 163 entregue na r25
+        # r43: o catalogo ESGOTOU — as ultimas 80 propostas viraram ferramentas.
+        self.assertEqual(propostas, [])
+        with io.open(caminho, encoding='utf-8') as f:
+            texto = f.read()
+        self.assertEqual(len(re.findall(r'^\d+\. \u2705 `', texto, re.M)), 219)
+        self.assertEqual(texto.count('Proposta `'), 0)
 
 
 class Filtros(unittest.TestCase):
@@ -145,10 +148,10 @@ class RelatorioEComando(unittest.TestCase):
         self.assertIn('gerar_senha: 1 erro(s) em 4 uso(s) (ultimo: ValueError)', texto)
         self.assertIn('COMO USAR', texto)
 
-    def test_relatorio_com_catalogo_real_lista_propostas(self):
+    def test_relatorio_com_catalogo_real_mostra_catalogo_completo(self):
         env = base_env(__file__=os.path.abspath('agente.py'))
         texto, _ = capturar(env['_r26_relatorio'])
-        self.assertIn('restantes no arquivo', texto)
+        self.assertIn('CATALOGO COMPLETO (r43)', texto)
         self.assertIn('[3] PROPOSTAS DO CATALOGO', texto)
 
     def test_comando_fabrica_e_exatidao_da_frase(self):
