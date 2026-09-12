@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58 **614 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59 **615 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -658,6 +658,20 @@ ou relatórios reais sem revisão e autorização.
   pasta do PC (suspeita: quarentena do antivírus ou move da auto-aplicação);
   agente.py foi rebaixado manual com sucesso. **614 testes OK** (+4:
   test_elevate_r58.py). Selo `-r58`. Não testado no Windows real.
+- **r59 — CORREÇÃO DA CORREÇÃO: REM com parênteses dentro de bloco (resgate,
+  parte 3)**: o fix r58 NÃO resolveu no PC real — o usuário rebaixou o BAT e o
+  erro `-ArgumentList ''` PERSISTIU. Causa raiz no meu próprio patch: dentro
+  do bloco `if errorlevel 1 ( ... )`, um REM com parênteses (e um lixo
+  `%%20morre...`); no cmd, o `)` do comentário FECHA O BLOCO antes da hora —
+  a linha com `-ArgumentList '%*'` executou com `%*` vazio do mesmo jeito.
+  Lição: REM dentro de bloco é mina de quartzo. A r59 reescreveu a seção de
+  admin SEM NENHUM BLOCO: `net session` → falhou ⇒ `goto pedir_admin` ⇒
+  `set "R58_ARGS="` + `if not "%~1"=="" set "R58_ARGS=-ArgumentList '%*'"`
+  (if de UMA linha) ⇒ `Start-Process -FilePath '%~f0' %R58_ARGS% -Verb RunAs`
+  ⇒ `exit /b` ⇒ `:ja_admin`. Guardas novos: sem `) else (` na seção, sem
+  `%%20`, sem linha só de `(`/`)` fora de REM, `%R58_ARGS%` no Start-Process.
+  **615 testes OK** (test_elevate_r58.py reescrito p/ r59). Selo `-r59`. Não
+  testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
