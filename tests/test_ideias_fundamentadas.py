@@ -102,7 +102,7 @@ class IdeiasFundamentadas(unittest.TestCase):
         for nuvem in (False, True):
             sugerir = Mock(return_value='Proposta fundamentada')
             cerebro = Mock(side_effect=AssertionError('Nao executar ferramentas'))
-            env = carregar('processar_atalho_rapido', '_pedido_ideias_do_agente', '_norm_pt',
+            env = carregar('_r50_comandos', 'processar_atalho_rapido', '_pedido_ideias_do_agente', '_norm_pt',
                            config={'usar_ia_nuvem': nuvem},
                            _configurar_conversa_local=lambda x: False,
                            _comandos_oficina_local=lambda *_: False,

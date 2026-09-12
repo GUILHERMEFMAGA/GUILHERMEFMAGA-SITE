@@ -499,6 +499,27 @@ ou relatórios reais sem revisão e autorização.
   confirmar no banner (o BAT novo e o main.py chegam na primeira verificacao;
   o BAT novo se aplica ao fechar). **516 testes OK** (+15). Não testado no
   Windows real.
+- **r50 — Autoatualização pela CONVERSA (`atualizar agora`)**: o mesmo esquema
+  oficial do iniciar.bat agora roda de dentro da conversa, sem o usuário fechar
+  nada. `_r50_atualizar_agente(downloader, confirmar, reiniciar, origem, backup)`
+  (tudo injetável p/ testes): `pedir_confirmacao` → baixa `URL_AGENTE_OFICIAL`
+  com cache-buster (`?cache=%d`, `random.randint`) → valida (≥50000 caracteres +
+  `compile()`/py_compile) → compara com o conteúdo atual (igual ⇒ "nada trocado")
+  → backup em `agente_backup.py` → troca → relança com
+  `subprocess.Popen([sys.executable, origem])` e `os._exit(0)` (conversa fica
+  salva no JSON; usuário não fecha/reabre nada). `SEM_ATUALIZAR.txt` bloqueia
+  tudo; download pequeno, fonte que não compila ou rede falha ⇒ NADA é trocado
+  (à prova de tijolo, honesto). `_r50_comandos` aceita "atualizar agora",
+  "atualizar agente" e "atualizar" (exato), wired ANTES de `_r43_comandos` na
+  cadeia; nova linha no menu perto de VELOCIDADE. `_r50_caminhos_agente()` deriva
+  origem/backup de `__file__`. **[1]** Sem novas ferramentas (699 mantidas).
+  **[2]** O BAT continua sendo o caminho principal; o comando da conversa é o
+  atalho sob demanda. **[3]** Selo `-r50` para o usuário confirmar no banner.
+  **526 testes OK** (+10: test_autoatualizacao_r50.py — bloqueio SEM_ATUALIZAR,
+  cancela ANTES de baixar, download pequeno aborta, fonte que não compila
+  rejeitado, conteúdo igual não reinicia, sucesso faz backup+troca+reinicia,
+  bytes aceitos, rota/menu/cadeia, caminhos derivados de __file__).
+  Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

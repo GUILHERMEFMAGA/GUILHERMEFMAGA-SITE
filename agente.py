@@ -7794,6 +7794,7 @@ def _menu_ajuda_local():
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
+    print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
     print("FABRICA PRO (r28): telemetria persiste entre sessoes | 'ideia boa: <nome>' prioriza o tipo certo | 'zerar telemetria' recomeca (LIMPAR)")
@@ -10588,6 +10589,83 @@ def _r28_comandos(comando):
     return False
 
 
+def _r50_caminhos_agente():
+    """Caminhos (agente.py, backup) da copia RODANDO, derivados de __file__."""
+    origem = os.path.abspath(globals().get('__file__') or 'agente.py')
+    if origem.endswith('.py'):
+        backup = origem[:-3] + '_backup.py'
+    else:
+        backup = origem + '.bak'
+    return origem, backup
+
+
+def _r50_atualizar_agente(downloader=None, confirmar=None, reiniciar=None,
+                          origem=None, backup=None) -> str:
+    """r50: 'atualizar agora' pela conversa — o MESMO esquema oficial do
+    iniciar.bat (URL oficial + cache-buster, validacao de tamanho e py_compile,
+    comparacao de conteudo, backup e troca), mais o reinicio na hora. Tudo
+    injetavel para testes; SEM_ATUALIZAR.txt bloqueia; qualquer falha NAO troca
+    nada (honesto)."""
+    if origem is None or backup is None:
+        _origem_padrao, _backup_padrao = _r50_caminhos_agente()
+        origem = origem or _origem_padrao
+        backup = backup or _backup_padrao
+    pasta = os.path.dirname(origem) or '.'
+    if os.path.isfile(os.path.join(pasta, 'SEM_ATUALIZAR.txt')):
+        return ('Atualizacao automatica esta DESATIVADA neste PC (existe '
+                'SEM_ATUALIZAR.txt). Reconcilie as mudancas locais antes.')
+    if confirmar is None:
+        confirmar = pedir_confirmacao
+    if not confirmar('Atualizar o agente AGORA? Vou baixar a versao oficial, '
+                     'validar, fazer backup e REINICIAR (a conversa fica salva).'):
+        return 'Atualizacao cancelada pelo usuario.'
+    if downloader is None:
+        import random
+        import urllib.request
+        url = URL_AGENTE_OFICIAL + ('?cache=%d' % random.randint(100000, 999999))
+        with urllib.request.urlopen(url, timeout=20) as resposta:
+            novo = resposta.read()
+    else:
+        novo = downloader()
+    novo_texto = novo.decode('utf-8', errors='replace') if isinstance(novo, (bytes, bytearray)) else str(novo)
+    if len(novo_texto) < 50000:
+        return ('Download pequeno demais (' + str(len(novo_texto))
+                + ' caracteres; parece erro de rede). NADA foi trocado; tente de novo.')
+    try:
+        compile(novo_texto, 'agente_novo', 'exec')
+    except Exception as e:
+        return ('O arquivo baixado NAO compila (' + str(e)[:120]
+                + '). NADA foi trocado; o agente continua como estava.')
+    with open(origem, 'r', encoding='utf-8') as f:
+        atual = f.read()
+    if atual == novo_texto:
+        return 'Voce ja esta na versao oficial mais nova (conteudo identico). Nada foi trocado.'
+    with open(backup, 'w', encoding='utf-8', newline='') as f:
+        f.write(atual)
+    with open(origem, 'w', encoding='utf-8', newline='') as f:
+        f.write(novo_texto)
+    saida = ('Baixei a versao nova (' + str(len(novo_texto)) + ' caracteres), validei '
+             '(compila), fiz backup em ' + os.path.basename(backup)
+             + ' e troquei o agente.py. ')
+    if reiniciar is None:
+        import subprocess
+        import sys as _sys
+        subprocess.Popen([_sys.executable, origem])
+        os._exit(0)
+    reiniciar()
+    return saida + 'Reinicie para aplicar.'
+
+
+def _r50_comandos(comando):
+    """r50: 'atualizar agora' (ou 'atualizar agente' / 'atualizar') — a
+    autoatualizacao oficial rodando pela conversa, sem fechar nem reabrir nada."""
+    n = _norm_pt(comando)
+    if n.startswith('atualizaragora') or n.startswith('atualizaragente') or n == 'atualizar':
+        print(_r50_atualizar_agente())
+        return True
+    return False
+
+
 def _r43_comandos(comando):
     """r43: 'instantaneo ia local' (teto de 180 tokens nas geracoes normais,
     JSON/ideias intocados) e 'estatisticas cerebro' (radiografia honesta do que
@@ -12866,6 +12944,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r50_comandos(comando):
+        return True
     if _r43_comandos(comando):
         return True
     if _r24_comandos(comando):
@@ -32507,7 +32587,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r49] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r50] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
