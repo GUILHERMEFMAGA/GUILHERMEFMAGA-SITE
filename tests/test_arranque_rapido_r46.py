@@ -17,21 +17,27 @@ def texto(caminho):
 
 
 class LancadorMain(unittest.TestCase):
-    def test_main_existe_e_só_importa_o_agente(self):
+    def test_main_existe_e_importa_o_agente_no_fim(self):
         corpo = texto(str(SOURCE.parent / 'main.py'))
         self.assertIn('import agente', corpo)
         self.assertIn('__pycache__', corpo)  # explica o porque no comentario
-        # nada pesado no lancador: so import (1 statement de carga)
+        # r49: o lancador ganhou as checagens de prazo/libs (stdlib, leves),
+        # mas `import agente` continua sendo a ULTIMA instrucao do modulo —
+        # nada pesado antes, e o agente so carrega depois das saidas 7/8.
         arvore = ast.parse(corpo)
-        cargas = [n for n in arvore.body if isinstance(n, (ast.Import, ast.ImportFrom))]
-        self.assertEqual(len(cargas), 1)
-        self.assertEqual(cargas[0].names[0].name, 'agente')
+        self.assertIsInstance(arvore.body[-1], ast.Import)
+        self.assertEqual(arvore.body[-1].names[0].name, 'agente')
 
     def test_bat_usa_o_lancador_e_explica(self):
         bat = texto(str(SOURCE.parent / 'iniciar.bat'))
         self.assertIn('python main.py', bat)
-        self.assertNotIn('python agente.py\n', bat)
-        self.assertIn('__pycache__', bat)
+        # r49: python agente.py voltou SO como fallback de emergencia (quando
+        # o main.py ainda nao chegou ao PC); o caminho normal e o lancador
+        self.assertIn('if not exist "main.py" goto lancar_antigo', bat)
+        # r49: a explicacao do __pycache__ mora no main.py; o BAT explica o
+        # caminho rapido (um python so)
+        self.assertIn('__pycache__', texto(str(SOURCE.parent / 'main.py')))
+        self.assertIn('CAMINHO RAPIDO COM UM PYTHON SO', bat)
 
     def test_import_agente_roda_o_app_completo(self):
         """O loop de conversa esta no NIVEL DO MODULO do agente.py — provar
@@ -48,8 +54,8 @@ class LancadorMain(unittest.TestCase):
         gitignore = texto(str(SOURCE.parent / '.gitignore'))
         self.assertIn('__pycache__/', gitignore)
 
-    def test_selo_r48_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r48]', texto(str(SOURCE)))
+    def test_selo_r49_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r49]', texto(str(SOURCE)))
 
 
 if __name__ == '__main__':

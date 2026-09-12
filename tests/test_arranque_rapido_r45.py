@@ -24,26 +24,25 @@ def texto_agente():
 
 
 class BatUmaChamadaSo(unittest.TestCase):
-    def test_decisao_em_um_python_sem_powershell_de_prazo(self):
+    def test_r49_um_python_so_no_caminho_rapido(self):
+        # r49: a decisao mora DENTRO do main.py; o BAT roda UM python so e
+        # so volta a ele (uma vez) quando o main.py pede (codigos 7/8).
         bat = texto_bat()
-        self.assertIn(':decisao_rapida', bat)
-        self.assertIn(':instalar_libs', bat)
-        self.assertIn('fresco=os.path.exists(s) and (time.time()-os.stat(s).st_mtime)<43200', bat)
-        self.assertIn("u.find_spec('langchain_openai')) and bool(u.find_spec('langchain_google_genai')", bat)
-        self.assertEqual(bat.count('find_spec'), 5)  # 4 no codigo (2+2) + 1 em comentario
-        self.assertNotIn('TotalHours', bat)  # PowerShell do prazo foi embora
+        self.assertEqual(bat.count('python main.py'), 1)
+        self.assertIn('if errorlevel 8 goto instalar_libs', bat)
+        self.assertIn('if errorlevel 7 goto verificar_agora', bat)
+        self.assertEqual(bat.count('find_spec'), 0)  # decisao nao e mais do BAT
+        self.assertNotIn('TotalHours', bat)
+        self.assertIn(':verificar_agora', bat)
+        self.assertIn('goto lancar', bat)  # recomeca com carimbo em dia
 
     def test_fluxos_e_protecoes_preservados(self):
         bat = texto_bat()
-        self.assertIn('if exist "SEM_ATUALIZAR.txt" goto depois_atualizacao', bat)
-        self.assertIn('if /i not "%~1"=="atualizar"', bat)
+        self.assertIn('if exist "SEM_ATUALIZAR.txt" goto lancar', bat)
+        self.assertIn('if /i not "%~1"=="atualizar" goto lancar', bat)
         self.assertIn(BRANCH + '/agente.py', bat)
         self.assertIn(BRANCH + '/iniciar.bat', bat)
-        self.assertIn("if errorlevel 3 goto fazer_verificacao", bat)
-        self.assertIn('if errorlevel 2 goto instalar_libs', bat)
-        self.assertIn('if errorlevel 1 goto fazer_verificacao', bat)
         self.assertIn('type nul > ".ultima_verificacao"', bat)
-        self.assertIn('python main.py', bat)
         self.assertIn("move /y \"_atualizacao_iniciar.tmp\" \"iniciar.bat\"", bat)
         self.assertIn("-ArgumentList '%*'", bat)
 
@@ -88,8 +87,8 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertIn('def _r45_embeddings_model():', t)
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
-    def test_selo_r48_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r48]', texto_agente())
+    def test_selo_r49_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r49]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):

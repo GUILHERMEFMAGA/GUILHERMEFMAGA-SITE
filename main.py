@@ -1,9 +1,41 @@
 # -*- coding: utf-8 -*-
-# r46 (instantaneo de verdade): este lancador miudo existe para o Windows
-# carregar o agente como MODULO. O CPython so guarda bytecode pronto em
-# __pycache__ para modulos importados — um script rodado direto
-# (python agente.py) e RECOMPILADO do zero a cada abertura (0,3 s+ medidos).
-# Primeira abertura apos cada atualizacao ainda compila uma vez; as outras
-# carregam o bytecode pronto. Nada mais mudou: o agente inteiro continua no
-# agente.py e importar roda exatamente o mesmo programa (banner + conversa).
+# r46: este lancador existe para o Windows carregar o agente como MODULO.
+# O CPython so guarda bytecode pronto em __pycache__ para modulos importados —
+# um script rodado direto (python agente.py) e RECOMPILADO do zero a cada
+# abertura (0,3 s+ medidos). Primeira abertura apos cada atualizacao ainda
+# compila uma vez; as outras carregam o bytecode pronto.
+# r49: a DECISAO de atualizacao/bibliotecas agora acontece AQUI, dentro deste
+# mesmo processo python — o iniciar.bat no caminho rapido roda UM python so
+# (antes eram dois: um so para decidir). Codigos de saida para o BAT:
+#   7 = carimbo .ultima_verificacao venceu -> o BAT verifica atualizacao
+#   8 = falta biblioteca das IAs          -> o BAT instala e recomeca
+# Tudo depois do import e exatamente o mesmo programa de sempre.
+import os
+import sys
+import time
+
+_PASTA = os.path.dirname(os.path.abspath(__file__))
+
+
+def _verificacao_fresca():
+    try:
+        return (time.time() - os.stat(os.path.join(_PASTA, '.ultima_verificacao')).st_mtime) < 43200
+    except OSError:
+        return False
+
+
+def _bibliotecas_ok():
+    import importlib.util
+    return (importlib.util.find_spec('langchain_openai') is not None
+            and importlib.util.find_spec('langchain_google_genai') is not None)
+
+
+if not os.path.isfile(os.path.join(_PASTA, 'SEM_ATUALIZAR.txt')):
+    if not _verificacao_fresca():
+        print('Verificando atualizacoes do agente (uma vez a cada 12 horas)...')
+        sys.exit(7)
+    if not _bibliotecas_ok():
+        print('Falta uma biblioteca das IAs; o iniciar.bat instala agora...')
+        sys.exit(8)
+
 import agente

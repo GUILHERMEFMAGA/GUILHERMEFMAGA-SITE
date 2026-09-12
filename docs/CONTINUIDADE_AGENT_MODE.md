@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48 **508 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49 **516 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -484,6 +484,21 @@ ou relatórios reais sem revisão e autorização.
   type-checked, tipo errado ignorado). Previa rotulada evita parecer resposta
   final; JSON/ideias intocados; cache r24 e cap instantaneo/turbo seguem.
   **508 testes OK** (+7). Selo `-r48`. Não testado no Windows real.
+- **r49 (BAT AINDA MAIS RAPIDO + CORRECAO DE ENTREGA do main.py — usuario pediu
+  "iniciar.bat ainda mais rapido" e perguntou se eu edito so o agente.py ou todos
+  os arquivos):** nenhuma ferramenta nova (699 mantidas). **[1]** O caminho comum
+  agora roda **UM python so**: a decisao (carimbo 12h + bibliotecas via find_spec)
+  mudou para DENTRO do `main.py`, que sai com codigo 7 (verificar) ou 8 (instalar
+  libs) so quando precisa — o BAT trata os codigos e recomeca uma vez; o python
+  auxiliar de decisao saiu do duplo clique. **[2]** BURACO FECHADO: o atualizador
+  so baixava agente.py e iniciar.bat — o **main.py (r46) nunca foi entregue ao
+  PC**; se o BAT novo rodasse antes do main.py existir, `python main.py` falharia.
+  Agora: a verificacao baixa o main.py JUNTO (+ checagem de tamanho) e existe o
+  fallback `if not exist "main.py" goto lancar_antigo` → `python agente.py`
+  (funciona sempre; à prova de tijolo). **[3]** Selo `-r49` para o usuario
+  confirmar no banner (o BAT novo e o main.py chegam na primeira verificacao;
+  o BAT novo se aplica ao fechar). **516 testes OK** (+15). Não testado no
+  Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

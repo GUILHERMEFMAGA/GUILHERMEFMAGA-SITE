@@ -25,20 +25,25 @@ def ast_agente():
 
 class BatArranqueRapido(unittest.TestCase):
     def test_bibliotecas_por_find_spec_sem_importar(self):
+        # r49: o find_spec morou no main.py (decisao dentro do processo);
+        # o BAT nao importa biblioteca nenhuma para checar nada.
+        with io.open(str(SOURCE.parent / 'main.py'), encoding='utf-8') as f:
+            main_py = f.read()
+        self.assertIn("find_spec('langchain_openai')", main_py)
+        self.assertIn("find_spec('langchain_google_genai')", main_py)
         bat = texto_bat()
-        self.assertIn("find_spec('langchain_openai')", bat)
-        self.assertIn("find_spec('langchain_google_genai')", bat)
         self.assertNotIn('python -c "import langchain_openai"', bat)
         self.assertNotIn('python -c "import langchain_google_genai"', bat)
 
     def test_verificacao_com_validade_e_forcar(self):
         bat = texto_bat()
         self.assertIn('.ultima_verificacao', bat)
-        self.assertIn('if /i not "%~1"=="atualizar"', bat)
-        self.assertIn('<43200', bat)  # carimbo velho -> verifica; fresco -> abre direto
-        self.assertIn('Tudo em dia (verificado nas ultimas 12 horas)', bat)
-        # fluxo SEM_ATUALIZAR intacto
-        self.assertIn('if exist "SEM_ATUALIZAR.txt" goto depois_atualizacao', bat)
+        self.assertIn('if /i not "%~1"=="atualizar" goto lancar', bat)
+        # carimbo velho -> verifica; fresco -> abre direto (decisao no main.py, r49)
+        with io.open(str(SOURCE.parent / 'main.py'), encoding='utf-8') as f:
+            self.assertIn('< 43200', f.read())
+        # fluxo SEM_ATUALIZAR intacto: vai direto para o agente
+        self.assertIn('if exist "SEM_ATUALIZAR.txt" goto lancar', bat)
 
     def test_urls_e_mecanismo_de_troca_preservados(self):
         bat = texto_bat()
@@ -56,8 +61,8 @@ class BatArranqueRapido(unittest.TestCase):
 
     def test_rotulos_do_fluxo_estao_definidos(self):
         bat = texto_bat()
-        for rotulo in (':fazer_verificacao', ':verificar_bat', ':decisao_rapida',
-                       ':instalar_libs', ':depois_atualizacao'):
+        for rotulo in (':lancar', ':verificar_agora', ':verificar_bat',
+                       ':instalar_libs', ':fim_normal'):
             self.assertIn(rotulo, bat)
         # falha de rede NAO grava carimbo (tenta de novo na proxima abertura)
         self.assertIn('if errorlevel 1 goto verificar_bat', bat)
@@ -87,10 +92,10 @@ class AgenteSemImportPesadoNoArranque(unittest.TestCase):
         self.assertIn('def _r44_gemini_classe():', texto)
         self.assertIn('_r44_gemini_classe()', texto)
 
-    def test_selo_r48_no_banner(self):
+    def test_selo_r49_no_banner(self):
         with io.open(str(SOURCE), encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r48]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r49]', texto)
 
 
 class LazyGemini(unittest.TestCase):
