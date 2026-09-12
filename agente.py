@@ -8874,7 +8874,13 @@ _lock_ia_local = threading.Lock()  # evita subir dois servidores juntos
 def _r20_opcoes():
     """Opcoes locais validadas; nunca escolhe outro GGUF/provedor."""
     import os
-    padrao = {'threads':4, 'streaming':False, 'ram_min_mb':256,
+    # r48 (resposta rapida): streaming LIGADO por padrao (a resposta aparece
+    # sendo escrita em vez de chegar pronta no fim) e threads automaticas pelo
+    # CPU (o antigo fixo 4 desperdicava nucleos no processamento do prompt).
+    # Config explicita do usuario continua vencendo (merge abaixo, type-checked).
+    _nucleos_r48 = os.cpu_count() or 4
+    padrao = {'threads': max(4, min(_nucleos_r48 - 2, 8)), 'streaming':True,
+              'ram_min_mb':256,
               'avaliacao_ampliada':False, 'repeticoes':1, 'semente':42,
               'cobertura_minima':0.5, 'repeticoes_maximas':3, 'cache_minutos':5,
               'turbo':False, 'instantaneo':False}
@@ -32501,7 +32507,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r47] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r48] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

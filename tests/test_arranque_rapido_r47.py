@@ -66,10 +66,10 @@ class EstruturaDoStub(unittest.TestCase):
             self.assertIn('_garantir_tools()', fonte_da_funcao(t, nome),
                           'faltou materializar em ' + nome)
 
-    def test_literal_tools_intacto_e_selo_r47(self):
+    def test_literal_tools_intacto_e_selo_r48(self):
         t = texto_agente()
         self.assertIn('\ntools = [\n', t)
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r47]', t)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r48]', t)
         self.assertIn('Thread(target=falar', t)  # greeting de voz fora do caminho critico
 
 

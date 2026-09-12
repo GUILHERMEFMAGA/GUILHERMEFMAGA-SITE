@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47 **501 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48 **508 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -468,6 +468,22 @@ ou relatórios reais sem revisão e autorização.
   sumido: a 1a mensagem que precisa da lista (nuvem, listagem, contador) paga ~1,2 s
   uma unica vez na sessao. **501 testes OK** (+8). Selo `-r47`. Não testado no
   Windows real.
+- **r48 (RESPOSTA DA IA LOCAL MAIS RAPIDA — "super rapida em respostas seja o
+  que for"):** nenhuma ferramenta nova (699 mantidas). Duas alavancas de tempo
+  de resposta: **[1]** **STREAMING LIGADO POR PADRAO** — a infraestrutura ja
+  existia (`stream=streaming` em `perguntar_ia_local`, callback imprimindo
+  trechos, "[Previa da geracao; texto ainda nao verificado]" + "[Fim da previa]"
+  + resposta final verificada abaixo, cancelamento r21 e timeout funcionando no
+  stream) mas o default `'streaming':False` fazia o usuario esperar a geracao
+  INTEIRA sem ver nada; agora o default e `True` (a resposta comeca a aparecer
+  em segundos mesmo antes de terminar; previa rotulada como nao verificada,
+  final verificado embaixo — honestidade intacta); **[2]** **THREADS
+  AUTOMATICAS** pelo CPU: o fixo `threads:4` desperdicava nucleos no
+  processamento do prompt — agora o padrao e `max(4, min(nucleos-2, 8))`
+  (clamp pelo total logico; config explicita do usuario continua vencendo,
+  type-checked, tipo errado ignorado). Previa rotulada evita parecer resposta
+  final; JSON/ideias intocados; cache r24 e cap instantaneo/turbo seguem.
+  **508 testes OK** (+7). Selo `-r48`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
