@@ -566,6 +566,24 @@ ou relatórios reais sem revisão e autorização.
   **578 testes OK** (+33: test_lote_poder_r52.py + test_lote_poder_r52b.py;
   2 skips condicionais de PIL/pypdf; auditoria 703 → 733). Selo `-r52`. Não
   testado no Windows real.
+- **r53 — COMANDO DIRETO DE ATALHO (fechando o buraco de roteamento relatado no
+  PC)**: o usuário digitou "crie um atalho pra abrir isso rapido" e o seletor de
+  ferramentas ofereceu itens sem relação (a ferramenta certa,
+  `criar_atalho_area_trabalho`, SEMPRE existiu — o "isso" vago não a encontrou).
+  Agora `_r53_comandos` roda na cadeia ANTES do seletor: **`atalho do agente`**
+  / "crie um atalho pra abrir isso" cria o ícone "Super Agente" na Área de
+  Trabalho apontando para o `iniciar.bat` (ou `agente.py`), REUSANDO a
+  ferramenta antiga (zero duplicação) e avisando como pedir de outros programas;
+  **`atalho para <programa>`** resolve apelidos conhecidos (`chrome`, `edge`,
+  `firefox`, `bloco de notas`, `calculadora`, `explorador`, `cmd`, `powershell`,
+  `vscode`) para o .exe real (checa os caminhos padrão do Windows) e passa
+  caminhos crus direto. Pronomes ambíguos ("isso", "isto", "ele") = o agente.
+  Nota técnica importante: `_norm_pt` REMOVE TODOS OS ESPAÇOS (rotas exatas) —
+  o parser r53 usa `_r53_normalizar` próprio (minúsculas sem acento COM
+  espaços) para extrair o alvo. Não captura "remover atalho"/"onde fica o
+  atalho" (só pedidos de criação). **588 testes OK** (+10:
+  test_atalho_rapido_r53.py; 733 ferramentas mantidas — nenhum @tool novo).
+  Selo `-r53`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

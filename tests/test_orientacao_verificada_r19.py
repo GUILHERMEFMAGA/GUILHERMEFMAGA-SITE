@@ -10,7 +10,7 @@ from test_precisao_local_r17 import ambiente as ambiente_avaliacao
 
 class OrientacaoVerificada(unittest.TestCase):
     def ambiente(self, nuvem=False):
-        return carregar('_norm_pt', '_resposta_contextual_curta', '_r50_comandos', 'processar_atalho_rapido',
+        return carregar('_norm_pt', '_resposta_contextual_curta', '_r53_comandos', '_r50_comandos', 'processar_atalho_rapido',
                         config={'usar_ia_nuvem':nuvem, 'nivel_permissao':'admin'},
                         historico_conversas=[], salvar_historico=Mock(),
                         preparar_ia_local=Mock(), _chamar_neural=Mock(),

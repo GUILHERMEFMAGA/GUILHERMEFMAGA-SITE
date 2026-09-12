@@ -7796,6 +7796,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
+    print("ATALHOS (r53): 'atalho do agente' cria o icone do agente na Area de Trabalho | 'atalho para <programa>' (chrome, bloco de notas, vscode...)")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
@@ -12323,6 +12324,116 @@ def gerar_sitemap(pasta: str, dominio: str, arquivo_saida: str = "") -> str:
     return executar_com_autocura('gerar_sitemap', _gerar)
 
 
+def _r53_normalizar(texto):
+    """r53: minusculas sem acento, com ESPACOS preservados (o _norm_pt junta
+    tudo — otimo pra rotas exatas, ruim pra extrair o alvo do atalho)."""
+    import unicodedata
+    sem_acento = ''.join(c for c in unicodedata.normalize('NFD', str(texto or ''))
+                         if not unicodedata.combining(c))
+    return ' '.join(sem_acento.lower().split())
+
+
+def _r53_resolver_app(nome, existe=None):
+    """r53: traduz apelidos de programas para o caminho real do .exe.
+    Devolve '' quando nao conhece o apelido (o chamador usa o texto cru)."""
+    import os as _os
+    existe = existe or _os.path.isfile
+    n = _r53_normalizar(nome)
+    candidatos = {
+        'chrome': ('C:/Program Files/Google/Chrome/Application/chrome.exe',
+                   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'),
+        'google chrome': ('C:/Program Files/Google/Chrome/Application/chrome.exe',
+                          'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'),
+        'edge': ('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+                 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'),
+        'microsoft edge': ('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+                           'C:/Program Files/Microsoft/Edge/Application/msedge.exe'),
+        'firefox': ('C:/Program Files/Mozilla Firefox/firefox.exe',
+                    'C:/Program Files (x86)/Mozilla Firefox/firefox.exe'),
+        'notepad': ('C:/Windows/System32/notepad.exe',),
+        'bloco de notas': ('C:/Windows/System32/notepad.exe',),
+        'calc': ('C:/Windows/System32/calc.exe',),
+        'calculadora': ('C:/Windows/System32/calc.exe',),
+        'explorer': ('C:/Windows/explorer.exe',),
+        'explorador de arquivos': ('C:/Windows/explorer.exe',),
+        'cmd': ('C:/Windows/System32/cmd.exe',),
+        'prompt de comando': ('C:/Windows/System32/cmd.exe',),
+        'powershell': ('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',),
+        'vscode': (_os.path.expandvars('%LOCALAPPDATA%/Programs/Microsoft VS Code/Code.exe'),
+                   'C:/Program Files/Microsoft VS Code/Code.exe',
+                   'C:/Program Files (x86)/Microsoft VS Code/Code.exe'),
+        'visual studio code': (_os.path.expandvars('%LOCALAPPDATA%/Programs/Microsoft VS Code/Code.exe'),
+                               'C:/Program Files/Microsoft VS Code/Code.exe'),
+    }
+    for apelido, caminhos in candidatos.items():
+        if n == apelido:
+            for caminho in caminhos:
+                if existe(caminho):
+                    return caminho
+            return ''
+    return ''
+
+
+def _r53_alvo_atalho(comando):
+    """r53: le o pedido de atalho e devolve:
+    None -> nao e pedido de atalho; '' -> sem alvo claro (padrao: o AGENTE);
+    texto -> o alvo pedido (programa/arquivo/pasta)."""
+    n = ' ' + _r53_normalizar(comando) + ' '
+    if 'atalho' not in n:
+        return None
+    comeca_com_atalho = n.strip().startswith('atalho')
+    quer_criar = any(p in n for p in ('crie', 'criar', 'cria', 'faz ', 'fazer', 'faca'))
+    if not (comeca_com_atalho or quer_criar):
+        return None  # "remover atalho", "onde fica o atalho" etc. nao sao capturados
+    alvo = ''
+    for marcador in ('atalho para ', 'atalho pra ', 'atalho pro ', 'atalho p ',
+                     'atalho do ', 'atalho da ', 'atalho de '):
+        posicao = n.find(marcador)
+        if posicao >= 0:
+            alvo = n[posicao + len(marcador):].strip()
+            break
+    for verbo in ('abrir ', 'abre ', 'abra ', 'abrir o ', 'abrir a '):
+        if alvo.startswith(verbo):
+            alvo = alvo[len(verbo):]
+            break
+    for artigo in ('o ', 'a ', 'os ', 'as ', 'um ', 'uma '):
+        if alvo.startswith(artigo):
+            alvo = alvo[len(artigo):]
+            break
+    for enfeite in (' rapido', ' rapidinho', ' rapidamente', ' aqui', ' no desktop',
+                    ' na area de trabalho', ' por favor', ' pra mim', ' pf'):
+        if alvo.endswith(enfeite):
+            alvo = alvo[:-len(enfeite)]
+    alvo = alvo.strip()
+    if alvo in ('novo', 'mais', 'outro', 'de novo', 'denovo'):
+        return ''  # "faz o atalho de novo" = refaz o do agente
+    if alvo in ('isso', 'isto', 'esse', 'este', 'ele', 'esse programa', 'este programa'):
+        return ''  # pronome sem antecedente claro: o padrao seguro e o PROPRIO agente
+    return alvo
+
+
+def _r53_comandos(comando, criar=None, existe=None, pasta=None):
+    """r53: 'atalho do agente' / 'crie um atalho pra abrir isso' / 'atalho para
+    <programa>' — comando DIRETO (nao passa pelo seletor de ferramentas). O
+    caso do agente usa o iniciar.bat (ou agente.py) e reaproveita a ferramenta
+    criar_atalho_area_trabalho, sem duplicar nada."""
+    alvo = _r53_alvo_atalho(comando)
+    if alvo is None:
+        return False
+    if criar is None:
+        criar = criar_atalho_area_trabalho
+    if not alvo or 'agente' in alvo or alvo in ('isso', 'isto', 'ele'):
+        pasta = pasta or PASTA_BASE
+        bat = os.path.join(pasta, 'iniciar.bat')
+        alvo_final = bat if os.path.isfile(bat) else os.path.join(pasta, 'agente.py')
+        print('[Atalho do agente]: ' + str(criar(alvo_final, 'Super Agente')))
+        print('Se o atalho era para OUTRO programa, me diga: atalho para <nome do programa>.')
+        return True
+    caminho = _r53_resolver_app(alvo, existe=existe)
+    print('[Atalho]: ' + str(criar(caminho or alvo, alvo[:40])))
+    return True
+
+
 def _r50_caminhos_agente():
     """Caminhos (agente.py, backup) da copia RODANDO, derivados de __file__."""
     origem = os.path.abspath(globals().get('__file__') or 'agente.py')
@@ -14769,6 +14880,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r53_comandos(comando):
+        return True
     if _r50_comandos(comando):
         return True
     if _r43_comandos(comando):
@@ -34446,7 +34559,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r52] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r53] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

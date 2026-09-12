@@ -286,7 +286,7 @@ class CompartilhamentoQR(unittest.TestCase):
         with io.open('agente.py', encoding='utf-8') as f:
             texto = f.read()
         self.assertIn('LOTE PODER (r52)', texto)                                  # menu
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r52]', texto)          # selo
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r53]', texto)          # selo
         for nome in ('plano_de_tarefa', 'avaliar_risco_comando', 'guardiao_de_arquivo',
                      'cofre_de_notas', 'gerar_sitemap'):
             self.assertIn('    ' + nome + ',', texto)                             # 30 registradas

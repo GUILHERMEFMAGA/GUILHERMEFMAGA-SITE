@@ -50,7 +50,7 @@ class ConversaContextual(unittest.TestCase):
 
     def test_fluxo_nao_invoca_ferramentas_nem_modelo(self):
         for texto in ['vc esta de bom humor?', 'agora e noite ou dia em Ribeirão Preto']:
-            env = carregar('_r50_comandos', 'processar_atalho_rapido', '_norm_pt', '_resposta_contextual_curta',
+            env = carregar('_r53_comandos', '_r50_comandos', 'processar_atalho_rapido', '_norm_pt', '_resposta_contextual_curta',
                            config={}, historico_conversas=[], salvar_historico=Mock())
             with redirect_stdout(StringIO()):
                 self.assertTrue(env['processar_atalho_rapido'](texto))
