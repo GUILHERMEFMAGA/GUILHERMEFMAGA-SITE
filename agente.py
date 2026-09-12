@@ -7796,7 +7796,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
-    print("ATALHOS (r53/r54): 'atalho do agente' | 'atalho para <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
+    print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
@@ -12366,6 +12366,12 @@ def _r53_resolver_app(nome, existe=None):
                                'C:\\Program Files\\Microsoft VS Code\\Code.exe'),
         # r54: raiz principal do PC (atalho que abre C:\ / Este Computador)
         'este pc': ('C:\\',),
+        # r56: "tela principal" do relato real = a raiz do PC para o usuario
+        'tela principal': ('C:\\',),
+        'tela do pc': ('C:\\',),
+        'tela do computador': ('C:\\',),
+        'desktop': (_os.path.expanduser('~') + '\\Desktop',),
+        'area de trabalho': (_os.path.expanduser('~') + '\\Desktop',),
         'meu computador': ('C:\\',),
         'computador': ('C:\\',),
         'raiz': ('C:\\',),
@@ -12397,7 +12403,8 @@ def _r53_alvo_atalho(comando):
         return None  # "remover atalho", "onde fica o atalho" etc. nao sao capturados
     alvo = ''
     for marcador in ('atalho para ', 'atalho pra ', 'atalho pro ', 'atalho p ',
-                     'atalho do ', 'atalho da ', 'atalho de '):
+                     'atalho do ', 'atalho da ', 'atalho de ',
+                     'atalho na ', 'atalho no '):
         posicao = n.find(marcador)
         if posicao >= 0:
             alvo = n[posicao + len(marcador):].strip()
@@ -12420,6 +12427,14 @@ def _r53_alvo_atalho(comando):
     if alvo in ('isso', 'isto', 'esse', 'este', 'ele', 'esse programa', 'este programa'):
         return ''  # pronome sem antecedente claro: o padrao seguro e o PROPRIO agente
     return alvo
+
+
+def _r53_parece_caminho(alvo):
+    """r56: o texto informado parece um caminho/arquivo (aceitamos cru)?"""
+    import re as _re
+    a = (alvo or '').strip().lower()
+    return bool(_re.search(r'[/\\]', a) or a.endswith(('.exe', '.lnk', '.bat', '.py', '.pdf',
+                                                        '.txt', '.docx', '.xlsx', '.mp3', '.mp4')))
 
 
 def _r53_comandos(comando, criar=None, existe=None, pasta=None):
@@ -12449,6 +12464,11 @@ def _r53_comandos(comando, criar=None, existe=None, pasta=None):
         print('Se o atalho era para OUTRO programa, me diga: atalho para <nome do programa>.')
         return True
     caminho = _r53_resolver_app(alvo, existe=existe)
+    if not caminho and not _r53_parece_caminho(alvo):
+        print('[Atalho]: nao reconheci "' + alvo[:40] + '" como programa ou pasta.')
+        print('Me diga o caminho completo (ex.: atalho para C:/Users/voce/Downloads)'
+              ' ou um programa conhecido (chrome, vscode, bloco de notas...).')
+        return True
     print('[Atalho]: ' + str(criar(caminho or alvo, alvo[:40])))
     return True
 
@@ -34580,7 +34600,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r55] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r56] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

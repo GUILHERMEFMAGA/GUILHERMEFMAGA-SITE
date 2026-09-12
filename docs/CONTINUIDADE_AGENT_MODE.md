@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55 **599 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56 **604 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -614,6 +614,20 @@ ou relatórios reais sem revisão e autorização.
   se alguém criar função com nome inresolvível, os testes QUEBRAM na hora —
   nunca mais uma ferramenta morta escondida. **599 testes OK** (+5). 733
   ferramentas mantidas. Selo `-r55`. Não testado no Windows real.
+- **r56 — ATALHO "NA TELA PRINCIPAL" (2º relato real da mesma família)**: o
+  usuário escreveu "crie um atalho na tela principal" e caiu na pergunta do
+  pedido vago — o parser só entendia "atalho para/pro/pra/do/da/de" (o "na/no"
+  não era marcador) e "tela principal" não estava nos apelidos. Correções:
+  **[1]** marcadores `atalho na ` / `atalho no ` adicionados; **[2]** novos
+  apelidos no `_r53_resolver_app`: tela principal / tela do pc / tela do
+  computador → `C:\` (no vocabulário do usuário, "tela/raiz principal" = raiz
+  do PC); desktop / area de trabalho → pasta Desktop do usuário
+  (expanduser); **[3]** alvo desconhecido que NÃO parece caminho (sem `/`,
+  `\` ou extensão conhecida — novo `_r53_parece_caminho`) agora PERGUNTA em
+  vez de criar um .lnk quebrado; caminhos crus continuam passando direto
+  (minúsculos pelo normalizador — case-insensitive no Windows).
+  **604 testes OK** (+5: test_atalho_tela_r56.py; 733 ferramentas mantidas).
+  Selo `-r56`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
