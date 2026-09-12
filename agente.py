@@ -7119,7 +7119,7 @@ def _despachar_ferramenta_local(comando: str) -> bool:
     if _eh_pergunta_de_conversa(comando) or not _parece_pedido_de_acao(comando):
         return False
     try:
-        achados = _buscar_ferramentas(comando, 3)
+        achados = _buscar_ferramentas(comando, 5)  # r55: 5 opcoes no seletor (era 3)
     except Exception:
         return False
     if not achados:
@@ -26536,6 +26536,7 @@ def modo_apresentacao(acao: str = "ligar") -> str:
 def agendar_desligamento(minutos: int = 60) -> str:
     """Agenda o desligamento do PC para daqui a X minutos (util pra dormir
     ouvindo musica ou terminar um download)."""
+    from datetime import timedelta  # r55: faltava import (NameError depois de agendar)
     minutos = max(1, int(minutos))
     if not _confirma_poderoso(f"Programar o PC para DESLIGAR em {minutos} minuto(s)?"):
         return "Cancelado."
@@ -27528,6 +27529,7 @@ def regra_de_tres(a: str, b: str, c: str) -> str:
 def dias_uteis_entre_datas(data_inicio: str, data_fim: str, feriados: str = "") -> str:
     """Conta quantos DIAS UTEIS (sem sabado/domingo) existem entre duas datas.
     Datas em DD/MM/AAAA. Feriados opcionais separados por virgula."""
+    from datetime import timedelta  # r55: faltava import (NameError em toda chamada)
     def ler(d):
         for f in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
             try:
@@ -34578,7 +34580,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r54] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r55] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

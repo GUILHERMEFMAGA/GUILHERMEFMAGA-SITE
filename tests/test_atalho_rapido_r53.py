@@ -107,7 +107,7 @@ class Estrutura(unittest.TestCase):
         self.assertLess(texto.index('if _r53_comandos(comando):'),
                         texto.index('if _r50_comandos(comando):'))
         self.assertIn("ATALHOS (r53/r54): 'atalho do agente'", texto)  # rotulo evoluiu na r54
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r54]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r55]', texto)
         self.assertIn('criar_atalho_area_trabalho', texto)  # reuso, sem duplicar
 
 

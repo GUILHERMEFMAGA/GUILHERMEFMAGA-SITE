@@ -31,7 +31,7 @@ class RoteamentoConversa(unittest.TestCase):
 
     def test_acao_ainda_busca_ferramenta(self):
         self.env['_despachar_ferramenta_local']('instale python')
-        self.busca.assert_called_once_with('instale python', 3)
+        self.busca.assert_called_once_with('instale python', 5)  # r55: seletor mostra 5
 
     def test_perguntas_sao_conversa(self):
         for texto in ['OQUE VC FAZER', 'o que é IA?', 'COMO FAÇO PRA IR NA IA LOCAL']:
