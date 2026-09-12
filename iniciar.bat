@@ -32,7 +32,13 @@ REM PowerShell intermediario e o aviso aparece direto na hora.
 net session >nul 2>&1
 if errorlevel 1 (
     echo Pedindo permissao de Administrador...
-    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs"
+    REM r58: com %* vazio o PowerShell rejeita -ArgumentList '' (Start-Process
+    %%20morre e a janela fecha). Sem argumentos: nem passa ArgumentList.
+    if "%~1"=="" (
+        powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    ) else (
+        powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs"
+    )
     exit /b
 )
 
