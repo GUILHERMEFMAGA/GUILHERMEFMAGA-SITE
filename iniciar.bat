@@ -30,17 +30,20 @@ REM DICA: crie um ATALHO deste arquivo, abra Propriedades > Avancado >
 REM "Executar como administrador" e use o atalho no dia a dia: pula o
 REM PowerShell intermediario e o aviso aparece direto na hora.
 net session >nul 2>&1
-if errorlevel 1 (
-    echo Pedindo permissao de Administrador...
-    REM r58: com %* vazio o PowerShell rejeita -ArgumentList '' (Start-Process
-    %%20morre e a janela fecha). Sem argumentos: nem passa ArgumentList.
-    if "%~1"=="" (
-        powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
-    ) else (
-        powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -ArgumentList '%*' -Verb RunAs"
-    )
-    exit /b
-)
+if errorlevel 1 goto pedir_admin
+goto ja_admin
+
+:pedir_admin
+echo Pedindo permissao de Administrador...
+REM r59: %* vazio nao pode virar -ArgumentList vazio (o PowerShell rejeita) e
+REM r59: REM com parenteses DENTRO de bloco fecha o bloco antes da hora (bug r58).
+REM r59: Por isso esta secao NAO usa blocos: so goto, if de uma linha e set.
+set "R58_ARGS="
+if not "%~1"=="" set "R58_ARGS=-ArgumentList '%*'"
+powershell -NoProfile -Command "Start-Process -FilePath '%~f0' %R58_ARGS% -Verb RunAs"
+exit /b
+
+:ja_admin
 
 REM ===== r49: CAMINHO RAPIDO COM UM PYTHON SO =====
 REM O main.py decide TUDO dentro do proprio processo (carimbo de 12h +
