@@ -25,7 +25,10 @@ REM Limpa restos de atualizacoes antigas que ficaram clicaveis por engano
 if exist "iniciar_novo.bat" del /q "iniciar_novo.bat" >nul 2>&1
 
 REM Pede privilegio de Administrador se nao estiver elevado
-REM (r44: repassa os argumentos, ex.:  iniciar.bat atualizar  continua "atualizar" depois do UAC)
+REM (r44: repassa os argumentos, ex.:  iniciar.bat atualizar)
+REM DICA r45: crie um ATALHO deste arquivo, abra Propriedades > Avancado >
+REM "Executar como administrador" e use o atalho no dia a dia: pula o
+REM PowerShell intermediario e o aviso aparece direto na hora.
 net session >nul 2>&1
 if errorlevel 1 (
     echo Pedindo permissao de Administrador...
@@ -33,18 +36,14 @@ if errorlevel 1 (
     exit /b
 )
 
-REM ===== ATUALIZACAO AUTOMATICA DO AGENTE (r44: com validade de 12 horas) =====
-REM Baixa a versao mais nova do agente.py direto do GitHub, assim voce NAO
-REM precisa copiar/colar arquivo nenhum. Mas verificar a cada duplo clique
-REM custava um download de ~1,5 MB + compilacao TODA abertura e atrasava o
-REM arranque. Agora o carimbo ".ultima_verificacao" vale 12 horas: dentro do
-REM prazo o agente abre DIRETO, sem rede. Para forcar agora, rode:
+REM ===== ATUALIZACAO AUTOMATICA DO AGENTE (r44: validade 12h; r45: decisao em UMA chamada de Python) =====
+REM Dentro da validade de 12 horas o agente abre DIRETO, sem rede e sem
+REM PowerShell (que so de nascer custa ~1s). Para forcar agora:
 REM      iniciar.bat atualizar
-REM (ou apague o arquivo .ultima_verificacao). SEM_ATUALIZAR.txt continua
-REM valendo: se existir, nada e baixado.
+REM SEM_ATUALIZAR.txt continua valendo: se existir, nada e baixado.
 
 if exist "SEM_ATUALIZAR.txt" goto depois_atualizacao
-if /i not "%~1"=="atualizar" goto checar_prazo
+if /i not "%~1"=="atualizar" goto decisao_rapida
 if exist ".ultima_verificacao" del /q ".ultima_verificacao" >nul 2>&1
 echo Modo atualizar: verificando agora mesmo...
 
@@ -61,31 +60,33 @@ REM Entao baixamos para um arquivo .tmp - de proposito SEM extensao .bat,
 REM pra ninguem clicar nele por engano - e trocamos na ULTIMA linha, junto
 REM com o exit; depois disso o cmd nao le mais nada do arquivo.
 powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/arena/01a08d8e-guilhermefmaga-site/iniciar.bat?cache=%RANDOM%' -OutFile '_atualizacao_iniciar.tmp' -UseBasicParsing -TimeoutSec 20; if ((Get-Item '_atualizacao_iniciar.tmp').Length -lt 800) { Remove-Item '_atualizacao_iniciar.tmp' -Force } elseif ((Get-FileHash '_atualizacao_iniciar.tmp').Hash -eq (Get-FileHash 'iniciar.bat').Hash) { Remove-Item '_atualizacao_iniciar.tmp' -Force } else { Write-Host 'Ha uma versao nova do iniciar.bat: aplico sozinho quando voce fechar (voce nao precisa fazer nada).' } } catch { Remove-Item '_atualizacao_iniciar.tmp' -ErrorAction SilentlyContinue }"
+goto instalar_libs
+
+:decisao_rapida
+REM r45: UMA chamada de Python decide tudo (saiu o PowerShell da verificacao
+REM de prazo e sobrou um unico python de milissegundos). Codigos de saida:
+REM   0 = dentro da validade de 12h + bibliotecas ok  -> abre direto
+REM   1 = fora da validade + bibliotecas ok           -> verifica atualizacao
+REM   2 = dentro da validade + FALTA biblioteca       -> instala bibliotecas
+REM   3 = fora da validade + falta biblioteca         -> ambos
+python -c "import os, sys, time, importlib.util as u; s='.ultima_verificacao'; fresco=os.path.exists(s) and (time.time()-os.stat(s).st_mtime)<43200; libs=bool(u.find_spec('langchain_openai')) and bool(u.find_spec('langchain_google_genai')); sys.exit((0 if libs else 2)+(0 if fresco else 1))"
+if errorlevel 3 goto fazer_verificacao
+if errorlevel 2 goto instalar_libs
+if errorlevel 1 goto fazer_verificacao
+echo Tudo em dia (verificado nas ultimas 12 horas) - abrindo direto.
 goto depois_atualizacao
 
-:checar_prazo
-if not exist ".ultima_verificacao" goto fazer_verificacao
-powershell -NoProfile -Command "$h=((Get-Date)-(Get-Item '.ultima_verificacao').LastWriteTime).TotalHours; exit ([int]($h -ge 12))"
-if errorlevel 1 goto fazer_verificacao
-echo Atualizacao verificada nas ultimas 12 horas - abrindo direto.
-echo Para forcar a verificacao agora: feche e rode   iniciar.bat atualizar
-
-:depois_atualizacao
-
-REM Garante as bibliotecas das IAs (r44: checagem SEM importar a biblioteca —
-REM importar langchain so para ver se existe custava segundos a cada abertura;
-REM find_spec olha a existencia em milissegundos)
-python -c "import importlib.util as _u; import sys; sys.exit(0 if _u.find_spec('langchain_openai') else 1)"
+:instalar_libs
+REM Garante as bibliotecas das IAs (checagem por find_spec: milissegundos,
+REM SEM importar a biblioteca — importar langchain so para ver se existe
+REM custava segundos a cada abertura)
+python -c "import importlib.util as u, sys; sys.exit(0 if (u.find_spec('langchain_openai') and u.find_spec('langchain_google_genai')) else 1)"
 if errorlevel 1 (
     echo Instalando bibliotecas das IAs, aguarde...
     python -m pip install -q langchain-openai langchain-google-genai
 )
-REM Garante tambem a do Gemini (Google) - so instala se faltar
-python -c "import importlib.util as _u; import sys; sys.exit(0 if _u.find_spec('langchain_google_genai') else 1)"
-if errorlevel 1 (
-    echo Instalando biblioteca do Gemini, aguarde...
-    python -m pip install -q langchain-google-genai
-)
+
+:depois_atualizacao
 
 REM Roda o agente que esta no arquivo agente.py (nesta mesma pasta)
 python agente.py

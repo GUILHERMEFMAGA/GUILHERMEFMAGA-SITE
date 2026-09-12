@@ -671,8 +671,6 @@ import traceback
 import queue
 from datetime import datetime
 
-import pyautogui
-from pypdf import PdfReader
 # r44 (arranque instantaneo): pywhatkit (que arrastava OpenCV junto), pandas e a
 # classe do Gemini agora sao importados SO na hora do uso — o arranque do agente
 # nao paga mais por bibliotecas pesadas que a maioria dos comandos nao toca.
@@ -695,7 +693,42 @@ def _r44_gemini_classe():
     return atual
 
 
-from langchain.agents import create_agent
+
+
+def _r45_pyautogui():
+    """Importa o pyautogui na PRIMEIRA vez que e usado (cache global).
+    r45: o arranque nao paga mais o import pesado dele e seus vizinhos."""
+    modulo = globals().get('_r45_pg')
+    if modulo is None:
+        import pyautogui as _pg
+        globals()['_r45_pg'] = _pg
+        return _pg
+    return modulo
+
+
+def _r45_embeddings_model():
+    """Importa e monta o modelo de embeddings do Gemini SO na primeira memoria
+    (cache global). Sem chave ou sem biblioteca: None e a busca cai para texto
+    (difflib), exatamente como o comportamento antigo de fallback."""
+    if '_r45_emb' in globals():
+        return globals()['_r45_emb']
+    modelo = None
+    chave = None
+    _pega = globals().get('_chave_ia')
+    if callable(_pega):
+        chave = _pega('GEMINI_API_KEY')
+    if chave:
+        try:
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+            modelo = GoogleGenerativeAIEmbeddings(
+                model='models/text-embedding-004', google_api_key=chave)
+        except Exception as e:
+            print(f"[Aviso]: memoria semantica por embeddings indisponivel ({type(e).__name__}). Usando busca por texto.")
+            modelo = None
+    globals()['_r45_emb'] = modelo
+    return modelo
+
+
 from langchain_core.tools import tool
 
 # ==========================================================================
@@ -1557,17 +1590,9 @@ else:
 # SIGNIFICADO, não só texto parecido. Se a API de embeddings falhar por
 # qualquer motivo (sem internet, sem crédito), o agente cai automaticamente
 # de volta pra busca por similaridade de texto (difflib) — nunca quebra.
-embeddings_model = None
-_chave_gemini_emb = _chave_ia("GEMINI_API_KEY")
-if _chave_gemini_emb:
-    try:
-        from langchain_google_genai import GoogleGenerativeAIEmbeddings
-        embeddings_model = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004", google_api_key=_chave_gemini_emb
-        )
-    except Exception as e:
-        print(f"[Aviso]: memoria semantica por embeddings indisponivel ({type(e).__name__}). Usando busca por texto.")
-# Sem chave do Gemini: fica so com a busca por texto (difflib), sem aviso.
+# r45: o modelo de embeddings NAO e mais montado no arranque —
+# _r45_embeddings_model() importa e monta SO na primeira memoria; sem chave
+# ou sem biblioteca, a busca cai para texto (difflib), sem aviso.
 
 # Voz: carregamento tolerante (se as libs não estiverem instaladas, o agente
 # simplesmente desativa o recurso e avisa, sem travar o resto)
@@ -1800,9 +1825,10 @@ def registrar_memoria_longa(texto: str, tags=None):
         "tags": tags or [],
         "data": datetime.now().isoformat(),
     }
-    if embeddings_model:
+    _emb_r45 = _r45_embeddings_model()
+    if _emb_r45:
         try:
-            entrada["embedding"] = embeddings_model.embed_query(texto)
+            entrada["embedding"] = _emb_r45.embed_query(texto)
         except Exception:
             pass  # sem embedding neste registro, ainda funciona pela busca por texto
     memoria_longa.append(entrada)
@@ -1826,9 +1852,10 @@ def buscar_memorias_relevantes(pergunta: str, limite=3):
     if not memoria_longa:
         return []
 
-    if embeddings_model:
+    _emb_r45 = _r45_embeddings_model()
+    if _emb_r45:
         try:
-            vetor_pergunta = embeddings_model.embed_query(pergunta)
+            vetor_pergunta = _emb_r45.embed_query(pergunta)
             pontuadas = [
                 (_similaridade_cosseno(vetor_pergunta, m["embedding"]), m)
                 for m in memoria_longa if m.get("embedding")
@@ -6098,6 +6125,7 @@ def _ler_texto_de_arquivo(caminho: str) -> str:
                     from PyPDF2 import PdfReader
                 except Exception:
                     return ""
+            from pypdf import PdfReader  # r45: import tardio
             leitor = PdfReader(caminho)
             return "\n".join((pag.extract_text() or "") for pag in leitor.pages[:80])
         if baixo.endswith(".docx"):
@@ -12925,7 +12953,7 @@ def processar_atalho_rapido(comando: str) -> bool:
         chave_midia = cmd if cmd in ATALHOS_MIDIA else resolver_atalho_midia_por_similaridade(cmd)
         if chave_midia:
             tecla = ATALHOS_MIDIA[chave_midia]
-            pyautogui.press(tecla)
+            _r45_pyautogui().press(tecla)
             print(f"\n[Atalho de mídia]: comando '{tecla}' enviado ao player ativo.")
             falar("Feito.")
             return True
@@ -13304,7 +13332,7 @@ def gerenciar_contatos(acao: str, nome: str = "", numero: str = "") -> str:
 
 def _colar_texto_clipboard(texto: str) -> bool:
     """Coloca 'texto' na area de transferencia do Windows suportando acentos e
-    Unicode (o pyautogui.write nao digita acento). Tenta pyperclip; se nao
+    Unicode (o _r45_pyautogui().write nao digita acento). Tenta pyperclip; se nao
     houver, usa PowerShell lendo um arquivo temporario UTF-8."""
     try:
         import pyperclip
@@ -13653,9 +13681,9 @@ def repetir_macro(nome_macro: str) -> str:
         eventos = carregar_json(caminho, [])
         for evento in eventos:
             if evento["tipo"] == "clique":
-                pyautogui.click(evento["x"], evento["y"])
+                _r45_pyautogui().click(evento["x"], evento["y"])
             elif evento["tipo"] == "tecla":
-                pyautogui.write(evento["tecla"])
+                _r45_pyautogui().write(evento["tecla"])
         return f"Macro '{nome_macro}' repetida com {len(eventos)} eventos."
 
     return executar_com_autocura("repetir_macro", _repetir)
@@ -13690,7 +13718,7 @@ def dar_olhos_ao_agente(instrucao_do_que_buscar: str) -> str:
     """Dá OLHOS à IA: tira print da tela e analisa o que está aberto agora."""
     def _analisar():
         caminho_print = os.path.join(PASTA_BASE, "tela_atual.png")
-        pyautogui.screenshot(caminho_print)
+        _r45_pyautogui().screenshot(caminho_print)
         resposta_visual = invocar_com_fallback([
             {"role": "user", "content": [
                 {"type": "text", "text": f"Analise esta imagem da tela do meu PC e responda: {instrucao_do_que_buscar}"},
@@ -13719,6 +13747,7 @@ def ler_e_analisar_arquivos_dados(caminho_arquivo: str) -> str:
             df = pd.read_csv(caminho_arquivo)
             return f"Conteúdo do arquivo CSV:\n{df.head(10).to_string()}"
         elif extensao == ".pdf":
+            from pypdf import PdfReader  # r45: import tardio
             reader = PdfReader(caminho_arquivo)
             texto_pdf = ""
             for i, pagina in enumerate(reader.pages[:5]):
@@ -13736,11 +13765,11 @@ def controlar_mouse_e_teclado(acao: str, texto_ou_botao: str = "") -> str:
     """Interage visualmente com a tela (clicar, digitar, esperar)."""
     def _controlar():
         if acao == "clicar":
-            largura, altura = pyautogui.size()
-            pyautogui.click(largura / 2, altura / 2)
+            largura, altura = _r45_pyautogui().size()
+            _r45_pyautogui().click(largura / 2, altura / 2)
             return "Clique executado."
         elif acao == "digitar":
-            pyautogui.write(texto_ou_botao, interval=0.05)
+            _r45_pyautogui().write(texto_ou_botao, interval=0.05)
             return "Texto digitado."
         elif acao == "esperar":
             time.sleep(2)
@@ -14264,7 +14293,7 @@ def controlar_midia(acao: str) -> str:
         tecla = mapa.get(acao)
         if not tecla:
             return f"Ação '{acao}' não reconhecida. Use: {', '.join(mapa.keys())}."
-        pyautogui.press(tecla)
+        _r45_pyautogui().press(tecla)
         return f"Comando de mídia '{acao}' enviado com sucesso ao player ativo."
 
     return executar_com_autocura("controlar_midia", _executar)
@@ -14716,7 +14745,7 @@ def capturar_tela_arquivo(nome: str = "") -> str:
         if not arquivo.lower().endswith(".png"):
             arquivo += ".png"
         caminho = os.path.join(pasta, arquivo)
-        pyautogui.screenshot(caminho)
+        _r45_pyautogui().screenshot(caminho)
         return f"Print da tela salvo em: {caminho}"
 
     return executar_com_autocura("capturar_tela_arquivo", _capturar)
@@ -15264,7 +15293,7 @@ def central_programas_janelas(acao: str, valor: str = "") -> str:
         s, e, c = _rodar_cmd(f'taskkill /im "{nome}.exe" /t', 30)
         return f"Pedido para fechar '{nome}'." if c == 0 else f"Nao consegui fechar '{nome}': {e or s}"
     if a in ("minimizar_tudo", "area_trabalho", "mostrar_area"):
-        pyautogui.hotkey("win", "d")
+        _r45_pyautogui().hotkey("win", "d")
         return "Mostrando a area de trabalho (janelas minimizadas)."
     if a == "abrir":
         if not valor.strip():
@@ -15290,15 +15319,15 @@ def central_tela_audio(acao: str, valor: str = "") -> str:
     if a in ("aumentar_volume", "aumentar", "volume_up"):
         vezes = int(valor) if str(valor).strip().isdigit() else 5
         for _ in range(vezes):
-            pyautogui.press("volumeup")
+            _r45_pyautogui().press("volumeup")
         return f"Volume aumentado ({vezes} niveis)."
     if a in ("diminuir_volume", "diminuir", "volume_down"):
         vezes = int(valor) if str(valor).strip().isdigit() else 5
         for _ in range(vezes):
-            pyautogui.press("volumedown")
+            _r45_pyautogui().press("volumedown")
         return f"Volume diminuido ({vezes} niveis)."
     if a in ("mudo", "mutar", "silenciar"):
-        pyautogui.press("volumemute")
+        _r45_pyautogui().press("volumemute")
         return "Mudo ligado/desligado (toggle)."
     if a in ("capturar_janela", "print_janela"):
         def _cap():
@@ -15804,7 +15833,7 @@ def central_codigo(acao: str, nome_projeto: str = "", caminho_arquivo: str = "",
         try:
             subprocess.Popen(f'code -r "{pasta}"', shell=True)
             time.sleep(2)
-            pyautogui.hotkey("ctrl", "`")  # atalho do VS Code: abre o terminal integrado
+            _r45_pyautogui().hotkey("ctrl", "`")  # atalho do VS Code: abre o terminal integrado
             return "Terminal integrado do VS Code aberto na pasta do projeto."
         except Exception as e:
             return f"Nao consegui abrir o terminal do VS Code ({e})."
@@ -20092,9 +20121,9 @@ def cor_do_pixel(x: int, y: int) -> str:
     """PEGA A COR (em HEX e RGB) de um ponto da tela pelas coordenadas X,Y (util
     para design/front-end - descobrir a cor exata de algo na tela). Use para 'qual
     a cor do pixel 100,200', 'pega essa cor da tela'. Para achar coordenadas, use a
-    visao de tela. So Windows/com pyautogui."""
+    visao de tela. So Windows/com _r45_pyautogui()."""
     def _pegar():
-        img = pyautogui.screenshot()
+        img = _r45_pyautogui().screenshot()
         larg, alt = img.size
         if not (0 <= x < larg and 0 <= y < alt):
             return f"Coordenadas fora da tela (a tela e {larg}x{alt})."
@@ -32359,6 +32388,7 @@ def _pegar_agente(idx, ferramentas=None):
         ferramentas = tools
     _chave = (idx, tuple(sorted(_nome_ferramenta(t) for t in ferramentas)))
     if _chave not in _agentes_por_ia:
+        from langchain.agents import create_agent  # r45: import so no caminho da nuvem
         _agentes_por_ia[_chave] = create_agent(model=modelos_ia[idx]["llm"], tools=ferramentas)
     return _agentes_por_ia[_chave]
 
@@ -32417,7 +32447,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r44] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r45] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

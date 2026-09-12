@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44 **477 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45 **488 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -418,6 +418,23 @@ ou relatórios reais sem revisão e autorização.
   protecao preservada (copias/admin/backup/py_compile/hash/autoatualizacao do BAT
   na ultima linha/URLs). **477 testes OK** (+10: texto do BAT, AST do agente, lazy
   do Gemini). Selo `-r44`. Não testado no Windows real.
+- **r45 (ARRANQUE MAIS RAPIDO AINDA — usuario relatou que r44 ainda demorava):**
+  nenhuma ferramenta nova (699 mantidas). Segunda passada nos viloes: **[1]** o BAT
+  ainda rodava PowerShell so para checar o prazo do carimbo + DOIS python de
+  find_spec — agora **UMA unica chamada de Python** decide prazo+libs (codigos de
+  saida 0-3; rotulos :decisao_rapida e :instalar_libs; normal = 1 python de
+  milissegundos); **[2]** o agente ainda importava no arranque: **pyautogui**
+  (puxa pygetwindow/pyscreeze; 17 usos agora via `_r45_pyautogui()`), **pypdf**
+  (4 imports locais nos sites que usam) e **`from langchain.agents import
+  create_agent`** (importava o pacote langchain INTEIRO para um recurso que so o
+  caminho da NUVEM usa — agora o import e DENTRO de `_pegar_agente`); **[3]** o
+  modelo de embeddings do Gemini era montado no nivel do modulo quando existia
+  chave — agora `_r45_embeddings_model()` importa/monta so na primeira memoria
+  (cache de falha + aviso unico; sem chave/biblioteca cai para difflib como antes).
+  langchain_core permanece no arranque (decorador @tool das 699). Dica nova no
+  proprio BAT: atalho com "Executar como administrador" pula o PowerShell
+  intermediario do UAC. **488 testes OK** (+11: BAT em 1 chamada, AST do topo,
+  comportamento dos 2 accessors). Selo `-r45`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
