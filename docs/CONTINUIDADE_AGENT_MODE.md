@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43 **467 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44 **477 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -402,6 +402,22 @@ ou relatórios reais sem revisão e autorização.
   defasado saiu da saida. **467 testes OK** (+52); auditoria 699/0 duplicatas;
   catálogo reconciliado; `consultar_porta_conhecida` levanta erro para porta <= 0;
   selo `-r43`. Não testado no Windows real.
+- **r44 (ARRANQUE INSTANTANEO — pedido "duplo clique carregar instantaneamente,
+  sem a demora"):** nenhuma ferramenta nova (699 mantidas; nada na lista). Os viloes
+  do duplo clique eram 3: **[1]** o BAT baixava a atualizacao TODA abertura (2
+  PowerShell + ~1,5 MB + py_compile + hash) — agora o carimbo `.ultima_verificacao`
+  vale **12 horas** (dentro do prazo abre direto, sem rede; falha de internet NAO
+  grava carimbo e tenta de novo na proxima abertura; **`iniciar.bat atualizar`**
+  forca na hora; o UAC repassa o argumento via `-ArgumentList '%*'`; SEM_ATUALIZAR.txt
+  continua mandando); **[2]** `python -c "import langchain_openai"` IMPORTAVA a
+  biblioteca pesada so para ver se existe — agora `find_spec` (milissegundos), idem
+  Gemini; **[3]** o agente importava pywhatkit (que arrasta OpenCV), pandas e a
+  classe do Gemini no arranque — agora sao **imports tardios** (`_r44_gemini_classe`
+  com cache de falha e aviso unico; pywhatkit/pandas dentro das funcoes que usam).
+  O motor GGUF JA subia em segundo plano (thread daemon) e segue igual. Toda a
+  protecao preservada (copias/admin/backup/py_compile/hash/autoatualizacao do BAT
+  na ultima linha/URLs). **477 testes OK** (+10: texto do BAT, AST do agente, lazy
+  do Gemini). Selo `-r44`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

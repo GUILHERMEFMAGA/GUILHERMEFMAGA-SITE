@@ -672,13 +672,29 @@ import queue
 from datetime import datetime
 
 import pyautogui
-import pywhatkit as kit
-import pandas as pd
 from pypdf import PdfReader
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI as _ChatGoogleGenerativeAI
-except Exception:  # biblioteca do Google ausente: o Gemini so fica indisponivel
-    _ChatGoogleGenerativeAI = None
+# r44 (arranque instantaneo): pywhatkit (que arrastava OpenCV junto), pandas e a
+# classe do Gemini agora sao importados SO na hora do uso — o arranque do agente
+# nao paga mais por bibliotecas pesadas que a maioria dos comandos nao toca.
+_ChatGoogleGenerativeAI = None
+
+
+def _r44_gemini_classe():
+    """Importa a classe do Gemini na PRIMEIRA vez que ela e usada (cache).
+    Retorna a classe, ou False se a biblioteca nao existir (avisa uma vez so)."""
+    atual = globals().get('_ChatGoogleGenerativeAI')
+    if atual is None:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI as _C
+            globals()['_ChatGoogleGenerativeAI'] = _C
+            return _C
+        except Exception:
+            globals()['_ChatGoogleGenerativeAI'] = False
+            print("[Aviso]: 'langchain-google-genai' nao instalada (rode: pip install langchain-google-genai). Gemini desligado.")
+            return False
+    return atual
+
+
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 
@@ -1145,13 +1161,13 @@ for _prov in PROVEDORES_IA_PADRAO:
         continue
     try:
         if _prov.get("tipo") == "gemini":
-            if _ChatGoogleGenerativeAI is None:
-                # biblioteca do Google faltando: avisa e segue com as outras IAs
-                print("[Aviso]: 'langchain-google-genai' nao instalada (rode: pip install langchain-google-genai). Gemini desligado.")
+            _gemini_cls_r44 = _r44_gemini_classe()
+            if not _gemini_cls_r44:
+                # biblioteca do Google faltando (aviso ja dado uma vez): segue
                 continue
             # Passa a chave EXPLICITAMENTE: assim funciona tanto por variavel de
             # ambiente (setx) quanto lida do arquivo chaves.txt.
-            _modelo = _ChatGoogleGenerativeAI(
+            _modelo = _gemini_cls_r44(
                 model=_prov["modelo"], temperature=0,
                 google_api_key=_chave,
             )
@@ -13258,6 +13274,7 @@ def enviar_mensagem_whatsapp(destinatario: str, mensagem: str) -> str:
         return "Envio cancelado pelo usuario."
 
     def _enviar():
+        import pywhatkit as kit  # r44: import tardio (arranque nao paga OpenCV)
         kit.sendwhatmsg_instantly(numero, mensagem, wait_time=15, tab_close=True)
         _confirmar_envio_wpp(numero, mensagem, modo="whatsapp web (pywhatkit)")
         # se veio um nome e ainda nao estava salvo, garante o cadastro
@@ -13420,6 +13437,7 @@ def _desligada_enviar_mensagem_grupo_whatsapp(grupo: str, mensagem: str) -> str:
         return "Envio cancelado pelo usuário."
 
     def _enviar():
+        import pywhatkit as kit  # r44: import tardio (arranque nao paga OpenCV)
         kit.sendwhatmsg_to_group_instantly(grupo_id, mensagem, wait_time=15, tab_close=True)
         logs_whatsapp.append({
             "data": datetime.now().isoformat(), "tipo": "grupo",
@@ -13690,6 +13708,7 @@ def dar_olhos_ao_agente(instrucao_do_que_buscar: str) -> str:
 def ler_e_analisar_arquivos_dados(caminho_arquivo: str) -> str:
     """Lê e extrai conteúdo de planilhas (.xlsx, .csv), PDFs ou arquivos de texto."""
     def _ler():
+        import pandas as pd  # r44: import tardio (arranque nao paga pandas)
         if not os.path.exists(caminho_arquivo):
             return "Erro: O arquivo especificado não foi encontrado."
         extensao = os.path.splitext(caminho_arquivo)[1].lower()
@@ -32398,7 +32417,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r43] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r44] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
