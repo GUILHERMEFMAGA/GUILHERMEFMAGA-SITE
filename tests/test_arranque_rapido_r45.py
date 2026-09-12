@@ -61,7 +61,9 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertNotIn('pyautogui', topo)
         self.assertNotIn('pypdf', topo)
         self.assertNotIn('langchain.agents', topo)
-        self.assertIn('langchain_core', topo)  # @tool das 699 ferramentas
+        # r47: langchain_core saiu do topo — @tool virou stub e o import real
+        # acontece dentro de _garantir_tools() na primeira leitura da lista
+        self.assertNotIn('langchain_core', topo)
 
     def test_create_agent_somente_no_caminho_da_nuvem(self):
         t = texto_agente()
@@ -86,8 +88,8 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertIn('def _r45_embeddings_model():', t)
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
-    def test_selo_r46_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r46]', texto_agente())
+    def test_selo_r47_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r47]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):

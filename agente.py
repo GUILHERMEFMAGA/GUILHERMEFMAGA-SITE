@@ -729,7 +729,49 @@ def _r45_embeddings_model():
     return modelo
 
 
-from langchain_core.tools import tool
+# r47 (arranque instantaneo, parte 2): o decorador @tool agora so REGISTRA a
+# funcao (custo zero no arranque); a StructuredTool de verdade nasce em
+# _garantir_tools() na primeira vez que ALGUEM precisa da lista completa.
+# Medicao: import do langchain_core ~0,48 s + decorar ~479 ferramentas ~0,75 s
+# que o arranque pagava mesmo no modo 100% local, a cada duplo clique.
+
+def tool(fn):
+    """Stub do decorador @tool: devolve a funcao crua, marcada. A versao real
+    (StructuredTool do langchain_core) e criada em _garantir_tools()."""
+    try:
+        fn._r47_tool = True
+    except Exception:
+        pass
+    return fn
+
+
+def _garantir_tools(fabrica=None):
+    """Materializa a lista global `tools` UMA vez: troca cada funcao marcada
+    com @tool pela StructuredTool real (o import pesado acontece AQUI, nao no
+    arranque). Entradas sem marca (helpers internos da lista) ficam como estao,
+    exatamente como antes. Idempotente e a prova de falha de import (se o
+    langchain_core nao estiver, a lista volta crua em vez de derrubar nada)."""
+    if globals().get('_r47_prontas'):
+        return tools
+    if fabrica is None:
+        try:
+            from langchain_core.tools import tool as _tool_real
+        except Exception:
+            globals()['_r47_prontas'] = True
+            return tools
+    else:
+        _tool_real = fabrica
+    prontas = []
+    for x in tools:
+        if getattr(x, '_r47_tool', False) and callable(x):
+            prontas.append(_tool_real(x))
+        else:
+            prontas.append(x)
+    tools[:] = prontas
+    globals()['_r47_prontas'] = True
+    return tools
+
+
 
 # ==========================================================================
 # =================== PRIVILÉGIOS DE ADMINISTRADOR (NOVO) ==================
@@ -1992,6 +2034,7 @@ def listar_ferramentas(assunto: str = "") -> str:
     ferramenta existe ou qual usar para um pedido (ex.: WhatsApp, grupos,
     arquivos, programas, email, midia, sistema). Se informar 'assunto' (ex.:
     'whatsapp', 'arquivo', 'sistema'), lista so as ferramentas relacionadas."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     linhas = []
     for fn in tools:
         nome = getattr(fn, "name", getattr(fn, "__name__", str(fn)))
@@ -4488,6 +4531,7 @@ def _ordenar_fluxo(fluxo: dict):
 
 
 def _painel_status() -> dict:
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     import platform as _pl
     dados = {"cpu": 0.0, "ram": 0.0, "disco": 0.0, "uptime": "?", "processos": 0,
              "ferramentas": 0, "ia_local": False, "pc": ""}
@@ -4777,6 +4821,7 @@ def abrir_painel_web(porta: int = 8777) -> str:
     seu proprio PC - estado da maquina em tempo real, busca e execucao de
     qualquer ferramenta, navegador de arquivos com editor (com backup),
     rotinas e conversa com a IA local. Sem internet, so no seu computador."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     try:
         real = _iniciar_painel(int(porta))
     except OSError:
@@ -6599,6 +6644,7 @@ _indice_ferramentas_cache = None
 
 def _indice_ferramentas():
     """Indexa TODAS as @tool: nome, descricao, palavras-chave e parametros."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     global _indice_ferramentas_cache
     if _indice_ferramentas_cache is not None:
         return _indice_ferramentas_cache
@@ -11072,6 +11118,7 @@ def _contexto_pc() -> str:
 
 def _resposta_identidade() -> str:
     """Distingue configuracao do agente de elevacao real no Windows."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     nivel = config.get("nivel_permissao", "padrao")
     estado = "Nao confirmei a elevacao do processo Windows."
     if os.name == "nt":
@@ -19395,6 +19442,7 @@ def estatisticas_uso() -> str:
     projetos, notas, gastos, tarefas concluidas/pendentes, lembretes, habitos e
     quantas ferramentas existem. Tudo instantaneo, sem internet. Use para 'minhas
     estatisticas', 'quanto eu ja usei o agente', 'quantas tarefas fiz'."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     def _q(arq, padrao):
         try:
             d = carregar_json(os.path.join(PASTA_BASE, arq), padrao)
@@ -22747,6 +22795,7 @@ def agente_opinioes() -> str:
     gostaria de ter?', conta o que ele ja sabe fazer e da ideias sinceras (com
     humor) de novos poderes. Use quando o usuario perguntar o que o agente
     acha/quer/sonha."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     n = len(tools) if isinstance(tools, (list, tuple)) else 300
     ideias = [
         "Controle de voz continuo: eu ouvir voce o tempo todo e executar sem voce digitar.",
@@ -22847,6 +22896,7 @@ def estatisticas_poder() -> str:
     """MOSTRA O PODER DO AGENTE: quantas ferramentas ele tem no total e um resumo
     animado (com humor) do que ele e capaz de fazer. Use quando perguntarem 'quantas
     ferramentas voce tem', 'o que voce sabe fazer', 'mostre seu poder'."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     n = len(tools) if isinstance(tools, (list, tuple)) else 300
     blocos = [
         "Administracao do Windows (registro, usuarios, servicos, BitLocker, Defender)",
@@ -31409,6 +31459,7 @@ def resumo_ferramentas_por_tema() -> str:
     """AUTOCOGNICAO (r23): conta as ferramentas do agente por tema (agrupamento
     por palavras-chave do nome). Vista geral para navegar o inventario; a
     contagem total e a real (len(tools)), sem inflar nada."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     temas = [
         ('Windows/sistema/seguranca', ('windows', 'registro', 'bitlocker', 'defender', 'servico', 'usuario', 'firewall', 'uac', 'boot', 'driver', 'particao', 'disco', 'energia', 'hibernacao', 'telemetria', 'bloatware', 'wsl', 'hyperv', 'sandbox', 'rdp', 'admin')),
         ('Arquivos/pastas/dados', ('arquivo', 'pasta', 'csv', 'json', 'xml', 'pdf', 'zip', 'backup', 'duplicad', 'lixeira', 'renomear', 'organizar', 'utf8', 'xlsx', 'planilha')),
@@ -31440,6 +31491,7 @@ def achar_ferramenta_para_tarefa(tarefa: str = "") -> str:
     do disco', 'saber quando cai feriado'), ranqueia as ferramentas por
     semelhanca de palavras (nome + descricao) e explica por que cada uma foi
     sugerida. Consulta local ao inventario; NAO executa nada sem voce confirmar."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     import unicodedata
     pedido = str(tarefa).strip()
     if not pedido:
@@ -32341,6 +32393,7 @@ def _pontuar_ferramenta(ferramenta, texto):
 def _selecionar_ferramentas(comando: str):
     """Devolve a lista ENXUTA de ferramentas relevantes para o pedido.
     Inclui o nucleo fixo + as mais bem pontuadas, ate o limite seguro."""
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     try:
         por_nome = {_nome_ferramenta(t): t for t in tools if _nome_ferramenta(t)}
         selecionadas = []
@@ -32384,6 +32437,7 @@ _agentes_por_ia = {}
 
 
 def _pegar_agente(idx, ferramentas=None):
+    _garantir_tools()  # r47: 1a materializacao so quando alguem le a lista
     if ferramentas is None:
         ferramentas = tools
     _chave = (idx, tuple(sorted(_nome_ferramenta(t) for t in ferramentas)))
@@ -32447,7 +32501,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r46] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r47] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -32483,7 +32537,7 @@ if config.get("abrir_painel_no_inicio"):
         print(" (nao consegui subir o painel web automaticamente)")
 _checar_iniciar_bat()
 print("")
-falar("Agente pronto para uso.")
+threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
 
 while True:
     comando_usuario = input("\nO que o agente deve fazer no PC? ")

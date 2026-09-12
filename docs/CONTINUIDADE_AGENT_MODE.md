@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46 **493 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47 **501 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -450,6 +450,24 @@ ou relatórios reais sem revisão e autorização.
   Python + import do langchain_core (decorador @tool das 699) + decoracao das
   ferramentas + UAC do Windows. **493 testes OK** (+5). Selo `-r46`. Não
   testado no Windows real.
+- **r47 (INSTANTANEO PARTE 2 — a "cirurgia grande", pedido reforcado de rapidez):**
+  nenhuma ferramenta nova (699 mantidas). Medicao no sandbox: `from
+  langchain_core.tools import tool` custava **~0,48 s** + decorar ~479 ferramentas
+  **~0,75 s** = **~1,2 s que TODO duplo clique pagava, mesmo no modo 100% local**.
+  Mudancas: **[1]** `@tool` virou STUB custo-zero (marca `fn._r47_tool` e devolve a
+  funcao crua; as ~479 linhas @tool nao mudaram); **[2]** `_garantir_tools(fabrica=None)`
+  materializa a lista global `tools` UMA vez (importa langchain_core ali dentro;
+  entradas sem marca — helpers internos — ficam como estao; idempotente; falha de
+  import devolve a lista crua em vez de derrubar); **[3]** os **12 leitores** de
+  `tools` mapeados por AST (listar_ferramentas, _painel_status, abrir_painel_web,
+  _indice_ferramentas, _resposta_identidade, estatisticas_uso, agente_opinioes,
+  estatisticas_poder, resumo_ferramentas_por_tema, achar_ferramenta_para_tarefa,
+  _selecionar_ferramentas, _pegar_agente) materializam antes da 1a leitura — rotas
+  deterministicas (oi/atalhos/GGUF) NUNCA materializam; **[4]** greeting de voz do
+  boot virou thread daemon (pyttsx3 fora do caminho critico). Custo MOVIDO, nao
+  sumido: a 1a mensagem que precisa da lista (nuvem, listagem, contador) paga ~1,2 s
+  uma unica vez na sessao. **501 testes OK** (+8). Selo `-r47`. Não testado no
+  Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

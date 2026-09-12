@@ -158,7 +158,7 @@ class NumerosDatasFinancas(unittest.TestCase):
 
 class CapacidadesInternas(unittest.TestCase):
     def test_resumo_por_tema_com_inventario_falso(self):
-        env = carregar('resumo_ferramentas_por_tema', tools=[
+        env = carregar('_garantir_tools', 'resumo_ferramentas_por_tema', tools=[
             fake_tool('feriados_brasil_ano'), fake_tool('status_defender'),
             fake_tool('estatisticas_descritivas')])
         r = env['resumo_ferramentas_por_tema']()
@@ -167,7 +167,7 @@ class CapacidadesInternas(unittest.TestCase):
         self.assertIn('Fora dos temas listados: 0', r)
 
     def test_achar_ferramenta_para_tarefa(self):
-        env = carregar('achar_ferramenta_para_tarefa', tools=[
+        env = carregar('_garantir_tools', 'achar_ferramenta_para_tarefa', tools=[
             fake_tool('feriados_brasil_ano', 'feriados nacionais do Brasil'),
             fake_tool('espaco_recuperavel', 'espaco em disco recuperavel'),
             fake_tool('status_defender', 'status do antivirus')])
