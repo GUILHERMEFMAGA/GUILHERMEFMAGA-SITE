@@ -43,7 +43,7 @@ class BatUmaChamadaSo(unittest.TestCase):
         self.assertIn('if errorlevel 2 goto instalar_libs', bat)
         self.assertIn('if errorlevel 1 goto fazer_verificacao', bat)
         self.assertIn('type nul > ".ultima_verificacao"', bat)
-        self.assertIn('python agente.py', bat)
+        self.assertIn('python main.py', bat)
         self.assertIn("move /y \"_atualizacao_iniciar.tmp\" \"iniciar.bat\"", bat)
         self.assertIn("-ArgumentList '%*'", bat)
 
@@ -86,8 +86,8 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertIn('def _r45_embeddings_model():', t)
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
-    def test_selo_r45_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r45]', texto_agente())
+    def test_selo_r46_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r46]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):

@@ -88,8 +88,10 @@ if errorlevel 1 (
 
 :depois_atualizacao
 
-REM Roda o agente que esta no arquivo agente.py (nesta mesma pasta)
-python agente.py
+REM Roda o agente pelo lancador main.py (r46): importar como modulo faz o
+REM Python guardar bytecode pronto em __pycache__ — as aberturas seguintes
+REM NAO recompilam o agente inteiro (script direto nao usa esse cache).
+python main.py
 
 echo.
 echo O agente foi encerrado.

@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45 **488 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46 **493 testes isolados passaram** (auditoria: 699 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r24).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -435,6 +435,21 @@ ou relatórios reais sem revisão e autorização.
   proprio BAT: atalho com "Executar como administrador" pula o PowerShell
   intermediario do UAC. **488 testes OK** (+11: BAT em 1 chamada, AST do topo,
   comportamento dos 2 accessors). Selo `-r45`. Não testado no Windows real.
+- **r46 (INSTANTANEO DE VERDADE — "vamos deixar instantaneamente rapido", 3a
+  rodada de arranque):** nenhuma ferramenta nova (699 mantidas). Achado com
+  MEDICAO: o CPython NAO cria cache de bytecode para script rodado direto —
+  `python agente.py` RECOMPILAVA o arquivo de 1,5 MB a cada duplo clique
+  (~0,3 s medidos no sandbox; no PC pode custar mais). Correcao: lancador
+  miudo **`main.py`** (`import agente`) — importar como modulo ativa o
+  `__pycache__`: a 1a abertura apos cada atualizacao compila uma vez e as
+  seguintes carregam o bytecode pronto. O BAT agora roda `python main.py`
+  (compativel nos dois sentidos: o BAT velho com agente novo funciona; o
+  agente so muda de porta de entrada). `import agente` roda EXATAMENTE o
+  mesmo programa (loop de conversa comprovadamente no nivel do modulo —
+  teste AST). __pycache__ fora do Git (.gitignore). Resto honesto: interpreter
+  Python + import do langchain_core (decorador @tool das 699) + decoracao das
+  ferramentas + UAC do Windows. **493 testes OK** (+5). Selo `-r46`. Não
+  testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

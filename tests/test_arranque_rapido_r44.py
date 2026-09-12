@@ -48,7 +48,7 @@ class BatArranqueRapido(unittest.TestCase):
         self.assertIn('py_compile agente_novo.py', bat)
         self.assertIn('_atualizacao_iniciar.tmp', bat)
         self.assertIn('move /y "_atualizacao_iniciar.tmp" "iniciar.bat"', bat)
-        self.assertIn('python agente.py', bat)
+        self.assertIn('python main.py', bat)
 
     def test_elevacao_repassa_argumento(self):
         bat = texto_bat()
@@ -87,10 +87,10 @@ class AgenteSemImportPesadoNoArranque(unittest.TestCase):
         self.assertIn('def _r44_gemini_classe():', texto)
         self.assertIn('_r44_gemini_classe()', texto)
 
-    def test_selo_r45_no_banner(self):
+    def test_selo_r46_no_banner(self):
         with io.open(str(SOURCE), encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r45]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r46]', texto)
 
 
 class LazyGemini(unittest.TestCase):
