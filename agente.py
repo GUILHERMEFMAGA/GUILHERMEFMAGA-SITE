@@ -7796,7 +7796,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
-    print("ATALHOS (r53): 'atalho do agente' cria o icone do agente na Area de Trabalho | 'atalho para <programa>' (chrome, bloco de notas, vscode...)")
+    print("ATALHOS (r53/r54): 'atalho do agente' | 'atalho para <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
     print("FABRICA DE IDEIAS (r41): 'fabrica de ideias' cruza catalogo + telemetria + rejeitadas | 'fabrica de ideias: 20' traz mais de uma vez (3 a 20)")
@@ -12337,33 +12337,43 @@ def _r53_resolver_app(nome, existe=None):
     """r53: traduz apelidos de programas para o caminho real do .exe.
     Devolve '' quando nao conhece o apelido (o chamador usa o texto cru)."""
     import os as _os
-    existe = existe or _os.path.isfile
+    existe = existe or _os.path.exists  # r54: pastas (C:\) tambem valem
     n = _r53_normalizar(nome)
     candidatos = {
-        'chrome': ('C:/Program Files/Google/Chrome/Application/chrome.exe',
-                   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'),
-        'google chrome': ('C:/Program Files/Google/Chrome/Application/chrome.exe',
-                          'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'),
-        'edge': ('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-                 'C:/Program Files/Microsoft/Edge/Application/msedge.exe'),
-        'microsoft edge': ('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-                           'C:/Program Files/Microsoft/Edge/Application/msedge.exe'),
-        'firefox': ('C:/Program Files/Mozilla Firefox/firefox.exe',
-                    'C:/Program Files (x86)/Mozilla Firefox/firefox.exe'),
-        'notepad': ('C:/Windows/System32/notepad.exe',),
-        'bloco de notas': ('C:/Windows/System32/notepad.exe',),
-        'calc': ('C:/Windows/System32/calc.exe',),
-        'calculadora': ('C:/Windows/System32/calc.exe',),
-        'explorer': ('C:/Windows/explorer.exe',),
-        'explorador de arquivos': ('C:/Windows/explorer.exe',),
-        'cmd': ('C:/Windows/System32/cmd.exe',),
-        'prompt de comando': ('C:/Windows/System32/cmd.exe',),
-        'powershell': ('C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe',),
-        'vscode': (_os.path.expandvars('%LOCALAPPDATA%/Programs/Microsoft VS Code/Code.exe'),
-                   'C:/Program Files/Microsoft VS Code/Code.exe',
-                   'C:/Program Files (x86)/Microsoft VS Code/Code.exe'),
-        'visual studio code': (_os.path.expandvars('%LOCALAPPDATA%/Programs/Microsoft VS Code/Code.exe'),
-                               'C:/Program Files/Microsoft VS Code/Code.exe'),
+        'chrome': ('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'),
+        'google chrome': ('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+                          'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe'),
+        'edge': ('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'),
+        'microsoft edge': ('C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+                           'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'),
+        'firefox': ('C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+                    'C:\\Program Files (x86)\\Mozilla Firefox\\firefox.exe'),
+        'notepad': ('C:\\Windows\\System32\\notepad.exe',),
+        'bloco de notas': ('C:\\Windows\\System32\\notepad.exe',),
+        'calc': ('C:\\Windows\\System32\\calc.exe',),
+        'calculadora': ('C:\\Windows\\System32\\calc.exe',),
+        'explorer': ('C:\\Windows\\explorer.exe',),
+        'explorador de arquivos': ('C:\\Windows\\explorer.exe',),
+        'cmd': ('C:\\Windows\\System32\\cmd.exe',),
+        'prompt de comando': ('C:\\Windows\\System32\\cmd.exe',),
+        'powershell': ('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',),
+        'vscode': (_os.path.expandvars('%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe'),
+                   'C:\\Program Files\\Microsoft VS Code\\Code.exe',
+                   'C:\\Program Files (x86)\\Microsoft VS Code\\Code.exe'),
+        'visual studio code': (_os.path.expandvars('%LOCALAPPDATA%\\Programs\\Microsoft VS Code\\Code.exe'),
+                               'C:\\Program Files\\Microsoft VS Code\\Code.exe'),
+        # r54: raiz principal do PC (atalho que abre C:\ / Este Computador)
+        'este pc': ('C:\\',),
+        'meu computador': ('C:\\',),
+        'computador': ('C:\\',),
+        'raiz': ('C:\\',),
+        'raiz do pc': ('C:\\',),
+        'raiz principal': ('C:\\',),
+        'disco c': ('C:\\',),
+        'c': ('C:\\',),
+        'c:': ('C:\\',),
     }
     for apelido, caminhos in candidatos.items():
         if n == apelido:
@@ -12413,16 +12423,25 @@ def _r53_alvo_atalho(comando):
 
 
 def _r53_comandos(comando, criar=None, existe=None, pasta=None):
-    """r53: 'atalho do agente' / 'crie um atalho pra abrir isso' / 'atalho para
-    <programa>' — comando DIRETO (nao passa pelo seletor de ferramentas). O
-    caso do agente usa o iniciar.bat (ou agente.py) e reaproveita a ferramenta
-    criar_atalho_area_trabalho, sem duplicar nada."""
+    """r53/r54: 'atalho do agente' / 'atalho para <programa ou pasta>' /
+    'atalho para este pc' (raiz C:\\). Reusa criar_atalho_area_trabalho.
+    r54: pedido SEM alvo e SEM contexto ("criar atalho" nu) agora PERGUNTA o
+    que o usuario quer, em vez de assumir o agente sozinho."""
     alvo = _r53_alvo_atalho(comando)
     if alvo is None:
         return False
     if criar is None:
         criar = criar_atalho_area_trabalho
-    if not alvo or 'agente' in alvo or alvo in ('isso', 'isto', 'ele'):
+    palavras = set(_r53_normalizar(comando).split())
+    fala_do_agente = bool(palavras & {'isso', 'isto', 'esse', 'este', 'ele', 'de novo',
+                                      'denovo', 'novo', 'mais', 'outro', 'outra', 'agente'})
+    if not alvo and not fala_do_agente:
+        print('[Atalho]: de que voce quer um atalho? Me diga de uma dessas formas:')
+        print("  1) atalho do agente            (icone do Super Agente na Area de Trabalho)")
+        print('  2) atalho para este pc         (abre a raiz C:\\)')
+        print('  3) atalho para <programa ou pasta>   (ex.: atalho para chrome)')
+        return True
+    if not alvo or 'agente' in alvo:
         pasta = pasta or PASTA_BASE
         bat = os.path.join(pasta, 'iniciar.bat')
         alvo_final = bat if os.path.isfile(bat) else os.path.join(pasta, 'agente.py')
@@ -34559,7 +34578,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r53] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r54] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

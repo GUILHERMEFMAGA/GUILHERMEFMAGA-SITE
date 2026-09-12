@@ -21,12 +21,12 @@ def rodar(env, *args, **kwargs):
 class ResolverApp(unittest.TestCase):
     def test_apelidos_conhecidos_resolvem_o_primeiro_caminho_existente(self):
         env = carregar('_r53_resolver_app', '_norm_pt')
-        existentes = {'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-                      'C:/Windows/System32/notepad.exe'}
+        existentes = {'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+                      'C:\\Windows\\System32\\notepad.exe'}
         resolve = lambda nome: env['_r53_resolver_app'](nome, existe=existentes.__contains__)
         self.assertEqual(resolve('chrome'),
-                         'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe')
-        self.assertEqual(resolve('bloco de notas'), 'C:/Windows/System32/notepad.exe')
+                         'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe')
+        self.assertEqual(resolve('bloco de notas'), 'C:\\Windows\\System32\\notepad.exe')
         self.assertEqual(resolve('não conheço esse'), '')
 
     def test_apelido_conhecido_sem_exe_devolve_vazio(self):
@@ -87,7 +87,7 @@ class ComandosAtalho(unittest.TestCase):
         rodar(env, 'atalho para o chrome',
               criar=lambda alvo, nome: feitos.append((alvo, nome)),
               existe=lambda c: True)
-        self.assertEqual(feitos[0][0], 'C:/Program Files/Google/Chrome/Application/chrome.exe')
+        self.assertEqual(feitos[0][0], 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe')
         feitos.clear()
         rodar(env, 'atalho para c:/minha pasta/programa.exe',
               criar=lambda alvo, nome: feitos.append((alvo, nome)),
@@ -106,8 +106,8 @@ class Estrutura(unittest.TestCase):
             texto = f.read()
         self.assertLess(texto.index('if _r53_comandos(comando):'),
                         texto.index('if _r50_comandos(comando):'))
-        self.assertIn("ATALHOS (r53): 'atalho do agente'", texto)
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r53]', texto)
+        self.assertIn("ATALHOS (r53/r54): 'atalho do agente'", texto)  # rotulo evoluiu na r54
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r54]', texto)
         self.assertIn('criar_atalho_area_trabalho', texto)  # reuso, sem duplicar
 
 
