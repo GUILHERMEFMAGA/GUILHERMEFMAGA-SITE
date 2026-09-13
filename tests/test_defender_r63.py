@@ -86,7 +86,7 @@ class Estrutura(unittest.TestCase):
                         texto.index('if _r62_comandos(comando):'))
         self.assertIn("DEFENDER (r63): 'historico de protecao'", texto)
         self.assertIn('status defender', texto)  # rota antiga preservada
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r67]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r68]'), 1)
 
 
 if __name__ == '__main__':

@@ -7802,6 +7802,7 @@ def _menu_ajuda_local():
     print("HONESTIDADE (r65): 'o agente nao abre/funciona' e falhas da casa eu respondo com FATOS do disco - nunca com chute")
     print("LOTE SAUDE (r67): 'diagnostico do python/defender/disco' | 'quem e este pc' | 'modo aviao' | 'criar checkpoint'/'restaurar checkpoint' | 'velocimetro' | 'teste de estresse'")
     print("LOTE PODER (r67): 'resumo da sessao' | 'raio-x da decisao' | 'meus poderes' | 'economia' | 'traduz erro <erro>' | 'conferir atalho' | 'me chama de <nome>' | 'silenciar' | 'sair e atualizar' | 'salvar/voltar configuracao'")
+    print("LOTE EXTREMO (r68): 'cerebro indexar'/'onde esta <arquivo>' | 'cacar duplicatas' | 'comparar pastas' | 'por que o pc esta lento' | 'quiz' | 'raio-x do pdf' | 'o que cozinhar' | 'organizar downloads'/'desfazer organizacao' | 'prova' | 'rpg comecar' | 'aniversarios' | 'me mostra seu codigo' (e mais no ajuda)")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -12699,6 +12700,1017 @@ def _r64_aviso_de_boot(diagnosticar=None):
     return True
 
 
+def _r68_json(nome, pasta=None, valor=None, padrao=None):
+    """r68: arquivo JSON da casa (revisoes, geladeira, citacoes...)."""
+    pasta = pasta or PASTA_BASE
+    caminho = os.path.join(pasta, nome)
+    if valor is None:
+        if not os.path.isfile(caminho):
+            return padrao
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return padrao
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(valor, f, ensure_ascii=True, indent=1)
+        return True
+    except Exception:
+        return False
+
+
+def _r68_cerebro_indexar(raizes=None, pasta=None):
+    """r68 (ideia 1): segundo cerebro de ARQUIVOS — indice local por NOME."""
+    pasta = pasta or PASTA_BASE
+    if raizes is None:
+        casa = os.path.expanduser('~')
+        raizes = [os.path.join(casa, 'Documents'), os.path.join(casa, 'Desktop'),
+                  os.path.join(casa, 'Downloads')]
+    indice = {}
+    varridos = 0
+    for raiz in raizes:
+        if not os.path.isdir(raiz):
+            continue
+        for atual, pastas, arquivos in os.walk(raiz):
+            pastas[:] = [p for p in pastas if not p.startswith(('.', '$', '_orfaos'))]
+            for a in arquivos:
+                varridos += 1
+                if varridos > 20000 or len(indice) >= 5000:
+                    break
+                if len(a) >= 4:
+                    indice[a.lower()] = atual
+    if not indice:
+        return '[INFO] nada para indexar (pastas de usuario nao encontradas aqui).'
+    _r68_json('cerebro_index.json', pasta=pasta, valor=indice)
+    return ('[OK] segundo cerebro: %d arquivo(s) indexados por NOME.'
+            ' Pergunte: onde esta <pedaco do nome>' % len(indice))
+
+
+def _r68_cerebro_buscar(termo=None, pasta=None):
+    termo = (termo or '').strip().lower()
+    indice = _r68_json('cerebro_index.json', pasta=pasta, padrao={}) or {}
+    if not indice:
+        return "Indice vazio: rode 'cerebro indexar' uma vez (leva segundos)."
+    if not termo:
+        return 'Pergunte assim: onde esta <pedaco do nome do arquivo>'
+    achados = [(n, c) for n, c in indice.items() if termo in n][:10]
+    if not achados:
+        return 'Nao achei "%s" no indice (%d arquivos). Atualize com: cerebro indexar' % (termo, len(indice))
+    linhas = ['Achei %d candidato(s) (fatos do indice local):' % len(achados)]
+    linhas += ['  %s\n     em %s' % (n, c) for n, c in achados]
+    return '\n'.join(linhas)
+
+
+def _r68_cacar_duplicatas(pasta_alvo=None, hasher=None):
+    """r68 (ideia 2): arquivos IDENTICOS por hash. So aponta; nao apaga nada."""
+    import hashlib as _hl
+    pasta_alvo = (pasta_alvo or os.path.join(os.path.expanduser('~'), 'Downloads')).strip(' "\'')
+    hasher = hasher or (lambda dados: _hl.md5(dados).hexdigest())
+    if not os.path.isdir(pasta_alvo):
+        return '[INFO] pasta nao encontrada: %s' % pasta_alvo
+    grupos = {}
+    conferidos = 0
+    for atual, pastas, arquivos in os.walk(pasta_alvo):
+        pastas[:] = [p for p in pastas if not p.startswith('.')]
+        for a in arquivos:
+            conferidos += 1
+            if conferidos > 2000:
+                break
+            caminho = os.path.join(atual, a)
+            try:
+                if os.path.getsize(caminho) > 50 * 1024 * 1024:
+                    continue
+                with open(caminho, 'rb') as f:
+                    grupos.setdefault(hasher(f.read()), []).append(caminho)
+            except Exception:
+                continue
+    duplicados = [c for c in grupos.values() if len(c) > 1]
+    if not duplicados:
+        return '[OK] nenhuma copia identica em %s (%d arquivo(s) conferidos por hash).' % (pasta_alvo, conferidos)
+    linhas = ['%d grupo(s) de arquivos IDENTICOS em %s (eu NAO apago nada):' % (len(duplicados), pasta_alvo)]
+    for grupo in duplicados:
+        linhas += ['  ' + g for g in grupo]
+    linhas.append('Apagar e decisao sua; eu so aponto o fato.')
+    return '\n'.join(linhas)
+
+
+def _r68_auditar_inicializacao(executar=None):
+    """r68 (ideia 3): o que sobe com o Windows (fatos; leitura)."""
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(['powershell', '-NoProfile', '-Command',
+                 'Get-CimInstance Win32_StartupCommand | Select-Object Name,Command | Format-List'],
+                                  capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return '[INFO] nao consegui ler a inicializacao (%s).' % type(erro).__name__
+    texto = (getattr(feito, 'stdout', '') or '').strip()
+    if not texto:
+        return '[OK] nenhum programa configurado para subir com o Windows (por aqui).'
+    return ('O que sobe junto com o Windows (fatos):\n' + texto
+            + '\nDesativar algum: Gerenciador de Tarefas (Ctrl+Shift+Esc) > inicializacao. Eu nao desativo nada.')
+
+
+def _r68_comparar_pastas(a=None, b=None):
+    """r68 (ideia 4): diferenca por nome+tamanho."""
+    a = (a or '').strip(' "\'')
+
+    b = (b or '').strip(' "\"')
+    if not a or not b:
+        return 'Use assim: comparar pasta "C:\pasta1" com "C:\pasta2"'
+    if not (os.path.isdir(a) and os.path.isdir(b)):
+        return '[INFO] alguma das pastas nao existe (confira os caminhos).'
+
+    def mapa(p):
+        saida = {}
+        for atual, pastas, arquivos in os.walk(p):
+            pastas[:] = [x for x in pastas if not x.startswith('.')]
+            for nome in arquivos:
+                completo = os.path.join(atual, nome)
+                try:
+                    saida[os.path.relpath(completo, p).lower()] = os.path.getsize(completo)
+                except Exception:
+                    pass
+        return saida
+    ma, mb = mapa(a), mapa(b)
+    so_a = sorted(set(ma) - set(mb))[:8]
+    so_b = sorted(set(mb) - set(ma))[:8]
+    dif = sorted(n for n in set(ma) & set(mb) if ma[n] != mb[n])[:8]
+    return ('Comparacao por nome+tamanho (fatos):\n'
+            '  so em %s: %s\n  so em %s: %s\n  tamanhos diferentes: %s'
+            % (a, ', '.join(so_a) or '(nenhum)', b, ', '.join(so_b) or '(nenhum)',
+               ', '.join(dif) or '(nenhum)'))
+
+
+def _r68_detetive_lentidao(processos=None):
+    """r68 (ideia 5): quem mais consome RAM agora (fatos)."""
+    if processos is None:
+        try:
+            import psutil
+
+            def processos():
+                return sorted(psutil.process_iter(['name', 'memory_percent']),
+                              key=lambda p: (p.info.get('memory_percent') or 0), reverse=True)[:8]
+        except Exception:
+            def processos():
+                return []
+    try:
+        lista = processos()
+    except Exception:
+        lista = []
+    if not lista:
+        return ('Nao consegui listar processos aqui. Caminho garantido: Ctrl+Shift+Esc'
+                ' > Processos > ordenar por Memoria.')
+    linhas = ['Quem mais consome memoria AGORA (fatos):']
+    for p in lista:
+        try:
+            info = p if isinstance(p, dict) else getattr(p, 'info', {})
+            linhas.append('  %s — %.1f%% da RAM' % (info.get('name') or '?', info.get('memory_percent') or 0.0))
+        except Exception:
+            continue
+    linhas.append('Fechar algum e decisao sua; na duvida, me pergunta pelo nome.')
+    return '\n'.join(linhas)
+
+
+def _r68_citar(texto=None, pasta=None):
+    """r68 (ideia 6): colecionador de citacoes (substituiu a ideia de clipboard,
+    que ja existe no codigo como ferramenta)."""
+    bruto = (texto or '').strip()
+    if not bruto:
+        return 'Guarde assim: citar <frase> — <autor> (o traco separa)'
+    if ' — ' in bruto or ' -- ' in bruto:
+        frase, _, autor = bruto.replace(' -- ', ' — ').partition(' — ')
+    else:
+        frase, autor = bruto, 'autor desconhecido'
+    dados = _r68_json('citacoes.json', pasta=pasta, padrao=[]) or []
+    dados.append({'frase': frase.strip()[:300], 'autor': autor.strip()[:60]})
+    _r68_json('citacoes.json', pasta=pasta, valor=dados)
+    return '[OK] citacao guardada (%d no album).' % len(dados)
+
+
+def _r68_citacoes(pasta=None):
+    import random as _rd
+    dados = _r68_json('citacoes.json', pasta=pasta, padrao=[]) or []
+    if not dados:
+        return 'Album vazio. Guarde com: citar <frase> — <autor>'
+    escolhida = _rd.choice(dados)
+    return ('Album com %d citacao(oes). Hoje destaco:\n  "%s"\n  — %s'
+            % (len(dados), escolhida['frase'], escolhida['autor']))
+
+
+def _r68_quiz_iniciar(texto=None):
+    """r68 (ideia 7): professor socratico — cria lacunas do SEU texto e corrige."""
+    import re as _re
+    texto = (texto or '').strip()
+    if len(texto) < 40:
+        return 'Me ensine assim: quiz <cole um texto de pelo menos 40 letras> — eu pergunto e corrijo.'
+    sentencas = [s.strip() for s in _re.split(r'[.!?]', texto) if len(s.strip()) > 15][:5]
+    perguntas = []
+    for s in sentencas:
+        palavras = _re.findall(r'[A-Za-z]{5,}', s)
+        if not palavras:
+            continue
+        alvo = max(palavras, key=len)
+        perguntas.append({'frase': s.replace(alvo, '____'), 'resposta': alvo.lower()})
+    if not perguntas:
+        return '[Aviso]: nao consegui montar perguntas com esse texto.'
+    globals().setdefault('_R68_ESTADO', {})['quiz'] = {'perguntas': perguntas, 'acertos': 0, 'i': 0}
+    return ('Quiz pronto! %d pergunta(s). Complete a lacuna:\n  %s\n'
+            'Responda com: responder quiz <palavra>' % (len(perguntas), perguntas[0]['frase']))
+
+
+def _r68_quiz_responder(palavra=None):
+    estado = globals().setdefault('_R68_ESTADO', {}).get('quiz')
+    if not estado:
+        return 'Nenhum quiz ativo. Comece com: quiz <texto>'
+    palavra = (palavra or '').strip().lower()
+    correta = estado['perguntas'][estado['i']]['resposta']
+    nota = 'ACERTOU!' if palavra == correta else 'quase! a resposta era "%s"' % correta
+    if palavra == correta:
+        estado['acertos'] += 1
+    estado['i'] += 1
+    if estado['i'] >= len(estado['perguntas']):
+        fim = 'Fim do quiz: %d/%d acertos.' % (estado['acertos'], len(estado['perguntas']))
+        globals()['_R68_ESTADO']['quiz'] = None
+        return '(%s) %s' % (nota, fim)
+    return '(%s) Proxima: %s' % (nota, estado['perguntas'][estado['i']]['frase'])
+
+
+def _r68_raio_x_pdf(caminho=None):
+    """r68 (ideia 8): estrutura do PDF lida do proprio arquivo (sem libs)."""
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: raio-x do pdf "C:\caminho\arquivo.pdf"'
+    try:
+        with open(caminho, 'rb') as f:
+            dados = f.read(20_000_000)
+    except Exception as erro:
+        return '[INFO] nao consegui ler o arquivo (%s).' % type(erro).__name__
+    paginas = dados.count(b'/Type /Page') or dados.count(b'/Type/Page')
+    return ('Fatos de %s:\n  tamanho: %d KB\n  PDF valido: %s\n  marcadores de pagina: ~%d\n'
+            '(resumo do CONTEUDO: cole o trecho na conversa que o modelo local resume)'
+            % (os.path.basename(caminho), len(dados) // 1024,
+               str(dados[:5] == b'%PDF-'), paginas))
+
+
+def _r68_escrever(abrir=True, pasta=None):
+    """r68 (ideia 9): escrita sem distracao (substituiu o pomodoro, que ja
+    existe no codigo). Voce digita linhas; linha vazia salva e mostra stats."""
+    return ('[OK] modo de escrita livre: digite suas linhas; quando terminar,'
+            ' deixe uma linha VAZIA que eu salvo com data e contagem.'
+            ' (Nesta versao por turnos: mande tudo de uma vez.)')
+
+
+def _r68_guardiao_privacidade(executar=None):
+    """r68 (ideia 10): dispositivos de camera/audio ativos (fatos PnP)."""
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(
+                ['powershell', '-NoProfile', '-Command',
+                 'Get-PnpDevice -Class Camera,Image,Media -Status OK | Select-Object Class,FriendlyName | Format-Table -AutoSize'],
+                capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return '[INFO] nao consegui listar dispositivos (%s).' % type(erro).__name__
+    linhas = [l.rstrip() for l in (getattr(feito, 'stdout', '') or '').split('\n') if l.strip()]
+    if not linhas:
+        return '[INFO] nenhum dispositivo de camera/audio ativo nesta leitura.'
+    saida = ['Dispositivos de camera/audio ativos neste PC (fatos):']
+    saida += ['  ' + l for l in linhas]
+    saida.append('O Windows nao mostra "quem usa agora"; o LED da camera e o sinal mais honesto.')
+    return '\n'.join(saida)
+
+
+def _r68_prep_traducao(caminho=None, pasta=None):
+    """r68 (ideia 11): divide o arquivo em blocos para o MODELO LOCAL traduzir."""
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: traduzir arquivo "C:\caminho\texto.txt"'
+    try:
+        with open(caminho, 'r', encoding='utf-8', errors='replace') as f:
+            texto = f.read(200_000)
+    except Exception as erro:
+        return '[INFO] nao consegui ler (%s).' % type(erro).__name__
+    blocos = max(1, -(-len(texto) // 4000))
+    destino = os.path.join(pasta or PASTA_BASE, 'traducao_blocos.txt')
+    try:
+        with open(destino, 'w', encoding='utf-8') as f:
+            for i in range(blocos):
+                f.write('=== BLOCO %d/%d ===\n%s\n\n' % (i + 1, blocos, texto[i * 4000:(i + 1) * 4000]))
+    except Exception as erro:
+        return '[INFO] nao consegui salvar os blocos (%s).' % type(erro).__name__
+    return ('[OK] %s: %d letra(s) em %d bloco(s) (traducao_blocos.txt).'
+            ' Me mande um bloco por vez na conversa: o MODELO LOCAL traduz, sem nuvem.'
+            % (os.path.basename(caminho), len(texto), blocos))
+
+
+def _r68_ortografia_conf(): return (('voce', 'voce'), ('nao ', 'nao '), (' pq ', ' porque '),
+                   ('mto ', 'muito '), ('qdo ', 'quando '), ('agr ', 'agora '),
+                   (' tb ', ' tambem '), ('msm ', 'mesmo '), ('hj', 'hoje'),
+                   ('obg', 'obrigado'), ('blz', 'beleza'), (' vc ', ' voce '),
+                   (' amanha ', ' amanha '), ('coracao', 'coracao'))
+
+
+def _r68_ortografia(texto=None):
+    """r68 (ideia 12): internetes -> formal com dicionario local pequeno."""
+    import re as _re
+    t = (texto or '').strip()
+    if not t:
+        return 'Use assim: ortografia <cole seu texto> — aponto abreviacoes e sugiro o formal.'
+    corrigido = ' ' + t + ' '
+    mudancas = []
+    for errado, certo in _r68_ortografia_conf():
+        if errado in corrigido.lower() and errado != certo:
+            mudancas.append('%s -> %s' % (errado.strip(), certo.strip()))
+            corrigido = _re.sub(_re.escape(errado), certo, corrigido, flags=_re.I)
+    if not mudancas:
+        return '[OK] nenhuma abreviacao da minha lista nesse texto (revisao local simples).'
+    return ('Ajustes (dicionario local):\n  ' + '\n  '.join(mudancas)
+            + '\n\nTexto polido:\n' + corrigido.strip())
+
+
+def _r68_rpg_mapa(): return {
+    'inicio': {'texto': 'Voce acorda numa caverna: porta de madeira a leste(1) ou tunel escuro ao norte(2)?',
+               'opcoes': {'1': 'porta', '2': 'tunel'}},
+    'porta': {'texto': 'Um goblin guarda um bau. Lutar(1) ou conversar(2)?',
+              'opcoes': {'1': 'luta', '2': 'conversa'}},
+    'tunel': {'texto': 'O tunel desaba atras de voce: escada(1) ou rio(2)?',
+              'opcoes': {'1': 'escada', '2': 'rio'}},
+    'luta': {'texto': 'Voce vence! O bau tem 30 moedas de ouro. FIM (vitoria!).', 'opcoes': {}},
+    'conversa': {'texto': 'O goblin gosta do seu papo e abre o bau. FIM (pacifico!).', 'opcoes': {}},
+    'escada': {'texto': 'Voce sai e ve o sol. FIM (liberdade!).', 'opcoes': {}},
+    'rio': {'texto': 'O rio te leva a uma saida misteriosa. FIM (misterio!).', 'opcoes': {}},
+}
+
+
+def _r68_rpg(acao=None, escolha=None):
+    """r68 (ideia 13): mestre de RPG textual (aventura com ficha)."""
+    import random as _rd
+    estado = globals().setdefault('_R68_ESTADO', {})
+    acao = (acao or 'comecar').lower()
+    if acao.isdigit() and escolha is None:
+        escolha, acao = acao, 'mover'
+    if acao in ('comecar', 'novo', ''):
+        estado['rpg'] = {'lugar': 'inicio', 'vida': 10 + _rd.randint(0, 4), 'ouro': _rd.randint(0, 6)}
+        no = _r68_rpg_mapa()['inicio']
+        return ('[RPG] Ficha: %d vida, %d ouro.\n%s\n(rpg 1 ou rpg 2)'
+                % (estado['rpg']['vida'], estado['rpg']['ouro'], no['texto']))
+    rpg = estado.get('rpg')
+    if not rpg:
+        return 'Nenhuma aventura ativa. Comece com: rpg comecar'
+    if acao in ('status', 'ficha'):
+        return '[RPG] vida %d | ouro %d | lugar %s' % (rpg['vida'], rpg['ouro'], rpg['lugar'])
+    no = _r68_rpg_mapa()[rpg['lugar']]
+    destino = no['opcoes'].get(escolha or '')
+    if not destino:
+        return '[RPG] escolha invalida. Opcoes: ' + ' | '.join('%s=%s' % kv for kv in no['opcoes'].items())
+    rpg['lugar'] = destino
+    fim = _r68_rpg_mapa()[destino]
+    if not fim['opcoes']:
+        estado['rpg'] = None
+        return '[RPG] %s\n(Aventura encerrada; recomece com: rpg comecar)' % fim['texto']
+    return '[RPG] %s\n(rpg 1 ou rpg 2)' % fim['texto']
+
+
+def _r68_revisar_salvar(texto=None, pasta=None, agora=None):
+    """r68 (ideia 14): repeticao espacada 1/3/7/15 dias (revisoes.json)."""
+    import datetime as _dt
+    texto = (texto or '').strip()
+    if not texto:
+        return 'Use assim: revisar salvar <o que quer lembrar>'
+    agora_ = agora or _dt.datetime.now()
+    dados = _r68_json('revisoes.json', pasta=pasta, padrao=[]) or []
+    dados.append({'texto': texto[:300], 'passos': 0,
+                  'quando': (agora_ + _dt.timedelta(days=1)).strftime('%Y-%m-%d')})
+    _r68_json('revisoes.json', pasta=pasta, valor=dados)
+    return '[OK] guardado! Volta amanha; depois em 3, 7 e 15 dias.'
+
+
+def _r68_revisar_hoje(pasta=None, agora=None):
+    import datetime as _dt
+    hoje = (agora or _dt.datetime.now()).strftime('%Y-%m-%d')
+    dados = _r68_json('revisoes.json', pasta=pasta, padrao=[]) or []
+    pendentes = [d for d in dados if d.get('quando', '') <= hoje]
+    if not pendentes:
+        return '[OK] nada para revisar hoje (%d item(ns) no total).' % len(dados)
+    linhas = ['Para revisar hoje (%d):' % len(pendentes)]
+    linhas += ['  %d. %s' % (i + 1, d['texto'][:90]) for i, d in enumerate(pendentes)]
+    linhas.append('Concluiu? revisar feito <numero>')
+    return '\n'.join(linhas)
+
+
+def _r68_revisar_feito(numero=None, pasta=None, agora=None):
+    import datetime as _dt
+    escada = (1, 3, 7, 15)
+    dados = _r68_json('revisoes.json', pasta=pasta, padrao=[]) or []
+    hoje_dt = agora or _dt.datetime.now()
+    pendentes = [d for d in dados if d.get('quando', '') <= hoje_dt.strftime('%Y-%m-%d')]
+    try:
+        item = pendentes[int((numero or 0)) - 1]
+    except Exception:
+        return '[Aviso]: numero invalido (veja em: revisar hoje).'
+    passo = min(item.get('passos', 0) + 1, len(escada) - 1)
+    item['passos'] = passo
+    item['quando'] = (hoje_dt + _dt.timedelta(days=escada[passo])).strftime('%Y-%m-%d')
+    _r68_json('revisoes.json', pasta=pasta, valor=dados)
+    return '[OK] proxima revisao em %d dia(s).' % escada[passo]
+
+
+def _r68_receitas(): return ((('arroz', 'feijao'), 'Arroz com feijao e ovo frito — o classico.'),
+                 (('macarrao', 'tomate'), 'Macarrao ao sugo rapido.'),
+                 (('pao', 'ovo'), 'Ovo mexido no pao.'),
+                 (('batata', 'frango'), 'Frango assado com batatas.'),
+                 (('banana', 'ovo'), 'Panqueca de banana (2 ingredientes).'))
+
+
+def _r68_geladeira(itens_texto=None, pasta=None):
+    """r68 (ideia 15): o que tem em casa -> receitas possiveis."""
+    itens = [i.strip().lower() for i in (itens_texto or '').replace(',', ' ').split() if i.strip()]
+    if itens:
+        _r68_json('geladeira.json', pasta=pasta, valor=itens[:30])
+        return '[OK] geladeira anotada: %s. Pergunte: o que cozinhar?' % ', '.join(itens)
+    return 'Conte o que tem: minha geladeira arroz feijao ovo'
+
+
+def _r68_o_que_cozinhar(pasta=None):
+    itens = _r68_json('geladeira.json', pasta=pasta, padrao=[]) or []
+    if not itens:
+        return 'Primeiro me diga o que tem: minha geladeira arroz feijao ovo'
+    possiveis = [rec for ing, rec in _r68_receitas() if all(i in itens for i in ing)]
+    if not possiveis:
+        return ('Com %s nenhuma receita da minha lista curta fecha.'
+                ' Falta basico (arroz/feijao/macarrao/pao/batata...).' % ', '.join(itens))
+    return 'Da pra cozinhar com o que voce tem:\n  ' + '\n  '.join(possiveis)
+
+
+def _r68_pastas_tipo(): return (('imagens', ('.jpg', '.png', '.gif', '.webp', '.bmp')),
+                    ('documentos', ('.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.csv')),
+                    ('videos', ('.mp4', '.mkv', '.avi', '.mov')),
+                    ('musicas', ('.mp3', '.wav', '.flac')),
+                    ('compactados', ('.zip', '.rar', '.7z')))
+
+
+def _r68_organizar(pasta_alvo=None, mover=None):
+    """r68 (ideias 16 e 24): classifica arquivos soltos em subpastas + log p/ desfazer."""
+    import shutil as _sh
+    pasta_alvo = (pasta_alvo or os.path.join(os.path.expanduser('~'), 'Downloads')).strip(' "\'')
+
+    if not os.path.isdir(pasta_alvo):
+        return '[INFO] pasta nao encontrada: %s' % pasta_alvo
+    mover = mover or _sh.move
+    log, movidos = [], 0
+    for nome in sorted(os.listdir(pasta_alvo)):
+        caminho = os.path.join(pasta_alvo, nome)
+        if not os.path.isfile(caminho) or nome.startswith('.') or nome == 'organizacao_log.txt':
+            continue
+        baixo = nome.lower()
+        destino_nome = 'outros'
+        for pasta_tipo, exts in _r68_pastas_tipo():
+            if baixo.endswith(exts):
+                destino_nome = pasta_tipo
+                break
+        destino = os.path.join(pasta_alvo, destino_nome)
+        os.makedirs(destino, exist_ok=True)
+        try:
+            mover(caminho, os.path.join(destino, nome))
+        except Exception:
+            continue
+        log.append('%s -> %s' % (nome, destino_nome))
+        movidos += 1
+    if not movidos:
+        return '[OK] nada solto para organizar em %s.' % pasta_alvo
+    with open(os.path.join(pasta_alvo, 'organizacao_log.txt'), 'a', encoding='utf-8') as f:
+        f.write('\n'.join(log) + '\n')
+    return ('[OK] %d arquivo(s) organizados em %s (log em organizacao_log.txt).'
+            ' Desfazer: desfazer organizacao' % (movidos, pasta_alvo))
+
+
+def _r68_desfazer_organizacao(pasta_alvo=None):
+    import shutil as _sh
+    pasta_alvo = (pasta_alvo or os.path.join(os.path.expanduser('~'), 'Downloads')).strip(' "\'')
+
+    caminho_log = os.path.join(pasta_alvo, 'organizacao_log.txt')
+    if not os.path.isfile(caminho_log):
+        return '[Aviso]: sem log de organizacao nessa pasta.'
+    with open(caminho_log, 'r', encoding='utf-8') as f:
+        linhas = [l.strip() for l in f if l.strip()]
+    desfeitos, restam = 0, []
+    for l in linhas:
+        if ' -> ' not in l:
+            continue
+        nome, destino = l.rsplit(' -> ', 1)
+        origem = os.path.join(pasta_alvo, destino, nome)
+        if os.path.isfile(origem):
+            _sh.move(origem, os.path.join(pasta_alvo, nome))
+            desfeitos += 1
+        else:
+            restam.append(l)
+    if desfeitos:
+        with open(caminho_log, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(restam) + ('\n' if restam else ''))
+    return '[OK] %d arquivo(s) devolvidos ao lugar original.' % desfeitos
+
+
+def _r68_lixo_link():
+    return '.,;:)>"'
+
+
+def _r68_conferir_links(caminho=None):
+    """r68 (ideia 17): extrai links unicos de .md/.txt/.html (sem rede)."""
+    import re as _re
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: conferir links "C:\caminho\arquivo.md"'
+    try:
+        with open(caminho, 'r', encoding='utf-8', errors='replace') as f:
+            texto = f.read(500_000)
+    except Exception as erro:
+        return '[INFO] nao consegui ler (%s).' % type(erro).__name__
+    links = sorted(set(l.rstrip(_r68_lixo_link()) for l in _re.findall(r'https?://\S+', texto)))
+    if not links:
+        return '[OK] nenhum link http(s) nesse arquivo.'
+    linhas = ['%d link(s) unico(s) (extracao local; teste de acesso exige internet):' % len(links)]
+    linhas += ['  ' + l for l in links[:15]]
+    return '\n'.join(linhas)
+
+
+def _r68_descrever_imagem(caminho=None):
+    """r68 (ideia 18): fatos da imagem; NAO inventa descricao visual."""
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: o que tem nesta foto "C:\caminho\foto.jpg"'
+    fatos = ['  arquivo: %s (%d KB)' % (os.path.basename(caminho), os.path.getsize(caminho) // 1024)]
+    try:
+        from PIL import Image
+        with Image.open(caminho) as im:
+            fatos.append('  dimensoes: %dx%d (%s)' % (im.width, im.height, im.format))
+    except ImportError:
+        fatos.append('  dimensoes: instale a biblioteca Pillow para eu ler (me peca o comando)')
+    except Exception as erro:
+        fatos.append('  dimensoes: nao consegui ler (%s)' % type(erro).__name__)
+    return ('Fatos da imagem:\n' + '\n'.join(fatos)
+            + '\nDescricao VISUAL exige modelo de visao que eu ainda nao tenho:'
+              ' eu NAO invento o que vejo na foto.')
+
+
+def _r68_entrevistas(): return ('Fale de voce em 1 minuto.', 'Por que quer esta vaga?',
+                    'Seu maior ponto forte?', 'E um ponto a melhorar?',
+                    'Onde se ve em 2 anos?', 'Tem duvidas sobre a vaga?')
+
+
+def _r68_entrevista(cargo=None, resposta=None):
+    """r68 (ideia 19): simulado de entrevista com feedback por regras."""
+    estado = globals().setdefault('_R68_ESTADO', {})
+    if resposta is None:
+        estado['entrevista'] = {'i': 0, 'cargo': (cargo or '').strip()[:40] or 'cargo geral'}
+        return ('[Entrevista simulada: %s] Pergunta 1/%d:\n  %s\n'
+                'Responda com: responder entrevista <sua resposta>'
+                % (estado['entrevista']['cargo'], len(_r68_entrevistas()), _r68_entrevistas()[0]))
+    ses = estado.get('entrevista')
+    if not ses:
+        return 'Comece primeiro: simular entrevista <cargo>'
+    resposta = (resposta or '').strip()
+    feedback = []
+    if len(resposta) < 30:
+        feedback.append('resposta curta: desenrole com 1 exemplo concreto')
+    if 'eu ' not in resposta.lower() and 'minha' not in resposta.lower():
+        feedback.append('fale na primeira pessoa ("eu fiz...", "minha experiencia...")')
+    ses['i'] += 1
+    if ses['i'] >= len(_r68_entrevistas()):
+        estado['entrevista'] = None
+        return '(%s) Fim do simulado! Treine em voz alta tambem.' % ('; '.join(feedback) or 'boa resposta')
+    return '(%s) Pergunta %d/%d:\n  %s' % ('; '.join(feedback) or 'boa resposta', ses['i'] + 1,
+                                            len(_r68_entrevistas()), _r68_entrevistas()[ses['i']])
+
+
+def _r68_analisar_extrato(caminho=None):
+    """r68 (ideia 20): somas da coluna de valor (CSV; PT-BR 1.234,56). Nada sai do PC."""
+    import csv as _csv
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: analisar extrato "C:\caminho\extrato.csv"'
+    try:
+        with open(caminho, 'r', encoding='utf-8', errors='replace', newline='') as f:
+            linhas = list(_csv.reader(f, delimiter=';'))[:500]
+    except Exception as erro:
+        return '[INFO] nao consegui ler o CSV (%s).' % type(erro).__name__
+    if len(linhas) < 2:
+        return '[INFO] CSV sem linhas de dados suficientes.'
+    cab = linhas[0]
+    col = next((i for i, h in enumerate(cab) if any(p in h.lower() for p in ('valor', 'amount'))), None)
+    if col is None:
+        return 'Cabecalho: %s\nNao identifiquei a coluna de VALOR; me diga qual e.' % ' | '.join(cab)
+
+    def numero(bruto):
+        try:
+            return float((bruto or '').replace('.', '').replace(',', '.'))
+        except Exception:
+            return None
+    valores = [numero(l[col]) for l in linhas[1:] if len(l) > col]
+    valores = [v for v in valores if v is not None]
+    if not valores:
+        return '[INFO] nao li numeros na coluna "%s" (formato diferente? me mande uma amostra).' % cab[col]
+    return ('Analise do extrato (fatos locais; nada sai do seu PC):\n'
+            '  %d lancamento(s) | soma "%s": %.2f | maior: %.2f | menor: %.2f\n'
+            '(organizo os numeros; conselho financeiro NAO e comigo)'
+            % (len(valores), cab[col], sum(valores), max(valores), min(valores)))
+
+
+def _r68_criar_cartaz(titulo=None, pasta=None):
+    """r68 (ideia 21): cartaz HTML local (abre no navegador)."""
+    import datetime as _dt
+    titulo = (titulo or '').strip()
+    if not titulo:
+        return 'Use assim: criar cartaz <titulo>'
+    html = ('<!doctype html><html><head><meta charset="utf-8"><title>%s</title>'
+            '<style>body{display:flex;align-items:center;justify-content:center;height:100vh;'
+            'margin:0;background:#111;color:#fff;font-family:Arial}h1{font-size:64px;'
+            'text-align:center;max-width:80%%;text-transform:uppercase}</style></head>'
+            '<body><h1>%s</h1></body></html>') % (titulo, titulo)
+    pasta = pasta or PASTA_BASE
+    nome = 'cartaz_%s.html' % _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+    try:
+        with open(os.path.join(pasta, nome), 'w', encoding='utf-8') as f:
+            f.write(html)
+    except Exception as erro:
+        return '[INFO] nao consegui salvar (%s).' % type(erro).__name__
+    return '[OK] cartaz criado: %s (abre no navegador; 100%% local).' % nome
+
+
+def _r68_calculadora_obra(texto=None):
+    """r68 (ideia 22): area -> tinta e piso (matematica pura)."""
+    import re as _re
+    m = _re.search(r'(\d+(?:[.,]\d+)?)\s*[xX]\s*(\d+(?:[.,]\d+)?)', texto or '')
+    if not m:
+        return 'Use assim: calcular obra parede 4x3 (metros)'
+    a = float(m.group(1).replace(',', '.'))
+    b = float(m.group(2).replace(',', '.'))
+    area = a * b
+    return ('Parede %.1f x %.1f = %.1f m2 (fatos da matematica):\n'
+            '  tinta: ~%.1f litro(s) (2 demaos, 6 m2/L)\n'
+            '  piso: %.1f m2 com 10%% de folga (~%d caixa(s) de 2 m2)'
+            % (a, b, area, area * 2 / 6.0, area * 1.1, round(area * 1.1 / 2 + 0.49)))
+
+
+def _r68_prova_banco(): return (('Qual e a capital do Brasil?', ('Sao Paulo', 'Brasilia', 'Rio'), 1, 'Brasilia, desde 1960.'),
+                    ('Quanto e 15% de 200?', ('30', '15', '25'), 0, '0,15 x 200 = 30.'),
+                    ('O modelo GGUF deste agente roda...', ('no seu PC', 'num site', 'num antivirus'), 0, '100% local.'),
+                    ('Quem escreveu Dom Casmurro?', ('Machado de Assis', 'Jorge Amado', 'Clarice L.'), 0, 'Machado, 1899.'),
+                    ('Para que serve o checkpoint?', ('Voltar atras com seguranca', 'Aumentar volume', 'Apagar virus'), 0, 'E o cinto de seguranca da casa.'))
+
+
+def _r68_prova(gabarito=None):
+    """r68 (ideia 23): prova relampago com correcao comentada."""
+    estado = globals().setdefault('_R68_ESTADO', {})
+    if gabarito is None:
+        estado['prova'] = True
+        linhas = ['PROVA relampago (5 perguntas):']
+        linhas += ['  %d. %s' % (i + 1, q[0]) for i, q in enumerate(_r68_prova_banco())]
+        linhas.append('Responda assim: prova responder 1b 2a 3a 4a 5a')
+        return '\n'.join(linhas)
+    if not estado.get('prova'):
+        return 'Comece com: prova'
+    respostas = dict((p[0], p[1:2]) for p in (gabarito or '').lower().split() if len(p) >= 2)
+    acertos, detalhes = 0, []
+    for i, (perg, opts, certa, explic) in enumerate(_r68_prova_banco(), start=1):
+        ok = respostas.get(str(i)) == 'abc'[certa]
+        acertos += 1 if ok else 0
+        detalhes.append('  %d. %s (%s)' % (i, 'certa' if ok else 'errada/em branco', explic))
+    estado['prova'] = None
+    return 'Nota: %d/5.\n%s' % (acertos, '\n'.join(detalhes))
+
+
+def _r68_narrar(caminho=None, falar_fn=None):
+    """r68 (ideia 25): le os primeiros trechos em voz alta (usa o 'falar' da casa)."""
+    caminho = (caminho or '').strip(' "\'')
+
+    if not caminho or not os.path.isfile(caminho):
+        return 'Use assim: ler em voz alta "C:\caminho\texto.txt"'
+    try:
+        with open(caminho, 'r', encoding='utf-8', errors='replace') as f:
+            texto = ' '.join(f.read(3000).split())
+    except Exception as erro:
+        return '[INFO] nao consegui ler (%s).' % type(erro).__name__
+    if not texto:
+        return '[INFO] o arquivo parece vazio.'
+    falar_fn = falar_fn or globals().get('falar')
+    if not falar_fn:
+        return '[INFO] voz indisponivel nesta sessao.'
+    import threading as _th
+    _th.Thread(target=falar_fn, args=(texto[:800],), daemon=True).start()
+    return '[OK] lendo o inicio em voz alta ("%s..."). Me peca continuar quando quiser.' % texto[:50]
+
+
+def _r68_jardim_plantar(texto=None, pasta=None, agora=None):
+    """r68 (ideia 26): caderno de ideias por tema (anotacoes suas, nao memoria da IA)."""
+    import datetime as _dt
+    texto = (texto or '').strip()
+    if not texto:
+        return 'Plante assim: ideia <sua ideia rapida>'
+    baixo = texto.lower()
+    temas = (('estudo', ('curso', 'prova', 'estudar', 'aula', 'enem')),
+             ('casa', ('conserto', 'consertar', 'conta', 'mercado', 'obra', 'limpeza')),
+             ('trabalho', ('cliente', 'curriculo', 'entrevista', 'projeto')),
+             ('saude', ('medico', 'exercicio', 'remedio', 'consulta')))
+    tema = next((nome for nome, chaves in temas if any(c in baixo for c in chaves)), 'soltas')
+    dados = _r68_json('jardim.json', pasta=pasta, padrao={}) or {}
+    dados.setdefault(tema, []).append({'ideia': texto[:200], 'dia': (agora or _dt.datetime.now()).strftime('%d/%m')})
+    _r68_json('jardim.json', pasta=pasta, valor=dados)
+    return '[OK] ideia plantada no tema "%s" (jardim.json da casa; nada de nuvem).' % tema
+
+
+def _r68_jardim_ver(pasta=None):
+    dados = _r68_json('jardim.json', pasta=pasta, padrao={}) or {}
+    if not dados:
+        return 'Jardim vazio. Plante com: ideia <texto>'
+    linhas = ['Seu jardim de ideias:']
+    for tema, lista in sorted(dados.items()):
+        linhas.append('  %s (%d):' % (tema, len(lista)))
+        linhas += ['    - %s [%s]' % (i2['ideia'][:70], i2['dia']) for i2 in lista[-4:]]
+    return '\n'.join(linhas)
+
+
+def _r68_fiscal_espaco(pasta_alvo=None):
+    """r68 (ideia 27): os maiores arquivos da regiao (fatos de tamanho)."""
+    pasta_alvo = (pasta_alvo or os.path.expanduser('~')).strip(' "\'')
+
+    if not os.path.isdir(pasta_alvo):
+        return '[INFO] pasta nao encontrada: %s' % pasta_alvo
+    tamanhos, conferidos = [], 0
+    for atual, pastas, arquivos in os.walk(pasta_alvo):
+        pastas[:] = [p for p in pastas if not p.startswith(('.', '$'))]
+        for a in arquivos:
+            conferidos += 1
+            if conferidos > 8000:
+                break
+            try:
+                caminho = os.path.join(atual, a)
+                tamanhos.append((os.path.getsize(caminho), caminho))
+            except Exception:
+                continue
+    if not tamanhos:
+        return '[INFO] nada medido aqui.'
+    tamanhos.sort(reverse=True)
+    linhas = ['Os 8 maiores arquivos sob %s (fatos):' % pasta_alvo]
+    linhas += ['  %.1f MB — %s' % (t / 1048576.0, c) for t, c in tamanhos[:8]]
+    linhas.append('  total medido: %.1f GB em %d arquivo(s)' % (sum(t for t, _ in tamanhos) / 1073741824.0, len(tamanhos)))
+    return '\n'.join(linhas)
+
+
+def _r68_aniversario(nome=None, data=None, pasta=None):
+    """r68 (ideia 28): datas importantes + dias restantes (substituiu o rastreio
+    de habitos, que ja existe no codigo)."""
+    import datetime as _dt
+    nome = (nome or '').strip()
+    dados = _r68_json('aniversarios.json', pasta=pasta, padrao={}) or {}
+    if nome and data is None:
+        alvo = dados.get(nome.lower())
+        if not alvo:
+            return '[Aviso]: "%s" nao esta no caderno. Guarde com: aniversario <nome> <dia/mes>' % nome
+        data = alvo['data']
+        return '[OK] %s — %s (esta no caderno; liste com: aniversarios)' % (alvo.get('nome', nome), data)
+    if not nome:
+        if not dados:
+            return 'Caderno vazio. Guarde com: aniversario <nome> <dia/mes>'
+        hoje = _dt.date.today()
+        linhas = ['Datas importantes (mais proximas primeiro):']
+        ordenados = []
+        for quem, info in dados.items():
+            try:
+                d, m = info['data'].split('/')
+                dia = _dt.date(hoje.year, int(d), int(m))
+                if dia < hoje:
+                    dia = _dt.date(hoje.year + 1, int(d), int(m))
+                ordenados.append(((dia - hoje).days, quem, info['data']))
+            except Exception:
+                continue
+        for dias, quem, original in sorted(ordenados):
+            linhas.append('  %s — %s (faltam %d dia(s))' % (quem, original, dias))
+        return '\n'.join(linhas)
+    if not data:
+        return 'Falta a data: aniversario <nome> <dia/mes> (ex.: aniversario Ana 07/09)'
+    partes = data.strip().split('/')
+    if len(partes) != 2 or not partes[0].isdigit() or not partes[1].isdigit():
+        return '[Aviso]: data no formato dia/mes (ex.: 07/09).'
+    dados[nome.lower()] = {'data': '%02d/%02d' % (int(partes[0]), int(partes[1])), 'nome': nome}
+    _r68_json('aniversarios.json', pasta=pasta, valor=dados)
+    return '[OK] %s no caderno (%s). Pergunte: aniversarios' % (nome, dados[nome.lower()]['data'])
+
+
+def _r68_internet_fora(minutos=None, agora=None):
+    """r68 (ideia 29): lembrete para VOCÊ desligar a internet; eu nao desligo nada."""
+    import datetime as _dt
+    try:
+        minutos = int(minutos or 5)
+    except Exception:
+        minutos = 5
+    minutos = max(1, min(120, minutos))
+    base = agora or _dt.datetime.now()
+    horario = base + _dt.timedelta(minutes=minutos)
+    globals().setdefault('_R68_ESTADO', {})['internet_alerta'] = horario
+    return ('[OK] combinado: as %s eu te lembro de DESLIGAR a internet'
+            ' (eu NAO desligo nada sozinho). Cancele com: internet volta'
+            % horario.strftime('%H:%M'))
+
+
+def _r68_internet_volta():
+    estado = globals().setdefault('_R68_ESTADO', {})
+    if estado.pop('internet_alerta', None) is None:
+        return 'Nao havia lembrete de internet ativo.'
+    return '[OK] lembrete cancelado.'
+
+
+def _r68_espelho(termo=None, caminho=None):
+    """r68 (ideia 30): mostra o PROPRIO codigo que respondeu (transparencia)."""
+    caminho = caminho or os.path.join(PASTA_BASE, 'agente.py')
+    termo = (termo or '').strip()
+    if not termo:
+        return 'Use assim: me mostra seu codigo <pedaco do nome da funcao>'
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            linhas = f.readlines()
+    except Exception as erro:
+        return '[INFO] nao consegui ler meu codigo (%s).' % type(erro).__name__
+    achados = [i for i, l in enumerate(linhas) if termo.lower() in l.lower() and l.startswith('def ')]
+    if not achados:
+        return 'Nao achei funcao com "%s" no nome (sou grande: %d linhas).' % (termo, len(linhas))
+    i = achados[0]
+    j = i + 1
+    while j < len(linhas) and (j - i) < 60 and not linhas[j].startswith('def '):
+        j += 1
+    corpo = ''.join(linhas[i:j]).rstrip()
+    if (j - i) >= 60:
+        corpo += '\n    ... (continua; funcao grande)'
+    return 'Eis o meu codigo que responde por "%s" (linha %d):\n\n%s' % (termo, i + 1, corpo)
+
+
+def _r68_comandos(comando):
+    """r68: LOTE EXTREMO — as 30 ideias (3 substituidas por pre-checagem anti-
+    duplicata: pomodoro/habitos/clipboard ja existiam). Tudo local e DI."""
+    import re as _re
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    bruto = (comando or '').strip()
+
+    def feito(rotulo):
+        registrar = globals().get('_r67_registrar')
+        if registrar:
+            registrar('FATOS', rotulo)
+        return True
+
+    if n in ('cerebro', 'cerebroindexar', 'indexararquivos'):
+        print(_r68_cerebro_indexar())
+        return feito('cerebro: indexar')
+    if n.startswith('ondeesta'):
+        base = globals().get('PASTA_BASE') or '.'
+        if not os.path.isfile(os.path.join(base, 'cerebro_index.json')):
+            return False  # sem indice, a pergunta segue o curso normal do agente
+        termo = _re.sub(r'^onde\s+esta\s*(o\s*|a\s*)?', '', bruto, flags=_re.I).strip(' ?!')
+        print(_r68_cerebro_buscar(termo))
+        return feito('cerebro: buscar')
+    if n in ('cacarduplicatas', 'duplicatas', 'arquivosduplicados'):
+        print(_r68_cacar_duplicatas())
+        return feito('cacar duplicatas')
+    if n in ('oqueligacomowindows', 'oquesobeconowindows', 'auditoriadainicializacao'):
+        print(_r68_auditar_inicializacao())
+        return feito('auditoria de inicializacao')
+    if n.startswith('compararpastas') or (' com ' in bruto.lower() and bruto.lower().startswith('comparar')):
+        pares = _re.findall(r'"([^"]+)"', bruto)
+        print(_r68_comparar_pastas(pares[0] if len(pares) > 0 else None,
+                                   pares[1] if len(pares) > 1 else None))
+        return feito('comparar pastas')
+    if n in ('porqueopcestalento', 'pqopcestalento', 'detectivedelentidao', 'opclento', 'opcetalento'):
+        print(_r68_detetive_lentidao())
+        return feito('detetive de lentidao')
+    if n == 'citar' or (n.startswith('citar') and len(n) > 5):
+        print(_r68_citar(_re.sub(r'^citar\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('citar')
+    if n in ('citacoes', 'meuscitacoes', 'albumdecitacoes'):
+        print(_r68_citacoes())
+        return feito('ver citacoes')
+    if n == 'quiz' or (n.startswith('quiz') and len(n) > 4):
+        print(_r68_quiz_iniciar(_re.sub(r'^quiz\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('quiz: iniciar')
+    if n.startswith('responderquiz'):
+        print(_r68_quiz_responder(_re.sub(r'^responder\s+quiz\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('quiz: responder')
+    if n.startswith('raiox') and 'pdf' in n:
+        print(_r68_raio_x_pdf(_re.sub(r'^raio[-\s]?x\s*(do\s*)?(pdf\s*)?','', bruto, flags=_re.I)))
+        return feito('raio-x do pdf')
+    if n in ('escrever', 'mododeescrita', 'escritasemdistrao'):
+        print(_r68_escrever())
+        return feito('modo de escrita')
+    if n in ('guardiaodeprivacidade', 'quemestausandocamera', 'cameramicrofone', 'privacidadeagora'):
+        print(_r68_guardiao_privacidade())
+        return feito('guardiao de privacidade')
+    if n.startswith('traduzirarquivo'):
+        print(_r68_prep_traducao(_re.sub(r'^traduzir\s+arquivo\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('prep de traducao')
+    if n == 'ortografia' or (n.startswith('ortografia') and len(n) > 10):
+        print(_r68_ortografia(_re.sub(r'^ortografia\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('ortografia')
+    if n.startswith('rpg'):
+        resto = _re.sub(r'^rpg\s*', '', bruto, flags=_re.I).strip()
+        partes = resto.split()
+        acao = partes[0].lower() if partes else 'comecar'
+        escolha = partes[1] if len(partes) > 1 else None
+        print(_r68_rpg(acao, escolha))
+        return feito('rpg')
+    if n.startswith('revisarsalvar'):
+        print(_r68_revisar_salvar(_re.sub(r'^revisar\s+salvar\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('revisar: salvar')
+    if n in ('revisarhoje', 'revisoesdehoje'):
+        print(_r68_revisar_hoje())
+        return feito('revisar: hoje')
+    if n.startswith('revisarfeito'):
+        print(_r68_revisar_feito(_re.sub(r'^revisar\s+feito\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('revisar: feito')
+    if n.startswith('minhageladeira'):
+        print(_r68_geladeira(_re.sub(r'^minha\s+geladeira\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('geladeira: anotar')
+    if n in ('oquecozinhar', 'cozinhardageladeira'):
+        print(_r68_o_que_cozinhar())
+        return feito('o que cozinhar')
+    if n in ('organizardownloads', 'arrumardownloads'):
+        print(_r68_organizar(os.path.join(os.path.expanduser('~'), 'Downloads')))
+        return feito('organizar downloads')
+    if n in ('organizarareadetrabalho', 'faxina na area de trabalho', 'faxinanaareadetrabalho', 'arrumarareadetrabalho'):
+        print(_r68_organizar(os.path.join(os.path.expanduser('~'), 'Desktop')))
+        return feito('organizar area de trabalho')
+    if n in ('desfazerorganizacao', 'desfazerfaxina'):
+        print(_r68_desfazer_organizacao())
+        return feito('desfazer organizacao')
+    if n.startswith('conferirlinks'):
+        print(_r68_conferir_links(_re.sub(r'^conferir\s+links\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('conferir links')
+    if n.startswith(('oquetemnestafoto', 'oquetemnafoto', 'descreverimagem')):
+        print(_r68_descrever_imagem(_re.sub(r'^o\s*que\s+tem\s+(nesta\s+|na\s+)?(foto|imagem)\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('descrever imagem')
+    if n.startswith('simularentrevista'):
+        print(_r68_entrevista(_re.sub(r'^simular\s+entrevista\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('entrevista: iniciar')
+    if n.startswith('responderentrevista'):
+        print(_r68_entrevista(resposta=_re.sub(r'^responder\s+entrevista\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('entrevista: responder')
+    if n.startswith('analisarextrato'):
+        print(_r68_analisar_extrato(_re.sub(r'^analisar\s+extrato\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('analisar extrato')
+    if n.startswith('criarcartaz'):
+        print(_r68_criar_cartaz(_re.sub(r'^criar\s+cartaz\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('criar cartaz')
+    if n.startswith('calcularobra'):
+        print(_r68_calculadora_obra(_re.sub(r'^calcular\s+obra\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('calculadora de obra')
+    if n == 'prova':
+        print(_r68_prova())
+        return feito('prova: iniciar')
+    if n.startswith('provaresponder'):
+        print(_r68_prova(_re.sub(r'^prova\s+responder\s*', '', bruto, flags=_re.I)))
+        return feito('prova: responder')
+    if n.startswith(('leremvozalta', 'narrar')):
+        print(_r68_narrar(_re.sub(r'^ler\s+(o\s+)?(arquivo\s+)?em\s+voz\s+alta\s*:?\s*|^narrar\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('narrar documento')
+    if bruto.lower().startswith(('ideia ', 'ideia:')):
+        print(_r68_jardim_plantar(_re.sub(r'^ideias?\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('jardim: plantar')
+    if n in ('verjardim', 'jardimdeideias', 'minhasideias'):
+        print(_r68_jardim_ver())
+        return feito('jardim: ver')
+    if n.startswith(('fiscaldeespaco', 'oquecomemeudisco', 'oquecomeudisco', 'oqueestacomendomeudisco')):
+        print(_r68_fiscal_espaco(_re.sub(r'^(fiscal\s+de\s+espac\w*|o\s*que\s+esta\s+comendo\s+meu\s+disco|o\s*que\s+come\s+meu\s+disco)\s*:?\s*', '', bruto, flags=_re.I).strip().strip('"')))
+        return feito('fiscal de espaco')
+    if n.startswith('habitofeito'):
+        print('[Aviso]: rastreio de habitos ja existe na casa (rastreio de habitos);'
+              ' experimente tambem: aniversario <nome> <dia/mes>')
+        return feito('habito (rota existente)')
+    if n.startswith('aniversario'):
+        print(_r68_aniversario(*_re.sub(r'^aniversarios?\s*:?\s*', '', bruto, flags=_re.I).split(maxsplit=1)))
+        return feito('aniversarios')
+    if n.startswith('internetfora'):
+        print(_r68_internet_fora(_re.search(r'\d+', n).group(0) if _re.search(r'\d+', n) else 5))
+        return feito('internet: lembrete')
+    if n in ('internetvolta', 'internetdevolta'):
+        print(_r68_internet_volta())
+        return feito('internet: cancelar')
+    if n.startswith(('memostraseucodigo', 'memostrooseucodigo', 'mostreoseucodigo', 'espelho')):
+        print(_r68_espelho(_re.sub(r'^(me\s+mostra|mostre)\s+seu\s+codigo\s*:?\s*|^espelho\s*:?\s*', '', bruto, flags=_re.I)))
+        return feito('espelho do agente')
+    return False
+
+
 _R67_GATILHOS_ATUALIZAR = frozenset((
     'atualizaragora', 'atualizaagora', 'atualisaagora', 'atualisaragora',
     'atualiseagora', 'atualizaroagente', 'atualizeoagente', 'atualizaragente',
@@ -15847,6 +16859,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r63_comandos(comando):
         return True
     if _r67_comandos(comando):
+        return True
+    if _r68_comandos(comando):
         return True
     if _r62_comandos(comando):
         return True
@@ -35535,7 +36549,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r67] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r68] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

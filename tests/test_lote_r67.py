@@ -345,7 +345,7 @@ class Estrutura(unittest.TestCase):
         self.assertIn('LOTE SAUDE (r67)', texto)
         self.assertEqual(texto.count('\n_r67_abertura()'), 1)
         self.assertIn('if not _r67_voz_silenciada():', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r67]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r68]'), 1)
 
 
 if __name__ == '__main__':
