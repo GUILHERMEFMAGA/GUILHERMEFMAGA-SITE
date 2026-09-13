@@ -498,10 +498,10 @@ class CerebroInstantaneo(unittest.TestCase):
 
 
 class GuardasR43(unittest.TestCase):
-    def test_selo_r60_no_banner(self):
+    def test_selo_r61_no_banner(self):
         with io.open('agente.py', encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('2026-09-11-r60', texto)
+        self.assertIn('2026-09-11-r61', texto)
         self.assertNotIn('2026-09-11-r44]', texto)
 
     def test_escada_de_teto_existe_no_fonte(self):

@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60 **616 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61 **622 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -699,6 +699,19 @@ ou relatórios reais sem revisão e autorização.
   Escudo do teste afiado: REM dentro da seção de admin não pode ter
   parêntese NENHUM (os da r59 reescritos); `) else (` banido na seção.
   **616 testes OK**. Selo `-r60`. Não testado no Windows real.
+- **r61 — DIAGNÓSTICO REAL DO ARRANQUE (a pergunta que o modelo chutou)**: o
+  usuário perguntou "porque o iniciar.bat não está funcionando?" e o GGUF
+  respondeu com INVENÇÃO (renomear para .exe, System32...). Nova rota
+  `_r61_comandos` ('diagnostico do iniciar', ou 'iniciar' + não
+  funciona/abre/pisca/porque) → `_r61_diagnostico_iniciar`: FATOS do disco —
+  iniciar.bat existe/tamanho ≥800/marcadores r59+ (pedir_admin+R58_ARGS) e
+  r57+ (:quebrou)/CRLF canônico (crlf ≥50 e 0 LF solto); agente.py ≥50000 e
+  COMPIla; main.py compila e tem _agente_integro; versão do selo extraída por
+  regex (sem literal — a 1ª tentativa do patch quebrou o próprio selo-bump por
+  duplicar o literal, e a GUARDA DE NOMES r55 pegou `re` sem import: dois
+  sistemas de segurança trabalhando). Veredito com contagem de problemas +
+  cura recomendada. **622 testes OK** (+6). Selo `-r61`. Não testado no
+  Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.

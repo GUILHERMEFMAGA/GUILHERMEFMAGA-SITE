@@ -23,7 +23,7 @@ class PedidosFerramentas(unittest.TestCase):
     def test_frase_real_nao_chega_a_conversa_generica(self):
         for nuvem in (False, True):
             analise = Mock(return_value='Lote de ate 5 propostas; ausencia nao comprovada.')
-            env = carregar('_r53_comandos', '_r50_comandos', 'processar_atalho_rapido', '_norm_pt', '_pedido_ideias_do_agente',
+            env = carregar('_r61_comandos', '_r53_comandos', '_r50_comandos', 'processar_atalho_rapido', '_norm_pt', '_pedido_ideias_do_agente',
                            config={'usar_ia_nuvem': nuvem},
                            _resposta_contextual_curta=lambda *args: None,
                            _comandos_oficina_local=lambda *_: False,

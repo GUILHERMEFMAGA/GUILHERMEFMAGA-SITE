@@ -7796,6 +7796,7 @@ def _menu_ajuda_local():
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
+    print("DIAGNOSTICO (r61): 'diagnostico do iniciar' confere os arquivos de arranque de verdade (sem chutar)")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
@@ -12473,6 +12474,115 @@ def _r53_comandos(comando, criar=None, existe=None, pasta=None):
     return True
 
 
+def _r61_compila(caminho):
+    """r61: o arquivo python compila? (False se faltar ou estiver corrompido)."""
+    try:
+        with open(caminho, 'rb') as f:
+            compile(f.read(), caminho, 'exec')
+        return True
+    except (OSError, SyntaxError, ValueError):
+        return False
+
+
+def _r61_diagnostico_iniciar(pasta=None):
+    """r61: checagem REAL dos arquivos de arranque (sem chutar como o modelo
+    bruto chuta): existencia, marcadores da versao atual, fim de linha do BAT
+    e compilacao dos .py. Tudo local, sem rede."""
+    import re
+    pasta = pasta or PASTA_BASE
+    linhas = ['Diagnostico de arranque em: ' + pasta]
+    problemas = []
+
+    def checar(ok, ok_msg, ruim_msg):
+        linhas.append(('[OK] ' if ok else '[PROBLEMA] ') + (ok_msg if ok else ruim_msg))
+        if not ok:
+            problemas.append(ruim_msg)
+
+    # iniciar.bat
+    bat = os.path.join(pasta, 'iniciar.bat')
+    if os.path.isfile(bat):
+        bruto = open(bat, 'rb').read()
+        texto_bat = bruto.decode('utf-8', errors='replace')
+        checar(len(bruto) >= 800, 'iniciar.bat existe e tem tamanho de versao real',
+               'iniciar.bat pequeno demais/quebrado - baixe a versao oficial de novo')
+        crlf = bruto.count(b'\r\n')
+        lf_solto = bruto.count(b'\n') - crlf
+        checar(crlf >= 50 and lf_solto == 0,
+               'iniciar.bat com fim de linha certo (CRLF)',
+               'iniciar.bat com fim de linha errado (LF) - baixe a versao oficial de novo')
+        checar(':pedir_admin' in texto_bat and 'R58_ARGS' in texto_bat,
+               'iniciar.bat na versao com administrador consertado (r59+)',
+               'iniciar.bat ANTIGO (bug do administrador) - baixe a versao oficial de novo')
+        checar(':quebrou' in texto_bat,
+               'iniciar.bat com o escudo de reparo automatico (r57+)',
+               'iniciar.bat sem o escudo de reparo - baixe a versao oficial de novo')
+    else:
+        checar(False, '', 'iniciar.bat NAO EXISTE nesta pasta - baixe a versao oficial')
+
+    # agente.py
+    agente_caminho = os.path.join(pasta, 'agente.py')
+    if os.path.isfile(agente_caminho):
+        tamanho = os.path.getsize(agente_caminho)
+        checar(tamanho >= 50000, 'agente.py existe (' + str(tamanho) + ' bytes)',
+               'agente.py pequeno demais/quebrado - baixe a versao oficial de novo')
+        checar(_r61_compila(agente_caminho), 'agente.py compila (saudavel)',
+               'agente.py CORROMPIDO (nao compila) - baixe a versao oficial de novo')
+        try:
+            conteudo_agente = open(agente_caminho, 'r', encoding='utf-8', errors='replace').read()
+            achou = re.search(r'\[Motor e avaliacao local 2026-09-11-(r\d+)\]', conteudo_agente)
+            linhas.append('[INFO] versao do agente.py: ' + (achou.group(1) if achou else 'selo nao encontrado'))
+        except Exception:
+            pass
+    else:
+        checar(False, '', 'agente.py NAO EXISTE nesta pasta')
+
+    # main.py
+    main_caminho = os.path.join(pasta, 'main.py')
+    if os.path.isfile(main_caminho):
+        checar(_r61_compila(main_caminho), 'main.py compila (saudavel)',
+               'main.py corrompido - baixe a versao oficial de novo')
+        try:
+            conteudo_main = open(main_caminho, 'r', encoding='utf-8', errors='replace').read()
+        except Exception:
+            conteudo_main = ''
+        checar('_agente_integro' in conteudo_main,
+               'main.py com o escudo de integridade (r57+)',
+               'main.py antigo (sem escudo) - baixe a versao oficial de novo')
+    else:
+        checar(False, '', 'main.py NAO EXISTE nesta pasta - o BAT velho tenta rodar sem ele')
+
+    if os.path.isfile(os.path.join(pasta, 'SEM_ATUALIZAR.txt')):
+        linhas.append('[INFO] SEM_ATUALIZAR.txt presente: atualizacao automatica desligada')
+    if os.path.isfile(os.path.join(pasta, 'agente_backup.py')):
+        linhas.append('[INFO] existe agente_backup.py (restauro disponivel)')
+
+    if problemas:
+        linhas.append('')
+        linhas.append('Total de problemas: ' + str(len(problemas)))
+        linhas.append('Cura na maioria dos casos: rode o comando ATUALIZAR AGORA, ou')
+        linhas.append('abra o cmd NESTA pasta e re-baixe os arquivos oficiais (me peca o comando).')
+        linhas.append('Me mande um print desta resposta que eu te passo o passo a passo exato.')
+    else:
+        linhas.append('')
+        linhas.append('Tudo saudavel por aqui! Se o duplo clique ainda falha, me manda')
+        linhas.append('o print da janela que abrir (agora ela fica aberta mostrando o erro).')
+    return '\n'.join(linhas)
+
+
+def _r61_comandos(comando):
+    """r61: 'diagnostico do iniciar' / 'porque o iniciar.bat nao funciona' —
+    resposta com FATOS do disco, nao com imaginacao do modelo."""
+    n = _r53_normalizar(comando) if globals().get('_r53_normalizar') else (comando or '').lower()
+    gatilho = ('diagnostico do iniciar' in n or 'diagnostico iniciar' in n
+               or ('iniciar' in n and any(p in n for p in
+                   ('nao funciona', 'nao abre', 'nao inicia', 'pisca', 'nao esta funcionando',
+                    'por que nao', 'porque nao'))))
+    if not gatilho:
+        return False
+    print(_r61_diagnostico_iniciar())
+    return True
+
+
 def _r50_caminhos_agente():
     """Caminhos (agente.py, backup) da copia RODANDO, derivados de __file__."""
     origem = os.path.abspath(globals().get('__file__') or 'agente.py')
@@ -14919,6 +15029,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r61_comandos(comando):
+        return True
     if _r53_comandos(comando):
         return True
     if _r50_comandos(comando):
@@ -34600,7 +34712,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r60] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r61] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
