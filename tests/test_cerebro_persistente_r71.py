@@ -149,7 +149,7 @@ class Estrutura(unittest.TestCase):
         self.assertGreater(texto.index('\n_r71_restaurar_na_abertura()'),
                            texto.index('if _r71_comandos(comando):'))  # rota definida antes do gancho
         self.assertIn('CEREBRO r71', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r71]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r72]'), 1)
 
 
 if __name__ == '__main__':

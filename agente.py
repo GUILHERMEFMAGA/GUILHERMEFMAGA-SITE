@@ -7843,6 +7843,7 @@ def _menu_ajuda_local():
     print("NUCLEO r69: 'nucleo' | 'diagnostico do cerebro' | 'conhecimento ensinar topico: fato' | 'aprender palavras' | 'confianca <pergunta>' — o cerebro aprende, reflete e se audita sozinho")
     print("PROTOTIPO r70 (exclusivo do dono desta pasta): respostas com revisao de 2a passada | fatos antes do modelo | 'o que voce sabe sobre X' | 'modo detalhado' | dica do proximo comando")
     print("CEREBRO r71: o que voce ensina SOBREVIVE ao fechar o agente (cerebro.json) | 'listar aprendizado' | 'esquecer <frase>'")
+    print("HONESTIDADE (r72): pergunta sobre VOCE que eu nao sei => eu te ensino a me ensinar ('conhecimento ensinar...') em vez de papo furado (kill-switch: 'dica_de_ensinar': false)")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -8922,6 +8923,18 @@ def _processar_cerebro_local(comando: str) -> bool:
     except Exception:
         pass
 
+    # r72: HONESTIDADE FINAL — pergunta pessoal sem fato ensinado e sem rota
+    # NAO vai pro modelo dar papo: ensinamos a ensinar (apos TODAS as rotas,
+    # por isso nada aqui rouba comando de ferramenta ou atalho).
+    _honesta72 = globals().get('_r72_honestidade')
+    if _honesta72:
+        try:
+            _nota72 = _honesta72(n, comando)
+            if _nota72:
+                print(_nota72)
+                return True
+        except Exception:
+            pass
     return False
 
 
@@ -14940,6 +14953,41 @@ def _r71_comandos(comando):
         print('Nao encontrei esse padrao. Veja todos: listar aprendizado')
         return True
     return False
+
+
+def _r72_honestidade(n, bruto=None):
+    """r72 (A): pergunta pessoal (meu/minha/eu...) que NAO casou com fato
+    ensinado e nao tem rota — em vez do modelo dar papo furado, ensinamos
+    a ensinar. Chamada no FIM do cerebro (rotas e ferramentas ja tiveram a
+    vez, entao nada e roubado). Kill-switch: config 'dica_de_ensinar': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('dica_de_ensinar', padrao=True):
+            return None
+    except Exception:
+        pass
+    if not n:
+        return None
+    if 'menu' in n:  # 'menu' contem 'meu'! (e menu e rota propria, ja tratada)
+        return None
+    interrogou = n.endswith('?') or n.startswith(
+        ('qual', 'oq', 'oque', 'quem', 'onde', 'aonde', 'quando', 'quanto', 'como'))
+    if not interrogou:
+        return None
+    if not any(m in n for m in ('meu', 'minha', 'meus', 'minhas')) \
+            and not n.startswith(('ondeeu', 'aondeeu', 'quemeu')):
+        return None
+    import re as _re
+    m = _re.search(r'meus?\s+(.{1,30})', (bruto or ''), _re.I)
+    assunto = (m.group(1).strip(' ?!.')[:30] if m else 'isso')
+    st = globals().get('_R69_NUCLEO') or {}
+    qtd = len(st.get('conhecimento') or {})
+    onde = (' (cerebro.json: %d topico(s) guardados)' % qtd) if qtd else ''
+    return ('[Honestidade r72]: isso eu ainda NAO sei — voce nunca me ensinou.%s\n'
+            'Me ensina com: conhecimento ensinar <assunto>: <fato>\n'
+            '  ex.: conhecimento ensinar meu %s: ...\n'
+            'Depois disso eu respondo na hora, com a fonte — e fica salvo mesmo fechando o agente.'
+            % (onde, assunto))
 
 
 def _r62_entregar_lancador(baixar=None, pasta=None):
@@ -37228,7 +37276,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r71] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r72] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

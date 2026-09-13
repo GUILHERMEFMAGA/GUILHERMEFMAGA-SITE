@@ -87,10 +87,10 @@ class PerguntarUsaStreaming(unittest.TestCase):
 
 
 class GuardasR48(unittest.TestCase):
-    def test_selo_r71_no_banner(self):
+    def test_selo_r72_no_banner(self):
         with io.open('agente.py', encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r71]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r72]', texto)
         self.assertNotIn('2026-09-11-r47]', texto)
 
 
