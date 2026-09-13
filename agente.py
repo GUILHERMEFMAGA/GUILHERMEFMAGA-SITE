@@ -7800,6 +7800,8 @@ def _menu_ajuda_local():
     print("DEFENDER (r63): 'historico de protecao' mostra as deteccoes reais do Windows Defender (sem inventar)")
     print("AUTO-DIAGNOSTICO (r64): cada abertura confere os arquivos de arranque em silencio; se achar problema eu te aviso na hora (cura: 'atualizar agora')")
     print("HONESTIDADE (r65): 'o agente nao abre/funciona' e falhas da casa eu respondo com FATOS do disco - nunca com chute")
+    print("LOTE SAUDE (r67): 'diagnostico do python/defender/disco' | 'quem e este pc' | 'modo aviao' | 'criar checkpoint'/'restaurar checkpoint' | 'velocimetro' | 'teste de estresse'")
+    print("LOTE PODER (r67): 'resumo da sessao' | 'raio-x da decisao' | 'meus poderes' | 'economia' | 'traduz erro <erro>' | 'conferir atalho' | 'me chama de <nome>' | 'silenciar' | 'sair e atualizar' | 'salvar/voltar configuracao'")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -12697,6 +12699,597 @@ def _r64_aviso_de_boot(diagnosticar=None):
     return True
 
 
+_R67_GATILHOS_ATUALIZAR = frozenset((
+    'atualizaragora', 'atualizaagora', 'atualisaagora', 'atualisaragora',
+    'atualiseagora', 'atualizaroagente', 'atualizeoagente', 'atualizaragente',
+    'atualizagente', 'atualiza', 'atualizar', 'atualize'))
+
+_R67_REGISTRO = []   # [(hh:mm, tag, evento)] desta sessao (resumo/raio-x/economia)
+_R67_SILENCIO_ATE = [None]  # voz pausada ate este horario ('nao me perturbe')
+
+
+def _r67_registrar(tag, evento):
+    """r67: registro local da sessao (memoria RAM, nunca disco)."""
+    import datetime as _dt
+    lista = globals().setdefault('_R67_REGISTRO', [])
+    lista.append((_dt.datetime.now().strftime('%H:%M'), tag, str(evento)[:120]))
+    del lista[:-200]
+
+
+def _r67_ler_config(chave, pasta=None, padrao=None):
+    pasta = pasta or PASTA_BASE
+    caminho = os.path.join(pasta, 'config.json')
+    if not os.path.isfile(caminho):
+        return padrao
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            dados = json.load(f)
+    except Exception:
+        return padrao
+    return dados.get(chave, padrao)
+
+
+def _r67_definir_config(chave, valor, pasta=None):
+    """r67: escreve UMA chave no config.json da casa (preserva o resto)."""
+    pasta = pasta or PASTA_BASE
+    caminho = os.path.join(pasta, 'config.json')
+    dados = {}
+    if os.path.isfile(caminho):
+        try:
+            with open(caminho, 'r', encoding='utf-8') as f:
+                dados = json.load(f)
+        except Exception:
+            dados = {}
+    dados[chave] = valor
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=True, indent=1)
+        return True
+    except Exception:
+        return False
+
+
+def _r67_resumo_da_sessao():
+    lista = globals().get('_R67_REGISTRO') or []
+    if not lista:
+        return 'Nada ainda nesta sessao: fui discreta(o). Acoes locais (checkpoints, atualizacoes, diagnosticos...) aparecem aqui.'
+    linhas = ['O que eu fiz nesta sessao (%d acao(oes)):' % len(lista)]
+    for hora, tag, evento in lista[-15:]:
+        linhas.append('  %s [%s] %s' % (hora, tag, evento))
+    return '\n'.join(linhas)
+
+
+def _r67_raio_x():
+    lista = globals().get('_R67_REGISTRO') or []
+    if not lista:
+        return ('Nenhuma acao por rotas locais ainda nesta sessao.'
+                ' (O registro comeca na r67; rotas antigas ainda nao assinam o caderno.)')
+    hora, tag, evento = lista[-1]
+    return ('Ultima decisao minha: [%s] %s (as %s).'
+            ' Isso veio de uma REGRA local com fatos, nao de imaginacao do modelo.' % (tag, evento, hora))
+
+
+def _r67_economia():
+    lista = globals().get('_R67_REGISTRO') or []
+    n = len([1 for _, tag, _ in lista if tag == 'FATOS'])
+    if not n:
+        return 'Sem atendimentos por FATOS ainda nesta sessao; tudo foi conversa com o modelo.'
+    return ('Relatorio de economia desta sessao: %d atendimento(s) resolvidos por FATOS locais'
+            ' (sem rede, sem cota). Estimativa conservadora: ~%d tokens de modelo poupados'
+            ' (300 por resposta). Fatos sao graca; imaginacao custa.' % (n, n * 300))
+
+
+def _r67_caderno_de_poderes(caminho=None):
+    caminho = caminho or os.path.join(PASTA_BASE, 'agente.py')
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            texto = f.read()
+    except Exception as erro:
+        return '[Aviso]: nao consegui ler o proprio codigo (%s).' % type(erro).__name__
+    import re as _re
+    rotas = sorted(set(_re.findall(r'_(r\d+)_comandos', texto)), key=lambda s: int(s[1:]))
+    linhas = texto.count('\n')
+    return ('Caderno de poderes (lido do PROPRIEO codigo, nunca desatualiza):\n'
+            '  rotas locais: %s\n'
+            '  %d linhas de codigo, tudo auditavel no agente.py desta pasta'
+            % (', '.join('r' + r[1:] for r in rotas) or '(nenhuma)', linhas))
+
+
+def _r67_checkpoint_criar(pasta=None, agora=None):
+    """r67: cinto de seguranca — zipa a casa (agente/main/bat/config)."""
+    import datetime as _dt
+    import zipfile as _zf
+    pasta = pasta or PASTA_BASE
+    nomes = [n for n in ('agente.py', 'main.py', 'iniciar.bat', 'config.json')
+             if os.path.isfile(os.path.join(pasta, n))]
+    if not nomes:
+        return '[Aviso]: nada para guardar nesta pasta (agente.py/main.py/iniciar.bat ausentes).'
+    dt = agora or _dt.datetime.now()
+    nome_arq = 'checkpoint_%s.zip' % dt.strftime('%Y%m%d_%H%M%S')
+    try:
+        with _zf.ZipFile(os.path.join(pasta, nome_arq), 'w', _zf.ZIP_DEFLATED) as z:
+            for n in nomes:
+                z.write(os.path.join(pasta, n), n)
+    except Exception as erro:
+        return '[Aviso]: nao consegui criar o checkpoint (%s).' % type(erro).__name__
+    _r67_registrar('CASA', 'checkpoint criado: ' + nome_arq)
+    return '[OK] checkpoint criado: %s (%d arquivo(s): %s).\nPara voltar atras: restaurar checkpoint.' % (nome_arq, len(nomes), ', '.join(nomes))
+
+
+def _r67_checkpoint_restaurar(pasta=None):
+    """r67: volta atras — extrai o checkpoint mais recente. O .bat NUNCA e
+    sobrescrito na mao: vai para _atualizacao_iniciar.tmp (mecanismo de sempre)."""
+    import zipfile as _zf
+    pasta = pasta or PASTA_BASE
+    lista = sorted(f for f in os.listdir(pasta)
+                   if f.startswith('checkpoint_') and f.endswith('.zip'))
+    if not lista:
+        return "[Aviso]: nao ha checkpoint nenhum por aqui. Crie um com 'criar checkpoint'."
+    alvo = lista[-1]
+    via_tmp = []
+    try:
+        with _zf.ZipFile(os.path.join(pasta, alvo), 'r') as z:
+            nomes = z.namelist()
+            for n in nomes:
+                dados = z.read(n)
+                destino = os.path.join(pasta, os.path.basename(n))
+                if n.lower().endswith('.bat'):
+                    with open(os.path.join(pasta, '_atualizacao_iniciar.tmp'), 'wb') as f:
+                        f.write(dados)
+                    via_tmp.append(os.path.basename(n))
+                else:
+                    with open(destino, 'wb') as f:
+                        f.write(dados)
+    except Exception as erro:
+        return '[Aviso]: nao consegui restaurar (%s).' % type(erro).__name__
+    _r67_registrar('CASA', 'restaurado ' + alvo)
+    msg = '[OK] restaurado %s (%d arquivo(s): %s).' % (alvo, len(nomes), ', '.join(os.path.basename(n) for n in nomes))
+    if via_tmp:
+        msg += '\nO iniciar.bat antigo se aplica ao fechar o agente (mecanismo de sempre); depois ele reabre.'
+    return msg
+
+
+def _r67_modo_aviao_ligado():
+    return bool(_r67_ler_config('modo_aviao', padrao=False))
+
+
+def _r67_diagnostico_python(sysmod=None, achar=None):
+    import sys as _sys
+    import importlib.util as _util
+    sysmod = sysmod or _sys
+    achar = achar or _util.find_spec
+    linhas = ['Python em uso: %s (%s)' % (sysmod.version.split()[0], getattr(sysmod, 'executable', 'n/d'))]
+    for lib in ('langchain_openai', 'langchain_google_genai', 'llama_cpp', 'requests', 'psutil'):
+        try:
+            ok = achar(lib) is not None
+        except Exception:
+            ok = False
+        linhas.append('[%s] %s%s' % ('OK' if ok else 'INFO', lib, '' if ok else ' (nao instalada)'))
+    linhas.append('Tudo acima e fato desta maquina, lido na hora.')
+    return '\n'.join(linhas)
+
+
+def _r67_diagnostico_defender(executar=None):
+    """r67: protecao em TEMPO REAL (diferente do historico da r63)."""
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(
+                ['powershell', '-NoProfile', '-Command',
+                 'Get-MpComputerStatus | Select-Object AMServiceEnabled,'
+                 'RealTimeProtectionEnabled,AntivirusEnabled,'
+                 'AntivirusSignatureLastUpdated | Format-List'],
+                capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return ('[INFO] nao consegui ler o status do Defender (%s).'
+                ' Caminho na janela: Seguranca do Windows > Protecao contra virus e ameacas.'
+                % type(erro).__name__)
+    texto = (getattr(feito, 'stdout', '') or '')
+    linhas = [l.strip() for l in texto.split('\n')
+              if l.strip() and ':' in l]
+    if getattr(feito, 'returncode', 0) != 0 or not linhas:
+        return '[INFO] o Defender nao respondeu com status aqui; confira na janela: Seguranca do Windows.'
+    saida = ['Status do Windows Defender AGORA (fatos):']
+    saida += ['  ' + l for l in linhas]
+    return '\n'.join(saida)
+
+
+def _r67_diagnostico_disco(executar=None):
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(
+                ['powershell', '-NoProfile', '-Command',
+                 'Get-PhysicalDisk | Select-Object FriendlyName,HealthStatus'
+                 ' | Format-Table -AutoSize; Get-PSDrive -PSProvider FileSystem'
+                 ' | Select-Object Name,@{n=\'LivreGB\';e={[math]::Round($_.Free/1GB,1)}}'
+                 ' | Format-Table -AutoSize'],
+                capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return '[INFO] nao consegui ler a saude dos discos (%s).' % type(erro).__name__
+    linhas = [l.rstrip() for l in (getattr(feito, 'stdout', '') or '').split('\n') if l.strip()]
+    if getattr(feito, 'returncode', 0) != 0 or not linhas:
+        return '[INFO] sem resposta do sistema de discos aqui.'
+    saida = ['Saude dos discos (fatos):']
+    saida += ['  ' + l for l in linhas]
+    saida.append('Se algum HealthStatus NAO estiver "Healthy", me avisa que eu explico o proximo passo.')
+    return '\n'.join(saida)
+
+
+def _r67_quem_e_este_pc(platform_mod=None, executar=None):
+    import platform as _pl
+    platform_mod = platform_mod or _pl
+    linhas = ['Este PC (fatos lidos agora):',
+              '  Sistema: %s %s (%s)' % (platform_mod.system(), platform_mod.release(), platform_mod.machine()),
+              '  Processador: %s' % ((platform_mod.processor() or 'n/d')[:90])]
+    if executar is not None:
+        try:
+            ram = (executar() or '').strip()
+            if ram:
+                linhas.append('  RAM: ' + ram)
+        except Exception:
+            linhas.append('  RAM: (nao consegui medir agora)')
+    return '\n'.join(linhas)
+
+
+def _r67_velocimetro(tempos=None):
+    """r67: velocidade REAL — le as medidas que o proprio agente ja faz das
+    geracoes (r24: segundos + tokens das ultimas 20 geracoes)."""
+    if tempos is None:
+        tempos = globals().get('_r24_tempos') or []
+    pares = [(x.get('tokens'), x.get('segundos')) for x in tempos
+             if isinstance(x.get('tokens'), (int, float))
+             and isinstance(x.get('segundos'), (int, float)) and x['segundos'] > 0]
+    if not pares:
+        return ('[INFO] ainda nao ha geracoes medidas nesta sessao.'
+                ' Converse um pouco com a IA local e volte: eu meço tokens/segundo de verdade.')
+    velocidades = [tok / seg for tok, seg in pares]
+    media = sum(velocidades) / len(velocidades)
+    return ('Velocimetro da IA local (ultimas %d geracoes REAIS):\n'
+            '  media: %.1f tokens/segundo | melhor: %.1f | pior: %.1f\n'
+            '  tempo total gerando: %.1fs | tokens gerados: %d'
+            % (len(pares), media, max(velocidades), min(velocidades),
+               sum(s for _, s in pares), sum(t for t, _ in pares)))
+
+
+def _r67_teste_estresse(tempos=None, disponivel=None, modelo=None):
+    if disponivel is None:
+        disponivel = globals().get('ia_local_disponivel')
+    try:
+        no_ar = bool(disponivel()) if disponivel else None
+    except Exception:
+        no_ar = None
+    if modelo is None:
+        modelo = globals().get('_modelo_ia_local')
+    linhas = ['Teste de estresse do motor local (fatos):']
+    linhas.append('  servidor da IA local: %s' % ('no ar' if no_ar else ('parado' if no_ar is False else 'desconhecido')))
+    if modelo:
+        linhas.append('  modelo em uso: %s' % modelo)
+    linhas.append('  ' + _r67_velocimetro(tempos=tempos).replace('\n', '\n  '))
+    return '\n'.join(linhas)
+
+
+def _r67_traduzir_erro(texto=None):
+    t = (texto or '').strip()
+    if not t:
+        return ("Cole o erro na frente do comando, assim: 'traduz erro FileNotFoundError: ...'")
+    mapa = (('0x80070005', 'acesso NEGADO (permissao)'),
+            ('0x8007000e', 'faltou memoria'),
+            ('0x80004005', 'erro generico do Windows (nao diz a causa)'),
+            ('ModuleNotFoundError', 'o Python nao achou uma BIBLIOTECA (esta faltando instalar)'),
+            ('FileNotFoundError', 'um ARQUIVO nao foi achado no caminho indicado'),
+            ('PermissionError', 'o Windows bloqueou por PERMISSAO'),
+            ('SyntaxError', 'erro de digitacao DENTRO de codigo Python'),
+            ('timeout', 'algo demorou demais e foi cancelado'))
+    achados = ['  %s -> %s' % (k, v) for k, v in mapa if k.lower() in t.lower()]
+    partes = ['Leitura do erro (fatos; eu NAO invento cura):']
+    partes += achados or ['  nenhum termo conhecido nesse erro; me manda o texto completo que eu releio.']
+    casa = [n for n in ('agente.py', 'iniciar.bat', 'main.py') if n.lower() in t.lower()]
+    if casa:
+        partes.append("O erro menciona ARQUIVOS DA CASA (%s): comeca com 'diagnostico do iniciar'." % ', '.join(casa))
+    else:
+        partes.append('Nao menciona arquivos da casa: provavelmente e do Windows ou de um programa externo.')
+    return '\n'.join(partes)
+
+
+_PS_ATALHO_SCAN = ("$ws=New-Object -ComObject WScript.Shell; foreach($a in (Get-ChildItem "
+                   "([Environment]::GetFolderPath('Desktop')) -Filter *.lnk)){ $s=$ws.CreateShortcut($a.FullName); "
+                   "Write-Output ($a.Name+'|'+$s.TargetPath) }")
+
+
+def _r67_conferir_atalho(executar=None):
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(['powershell', '-NoProfile', '-Command', _PS_ATALHO_SCAN],
+                                  capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return '[INFO] nao consegui ler os atalhos da Area de Trabalho (%s).' % type(erro).__name__
+    linhas = [l.strip() for l in (getattr(feito, 'stdout', '') or '').split('\n') if '|' in l]
+    certos, errados = [], []
+    for l in linhas:
+        nome, _, alvo = l.partition('|')
+        if 'agente_pc' in alvo.lower():
+            certos.append(nome)
+        elif 'iniciar.bat' in alvo.lower() or 'agente' in alvo.lower():
+            errados.append('%s -> %s' % (nome, alvo))
+    partes = ['Atalhos relacionados ao agente na Area de Trabalho (fatos):']
+    partes += ['  [OK] ' + c for c in certos]
+    partes += ['  [ERRADO] ' + e for e in errados]
+    if not certos and not errados:
+        partes.append('  nenhum atalho do agente encontrado (a Area de Trabalho pode estar em OneDrive).')
+    if errados:
+        partes.append("Para eu consertar os ERRADOS: digite 'consertar atalho'.")
+    return '\n'.join(partes)
+
+
+def _r67_consertar_atalho(executar=None):
+    """r67: conserta SOMENTE atalhos que apontam para iniciar.bat fora da pasta certa."""
+    if executar is None:
+        import subprocess
+        pasta_ag = PASTA_BASE
+
+        def executar():
+            alvo = os.path.join(pasta_ag, 'iniciar.bat').replace("'", "''")
+            cmd = ("$ws=New-Object -ComObject WScript.Shell; $d=[Environment]::GetFolderPath('Desktop'); "
+                   "foreach($a in (Get-ChildItem $d -Filter *.lnk)){ $s=$ws.CreateShortcut($a.FullName); "
+                   "if(($s.TargetPath -like '*iniciar.bat*') -and ($s.TargetPath -notlike '*agente_pc*')){ "
+                   "$s.TargetPath='" + alvo + "'; $s.WorkingDirectory='" + str(pasta_ag).replace("'", "''") + "'; $s.Save(); "
+                   "Write-Output ('CONSERTADO|'+$a.Name) } }")
+            return subprocess.run(['powershell', '-NoProfile', '-Command', cmd],
+                                  capture_output=True, text=True, timeout=60)
+    try:
+        feito = executar()
+    except Exception as erro:
+        return '[INFO] nao consegui consertar os atalhos (%s).' % type(erro).__name__
+    consertos = [l.strip().split('|', 1)[1] for l in (getattr(feito, 'stdout', '') or '').split('\n')
+                 if l.strip().startswith('CONSERTADO|')]
+    if consertos:
+        return '[OK] atalho(s) consertado(s): %s. Teste com duplo clique!' % ', '.join(consertos)
+    return '[OK] nada para consertar: nenhum atalho apontando para o lugar errado.'
+
+
+def _r67_definir_apelido(nome, pasta=None):
+    nome = (nome or '').strip()
+    if not nome or len(nome) > 30:
+        return '[Aviso]: me da um apelido de ate 30 letras, tipo: me chama de Chefe'
+    if not _r67_definir_config('apelido', nome, pasta=pasta):
+        return '[Aviso]: nao consegui salvar no config.json.'
+    _r67_registrar('CASA', 'apelido definido: ' + nome)
+    return '[OK] combinado! Vou te chamar de %s (fica salvo para as proximas aberturas).' % nome
+
+
+def _r67_qual_meu_nome(pasta=None):
+    apelido = _r67_ler_config('apelido', pasta=pasta)
+    if apelido:
+        return 'Voce e %s (apelido salvo aqui na casa).' % apelido
+    return 'Ainda nao defini seu apelido. Me diz: me chama de <nome>'
+
+
+def _r67_silenciar(minutos=30, agora=None):
+    import datetime as _dt
+    try:
+        minutos = int(minutos)
+    except Exception:
+        minutos = 30
+    minutos = max(1, min(240, minutos))
+    base = agora or _dt.datetime.now()
+    globals().setdefault('_R67_SILENCIO_ATE', [None])[0] = base + _dt.timedelta(minutes=minutos)
+    _r67_registrar('CASA', 'voz silenciada por %d min' % minutos)
+    return '[OK] voz pausada por %d minuto(s). Para liberar antes: permitir voz.' % minutos
+
+
+def _r67_voz_silenciada(agora=None):
+    import datetime as _dt
+    limite = (globals().get('_R67_SILENCIO_ATE') or [None])[0]
+    if not limite:
+        return False
+    if (agora or _dt.datetime.now()) >= limite:
+        globals().setdefault('_R67_SILENCIO_ATE', [None])[0] = None
+        return False
+    return True
+
+
+def _r67_liberar_voz():
+    globals().setdefault('_R67_SILENCIO_ATE', [None])[0] = None
+    return '[OK] voz liberada de novo!'
+
+
+def _r67_sair_e_atualizar(pasta=None, encerrar=None):
+    """r67: fecha NA HORA para o iniciar.bat aplicar a atualizacao pendente."""
+    import sys as _sys
+    pasta = pasta or PASTA_BASE
+    if not os.path.isfile(os.path.join(pasta, '_atualizacao_iniciar.tmp')):
+        return "Nao ha atualizacao de lancador pendente; um 'sair' simples resolve."
+    _r67_registrar('CASA', 'sair e atualizar')
+    print('Fechando para o iniciar.bat aplicar a atualizacao pendente... (ele reabre sozinho)')
+    try:
+        _sys.stdout.flush()
+    except Exception:
+        pass
+    (encerrar or os._exit)(0)
+
+
+def _r67_salvar_config(pasta=None, agora=None):
+    import datetime as _dt
+    pasta = pasta or PASTA_BASE
+    origem = os.path.join(pasta, 'config.json')
+    if not os.path.isfile(origem):
+        return '[Aviso]: nao ha config.json nesta pasta para guardar.'
+    dt = agora or _dt.datetime.now()
+    destino_dir = os.path.join(pasta, 'config_historico')
+    os.makedirs(destino_dir, exist_ok=True)
+    destino = os.path.join(destino_dir, 'config_%s.json' % dt.strftime('%Y%m%d_%H%M%S'))
+    with open(origem, 'rb') as f:
+        dados = f.read()
+    with open(destino, 'wb') as f:
+        f.write(dados)
+    _r67_registrar('CASA', 'config guardado: ' + os.path.basename(destino))
+    return '[OK] configuracao guardada em %s. Para desfazer mudancas: voltar configuracao.' % os.path.basename(destino)
+
+
+def _r67_voltar_config(pasta=None):
+    pasta = pasta or PASTA_BASE
+    pasta_h = os.path.join(pasta, 'config_historico')
+    if not os.path.isdir(pasta_h):
+        return '[Aviso]: nunca guardei configuracao; use salvar configuracao antes de mexer.'
+    lista = sorted(f for f in os.listdir(pasta_h) if f.startswith('config_') and f.endswith('.json'))
+    if not lista:
+        return '[Aviso]: nao ha copia guardada ainda.'
+    origem = os.path.join(pasta_h, lista[-1])
+    with open(origem, 'rb') as f:
+        dados = f.read()
+    with open(os.path.join(pasta, 'config.json'), 'wb') as f:
+        f.write(dados)
+    _r67_registrar('CASA', 'config restaurado: ' + lista[-1])
+    return '[OK] config.json voltou para a copia %s (vale na proxima abertura).' % lista[-1]
+
+
+def _r67_agendar_reexame(intervalo=43200, agendar=None, diagnosticar=None):
+    """r67: repete o exame r64 a cada 12h; so fala se NASCER problema."""
+    if _r67_modo_aviao_ligado():
+        return False
+    diagnosticar = diagnosticar or globals().get('_r64_aviso_de_boot')
+    if not diagnosticar:
+        return False
+
+    def rodar():
+        try:
+            diagnosticar()
+        except Exception:
+            pass
+    if agendar is None:
+        import threading as _th
+
+        def agendar(fun, segundos):
+            timer = _th.Timer(segundos, fun)
+            timer.daemon = True
+            timer.start()
+    agendar(rodar, intervalo)
+    return True
+
+
+def _r67_abertura():
+    """r67: gancho de abertura — apelido na saudacao + re-exame agendado."""
+    try:
+        apelido = _r67_ler_config('apelido')
+        if apelido:
+            print('\n Ola, %s! (apelido da casa)' % str(apelido)[:30])
+        _r67_agendar_reexame()
+    except Exception:
+        pass
+
+
+def _r67_comandos(comando):
+    """r67: LOTE SAUDE + PODER (as 20 ideias) — cada rota responde com FATOS
+    locais ou acoes reversiveis; nada aqui chuta."""
+    import re as _re
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    gatilhos = globals().get('_R67_GATILHOS_ATUALIZAR') or frozenset()
+
+    def feito(rotulo):
+        _r67_registrar('FATOS', rotulo)
+        return True
+
+    # modo aviao BLOQUEIA a atualizacao do proprio agente (antes da r62!)
+    if n in gatilhos and _r67_modo_aviao_ligado():
+        print('[Modo aviao]: atualizacao do agente pulada (esta desligada por voce).')
+        print("Para atualizar de novo: 'desligar modo aviao' e depois 'atualizar agora'.")
+        return True
+    if n in ('criarcheckpoint', 'checkpoint', 'salvarcheckpoint'):
+        print(_r67_checkpoint_criar())
+        return feito('criar checkpoint')
+    if n in ('restaurarcheckpoint', 'voltarcheckpoint', 'restaurarcheck'):
+        print(_r67_checkpoint_restaurar())
+        return feito('restaurar checkpoint')
+    if n in ('mododeaviao', 'modoviao', 'ativarmodoviao', 'ligarmodoviao'):
+        if _r67_definir_config('modo_aviao', True):
+            print("[OK] MODO AVIAO ligado: o agente NAO se atualiza sozinho (nem o re-exame roda).")
+            print("Nada mais muda: conversa, ferramentas e fatos continuam. Sair: 'desligar modo aviao'.")
+            return feito('modo aviao ligado')
+        print('[Aviso]: nao consegui gravar o modo aviao no config.json.')
+        return True
+    if n in ('desligarmodoviao', 'tirarmodoviao', 'modoreal'):
+        _r67_definir_config('modo_aviao', False)
+        print('[OK] modo aviao desligado: atualizacoes e re-exame voltam ao normal.')
+        return feito('modo aviao desligado')
+    if n in ('velocimetro', 'velocimetrodaia', 'velocidadedaia'):
+        print(_r67_velocimetro())
+        return feito('velocimetro da ia')
+    if n in ('testedeestresse', 'estressedomotor', 'testedomotor'):
+        print(_r67_teste_estresse())
+        return feito('teste de estresse do motor')
+    if n in ('diagnosticodopython', 'diagdopython'):
+        print(_r67_diagnostico_python())
+        return feito('diagnostico do python')
+    if n in ('diagnosticododefender', 'diagdodefender', 'defendertemporeal'):
+        print(_r67_diagnostico_defender())
+        return feito('diagnostico do defender')
+    if n in ('diagnosticododisco', 'diagdodisco', 'saudedodisco', 'saudededodisco'):
+        print(_r67_diagnostico_disco())
+        return feito('diagnostico do disco')
+    if n in ('quemeestepc', 'diagnosticodopc', 'diagnosticodocomputador'):
+        print(_r67_quem_e_este_pc())
+        return feito('quem e este pc')
+    if n in ('resumodasessao', 'oquevocefezhoje', 'oquefezhoje'):
+        print(_r67_resumo_da_sessao())
+        return feito('resumo da sessao')
+    if n in ('porquevocefezisso', 'porquefezisso', 'raioxdadecisao'):
+        print(_r67_raio_x())
+        return feito('raio-x da decisao')
+    if n in ('meuspoderes', 'cadernodepoderes'):
+        print(_r67_caderno_de_poderes())
+        return feito('caderno de poderes')
+    if n in ('relatoriodoeconomia', 'economia'):
+        print(_r67_economia())
+        return feito('relatorio de economia')
+    if n.startswith(('traduzerro', 'traduzirerro')) or n in ('oqueeesserro', 'expliicaesseerro'):
+        resto = _re.sub(r'^\s*traduz(ir)?\s+erro\s*:?\s*', '', comando or '', flags=_re.I).strip()
+        print(_r67_traduzir_erro(resto))
+        return feito('traduzir erro')
+    if n in ('conferiratalho', 'conferiratalhodoagente', 'oatalhoestaok'):
+        print(_r67_conferir_atalho())
+        return feito('conferir atalho')
+    if n in ('consertaratalho', 'consertaatalho', 'consertaratalhodoagente'):
+        print(_r67_consertar_atalho())
+        return feito('consertar atalho')
+    if n == 'qualmeunome' or n == 'qualmeuapelido' or n == 'comoeuchamo':
+        print(_r67_qual_meu_nome())
+        return feito('qual meu nome')
+    if n.startswith('mechamade'):
+        m = _re.search(r'me\s+chama\s+de\s+(.+)', comando or '', _re.I)
+        print(_r67_definir_apelido(m.group(1) if m else ''))
+        return feito('definir apelido')
+    if n.startswith(('silenciar', 'naomeperturbe')) or n == 'modosilencio':
+        m = _re.search(r'(\d+)', n)
+        print(_r67_silenciar(m.group(1) if m else 30))
+        return feito('silenciar voz')
+    if n in ('permitirvoz', 'acordarvoz', 'podefalar', 'liberarvoz'):
+        print(_r67_liberar_voz())
+        return feito('liberar voz')
+    if n in ('saireatualizar', 'saieatualiza', 'sairatualizando'):
+        print(_r67_sair_e_atualizar())
+        return True
+    if n in ('salvarconfiguracao', 'salvarconfig', 'backupdeconfiguracao'):
+        print(_r67_salvar_config())
+        return feito('salvar configuracao')
+    if n in ('voltarconfiguracao', 'voltarconfig', 'restaurarconfig', 'desfazerconfiguracao'):
+        print(_r67_voltar_config())
+        return feito('voltar configuracao')
+    return False
+
+
 def _r62_entregar_lancador(baixar=None, pasta=None):
     """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
     backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
@@ -12738,12 +13331,19 @@ def _r62_entregar_lancador(baixar=None, pasta=None):
                 if os.path.isfile(destino):
                     with open(destino, 'r', encoding='utf-8') as f:
                         antigo = f.read()
-                    with open(os.path.join(pasta, 'main_backup.py'), 'w',
-                              encoding='utf-8', newline='') as f:
-                        f.write(antigo)
-                with open(destino, 'w', encoding='utf-8', newline='') as f:
-                    f.write(texto)
-                linhas.append('[OK] main.py em dia (backup em main_backup.py).')
+                    if antigo == texto:
+                        linhas.append('[OK] main.py ja esta em dia (identico, nada trocado).')
+                    else:
+                        with open(os.path.join(pasta, 'main_backup.py'), 'w',
+                                  encoding='utf-8', newline='') as f:
+                            f.write(antigo)
+                        with open(destino, 'w', encoding='utf-8', newline='') as f:
+                            f.write(texto)
+                        linhas.append('[OK] main.py em dia (backup em main_backup.py).')
+                else:
+                    with open(destino, 'w', encoding='utf-8', newline='') as f:
+                        f.write(texto)
+                    linhas.append('[OK] main.py em dia (novo).')
     except Exception as erro:
         linhas.append('[Aviso]: nao consegui baixar o main.py agora (' + type(erro).__name__ + ').')
 
@@ -12759,9 +13359,17 @@ def _r62_entregar_lancador(baixar=None, pasta=None):
         if not pronto:
             linhas.append('[Aviso]: iniciar.bat baixado nao passou na vistoria; mantive o atual.')
         else:
-            with open(os.path.join(pasta, '_atualizacao_iniciar.tmp'), 'wb') as f:
-                f.write(bytes(bruto_bytes))
-            linhas.append('[OK] iniciar.bat novo pronto: ele se aplica SOZINHO quando voce fechar o agente.')
+            caminho_bat = os.path.join(pasta, 'iniciar.bat')
+            igual = False
+            if os.path.isfile(caminho_bat):
+                with open(caminho_bat, 'rb') as f:
+                    igual = f.read() == bytes(bruto_bytes)
+            if igual:
+                linhas.append('[OK] iniciar.bat ja esta em dia (identico, nada trocado).')
+            else:
+                with open(os.path.join(pasta, '_atualizacao_iniciar.tmp'), 'wb') as f:
+                    f.write(bytes(bruto_bytes))
+                linhas.append('[OK] iniciar.bat novo pronto: ele se aplica SOZINHO quando voce fechar o agente.')
     except Exception as erro:
         linhas.append('[Aviso]: nao consegui baixar o iniciar.bat agora (' + type(erro).__name__ + ').')
     return '\n'.join(linhas) if linhas else 'Nada entregue (falha de rede?).'
@@ -15237,6 +15845,8 @@ def processar_atalho_rapido(comando: str) -> bool:
         return True
 
     if _r63_comandos(comando):
+        return True
+    if _r67_comandos(comando):
         return True
     if _r62_comandos(comando):
         return True
@@ -34925,7 +35535,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r66] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r67] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -34961,8 +35571,10 @@ if config.get("abrir_painel_no_inicio"):
         print(" (nao consegui subir o painel web automaticamente)")
 _checar_iniciar_bat()
 _r64_aviso_de_boot()  # r64: exame silencioso; so fala se achar problema
+_r67_abertura()  # r67: apelido + re-exame de 12h agendado
 print("")
-threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
+if not _r67_voz_silenciada():  # r67: silenciar/nao me perturbe pausa a voz
+    threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
 
 while True:
     comando_usuario = input("\nO que o agente deve fazer no PC? ")

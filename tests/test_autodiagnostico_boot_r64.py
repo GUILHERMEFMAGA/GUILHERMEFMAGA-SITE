@@ -69,7 +69,7 @@ class Estrutura(unittest.TestCase):
         loop = texto.index('while True:\n    comando_usuario = input(')
         self.assertLess(gancho, loop)  # antes da primeira pergunta
         self.assertIn('AUTO-DIAGNOSTICO (r64)', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r66]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r67]'), 1)
 
 
 if __name__ == '__main__':

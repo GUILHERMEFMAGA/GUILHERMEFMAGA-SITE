@@ -54,8 +54,8 @@ class LancadorMain(unittest.TestCase):
         gitignore = texto(str(SOURCE.parent / '.gitignore'))
         self.assertIn('__pycache__/', gitignore)
 
-    def test_selo_r66_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r66]', texto(str(SOURCE)))
+    def test_selo_r67_no_banner(self):
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r67]', texto(str(SOURCE)))
 
 
 if __name__ == '__main__':

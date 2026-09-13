@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66 **649 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67 **679 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -773,6 +773,29 @@ ou relatórios reais sem revisão e autorização.
   "bateria"). Conversa normal passa ilesa. **645 testes OK** (+5:
   test_guarda_anti_invencao_r65.py). Selo `-r65`. Não testado no Windows
   real.
+- **r67 — LOTE SAUDE + PODER (as 20 ideias aprovadas de uma vez, estilo lote r52)**:
+  checkpoints ('criar checkpoint' zipa agente/main/bat/config datado;
+  'restaurar checkpoint' extrai o mais recente — o .bat NUNCA na mão, vai para
+  `_atualizacao_iniciar.tmp`); MODO AVIÃO (config 'modo_aviao'; a cadeia r67
+  fica ANTES da r62 e BLOQUEIA 'atualizar agora' enquanto ligado; também
+  desliga o re-exame de 12h); re-exame periódico (`_r67_agendar_reexame` chama
+  a r64 a cada 43200s); velocímetro com FATOS REAIS (lê `_r24_tempos` da r24:
+  tokens/s médio/melhor/pior das últimas gerações); teste de estresse (servidor
+  no ar + modelo + velocímetro); diagnósticos python/defender-tempo-real/disco/
+  quem-e-este-pc (todos DI, PowerShell só leitura); tradutor de erros do
+  Windows (mapa de termos + faro de arquivos da casa, SEM inventar cura);
+  resumo da sessão / raio-x da decisão / relatório de economia (`_R67_REGISTRO`
+  em RAM); caderno de poderes (lê o próprio código); conferir/consertar atalho
+  (scan do Desktop via WScript.Shell; conserta só alvo iniciar.bat fora da
+  pasta certa); apelido ('me chama de X' no config.json + saudação na
+  abertura); silenciar voz (`_R67_SILENCIO_ATE`; a linha do `falar` da abertura
+  agora pergunta `_r67_voz_silenciada()`); 'sair e atualizar' (só com
+  `_atualizacao_iniciar.tmp` pendente; `os._exit` após flush); salvar/voltar
+  configuração (`config_historico/`); r62 HONESTA (main.py/iniciar.bat
+  idênticos ⇒ 'ja esta em dia (identico, nada trocado)' — fim da msg
+  mentirosa). Gancho único `_r67_abertura()` (apelido + agendamento). +30
+  testes (test_lote_r67.py; typo meu numa rota: 'quemeestepc' com 2 e's, não
+  3). **679 testes OK**. Selo `-r67`. Não testado no Windows real.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
