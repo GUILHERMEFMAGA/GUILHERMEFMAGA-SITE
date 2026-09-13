@@ -7797,6 +7797,7 @@ def _menu_ajuda_local():
     print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora - e traz main.py/iniciar.bat em dia (o bat se aplica ao fechar)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
     print("DIAGNOSTICO (r61): 'diagnostico do iniciar' confere os arquivos de arranque de verdade (sem chutar)")
+    print("DEFENDER (r63): 'historico de protecao' mostra as deteccoes reais do Windows Defender (sem inventar)")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
@@ -12583,6 +12584,61 @@ def _r61_comandos(comando):
     return True
 
 
+def _r63_defender_historico(executar=None):
+    """r63: 'historico de protecao' — FATOS do Windows Defender. O usuario
+    perguntou dentro do agente e o modelo bruto respondeu texto generico de
+    apostila; agora o agente le o historico REAL de deteccoes
+    (Get-MpThreatDetection) e explica linha por linha."""
+    if executar is None:
+        import subprocess
+
+        def executar():
+            return subprocess.run(
+                ['powershell', '-NoProfile', '-Command',
+                 'Get-MpThreatDetection | Sort-Object InitialDetectionTime -Descending'
+                 ' | Select-Object -First 10 | ForEach-Object { "{0} | {1}"'
+                 ' -f $_.InitialDetectionTime, ($_.Resources -join ", ") }'],
+                capture_output=True, text=True, timeout=60)
+
+    def janela_fallback(detalhe=''):
+        extra = ' (' + detalhe[:120] + ')' if detalhe else ''
+        return ('[INFO] nao consegui ler o historico do Defender aqui' + extra + '.\n'
+                'Caminho garantido na janela: botao Iniciar > digite'
+                ' "Seguranca do Windows" > Protecao contra virus e ameacas >'
+                ' Historico de protecao (me manda print do que aparecer).')
+
+    try:
+        feito = executar()
+    except Exception as erro:
+        return janela_fallback(type(erro).__name__)
+    texto = (getattr(feito, 'stdout', '') or '').strip()
+    if getattr(feito, 'returncode', 0) != 0:
+        return janela_fallback((getattr(feito, 'stderr', '') or '').strip())
+    if not texto:
+        return ('[OK] nenhuma deteccao registrada no historico do Windows Defender.\n'
+                '(Se este PC usar outro antivirus no lugar do Defender,'
+                ' o historico fica dentro do proprio antivirus.)')
+    linhas = [l.strip() for l in texto.split('\n') if l.strip()]
+    resposta = ['O Defender registrou %d deteccao(oes) (mais recentes primeiro):' % len(linhas)]
+    for l in linhas:
+        resposta.append('  ' + l)
+    resposta.append('Isso e HISTORICO: pode ser antigo ou ja tratado.'
+                    ' Me manda print que eu explico cada linha.')
+    return '\n'.join(resposta)
+
+
+def _r63_comandos(comando):
+    """r63: roteia perguntas de historico do Defender para os FATOS."""
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    if ('historicodeprotecao' in n or 'historicododefender' in n
+            or 'historicodefender' in n):
+        print(_r63_defender_historico())
+        return True
+    return False
+
+
 def _r62_entregar_lancador(baixar=None, pasta=None):
     """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
     backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
@@ -15118,6 +15174,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r63_comandos(comando):
+        return True
     if _r62_comandos(comando):
         return True
     if _r61_comandos(comando):
@@ -34803,7 +34861,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r62] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r63] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
