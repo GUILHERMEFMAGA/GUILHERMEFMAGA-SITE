@@ -134,7 +134,7 @@ class ComandoERoteamento(unittest.TestCase):
         self.assertIn('subprocess.Popen([_sys.executable, origem])', texto)
         self.assertIn('os._exit(0)', texto)
         self.assertIn("'atualizar agora' baixa a versao oficial", texto)  # menu
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r63]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r64]', texto)
 
     def test_caminhos_derivados_de_file(self):
         env = carregar('_r50_caminhos_agente', os=os, __file__='/x/y/agente.py')

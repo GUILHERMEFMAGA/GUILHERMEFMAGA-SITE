@@ -7798,6 +7798,7 @@ def _menu_ajuda_local():
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
     print("DIAGNOSTICO (r61): 'diagnostico do iniciar' confere os arquivos de arranque de verdade (sem chutar)")
     print("DEFENDER (r63): 'historico de protecao' mostra as deteccoes reais do Windows Defender (sem inventar)")
+    print("AUTO-DIAGNOSTICO (r64): cada abertura confere os arquivos de arranque em silencio; se achar problema eu te aviso na hora (cura: 'atualizar agora')")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
@@ -12637,6 +12638,30 @@ def _r63_comandos(comando):
         print(_r63_defender_historico())
         return True
     return False
+
+
+def _r64_aviso_de_boot(diagnosticar=None):
+    """r64: auto-diagnostico de arranque NA ABERTURA — roda o exame r61 em
+    silencio. Tudo certo = nao imprime NADA (abertura limpa e rapida).
+    Problema = avisa ANTES de o usuario esbarrar nele, com a cura pronta.
+    Sem rede e a prova de falha: nunca derruba a abertura."""
+    diagnosticar = diagnosticar or globals().get('_r61_diagnostico_iniciar')
+    if not diagnosticar:
+        return False
+    try:
+        texto = diagnosticar() or ''
+    except Exception:
+        return False
+    problemas = [l.strip() for l in texto.split('\n')
+                 if l.strip().startswith('[PROBLEMA]')]
+    if not problemas:
+        return False
+    aviso = ['ATENCAO: a conferencia de arranque achou %d problema(s):' % len(problemas)]
+    aviso += ['  ' + p for p in problemas]
+    aviso.append("Cura na maioria dos casos: digite 'atualizar agora'."
+                 " Detalhes: 'diagnostico do iniciar'.")
+    print('\n'.join(aviso))
+    return True
 
 
 def _r62_entregar_lancador(baixar=None, pasta=None):
@@ -34861,7 +34886,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r63] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r64] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -34896,6 +34921,7 @@ if config.get("abrir_painel_no_inicio"):
     except Exception:
         print(" (nao consegui subir o painel web automaticamente)")
 _checar_iniciar_bat()
+_r64_aviso_de_boot()  # r64: exame silencioso; so fala se achar problema
 print("")
 threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
 
