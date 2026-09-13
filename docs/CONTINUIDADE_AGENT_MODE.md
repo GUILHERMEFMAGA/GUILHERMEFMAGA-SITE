@@ -710,8 +710,10 @@ ou relatórios reais sem revisão e autorização.
   regex (sem literal — a 1ª tentativa do patch quebrou o próprio selo-bump por
   duplicar o literal, e a GUARDA DE NOMES r55 pegou `re` sem import: dois
   sistemas de segurança trabalhando). Veredito com contagem de problemas +
-  cura recomendada. **622 testes OK** (+6). Selo `-r61`. Não testado no
-  Windows real.
+  cura recomendada. **622 testes OK** (+6). Selo `-r61`. PROVADO no Windows real no PC do usuário: o
+  diagnóstico leu a pasta `agente_pc` e apontou EXATAMENTE os 2 fatos (BAT
+  com LF da cirurgia manual no Bloco de Notas + main.py nunca entregue pela
+  r56) — zero chute.
 - **r62 — 'ATUALIZAR AGORA' COMPLETO (a descoberta do usuário no resgate)**: a
   usuária(o) resolveu na mão (colou o BAT novo pelo Bloco de Notas) e apontou
   o buraco: eu atualizava o agente.py pela conversa mas NÃO o
@@ -723,7 +725,13 @@ ou relatórios reais sem revisão e autorização.
   PRÓPRIO BAT em execução se aplicar SOZINHO ao fechar); depois delega o
   agente.py à r50. Falha de rede/vistoria não troca nada. Único caso manual
   remanescente: BAT TOTALMENTE ausente. **629 testes OK** (+7:
-  test_atualizar_tudo_r62.py). Selo `-r62`. Não testado no Windows real.
+  test_atualizar_tudo_r62.py). Selo `-r62`. **PROVADO no Windows real (e2e),
+  RESGATE `agente_pc` ENCERRADO**: diagnóstico apontou os 2 problemas;
+  'atualizar agora' (vindo do agente r56, sem a r62!) entregou main.py via
+  update do próprio BAT + r62 entregou main.py/BAT pela conversa; o BAT
+  aplicou-se SOZINHO ao fechar ("Lancador main.py em dia." é dele, linha
+  102); diagnóstico final: **Total de problemas: 0** (CRLF OK, r59+ OK,
+  escudo OK, main.py com integridade OK).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
