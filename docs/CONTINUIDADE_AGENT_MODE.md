@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59 **615 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60 **616 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -687,6 +687,18 @@ ou relatórios reais sem revisão e autorização.
   instável no cmd com blocos/labels, possivelmente ligado às bizarrices do
   resgate). **615 testes OK** (leitura de teste usa newlines universais;
   CRLF não afeta). Não testado no Windows real.
+- **r60 — NUNCA MAIS "PISCA E SOME" + mistério da pasta real**: o usuário
+  revelou que a pasta do agente é uma SUBPASTA `agente_pc` (não
+  C:\Users\gfmag) — todo o resgate anterior foi para a pasta errada
+  (assunção minha), o que explica o agente aberto com 'padrao' (config novo)
+  e sem IA local (GGUF mora na pasta certa); o iniciar.bat DE agente_pc
+  continua antigo (com o bug de elevate r58-) → duplo clique = falha de admin
+  silenciosa = janela pisca e some. Fix defensivo: em `:pedir_admin`,
+  `if errorlevel 1 (` após o Start-Process → "FALHOU o pedido de
+  Administrador" + `pause` — qualquer falha de elevação deixa o erro visível.
+  Escudo do teste afiado: REM dentro da seção de admin não pode ter
+  parêntese NENHUM (os da r59 reescritos); `) else (` banido na seção.
+  **616 testes OK**. Selo `-r60`. Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
