@@ -672,6 +672,21 @@ ou relatórios reais sem revisão e autorização.
   `%%20`, sem linha só de `(`/`)` fora de REM, `%R58_ARGS%` no Start-Process.
   **615 testes OK** (test_elevate_r58.py reescrito p/ r59). Selo `-r59`. Não
   testado no Windows real.
+- **r59+ — RESGATE CONCLUÍDO NO PC + proteções novas + BAT em CRLF**: agente
+  r57 NO AR via resgate manual (`type nul > .ultima_verificacao` +
+  `python main.py`). O print revelou o estrago do evento de disco: IA LOCAL
+  não detectada (motor/GGUF sumido → ramo de nuvem no banner),
+  `nivel_permissao` resetado para 'padrao' (config.json recriado); rodizio de
+  nuvem saudável (12 IAs — chaves setx sobreviveram). Surgiram na árvore duas
+  proteções novas (autor provável: usuário via interface do GitHub):
+  **.gitignore** (chaves.txt/.env/*.key/config.json/memórias/histórico —
+  reforça a regra "credenciais fora do GitHub") e **.gitattributes com
+  `*.bat -text`** (impede normalização de fim de linha em BAT). Aproveitando:
+  iniciar.bat convertido para **CRLF canônico** (com `-text` o git preserva
+  byte a byte; raw URLs passam a servir o BAT com CRLF — LF em BAT é
+  instável no cmd com blocos/labels, possivelmente ligado às bizarrices do
+  resgate). **615 testes OK** (leitura de teste usa newlines universais;
+  CRLF não afeta). Não testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
