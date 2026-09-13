@@ -742,7 +742,11 @@ ou relatórios reais sem revisão e autorização.
   detecção"; erro = ensina o caminho da janela (Iniciar > Segurança do Windows
   > Proteção contra vírus e ameaças > Histórico de proteção) + detalhe; com
   detecções = lista data|arquivo + aviso de que é HISTÓRICO. **635 testes OK**
-  (+6: test_defender_r63.py). Selo `-r63`. Não testado no Windows real.
+  (+6: test_defender_r63.py). Selo `-r63`. **PROVADA e2e no Windows real:**
+  respondeu com 3 detecções reais (OnlineFix64.dll / EOSSDK-Win64-Shipping.dll /
+  winmm.dll de um jogo em Downloads, 29/08) — NADA do agente. VEREDITO DO
+  INQUÉRITO: o Defender é INOCENTE quanto ao iniciar.bat que "sumiu"; o sumiço
+  era a própria confusão da pasta velha (BAT quebrado piscava e fechava).
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
