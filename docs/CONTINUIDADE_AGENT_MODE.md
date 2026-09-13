@@ -755,8 +755,10 @@ ou relatórios reais sem revisão e autorização.
   ('atualizar agora' / 'diagnostico do iniciar') ANTES de o usuário esbarrar
   nele. À prova de falha: exceção do exame jamais derruba a abertura; sem
   rede; sem rota de conversa nova (o exame já tem o comando r61). **640
-  testes OK** (+5: test_autodiagnostico_boot_r64.py). Selo `-r64`. Não
-  testado no Windows real.
+  testes OK** (+5: test_autodiagnostico_boot_r64.py). Selo `-r64`.
+  **PROVADA e2e no Windows real:** cascata r63→r64 via 'atualizar agora' +
+  abertura SAUDÁVEL em silêncio total (o exame rodou e nada falou — como
+  desenhado); 3ª cascata seguida do usuário sem resgate manual.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
