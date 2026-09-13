@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71 **749 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72 **757 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -905,6 +905,21 @@ ou relatórios reais sem revisão e autorização.
   na mesma sessão. Cascata r64→r71 num comando; segundo 'atualizar agora'
   mostrou as mensagens honestas r67 ("ja esta em dia (identico, nada
   trocado)") + requirements.txt r71.
+- **r72 — ACABAMENTO DA HONESTIDADE (opção A do usuário; resposta pessoal sem
+  fato ≠ papo furado)**: perguntas pessoais (marcadores meu/minha/meus/minhas
+  ou prefixos ondeeu/aondeeu/quemeu, com interrogação: '?' ou prefixos
+  qual/oq/oque/quem/onde/aonde/quando/quanto/como) que NÃO casaram com fato
+  ensinado e NÃO têm rota recebem a aula de ensinar: "[Honestidade r72]:
+  isso eu ainda NAO sei — voce nunca me ensinou... conhecimento ensinar
+  <assunto>: <fato>" (assunto extraído do 'meu <X>' do texto cru; conta
+  tópicos guardados). ENXERTO NO FIM do `_processar_cerebro_local` (depois
+  do `_despachar_ferramenta_local`) — por isso NÃO rouba rotas/ferramentas
+  ("qual meu ip", "limpa meu pc", "abre minha pasta" passam ilesos); sem
+  interrogação = não intercepta; 'menu' excluído (contém 'meu'!); kill-switch
+  config 'dica_de_ensinar': false. Aula de teste: a função lê o config DA
+  CASA (PASTA_BASE) — no teste, simular o config injetando o leitor.
+  +7 testes (test_honestidade_r72.py). **757 testes OK**. Selo `-r72`. Não
+  testado no Windows real.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
