@@ -7844,6 +7844,7 @@ def _menu_ajuda_local():
     print("PROTOTIPO r70 (exclusivo do dono desta pasta): respostas com revisao de 2a passada | fatos antes do modelo | 'o que voce sabe sobre X' | 'modo detalhado' | dica do proximo comando")
     print("CEREBRO r71: o que voce ensina SOBREVIVE ao fechar o agente (cerebro.json) | 'listar aprendizado' | 'esquecer <frase>'")
     print("HONESTIDADE (r72): pergunta sobre VOCE que eu nao sei => eu te ensino a me ensinar ('conhecimento ensinar...') em vez de papo furado (kill-switch: 'dica_de_ensinar': false)")
+    print("BOAS-VINDAS (r73): quando voce volta depois de um tempo, eu percebo e saudo com o resumo do seu cerebro (kill-switch: 'boas_vindas': false)")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -14988,6 +14989,74 @@ def _r72_honestidade(n, bruto=None):
             '  ex.: conhecimento ensinar meu %s: ...\n'
             'Depois disso eu respondo na hora, com a fonte — e fica salvo mesmo fechando o agente.'
             % (onde, assunto))
+
+
+def _r73_arquivo_sessao(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'sessao.json')
+
+
+def _r73_duracao_legivel(segundos):
+    s = max(0, int(segundos))
+    if s < 120:
+        return 'poucos minutos'
+    if s < 7200:
+        return '%d minutos' % (s // 60)
+    if s < 172800:
+        return '%d hora(s)' % max(1, s // 3600)
+    return '%d dia(s)' % max(1, s // 86400)
+
+
+def _r73_boas_vindas(pasta=None):
+    """r73 (melhoria renovadora): BEM-VINDO DE VOLTA — o agente percebe a sua
+    falta e sauda com o estado do cerebro persistente (r71). Grava a hora desta
+    abertura em sessao.json; na proxima abertura calcula quanto tempo voce
+    ficou fora. Silencioso na 1a vez e em reaberturas rapidas (< 1h).
+    Kill-switch: config 'boas_vindas': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('boas_vindas', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    import datetime as _dt
+    caminho = _r73_arquivo_sessao(pasta)
+    agora = _dt.datetime.now()
+    anterior = None
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            anterior = json.load(f).get('ultima_abertura')
+    except Exception:
+        anterior = None
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump({'ultima_abertura': agora.isoformat()}, f, ensure_ascii=1)
+    except Exception:
+        pass
+    if not anterior:
+        return None
+    try:
+        gap = (agora - _dt.datetime.fromisoformat(str(anterior))).total_seconds()
+    except Exception:
+        return None
+    if gap < 3600:
+        return None
+    st = globals().get('_R69_NUCLEO') or {}
+    conhecimento = st.get('conhecimento') or {}
+    aprendidas = st.get('aprendidas') or {}
+    if not conhecimento and not aprendidas:
+        return ('BEM-VINDO DE VOLTA (r73): fazem ' + _r73_duracao_legivel(gap)
+                + ' que voce nao aparece. (Seu cerebro ainda esta vazio;'
+                  ' "conhecimento ensinar <assunto>: <fato>" enche ele.)')
+    if conhecimento:
+        ultimo = list(conhecimento)[-1]
+        return ('BEM-VINDO DE VOLTA (r73): fazem ' + _r73_duracao_legivel(gap)
+                + ' que voce nao aparece. Seu cerebro continua inteiro: '
+                + '%d topico(s) ensinado(s), %d padrao(oes) aprendido(s). '
+                % (len(conhecimento), len(aprendidas))
+                + 'A ultima coisa que voce me ensinou foi "' + str(ultimo) + '".')
+    return ('BEM-VINDO DE VOLTA (r73): fazem ' + _r73_duracao_legivel(gap)
+            + ' que voce nao aparece. Seu cerebro continua inteiro: '
+            + '%d padrao(oes) aprendido(s).' % len(aprendidas))
 
 
 def _r62_entregar_lancador(baixar=None, pasta=None):
@@ -37276,7 +37345,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r72] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r73] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -37314,6 +37383,12 @@ _checar_iniciar_bat()
 _r64_aviso_de_boot()  # r64: exame silencioso; so fala se achar problema
 _r67_abertura()  # r67: apelido + re-exame de 12h agendado
 _r71_restaurar_na_abertura()  # r71: cerebro persistente (fatos/padroes sobrevivem ao fechar)
+_bemvindo73 = globals().get('_r73_boas_vindas')
+if _bemvindo73:
+    try:
+        _bemvindo73()
+    except Exception:
+        pass  # r73: boas-vindas nunca derrubam a abertura
 print("")
 if not _r67_voz_silenciada():  # r67: silenciar/nao me perturbe pausa a voz
     threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
