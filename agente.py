@@ -7794,7 +7794,7 @@ def _menu_ajuda_local():
     print("PRECISAO LOCAL: avaliar precisao local | ver ultima avaliacao local")
     print("CONFIABILIDADE: parar geracao local | refazer com penalidade (apos aviso de colapso)")
     print("VELOCIDADE: velocidade ia local | 'turbo ia local' teto de 300 tokens | 'instantaneo ia local' teto de 180 (JSON/ideias intocados) | 'estatisticas cerebro' mostra instantaneo vs gerado | 'oi' e afins sao instantaneos")
-    print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora (sem fechar nada)")
+    print("ATUALIZACAO: 'atualizar agora' baixa a versao oficial, valida, faz backup e reinicia na hora - e traz main.py/iniciar.bat em dia (o bat se aplica ao fechar)")
     print("IA LOCAL EXTREMA (r51): respostas cortadas continuam sozinhas + modelo sempre quente | NOVAS: gravar_tela_gif, baixar_video, marca_dagua, criptografar_arquivo")
     print("DIAGNOSTICO (r61): 'diagnostico do iniciar' confere os arquivos de arranque de verdade (sem chutar)")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
@@ -12583,6 +12583,95 @@ def _r61_comandos(comando):
     return True
 
 
+def _r62_entregar_lancador(baixar=None, pasta=None):
+    """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
+    backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
+    BAT em execucao se aplicar SOZINHO quando o agente fechar - nunca
+    sobrescrevemos um BAT rodando na mao). Valida tamanho/marcadores/CRLF;
+    qualquer falha NAO troca nada."""
+    pasta = pasta or PASTA_BASE
+    if baixar is None:
+        import random
+        import urllib.request
+        base = ('https://raw.githubusercontent.com/GUILHERMEFMAGA/'
+                'GUILHERMEFMAGA-SITE/arena/01a08d8e-guilhermefmaga-site/')
+
+        def baixar(nome):
+            with urllib.request.urlopen(base + nome + '?cache=%d'
+                                        % random.randint(100000, 999999),
+                                        timeout=20) as resposta:
+                return resposta.read()
+    linhas = []
+
+    def como_texto(bruto):
+        if isinstance(bruto, (bytes, bytearray)):
+            return bytes(bruto).decode('utf-8', errors='replace')
+        return str(bruto)
+
+    # main.py: troca direta (nao esta em execucao)
+    try:
+        bruto = baixar('main.py')
+        texto = como_texto(bruto)
+        if len(texto) < 100:
+            linhas.append('[Aviso]: main.py baixado estranho; mantive o atual.')
+        else:
+            try:
+                compile(texto, 'main.py', 'exec')
+            except Exception:
+                linhas.append('[Aviso]: main.py baixado nao compila; mantive o atual.')
+            else:
+                destino = os.path.join(pasta, 'main.py')
+                if os.path.isfile(destino):
+                    with open(destino, 'r', encoding='utf-8') as f:
+                        antigo = f.read()
+                    with open(os.path.join(pasta, 'main_backup.py'), 'w',
+                              encoding='utf-8', newline='') as f:
+                        f.write(antigo)
+                with open(destino, 'w', encoding='utf-8', newline='') as f:
+                    f.write(texto)
+                linhas.append('[OK] main.py em dia (backup em main_backup.py).')
+    except Exception as erro:
+        linhas.append('[Aviso]: nao consegui baixar o main.py agora (' + type(erro).__name__ + ').')
+
+    # iniciar.bat: via .tmp (o BAT em execucao se aplica ao fechar)
+    try:
+        bruto = baixar('iniciar.bat')
+        texto = como_texto(bruto)
+        bruto_bytes = bruto if isinstance(bruto, (bytes, bytearray)) else str(bruto).encode('utf-8')
+        crlf = bruto_bytes.count(b'\r\n')
+        lf_solto = bruto_bytes.count(b'\n') - crlf
+        pronto = (len(texto) >= 800 and ':pedir_admin' in texto and 'R58_ARGS' in texto
+                  and ':quebrou' in texto and crlf >= 50 and lf_solto == 0)
+        if not pronto:
+            linhas.append('[Aviso]: iniciar.bat baixado nao passou na vistoria; mantive o atual.')
+        else:
+            with open(os.path.join(pasta, '_atualizacao_iniciar.tmp'), 'wb') as f:
+                f.write(bytes(bruto_bytes))
+            linhas.append('[OK] iniciar.bat novo pronto: ele se aplica SOZINHO quando voce fechar o agente.')
+    except Exception as erro:
+        linhas.append('[Aviso]: nao consegui baixar o iniciar.bat agora (' + type(erro).__name__ + ').')
+    return '\n'.join(linhas) if linhas else 'Nada entregue (falha de rede?).'
+
+
+def _r62_comandos(comando):
+    """r62: 'atualizar agora' completo — primeiro entrega main.py/iniciar.bat,
+    depois delega a atualizacao do agente.py ao fluxo r50."""
+    n = _norm_pt(comando)
+    if n.startswith('atualizaragora') or n.startswith('atualizaragente') or n == 'atualizar':
+        entrega = globals().get('_r62_entregar_lancador')
+        if entrega:
+            try:
+                print(entrega())
+            except Exception as erro:
+                print('[Aviso]: entrega do main.py/iniciar.bat falhou (' + type(erro).__name__
+                      + '); atualizo so o agente.')
+        proximo = globals().get('_r50_comandos')
+        if proximo:
+            return proximo(comando)
+        return False
+    return False
+
+
 def _r50_caminhos_agente():
     """Caminhos (agente.py, backup) da copia RODANDO, derivados de __file__."""
     origem = os.path.abspath(globals().get('__file__') or 'agente.py')
@@ -15029,6 +15118,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r23_comandos(comando):
         return True
 
+    if _r62_comandos(comando):
+        return True
     if _r61_comandos(comando):
         return True
     if _r53_comandos(comando):
@@ -34712,7 +34803,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r61] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r62] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

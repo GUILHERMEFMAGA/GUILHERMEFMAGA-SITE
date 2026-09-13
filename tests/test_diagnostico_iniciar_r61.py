@@ -21,7 +21,7 @@ def pasta_saudavel():
     io.open(os.path.join(pasta, 'iniciar.bat'), 'wb').write(BAT_SAUDAVEL.encode('utf-8'))
     io.open(os.path.join(pasta, 'main.py'), 'w', encoding='utf-8').write(MAIN_SAUDAVEL)
     agente = ('# agente falso\n' + '# preenchimento\n' * 6000
-              + "print('[Motor e avaliacao local 2026-09-11-r61]')\n")
+              + "print('[Motor e avaliacao local 2026-09-11-r62]')\n")
     io.open(os.path.join(pasta, 'agente.py'), 'w', encoding='utf-8').write(agente)
     return pasta
 
@@ -33,7 +33,7 @@ class DiagnosticoSaudavel(unittest.TestCase):
         self.assertIn('Diagnostico de arranque em:', saida)
         self.assertNotIn('[PROBLEMA]', saida)
         self.assertIn('Tudo saudavel', saida)
-        self.assertIn('versao do agente.py: r61', saida)
+        self.assertIn('versao do agente.py: r62', saida)  # selo evolui na r62
 
 
 class DiagnosticoDeProblemas(unittest.TestCase):
@@ -94,7 +94,7 @@ class Estrutura(unittest.TestCase):
         self.assertLess(texto.index('if _r61_comandos(comando):'),
                         texto.index('if _r53_comandos(comando):'))
         self.assertIn("DIAGNOSTICO (r61): 'diagnostico do iniciar'", texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r61]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r62]'), 1)
 
 
 if __name__ == '__main__':
