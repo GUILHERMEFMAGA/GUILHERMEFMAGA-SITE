@@ -845,7 +845,14 @@ ou relatórios reais sem revisão e autorização.
   pegou); _r67_ler/definir_config com PASTA_BASE fallback; _norm_pt em
   ambiente sem _garantir_tools desliga anti-evasiva (correto: sem tools não
   há o que corrigir). +13 testes (test_fora_do_padrao_r70.py). **737 testes
-  OK**. Selo `-r70`. Não testado no Windows real.
+  OK**. Selo `-r70`. Não testado no Windows real. **POSICIONAMENTO HONESTO
+  (dito ao usuário, registrdo aqui para nenhum agente futuro prometer além):
+  a IA local NÃO supera Claude/Perplexity em conhecimento geral — um GGUF de
+  PC é pequeno e eles têm web ao vivo; nossa vantagem real é: fatos DO PC do
+  usuário (que eles não têm), resposta instantânea pelo que ele ensinou,
+  privacidade total, zero custo/cota, offline, e EXECUTAR ações de verdade.
+  Caminho honesto para "sabe de tudo": saber TUDO sobre O MUNDO DO USUÁRIO
+  (A2 da lista-80: índice de conteúdo + RAG local dos documentos dele).
 - **r68 — LOTE EXTREMO (as 30 ideias da lista-30; pré-checagem anti-duplicata
   SUBSTITUIU 3: pomodoro (ferramenta 19), rastreio de hábitos
   (rastreador_habitos) e área de transferência (area_transferencia) JÁ
