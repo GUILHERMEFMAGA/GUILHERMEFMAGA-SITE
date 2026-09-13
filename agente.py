@@ -7800,6 +7800,7 @@ def _menu_ajuda_local():
     print("DEFENDER (r63): 'historico de protecao' mostra as deteccoes reais do Windows Defender (sem inventar)")
     print("AUTO-DIAGNOSTICO (r64): cada abertura confere os arquivos de arranque em silencio; se achar problema eu te aviso na hora (cura: 'atualizar agora')")
     print("HONESTIDADE (r65): 'o agente nao abre/funciona' e falhas da casa eu respondo com FATOS do disco - nunca com chute")
+    print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
@@ -12770,7 +12771,9 @@ def _r62_comandos(comando):
     """r62: 'atualizar agora' completo — primeiro entrega main.py/iniciar.bat,
     depois delega a atualizacao do agente.py ao fluxo r50."""
     n = _norm_pt(comando)
-    if n.startswith('atualizaragora') or n.startswith('atualizaragente') or n == 'atualizar':
+    if n in ('atualizaragora', 'atualizaagora', 'atualisaagora', 'atualisaragora', 'atualiseagora',
+             'atualizaroagente', 'atualizeoagente', 'atualizaragente',
+             'atualizagente', 'atualiza', 'atualizar', 'atualize'):
         entrega = globals().get('_r62_entregar_lancador')
         if entrega:
             try:
@@ -12856,7 +12859,9 @@ def _r50_comandos(comando):
     """r50: 'atualizar agora' (ou 'atualizar agente' / 'atualizar') — a
     autoatualizacao oficial rodando pela conversa, sem fechar nem reabrir nada."""
     n = _norm_pt(comando)
-    if n.startswith('atualizaragora') or n.startswith('atualizaragente') or n == 'atualizar':
+    if n in ('atualizaragora', 'atualizaagora', 'atualisaagora', 'atualisaragora', 'atualiseagora',
+             'atualizaroagente', 'atualizeoagente', 'atualizaragente',
+             'atualizagente', 'atualiza', 'atualizar', 'atualize'):
         print(_r50_atualizar_agente())
         return True
     return False
@@ -34920,7 +34925,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r65] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r66] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
