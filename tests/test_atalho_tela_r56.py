@@ -70,7 +70,7 @@ class Estrutura(unittest.TestCase):
     def test_menu_selo_e_guardas(self):
         with io.open('agente.py', encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r69]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r70]', texto)
         self.assertIn("'atalho na tela principal' abre a raiz", texto)
         self.assertIn("'tela principal': ('C:", texto)
         self.assertIn("def _r53_parece_caminho", texto)

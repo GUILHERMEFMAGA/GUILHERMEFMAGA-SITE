@@ -68,7 +68,7 @@ class Estrutura(unittest.TestCase):
         self.assertLess(texto.index('if _r65_comandos(comando):'),
                         texto.index('if _r53_comandos(comando):'))
         self.assertIn('HONESTIDADE (r65)', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r69]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r70]'), 1)
 
 
 if __name__ == '__main__':

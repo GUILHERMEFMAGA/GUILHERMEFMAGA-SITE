@@ -7841,6 +7841,7 @@ def _menu_ajuda_local():
     print("LOTE PODER (r67): 'resumo da sessao' | 'raio-x da decisao' | 'meus poderes' | 'economia' | 'traduz erro <erro>' | 'conferir atalho' | 'me chama de <nome>' | 'silenciar' | 'sair e atualizar' | 'salvar/voltar configuracao'")
     print("LOTE EXTREMO (r68): 'cerebro indexar'/'onde esta <arquivo>' | 'cacar duplicatas' | 'comparar pastas' | 'por que o pc esta lento' | 'quiz' | 'raio-x do pdf' | 'o que cozinhar' | 'organizar downloads'/'desfazer organizacao' | 'prova' | 'rpg comecar' | 'aniversarios' | 'me mostra seu codigo' (e mais no ajuda)")
     print("NUCLEO r69: 'nucleo' | 'diagnostico do cerebro' | 'conhecimento ensinar topico: fato' | 'aprender palavras' | 'confianca <pergunta>' — o cerebro aprende, reflete e se audita sozinho")
+    print("PROTOTIPO r70 (exclusivo do dono desta pasta): respostas com revisao de 2a passada | fatos antes do modelo | 'o que voce sabe sobre X' | 'modo detalhado' | dica do proximo comando")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -7960,6 +7961,17 @@ def _processar_cerebro_local(comando: str) -> bool:
             _nota = _aviso_fase(n)
             if _nota:
                 print(_nota)
+        except Exception:
+            pass
+
+    # r70: FATO ANTES DO MODELO — casou com o que voce ensinou? responde na hora.
+    _fato70 = globals().get('_r70_responder_por_fato')
+    if _fato70:
+        try:
+            _resposta_fato = _fato70(comando)
+            if _resposta_fato:
+                print(_resposta_fato)
+                return True
         except Exception:
             pass
 
@@ -13790,7 +13802,7 @@ def _r67_registrar(tag, evento):
 
 
 def _r67_ler_config(chave, pasta=None, padrao=None):
-    pasta = pasta or PASTA_BASE
+    pasta = pasta or globals().get('PASTA_BASE') or os.getcwd()
     caminho = os.path.join(pasta, 'config.json')
     if not os.path.isfile(caminho):
         return padrao
@@ -13804,7 +13816,7 @@ def _r67_ler_config(chave, pasta=None, padrao=None):
 
 def _r67_definir_config(chave, valor, pasta=None):
     """r67: escreve UMA chave no config.json da casa (preserva o resto)."""
-    pasta = pasta or PASTA_BASE
+    pasta = pasta or globals().get('PASTA_BASE') or os.getcwd()
     caminho = os.path.join(pasta, 'config.json')
     dados = {}
     if os.path.isfile(caminho):
@@ -14273,6 +14285,14 @@ def _r67_comandos(comando):
 
     def feito(rotulo):
         _r67_registrar('FATOS', rotulo)
+        _dica70 = globals().get('_r70_dica_de_proximo')  # r70: sugere o proximo
+        if _dica70:
+            try:
+                _d = _dica70(rotulo)
+                if _d:
+                    print(_d)
+            except Exception:
+                pass
         return True
 
     # modo aviao BLOQUEIA a atualizacao do proprio agente (antes da r62!)
@@ -14434,10 +14454,25 @@ def _r69_injetar_conhecimento(mensagens):
     if globals().get('_r69_nonce'):
         return
     st = _r69_instalar_estado()
-    fatos = []
+    _tokenizar70 = globals().get('_r70_tokenizar')
+    _consulta70 = set()
+    for _m in reversed(mensagens):
+        if _m.get('role') == 'user':
+            if _tokenizar70:
+                _consulta70 = _tokenizar70(_m.get('content') or '')
+            break
+    _candidatos70 = []
     for topico, itens in st['conhecimento'].items():
         for entrada in itens:
-            fatos.append('%s: %s' % (topico, entrada['texto'][:80]))
+            _linha70 = '%s: %s' % (topico, entrada['texto'][:80])
+            _nota70 = 0.0
+            if _tokenizar70 and _consulta70:
+                _toks70 = _tokenizar70(_linha70)
+                if _toks70:
+                    _nota70 = len(_toks70 & _consulta70) / (len(_toks70) ** 0.5)
+            _candidatos70.append((_nota70, _linha70))
+    _candidatos70.sort(key=lambda x: -x[0])
+    fatos = [linha for _, linha in _candidatos70]
     for padrao, rotulo in st['aprendidas'].items():
         fatos.append('quando o usuario diz "%s", intenção: %s' % (padrao, rotulo))
     if fatos:
@@ -14626,6 +14661,151 @@ def _r69_comandos(comando):
         import re as _re
         resto = _re.sub(r'^confianca\s*(de\s*)?', '', comando or '', flags=_re.I).strip()
         print(_r69_confianca(resto or (globals().get('_ULTIMO_COMANDO') or {}).get('texto', '')))
+        return True
+    return False
+
+
+def _r70_tokenizar(texto):
+    """r70: tokens normalizados (>=3 letras) para o RAG caseiro."""
+    _norm = globals().get('_norm_pt')
+    if not _norm:
+        return set()
+    saida = set()
+    for bruto in (texto or '').split():
+        palavra = _norm(bruto)
+        if len(palavra) >= 3:
+            saida.add(palavra)
+    return saida
+
+
+def _r70_recuperar_fatos(pergunta, st=None):
+    """r70: RAG local MINIMO (TF-IDF de pobre: overlap/sqrt) — ranqueia os
+    fatos ensinados contra a pergunta. Zero rede, zero embeddings."""
+    st = st or globals().get('_R69_NUCLEO') or {}
+    tokenizar = globals().get('_r70_tokenizar')
+    if not tokenizar:
+        return []
+    consulta = tokenizar(pergunta or '')
+    if not consulta:
+        return []
+    pares = []
+    for topico, itens in (st.get('conhecimento') or {}).items():
+        for entrada in itens:
+            linha = '%s: %s' % (topico, entrada.get('texto', ''))
+            toks = tokenizar(linha)
+            if not toks:
+                continue
+            nota = len(toks & consulta) / (len(toks) ** 0.5)
+            pares.append((topico, entrada.get('texto', ''), round(nota, 3)))
+    pares.sort(key=lambda x: -x[2])
+    return pares[:5]
+
+
+def _r70_responder_por_fato(pergunta, st=None):
+    """r70 (FORA DO PADRAO): se a pergunta casa com fato ensinado, responde
+    NA HORA com fonte — o modelo nem e chamado. Zero invencao, zero espera."""
+    pares = _r70_recuperar_fatos(pergunta, st=st)
+    if not pares or pares[0][2] < 0.34:
+        return None
+    topico, texto, _ = pares[0]
+    linhas = ['[Resposta por FATO ensinado — fonte: "%s"]: %s' % (topico, texto)]
+    for topico2, texto2, _ in pares[1:3]:
+        linhas.append('  relacionado (%s): %s' % (topico2, texto2))
+    linhas.append('(respondi na hora pelo que VOCE me ensinou; nada de invencao)')
+    return '\n'.join(linhas)
+
+
+def _r70_revisar(texto, tem_ferramentas=None):
+    """r70: REVISOR DE 2a PASSADA — toda resposta do modelo local passa aqui:
+    anti-evasiva (o GGUF adora dizer 'nao tenho acesso' — mentira nesta casa),
+    anti-repeticao de frase, aviso de corte. Devolve (texto, notas)."""
+    t = (texto or '').strip()
+    notas = []
+    if not t:
+        return t, ['(o modelo veio em branco; reformule ou tente de novo)']
+    if tem_ferramentas is None:
+        tem_ferramentas = bool(globals().get('_garantir_tools'))
+    baixo = t.lower()
+    evasivas = ('nao tenho acesso', 'sou apenas uma ia', 'como uma ia',
+                'nao tenho a capacidade', 'nao posso ajudar com isso')
+    if tem_ferramentas and any(e in baixo for e in evasivas):
+        notas.append('[Correcao do nucleo r70]: eu TENHO acesso real a este PC'
+                     ' (milhares de acoes locais). Se pediu algo do PC, repita'
+                     ' que eu executo de verdade.')
+    import re as _re
+    partes = [p.strip() for p in _re.split(r'(?<=[.!?])\s+', t) if p.strip()]
+    vistas, unicas = set(), []
+    for p in partes:
+        chave = p.lower()[:80]
+        if chave in vistas:
+            continue
+        vistas.add(chave)
+        unicas.append(p)
+    if len(unicas) != len(partes):
+        notas.append('(removi frase(s) repetida(s))')
+    saida = ' '.join(unicas) if len(unicas) != len(partes) else t
+    # corte REAL ja e detectado pela r51 (finish_reason + auto_continuar);
+    # heuristica de pontuacao daria falso positivo — fica de fora de proposito.
+    return saida, notas
+
+
+def _r70_dica_de_proximo(ultimo=None):
+    """r70 (FORA DO PADRAO): aprende a SEQUENCIA dos seus comandos e sugere o
+    proximo — bigramas sobre o registro de FATOS da sessao (r67)."""
+    registro = globals().get('_R67_REGISTRO') or []
+    rotulos = [rot for _, tag, rot in registro if tag == 'FATOS']
+    if ultimo is not None and rotulos and rotulos[-1] == ultimo:
+        rotulos = rotulos[:-1]
+    if len(rotulos) < 2:
+        return None
+    seguintes = {}
+    for a, b in zip(rotulos, rotulos[1:]):
+        seguintes.setdefault(a, {})
+        seguintes[a][b] = seguintes[a].get(b, 0) + 1
+    chave = ultimo if ultimo is not None else rotulos[-1]
+    opcoes = seguintes.get(chave) or {}
+    if not opcoes:
+        return None
+    proximo, vezes = max(opcoes.items(), key=lambda x: x[1])
+    return '(dica do nucleo r70: depois de "%s" voce costuma pedir "%s")' % (chave, proximo)
+
+
+def _r70_sabe_sobre(alvo=None):
+    """r70: 'o que voce sabe sobre X' — lista os fatos ensinados casando."""
+    alvo = (alvo or '').strip().lower()
+    st = globals().get('_R69_NUCLEO') or {}
+    achados = []
+    for topico, itens in (st.get('conhecimento') or {}).items():
+        if not alvo or alvo in topico.lower() or any(alvo in e.get('texto', '').lower() for e in itens):
+            achados += ['  %s: %s' % (topico, e.get('texto', '')) for e in itens]
+    if achados:
+        return 'O que eu sei (fatos que VOCE ensinou):\n' + '\n'.join(achados[:10])
+    return ('Nada ensinado sobre isso ainda. Ensine com:'
+            ' conhecimento ensinar <topico>: <fato>')
+
+
+def _r70_comandos(comando):
+    """r70: FORA DO PADRAO — rotas do modo prototipo (dono da pasta)."""
+    import re as _re
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    bruto = (comando or '').strip()
+    if n in ('mododetalhado', 'respostadetalhada', 'mododetalhada'):
+        ler = globals().get('_r67_ler_config')
+        atual = bool(ler('resposta_detalhada', padrao=False)) if ler else False
+        definir = globals().get('_r67_definir_config')
+        if definir:
+            definir('resposta_detalhada', not atual)
+        print('[OK] modo detalhado %s: o modelo local %s.' % (
+            'LIGADO' if not atual else 'DESLIGADO',
+            'vai gastar mais tokens por resposta (seu pedido explicito vence o teto turbo)'
+            if not atual else 'volta as respostas enxutas'))
+        return True
+    if n.startswith(('oquesabesobre', 'oquevocesabesobre', 'oquevcsabesobre', 'sabesobre')):
+        alvo = _re.sub(r'^o\s*que\s+(?:voce\s+|vc\s+)?sabe\s+sobre\s*|^sabe\s+sobre\s*',
+                       '', bruto, flags=_re.I)
+        print(_r70_sabe_sobre(alvo))
         return True
     return False
 
@@ -16895,7 +17075,14 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
     try:
         _r20_estado('ocupado', 'Geracao em andamento')
         globals()['_r43_neural'] = globals().get('_r43_neural', 0) + 1  # r43: contador
-        if not formato_json and _r20_opcoes().get('instantaneo'):
+        _ler70 = globals().get('_r67_ler_config')
+        try:
+            _detalhado70 = bool(_ler70('resposta_detalhada', padrao=False)) if _ler70 else False
+        except Exception:
+            _detalhado70 = False
+        if not formato_json and _detalhado70:
+            pass  # r70: modo detalhado LIGADO por voce — resposta completa
+        elif not formato_json and _r20_opcoes().get('instantaneo'):
             max_tokens = min(max_tokens, 180)  # r43: instantaneo — degrau abaixo do turbo
         elif not formato_json and _r20_opcoes().get('turbo'):
             max_tokens = min(max_tokens, 300)  # r42: menos espera; respostas mais curtas
@@ -17109,6 +17296,14 @@ def perguntar_ia_local(pergunta: str, historico=None, penalidade_extra: float = 
         resposta += ('\n\n[Aviso de saude da geracao]: detectei repeticao em loop (' + detalhe
                      + '); o texto bruto foi preservado e nada foi corrigido. '
                        'Para tentar 1 nova geracao com penalidade de repeticao maior, envie: refazer com penalidade')
+    _revisar70 = globals().get('_r70_revisar')  # r70: 2a passada em TODA resposta
+    if _revisar70:
+        try:
+            resposta, _notas70 = _revisar70(resposta)
+            if _notas70:
+                resposta = resposta + '\n' + '\n'.join(_notas70)
+        except Exception:
+            pass
     if usa_cache:
         cache_r24[chave_r24] = (_time_r24.monotonic(), resposta)
         if len(cache_r24) > 32:
@@ -17196,6 +17391,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r68_comandos(comando):
         return True
     if _r69_comandos(comando):
+        return True
+    if _r70_comandos(comando):
         return True
     if _r62_comandos(comando):
         return True
@@ -36884,7 +37081,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r69] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r70] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
