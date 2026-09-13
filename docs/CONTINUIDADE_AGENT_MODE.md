@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70 **737 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71 **749 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -876,6 +876,27 @@ ou relatórios reais sem revisão e autorização.
   sem ' '; bugs reais pegos: aniversario re-salvia na consulta (falta de
   return), rpg com escolha numerica, 'quemeestepc'/'memostra' typos.
   +30 testes (test_lote_extremo_r68.py). **709 testes OK**. Selo `-r68`. Não
+  testado no Windows real.
+- **r71 — OS 3 CRÍTICOS DA ANÁLISE DE LACUNAS RESOLVIDOS**: (1) **CÉREBRO
+  PERSISTENTE** — `_r71_salvar_cerebro`/`_r71_carregar_cerebro`:
+  conhecimento+aprendidas+pesos+confiancas+desconhecidos do `_R69_NUCLEO`
+  agora moram em `cerebro.json`; save automático nas 4 mutações (ensinar,
+  esquecer tópico, esquecer tudo, aprender palavras) via hook defensivo;
+  load na abertura (`_r71_restaurar_na_abertura()` logo após
+  `_r67_abertura()`, avisa só se houver algo); kill-switch config
+  'cerebro_persistente': false; arquivo corrompido = silêncio (nunca derruba);
+  (2) **ESQUECER ESPECÍFICO** — 'esquecer <frase>' (match normalizado exato,
+  parecidos listados sem apagar, honesto quando não acha) + 'listar
+  aprendizado'; rota em `_r71_comandos` DEPOIS da r69 (que continua dona de
+  'esquecer aprendizado' total); BUG pego pelo teste: pop() devolve VALOR,
+  não chave — mensagem mostrava o rótulo; kill-switch seguia pasta errada
+  quando pasta vinha por argumento; (3) **DEPENDÊNCIAS PINADAS** —
+  requirements.txt por FAIXA MAJOR (langchain-openai>=1.0,<2.0;
+  langchain-google-genai>=4.0,<5.0 — versões consultadas ao vivo no PyPI
+  1.6.2/4.4.0), iniciar.bat agora faz `pip install -q -r requirements.txt`
+  (CRLF preservado) e a r62 ENTREGA o requirements.txt no 'atualizar agora'
+  (validado por conteúdo; sem o arquivo o BAT ficaria órfão). +12 testes
+  (test_cerebro_persistente_r71.py). **749 testes OK**. Selo `-r71`. Não
   testado no Windows real.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
