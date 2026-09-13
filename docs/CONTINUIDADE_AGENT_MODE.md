@@ -896,8 +896,15 @@ ou relatórios reais sem revisão e autorização.
   1.6.2/4.4.0), iniciar.bat agora faz `pip install -q -r requirements.txt`
   (CRLF preservado) e a r62 ENTREGA o requirements.txt no 'atualizar agora'
   (validado por conteúdo; sem o arquivo o BAT ficaria órfão). +12 testes
-  (test_cerebro_persistente_r71.py). **749 testes OK**. Selo `-r71`. Não
-  testado no Windows real.
+  (test_cerebro_persistente_r71.py). **749 testes OK**. Selo `-r71`. **PROVADA
+  e2e no Windows real:** usuário ensinou "conhecimento ensinar minha casa:
+  moro em Ribeirao Preto" no agente r71 e perguntou "onde eu moro?" →
+  `[Resposta por FATO ensinado — fonte: "minha casa"]` instantânea (r70
+  funcionando ao vivo; até colando setinhas decorativas na pergunta o casou
+  pegou). Revisor r70 também flagrou o GGUF mentindo ("não tenho acesso")
+  na mesma sessão. Cascata r64→r71 num comando; segundo 'atualizar agora'
+  mostrou as mensagens honestas r67 ("ja esta em dia (identico, nada
+  trocado)") + requirements.txt r71.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
