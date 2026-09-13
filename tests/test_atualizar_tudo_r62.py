@@ -18,8 +18,11 @@ BAT_BOM = ('@echo off\r\n' + 'REM linha de vistoria\r\n' * 60
 MAIN_BOM = "import os\n" + "# main de verdade com tamanho real\n" * 6 + "print('main novo')\n"
 
 
+REQ_BOM = 'langchain-openai>=1.0,<2.0\nlangchain-google-genai>=4.0,<5.0\n'
+
+
 def arquivos_bons():
-    return {'main.py': MAIN_BOM, 'iniciar.bat': BAT_BOM}
+    return {'main.py': MAIN_BOM, 'iniciar.bat': BAT_BOM, 'requirements.txt': REQ_BOM}
 
 
 class EntregaDoLancador(unittest.TestCase):
@@ -39,13 +42,16 @@ class EntregaDoLancador(unittest.TestCase):
     def test_entrega_main_direto_e_bat_via_tmp(self):
         env, pasta, pedidos, baixar = self._env(arquivos_bons())
         saida = env['_r62_entregar_lancador'](baixar=baixar, pasta=pasta)
-        self.assertEqual(sorted(pedidos), ['iniciar.bat', 'main.py'])
+        self.assertEqual(sorted(pedidos), ['iniciar.bat', 'main.py', 'requirements.txt'])
         self.assertIn('[OK] main.py em dia', saida)
         self.assertIn('se aplica SOZINHO quando voce fechar', saida)
         with io.open(os.path.join(pasta, 'main.py'), encoding='utf-8') as f:
             self.assertEqual(f.read(), MAIN_BOM)
         with io.open(os.path.join(pasta, '_atualizacao_iniciar.tmp'), 'rb') as f:
             self.assertIn(b':pedir_admin', f.read())
+        self.assertIn('[OK] requirements.txt em dia', saida)
+        with io.open(os.path.join(pasta, 'requirements.txt'), encoding='utf-8') as f:
+            self.assertIn('langchain-openai', f.read())
         # o iniciar.bat ATUAL nao foi sobrescrito (quem aplica e o proprio BAT ao fechar)
         self.assertFalse(os.path.exists(os.path.join(pasta, 'iniciar.bat')))
         # backup do main antigo (nao existia antes: sem backup criado aqui)
@@ -118,7 +124,7 @@ class Estrutura(unittest.TestCase):
         self.assertLess(texto.index('if _r62_comandos(comando):'),
                         texto.index('if _r61_comandos(comando):'))
         self.assertIn('e traz main.py/iniciar.bat em dia', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r70]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r71]'), 1)
 
 
 if __name__ == '__main__':

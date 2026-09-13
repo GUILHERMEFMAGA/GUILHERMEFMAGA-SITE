@@ -69,7 +69,7 @@ class EstruturaDoStub(unittest.TestCase):
     def test_literal_tools_intacto_e_selo_r48(self):
         t = texto_agente()
         self.assertIn('\ntools = [\n', t)
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r70]', t)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r71]', t)
         self.assertIn('Thread(target=falar', t)  # greeting de voz fora do caminho critico
 
 

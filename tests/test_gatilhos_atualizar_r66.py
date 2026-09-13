@@ -61,7 +61,7 @@ class Estrutura(unittest.TestCase):
         with io.open('agente.py', encoding='utf-8') as f:
             texto = f.read()
         self.assertIn("ATUALIZAR (r66): digite como vier", texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r70]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r71]'), 1)
         # as duas condicoes (r62 e r50) aceitam a variante do incidente real
         self.assertEqual(texto.count("'atualizaagora'"), 3)  # 2 gatilhos + 1 do modo aviao (r67)
 

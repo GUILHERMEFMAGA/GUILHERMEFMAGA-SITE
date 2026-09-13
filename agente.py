@@ -7842,6 +7842,7 @@ def _menu_ajuda_local():
     print("LOTE EXTREMO (r68): 'cerebro indexar'/'onde esta <arquivo>' | 'cacar duplicatas' | 'comparar pastas' | 'por que o pc esta lento' | 'quiz' | 'raio-x do pdf' | 'o que cozinhar' | 'organizar downloads'/'desfazer organizacao' | 'prova' | 'rpg comecar' | 'aniversarios' | 'me mostra seu codigo' (e mais no ajuda)")
     print("NUCLEO r69: 'nucleo' | 'diagnostico do cerebro' | 'conhecimento ensinar topico: fato' | 'aprender palavras' | 'confianca <pergunta>' — o cerebro aprende, reflete e se audita sozinho")
     print("PROTOTIPO r70 (exclusivo do dono desta pasta): respostas com revisao de 2a passada | fatos antes do modelo | 'o que voce sabe sobre X' | 'modo detalhado' | dica do proximo comando")
+    print("CEREBRO r71: o que voce ensina SOBREVIVE ao fechar o agente (cerebro.json) | 'listar aprendizado' | 'esquecer <frase>'")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -14617,12 +14618,18 @@ def _r69_comandos(comando):
         for padrao, rotulo in itens:
             _r69_lexico(padrao, rotulo)
         print('[OK] %d padrao(oes) no lexico do nucleo.' % len(itens))
+        _salvar71 = globals().get('_r71_salvar_cerebro')
+        if _salvar71:
+            _salvar71()
         return True
     if n in ('esqueceraprendizado', 'esquecerlexico'):
         st = _r69_instalar_estado()
         qtd = len(st['aprendidas'])
         st['aprendidas'].clear()
         print('[OK] %d padrao(oes) aprendidos apagados (o resto do nucleo fica).' % qtd)
+        _salvar71 = globals().get('_r71_salvar_cerebro')
+        if _salvar71:
+            _salvar71()
         return True
     if n.startswith('conhecimentoensinar'):
         import re as _re
@@ -14637,6 +14644,9 @@ def _r69_comandos(comando):
         lista.append({'texto': m.group(2).strip()[:200]})
         del lista[:-8]
         print("[OK] ensinado (%s: %s). O modelo local le isto ANTES de responder." % (topico, m.group(2).strip()[:60]))
+        _salvar71 = globals().get('_r71_salvar_cerebro')
+        if _salvar71:
+            _salvar71()
         return True
     if n in ('conhecimentolistar', 'verconhecimento'):
         st = _r69_instalar_estado()
@@ -14656,6 +14666,9 @@ def _r69_comandos(comando):
             print('[OK] topico "%s" esquecido.' % alvo)
         else:
             print('Topicos ensinados: %s' % (', '.join(st['conhecimento']) or '(nenhum)'))
+        _salvar71 = globals().get('_r71_salvar_cerebro')
+        if _salvar71:
+            _salvar71()
         return True
     if n.startswith('confianca'):
         import re as _re
@@ -14810,6 +14823,125 @@ def _r70_comandos(comando):
     return False
 
 
+def _r71_cerebro_path(pasta=None):
+    """r71: onde o cerebro mora no disco (cerebro.json da casa)."""
+    pasta = pasta or globals().get('PASTA_BASE') or os.getcwd()
+    return os.path.join(pasta, 'cerebro.json')
+
+
+def _r71_salvar_cerebro(pasta=None, st=None):
+    """r71: grava o cerebro em cerebro.json. Kill-switch: config
+    'cerebro_persistente': false volta a memoria volatil (r69 como era)."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('cerebro_persistente', pasta=pasta, padrao=True):
+            return False
+    except Exception:
+        pass
+    st = st or globals().get('_R69_NUCLEO') or {}
+    dados = {k: st.get(k) for k in ('conhecimento', 'aprendidas', 'pesos',
+                                    'confiancas', 'desconhecidos')}
+    try:
+        with open(_r71_cerebro_path(pasta), 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=True, indent=1)
+        return True
+    except Exception:
+        return False
+
+
+def _r71_carregar_cerebro(pasta=None, st=None):
+    """r71: restaura o cerebro salvo; devolve resumo ('' se nada houver)."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('cerebro_persistente', pasta=pasta, padrao=True):
+            return ''
+    except Exception:
+        pass
+    caminho = _r71_cerebro_path(pasta)
+    if not os.path.isfile(caminho):
+        return ''
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            dados = json.load(f)
+    except Exception:
+        return ''
+    if not isinstance(dados, dict):
+        return ''
+    st = st if st is not None else globals().get('_r69_instalar_estado')
+    if st is None:
+        return ''
+    st = st() if callable(st) and not isinstance(st, dict) else st
+    carregados = 0
+    for chave in ('conhecimento', 'aprendidas', 'pesos', 'confiancas', 'desconhecidos'):
+        valor = dados.get(chave)
+        if isinstance(valor, (dict, list)) and valor:
+            st[chave] = valor
+            carregados += 1
+    if not carregados:
+        return ''
+    return ('Cerebro restaurado de cerebro.json: %d topico(s) ensinado(s),'
+            ' %d padrao(oes) aprendidos (r71: o que voce ensina SOBREVIVE ao fechar).'
+            % (len(st.get('conhecimento') or {}), len(st.get('aprendidas') or {})))
+
+
+def _r71_restaurar_na_abertura(pasta=None):
+    """r71: gancho de abertura — restaura o cerebro e avisa so se houver algo."""
+    try:
+        resumo = _r71_carregar_cerebro(pasta=pasta)
+    except Exception:
+        return False
+    if resumo:
+        print(resumo)
+    return True
+
+
+def _r71_comandos(comando):
+    """r71: esquecer UM padrao especifico (nao todos) + listar o lexico."""
+    import re as _re
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    bruto = (comando or '').strip()
+    if n in ('listaraprendizado', 'meulexico', 'padroesaprendidos', 'listarpadroes'):
+        st = globals().get('_R69_NUCLEO') or {}
+        aprendidas = st.get('aprendidas') or {}
+        if not aprendidas:
+            print('Nenhum padrao aprendido ainda. Ensine com: aprender palavras {"frase":"intencao"}')
+            return True
+        for padrao, rotulo in sorted(aprendidas.items()):
+            print('  "%s" -> %s' % (padrao, rotulo))
+        print('Apagar um: esquecer <frase> | Apagar TODOS: esquecer aprendizado')
+        return True
+    if n.startswith('esquecer') and n not in ('esqueceraprendizado', 'esquecerlexico'):
+        resto = _re.sub(r'^esquecer\s*', '', bruto, flags=_re.I).strip().strip('"')
+        if not resto:
+            return False  # 'esquecer' solta nao e nossa
+        st = globals().get('_R69_NUCLEO') or {}
+        aprendidas = st.get('aprendidas')
+        if aprendidas is None:
+            print('Nada aprendido ainda para esquecer.')
+            return True
+        alvo_norm = _norm_pt(resto)
+        mapa = {}
+        for chave in aprendidas:
+            mapa.setdefault(_norm_pt(chave), []).append(chave)
+        if alvo_norm in mapa:
+            apagados = list(mapa[alvo_norm])
+            for chave_exata in apagados:
+                aprendidas.pop(chave_exata)
+            _r71_salvar_cerebro()
+            print('[OK] esquecido: "%s" (cerebro.json ja atualizado).' % '", "'.join(apagados))
+            return True
+        parecidos = [chave for chave in aprendidas if alvo_norm in _norm_pt(chave)]
+        if parecidos:
+            print('Achei parecido(s); repita exatamente: '
+                  + ' | '.join('"%s"' % p for p in parecidos[:6]))
+            return True
+        print('Nao encontrei esse padrao. Veja todos: listar aprendizado')
+        return True
+    return False
+
+
 def _r62_entregar_lancador(baixar=None, pasta=None):
     """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
     backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
@@ -14866,6 +14998,19 @@ def _r62_entregar_lancador(baixar=None, pasta=None):
                     linhas.append('[OK] main.py em dia (novo).')
     except Exception as erro:
         linhas.append('[Aviso]: nao consegui baixar o main.py agora (' + type(erro).__name__ + ').')
+
+    # requirements.txt: versoes fixadas (r71 — o pip nunca mais quebra em silencio)
+    try:
+        bruto = baixar('requirements.txt')
+        texto = como_texto(bruto)
+        if len(texto) < 10 or 'langchain-openai' not in texto:
+            linhas.append('[Aviso]: requirements.txt baixado estranho; mantive o atual.')
+        else:
+            with open(os.path.join(pasta, 'requirements.txt'), 'w', encoding='utf-8', newline='') as f:
+                f.write(texto)
+            linhas.append('[OK] requirements.txt em dia (versoes fixadas das bibliotecas).')
+    except Exception as erro:
+        linhas.append('[Aviso]: nao consegui baixar o requirements.txt agora (' + type(erro).__name__ + ').')
 
     # iniciar.bat: via .tmp (o BAT em execucao se aplica ao fechar)
     try:
@@ -17393,6 +17538,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r69_comandos(comando):
         return True
     if _r70_comandos(comando):
+        return True
+    if _r71_comandos(comando):
         return True
     if _r62_comandos(comando):
         return True
@@ -37081,7 +37228,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r70] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r71] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -37118,6 +37265,7 @@ if config.get("abrir_painel_no_inicio"):
 _checar_iniciar_bat()
 _r64_aviso_de_boot()  # r64: exame silencioso; so fala se achar problema
 _r67_abertura()  # r67: apelido + re-exame de 12h agendado
+_r71_restaurar_na_abertura()  # r71: cerebro persistente (fatos/padroes sobrevivem ao fechar)
 print("")
 if not _r67_voz_silenciada():  # r67: silenciar/nao me perturbe pausa a voz
     threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque

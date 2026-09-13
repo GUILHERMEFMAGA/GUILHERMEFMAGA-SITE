@@ -115,7 +115,7 @@ goto lancar
 :instalar_libs
 REM main.py disse (codigo 8) que falta biblioteca: instala e recomeca.
 echo Instalando bibliotecas das IAs, aguarde...
-python -m pip install -q langchain-openai langchain-google-genai
+python -m pip install -q -r requirements.txt
 goto lancar
 
 :fim_normal
