@@ -8913,6 +8913,88 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r74: RITMO E CEU — diagnostico de rotas (dry-run) + ritmo do motor ----
+    if n in ("replayerros", "replay", "errosderota", "candidatosarota") or cmd.startswith("replay "):
+        _r = _r74_replay_top(10)
+        _rel(_r if _r else "Nenhum comando registrado ainda. Quando um pedido nao tem rota, "
+             "eu anoto aqui (kill-switch: 'replay_erros': false).")
+        return True
+    if n in ("guardaogatilhos", "gatilhosdisputados") or cmd.startswith("guardiao "):
+        _r = _r74_guardiao_listar()
+        _rel(_r if _r else "Nenhum conflito de gatilhos registrado. (kill-switch: 'guardiao_gatilhos': false)")
+        return True
+    if n in ("testarmalha", "malhaderotas", "testarmalhaderotas") or cmd.startswith("testar malha"):
+        _resto = cmd.split("testar malha", 1)[-1].strip(" :")
+        _limite = int(_resto) if _resto.isdigit() else 100
+        _rel(_r74_testar_malha(limite=max(5, min(300, _limite))))
+        return True
+    if cmd.startswith("traduzir rota") or cmd.startswith("por que nao funcionou"):
+        _frase = cmd.split("traduzir rota", 1)[-1] if cmd.startswith("traduzir rota") \
+            else cmd.split("por que nao funcionou", 1)[-1]
+        _frase = _frase.strip(" :,?")
+        if not _frase:
+            _rel("Mostra assim: traduzir rota <a frase que nao funcionou>")
+        else:
+            _rel(_r74_traduzir_rota(_frase, explico=True))
+        return True
+    if n in ("criarrota", "queroumcomandonovo", "novocomando") or cmd.startswith("criar rota"):
+        _resto_cr = cmd[len("criar rota"):].strip() if cmd.startswith("criar rota") else ""
+        if ":" in _resto_cr:
+            _g, _a = _resto_cr.split(":", 1)
+            _g, _a = _g.strip(), _a.strip()
+            _salvar_at = globals().get('_atalhos_aprendidos_salvar')
+            if _g and _a and _salvar_at:
+                try:
+                    _salvar_at(_g, _a)
+                except Exception as _e_cr:
+                    _rel("Nao consegui guardar agora (%s). Tente de novo." % type(_e_cr).__name__)
+                    return True
+                _rel("Rota criada (r74): quando voce disser \"%s\" eu faco: %s\n"
+                     "Teste na sua frente agora: diga \"%s\"." % (_g, _a, _g))
+            else:
+                _rel("Faltou um lado. Formato: criar rota <gatilho>: <o que eu devo fazer>")
+            return True
+        _rel(_r74_rota_guiada())
+        return True
+    if cmd.startswith("aquecer"):
+        _resto_aq = cmd[len("aquecer"):].strip()
+        _config = globals().get('config')
+        _salvar_json = globals().get('salvar_json')
+        _arq_cfg = globals().get('ARQ_CONFIG')
+        def _r74_gravar_aquecer(horas):
+            if isinstance(_config, dict):
+                _config['aquecer_horas'] = horas
+                if _salvar_json and _arq_cfg:
+                    try:
+                        _salvar_json(_arq_cfg, _config)
+                    except Exception:
+                        pass
+        if _resto_aq.startswith("as "):
+            import re as _re_aq
+            validas = []
+            for _h in _resto_aq[3:].replace("e ", ",").split(","):
+                _m = _re_aq.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*', _h)
+                if _m:
+                    validas.append('%02d:%s' % (int(_m.group(1)), _m.group(2)))
+            if not validas:
+                _rel("Hora invalida. Use HH:MM, ex.: aquecer as 07:50 (ou: aquecer as 07:50, 21:15)")
+            else:
+                _r74_gravar_aquecer(validas)
+                _rel("Warm-up programado (r74): o motor local sobe sozinho em "
+                     + ", ".join(validas)
+                     + " (so se a IA local ja estiver baixada; nunca baixa nada). "
+                     "Veja: 'aquecer' | desligue: 'aquecer limpar")
+            return True
+        if _resto_aq in ("limpar", "desligar", "off", "tirar"):
+            _r74_gravar_aquecer([])
+            _rel("Warm-up programado desligado.")
+            return True
+        _atual_aq = _r74_aquecer_horas()
+        _rel("Warm-up programado (r74): "
+             + (", ".join(_atual_aq) if _atual_aq
+                else "desligado (nenhuma hora marcada).\nLigue: aquecer as 07:50 | desligue: aquecer limpar"))
+        return True
+
     # ---- PONTE PARA AS 314 FERRAMENTAS ----
     # Nenhuma regra pegou: em vez de desistir (como antes, quando so a IA da
     # NUVEM conseguia escolher ferramenta), procuro no arsenal inteiro e
@@ -15059,6 +15141,455 @@ def _r73_boas_vindas(pasta=None):
             + '%d padrao(oes) aprendido(s).' % len(aprendidas))
 
 
+# ================= r74: RITMO E CEU — a IA local mais rapida e rotas que aprendem =================
+# 7 melhorias da LISTA-IMPOSSIVEL (grupos D e E): 31 compactador de historico,
+# 32 warm-up programado, 33 replay de erros, 34 testador de malha, 35 guardiao
+# de gatilhos, 36 tradutor de rota, 37 rota em branco guiada.
+# Tudo 100% local e em LEITURA (nao executa rotas; dry-run). O que e passivo tem
+# kill-switch na config: 'replay_erros', 'guardiao_gatilhos', 'compactar_historico',
+# 'aquecer_horas' (lista vazia = desligado). Selo: 2026-09-11-r74.
+
+def _r74_arquivo_candidatos(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'candidatos_rota.json')
+
+
+def _r74_arquivo_conflitos(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'gatilhos_conflito.json')
+
+
+def _r74_ler_json(caminho, padrao=None):
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return padrao
+
+
+def _r74_escrever_json(caminho, dados):
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(dados, f, ensure_ascii=1)
+        return True
+    except Exception:
+        return False
+
+
+def _r74_kill(chave, pasta=None, padrao=True):
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler:
+            return bool(ler(chave, pasta=pasta, padrao=padrao))
+    except Exception:
+        pass
+    return bool(padrao)
+
+
+def _r74_catalogo_rotas(pasta=None):
+    """r74: catalogo de rotas conhecidas (canonicos r21 + atalhos aprendidos +
+    rotinas do usuario) para o tradutor (36), guardiao (35) e malha (34)."""
+    catalogo = []
+    conhecidos = globals().get('_r21_comandos_conhecidos')
+    if conhecidos:
+        try:
+            catalogo.extend([str(c) for c in conhecidos()])
+        except Exception:
+            pass
+    ler_json = globals().get('carregar_json')
+    atalhos_arq = globals().get('ARQ_ATALHOS_APRENDIDOS')
+    if ler_json and atalhos_arq:
+        try:
+            dados = ler_json(atalhos_arq, {})
+            if isinstance(dados, dict):
+                catalogo.extend([str(k) for k in dados.keys()])
+        except Exception:
+            pass
+    rotinas = globals().get('_carregar_rotinas')
+    if rotinas:
+        try:
+            dados = rotinas()
+            if isinstance(dados, dict):
+                catalogo.extend([str(k) for k in dados.keys()])
+        except Exception:
+            pass
+    vistos, unicos = set(), []
+    for c in catalogo:
+        nc = c.lower()
+        if nc and nc not in vistos:
+            vistos.add(nc)
+            unicos.append(c)
+    return unicos
+
+
+def _r74_proximos_comandos(frase, n=3, cutoff=0.6, pasta=None):
+    """r74: candidatos de rota mais proximos da frase (difflib, LEITURA pura,
+    nunca executa). Lista vazia se a frase casar EXATAMENTE com alguma rota."""
+    import difflib
+    if not isinstance(frase, str) or ':' in frase or not frase.strip():
+        return []
+    norm = globals().get('_norm_pt')
+    nf = norm(frase) if norm else frase.lower().replace(' ', '')
+    if len(nf) < 4:
+        return []
+    normais = []
+    for c in _r74_catalogo_rotas(pasta):
+        nc = norm(c) if norm else c.lower().replace(' ', '')
+        if nc:
+            normais.append((c, nc))
+    if not normais:
+        return []
+    if nf in {nc for _, nc in normais}:
+        return []
+    parecidos = difflib.get_close_matches(nf, [nc for _, nc in normais], n=n, cutoff=cutoff)
+    mapeia = {nc: c for c, nc in normais}
+    return [(mapeia[p], round(difflib.SequenceMatcher(None, nf, p).ratio(), 3)) for p in parecidos]
+
+
+def _r74_replay_registrar(comando, categoria='caiu_no_modelo', pasta=None):
+    """r74 (33): REPLAY DE ERROS — registra comando que NENHUMA rota pegou e
+    foi parar no modelo. Alimenta 'replay erros' (candidatos a rota nova) e o
+    guardiao de gatilhos (35). Kill-switch: config 'replay_erros': false."""
+    if not _r74_kill('replay_erros', pasta=pasta, padrao=True):
+        return None
+    if not isinstance(comando, str):
+        return None
+    if ':' in comando:  # tem payload (ex.: 'conhecimento ensinar x: y') — nao e candidato a rota
+        return None
+    norm = globals().get('_norm_pt')
+    n = norm(comando) if norm else comando.lower().replace(' ', '')
+    if not n or len(n) < 4:
+        return None
+    import datetime as _dt
+    agora = _dt.datetime.now().isoformat(timespec='seconds')
+    caminho = _r74_arquivo_candidatos(pasta)
+    dados = _r74_ler_json(caminho, [])
+    if not isinstance(dados, list):
+        dados = []
+    for item in dados:
+        if isinstance(item, dict) and item.get('n') == n:
+            item['vezes'] = int(item.get('vezes', 1)) + 1
+            item['ultima'] = agora
+            item['categoria'] = categoria
+            _r74_escrever_json(caminho, dados[-300:])
+            return n
+    dados.append({'n': n, 'txt': comando.strip()[:120], 'vezes': 1,
+                  'categoria': categoria, 'primeira': agora, 'ultima': agora})
+    _r74_escrever_json(caminho, dados[-300:])
+    guardiao = globals().get('_r74_guardiao_registrar')
+    if guardiao:
+        try:
+            guardiao(comando, pasta=pasta)
+        except Exception:
+            pass
+    return n
+
+
+def _r74_replay_top(n=10, pasta=None):
+    """r74 (33): os comandos que mais caem no modelo = melhores candidatos a rota nova."""
+    dados = _r74_ler_json(_r74_arquivo_candidatos(pasta), [])
+    if not isinstance(dados, list) or not dados:
+        return None
+    top = sorted(dados, key=lambda d: (int(d.get('vezes', 1)), str(d.get('ultima', ''))),
+                 reverse=True)[:max(1, int(n))]
+    linhas = ['Comandos que ainda NAO tem rota (mais pedidos primeiro):']
+    for i, item in enumerate(top, 1):
+        linhas.append('  %d. "%s" — %d vez(es), ultimo: %s (%s)' % (
+            i, item.get('txt', '?'), int(item.get('vezes', 1)),
+            str(item.get('ultima', '?'))[5:16], item.get('categoria', '?')))
+    linhas.append('Quer fechar um buraco? Diga: criar rota <gatilho>: <o que eu devo fazer>')
+    return '\n'.join(linhas)
+
+
+def _r74_guardiao_registrar(comando, pasta=None, limiar=0.72):
+    """r74 (35): GUARDIAO DE GATILHOS — quando DOIS gatilhos conhecidos ficam
+    igualmente proximos da mesma frase, registra a disputa (diagnostico; a
+    rota que ja esta no ar continua vencendo, nada muda no comportamento).
+    Kill-switch: config 'guardiao_gatilhos': false."""
+    if not _r74_kill('guardiao_gatilhos', pasta=pasta, padrao=True):
+        return None
+    proximos = _r74_proximos_comandos(comando, n=2, cutoff=limiar, pasta=pasta)
+    if len(proximos) < 2:
+        return None
+    import datetime as _dt
+    agora = _dt.datetime.now().isoformat(timespec='seconds')
+    norm = globals().get('_norm_pt')
+    n = norm(comando) if norm else comando.lower().replace(' ', '')
+    caminho = _r74_arquivo_conflitos(pasta)
+    dados = _r74_ler_json(caminho, [])
+    if not isinstance(dados, list):
+        dados = []
+    for item in dados:
+        if isinstance(item, dict) and item.get('n') == n:
+            item['vezes'] = int(item.get('vezes', 1)) + 1
+            item['ultima'] = agora
+            _r74_escrever_json(caminho, dados[-100:])
+            return n
+    dados.append({'n': n, 'txt': comando.strip()[:120],
+                  'disputa': [p[0] for p in proximos],
+                  'ratios': [p[1] for p in proximos],
+                  'vezes': 1, 'ultima': agora})
+    _r74_escrever_json(caminho, dados[-100:])
+    return n
+
+
+def _r74_guardiao_listar(pasta=None):
+    """r74 (35): mostra as disputas de gatilho registradas."""
+    dados = _r74_ler_json(_r74_arquivo_conflitos(pasta), [])
+    if not isinstance(dados, list) or not dados:
+        return None
+    linhas = ['Gatilhos disputados (dois comandos proximos demais da MESMA frase):']
+    ordenados = sorted(dados, key=lambda d: str(d.get('ultima', '')), reverse=True)[:10]
+    for i, item in enumerate(ordenados, 1):
+        disputa = ' vs '.join('"%s" (%s)' % (a, r) for a, r in
+                              zip(item.get('disputa', []), item.get('ratios', [])))
+        linhas.append('  %d. "%s" (%d x): %s' % (
+            i, item.get('txt', '?'), int(item.get('vezes', 1)), disputa))
+    linhas.append('Nada muda no comportamento: a rota ja no ar continua vencendo.')
+    return '\n'.join(linhas)
+
+
+def _r74_traduzir_rota(frase, explico=False, pasta=None):
+    """r74 (36): TRADUTOR DE ROTA — 'por que essa frase nao funcionou?' em
+    LEITURA pura (NUNCA executa nada): mostra o caso exato, os candidatos
+    proximos e se a frase e BURACO (nenhuma rota perto)."""
+    if not isinstance(frase, str) or not frase.strip():
+        if explico:
+            return 'Frase vazia. Use: traduzir rota <a frase que nao funcionou>'
+        return None
+    norm = globals().get('_norm_pt')
+    nf = norm(frase) if norm else frase.lower().replace(' ', '')
+    mapeia = {}
+    for c in _r74_catalogo_rotas(pasta):
+        nc = norm(c) if norm else c.lower().replace(' ', '')
+        if nc and nc not in mapeia:
+            mapeia[nc] = c
+    exata = mapeia.get(nf)
+    proximos = [] if exata else _r74_proximos_comandos(frase, n=3, cutoff=0.55, pasta=pasta)
+    ferramentas = []
+    buscar = globals().get('_buscar_ferramentas')
+    if buscar and not exata:
+        try:
+            achados = buscar(frase, 3) or []
+            for a in achados:
+                if isinstance(a, tuple) and len(a) >= 2 and isinstance(a[1], dict):
+                    ferramentas.append(str(a[1].get('nome', '?')))
+                elif isinstance(a, dict):
+                    ferramentas.append(str(a.get('nome', '?')))
+        except Exception:
+            ferramentas = []
+    resultado = {'frase': frase.strip(), 'exata': exata, 'proximos': proximos,
+                 'ferramentas': ferramentas, 'buraco': not exata and not proximos}
+    if not explico:
+        return resultado
+    linhas = ['RAIO-X da frase "%s":' % frase.strip()]
+    if exata:
+        linhas.append('  CASO EXATO: existe a rota "%s" — ela ja seria disparada.' % exata)
+    else:
+        linhas.append('  Nenhuma rota exata pegou essa frase.')
+        for c, r in proximos:
+            linhas.append('  Perto: "%s" (semelhanca %.0f%%) — digite exatamente: %s' % (c, r * 100, c))
+        if ferramentas:
+            linhas.append('  Ferramentas que combinam: ' + ', '.join(ferramentas[:3]))
+        if resultado['buraco']:
+            linhas.append('  BURACO: nada de perto. Para criar a rota: criar rota <gatilho>: <o que eu devo fazer>')
+    return '\n'.join(linhas)
+
+
+def _r74_testar_malha(frases=None, limite=100, pasta=None):
+    """r74 (34): TESTADOR DE MALHA — simula frases contra as rotas ativas em
+    DRY-RUN (NUNCA executa nenhuma) e mostra os buracos. Frases: sua lista, ou
+    os comandos reais do replay + um corpus padrao de dia a dia."""
+    if frases is None:
+        reais = _r74_ler_json(_r74_arquivo_candidatos(pasta), [])
+        if isinstance(reais, list) and reais:
+            reais_txt = [d.get('txt', '') for d in sorted(
+                (d for d in reais if isinstance(d, dict)),
+                key=lambda d: int(d.get('vezes', 1)), reverse=True)][:40]
+        else:
+            reais_txt = []
+        frases = list(dict.fromkeys(reais_txt + list(_r74_malha_padrao())))
+    frases = [str(f) for f in frases if str(f).strip()][:max(1, int(limite))]
+    casadas, buracos = [], []
+    for f in frases:
+        try:
+            r = _r74_traduzir_rota(f, explico=False, pasta=pasta)
+        except Exception:
+            r = None
+        if r and (r.get('exata') or r.get('proximos')):
+            casadas.append(f)
+        else:
+            buracos.append(f)
+    linhas = ['MALHA r74 (dry-run; NADA foi executado): %d frase(s) — %d casada(s) com rota, %d buraco(s).'
+              % (len(frases), len(casadas), len(buracos))]
+    if buracos:
+        linhas.append('BURACOS (nenhuma rota perto):')
+        for i, f in enumerate(buracos[:20], 1):
+            linhas.append('  %d. "%s"' % (i, f))
+        linhas.append('Para fechar um: criar rota <gatilho>: <o que eu devo fazer>')
+    else:
+        linhas.append('Nenhum buraco nesta amostra.')
+    return '\n'.join(linhas)
+
+
+def _r74_malha_padrao():
+    return (
+        'status', 'ajuda', 'status ia', 'criar ia', 'atualizar agora', 'sair e atualizar',
+        'diagnostico', 'analise do pc', 'otimiza tudo', 'organiza downloads',
+        'abre o youtube', 'abre o spotify', 'limpa cache', 'fechar programa', 'bloquear tela',
+        'clima em sao paulo', 'meus poderes', 'listar aprendizado', 'o que voce faz',
+        'quantas ferramentas voce tem', 'frase forte', 'modo admin', 'de novo',
+        'estudar o pc', 'meu pc esta lento', 'libera espaco no disco', 'oficina local',
+        'avaliar precisao local', 'teste de rede', 'abre a camera', 'toca uma musica',
+        'reduz brilho', 'liga a lanterna', 'conta quanto sobra', 'abre a calculadora',
+        'me chama de zeca', 'pausa', 'timer bolo 40 min', 'nota: chave no fogao',
+    )
+
+
+def _r74_rota_guiada():
+    """r74 (37): ROTA EM BRANCO GUIADA — assistente cria a rota com o usuario
+    reaproveitando o mecanismo de atalhos aprendidos (a acao so roda pelo
+    fluxo normal, que ja pede 'sim' nas acoes destrutivas)."""
+    return ('Vamos criar a sua rota (um comando novo so seu):\n'
+            '  1. Escolha a PALAVRA que voce vai dizer (ex.: "modo filme").\n'
+            '  2. Diga o que eu devo FAZER (ex.: "fecha o navegador e liga o netflix").\n'
+            '  3. Cole assim: criar rota modo filme: fecha o navegador e liga o netflix\n'
+            'Eu guardo e mostro o que ela fara; a acao roda pelo fluxo normal '
+            '(acao destrutiva sempre pede "sim"). "quando eu falar X faca Y" faz o mesmo.')
+
+
+def _r74_resumo_turnos(turnos, max_termos=6):
+    """r74 (31): resumo DETERMINISTICO (sem modelo) dos turnos antigos que o
+    orcamento cortaria — top de termos por frequencia. Vazio se < 4 trocas de
+    usuario (nao vale a pena compactar conversa curta)."""
+    if not isinstance(turnos, (list, tuple)):
+        return ''
+    conteudos = []
+    for t in turnos:
+        if isinstance(t, dict) and t.get('role') == 'user':
+            c = str(t.get('content', '')).lower()
+            if c:
+                conteudos.append(c)
+    if len(conteudos) < 4:
+        return ''
+    import re as _re
+
+    def _sem_acento(s):
+        for a, b in (("á", "a"), ("à", "a"), ("ã", "a"), ("â", "a"), ("ç", "c"),
+                     ("é", "e"), ("ê", "e"), ("í", "i"), ("ó", "o"), ("ô", "o"),
+                     ("õ", "o"), ("ú", "u")):
+            s = s.replace(a, b)
+        return s
+    stop = set(('e a o os as de do da dos das em no na nos nas que para com sem por '
+                'mas como quando onde qual quais quanto quem meu minha meus minhas eu '
+                'voce ele ela isso nao sim se ja muito mais menos um uma ao aos sera '
+                'foi era sou sao estar ter tem temo quer pode podeu deve dever').split())
+    frequencia = {}
+    for c in conteudos:
+        for p in _re.findall(r'[a-z]{4,}', _sem_acento(c)):
+            if p not in stop:
+                frequencia[p] = frequencia.get(p, 0) + 1
+    if not frequencia:
+        return ''
+    top = sorted(frequencia.items(), key=lambda kv: (-kv[1], kv[0]))[:max(1, int(max_termos))]
+    return ('[Resumo local r74 dos %d turnos anteriores (nada foi apagado do arquivo; '
+            'so encurtei o contexto enviado ao modelo): temas: %s]'
+            % (len(conteudos), ', '.join(p for p, _ in top)))
+
+
+def _r74_aquecer_horas(pasta=None):
+    """r74 (32): horas marcadas do WARM-UP PROGRAMADO ('aquecer as 07:50').
+    Lista vazia = desligado (kill-switch: config 'aquecer_horas': [])."""
+    ler = globals().get('_r67_ler_config')
+    v = None
+    try:
+        if ler:
+            v = ler('aquecer_horas', pasta=pasta, padrao=[])
+        else:
+            cfg = globals().get('config')
+            if isinstance(cfg, dict):
+                v = cfg.get('aquecer_horas', [])
+    except Exception:
+        v = None
+    if v is None:
+        v = []
+    if not isinstance(v, (list, tuple)):
+        return []
+    import re as _re
+    validas = []
+    for h in v:
+        m = _re.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*', str(h))
+        if m:
+            validas.append('%02d:%s' % (int(m.group(1)), m.group(2)))
+    return validas
+
+
+def _r74_aquecer_verificar(agora=None, disparados=None, horas=None, pasta=None):
+    """r74 (32): LOGICA PURA — quais horas marcadas cabem de disparar AGORA.
+    1 disparo por hora/dia (nunca repete); hora invalida e ignorada."""
+    import datetime as _dt
+    agora = agora or _dt.datetime.now()
+    disparados = set(disparados or set())
+    horas = horas if horas is not None else _r74_aquecer_horas(pasta)
+    if not horas:
+        return []
+    hoje = agora.strftime('%Y-%m-%d')
+    alvo = agora.strftime('%H:%M')
+    return [h for h in horas if h == alvo and (hoje + '|' + h) not in disparados]
+
+
+def _r74_aquecer_loop(disparados, verificar=None, subir=None, dormir=None, max_rodadas=None):
+    """r74 (32): o cote do loop (testavel) — so sobe o motor se motor+modelo
+    ja foram baixados (NUNCA baixa arquivo); marca hora/dia disparada."""
+    import datetime as _dt
+    _verificar = verificar or _r74_aquecer_verificar
+    _dormir = dormir or (lambda s: None)
+    rodadas = 0
+    while True:
+        try:
+            agora = _dt.datetime.now()
+            para_hoje = agora.strftime('%Y-%m-%d')
+            for h in _verificar(agora=agora, disparados=disparados):
+                ach = globals().get('_acha_modelo_gguf')
+                ach_s = globals().get('_acha_llama_server')
+                if not (ach and ach_s and ach() and ach_s()):
+                    break  # sem motor+modelo: nunca baixa nada
+                alvo = subir or globals().get('_auto_subir_ia_local') or globals().get('preparar_ia_local')
+                try:
+                    if alvo:
+                        alvo()
+                except Exception:
+                    pass
+                disparados.add(para_hoje + '|' + h)
+        except Exception:
+            pass
+        rodadas += 1
+        if max_rodadas is not None and rodadas >= max_rodadas:
+            return rodadas
+        _dormir(20)
+
+
+def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None):
+    """r74 (32): agenda a thread de fundo do warm-up programado (1x por
+    sessao). Config 'aquecer_horas' vazia = thread vive sem fazer nada."""
+    import threading as _th
+    if globals().get('_r74_aquecer_agendado'):
+        return False
+    globals()['_r74_aquecer_agendado'] = True
+    disparados = set()
+
+    def _loop():
+        _r74_aquecer_loop(disparados, verificar=verificar, subir=subir, dormir=dormir)
+
+    def _spawn():
+        _th.Thread(target=_loop, daemon=True).start()
+
+    try:
+        (agendador or _spawn)()
+        return True
+    except Exception:
+        globals()['_r74_aquecer_agendado'] = False
+        return False
+
+
 def _r62_entregar_lancador(baixar=None, pasta=None):
     """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
     backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
@@ -17308,6 +17839,20 @@ def _montar_contexto_local(pergunta: str, historico=None):
     """Monta pares completos sem modificar memoria; orcamento final aplicado antes do POST."""
     msgs = [{'role':'system', 'content':_sys_ia_local()}]
     msgs.extend(_r20_pares_historico(historico, pergunta))
+    # r74 (31): COMPACTADOR — os turnos antigos que o orcamento cortaria viram
+    # 1 linha de resumo local (nada e apagado; so encurta o contexto enviado).
+    # Kill-switch: config 'compactar_historico': false.
+    try:
+        if _r74_kill('compactar_historico', padrao=True):
+            _mantidos74 = {str(m.get('content', '')) for m in msgs if m.get('role') == 'user'}
+            _antigos74 = [m for m in (historico or [])
+                          if isinstance(m, dict) and m.get('role') == 'user'
+                          and str(m.get('content', '')) not in _mantidos74]
+            _resumo74 = _r74_resumo_turnos(_antigos74)
+            if _resumo74:
+                msgs[0]['content'] += ' ' + _resumo74
+    except Exception:
+        pass
     correcoes = _correcoes_relevantes_local(pergunta, config)
     conteudo = _anexar_referencias_revisadas(pergunta)
     if correcoes:
@@ -17969,6 +18514,11 @@ def processar_atalho_rapido(comando: str) -> bool:
             print("        'atualiza o windows'); digite 'ajuda' para ver tudo. Se quiser que eu adicione")
             print("        essa acao, me diga o que voce quer que ela faca. (A IA de conversa nao executa")
             print("        acoes no PC - quem controla o Windows sao os comandos, que rodam como admin.)")
+            # r74 (33): REPLAY — acao pedida sem regra vira candidato a rota
+            try:
+                _r74_replay_registrar(comando, 'acao_sem_rota')
+            except Exception:
+                pass
             return True
         _r = _resposta_da_neural(comando)
         if _r:
@@ -17996,6 +18546,12 @@ def processar_atalho_rapido(comando: str) -> bool:
             pass
         return True
 
+    # r74 (33): REPLAY — tarefa que nenhuma regra pegou vai pro modelo;
+    # anoto como candidato a rota nova (leitura; nada e executado aqui).
+    try:
+        _r74_replay_registrar(comando, 'tarefa_sem_rota')
+    except Exception:
+        pass
     return False
 
 
@@ -37345,7 +37901,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r73] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r74] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -37358,6 +37914,12 @@ if _tem_local:
 else:
     # Ainda nao baixou nada: deixa a nuvem como estiver (default ligado), so
     # pra nao travar quem nunca criou a IA local.
+    pass
+
+# r74: WARM-UP PROGRAMADO — 'aquecer as 07:50' sobe o motor antes de voce sentar
+try:
+    _r74_aquecer_agendar()
+except Exception:
     pass
 
 print("")

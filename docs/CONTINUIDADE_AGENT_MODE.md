@@ -1,6 +1,6 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r73**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r74**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
@@ -8,10 +8,10 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 
 ## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r73**. Suíte: **765 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa), `70a42fa` (r72), `f75e6ab` (r71).
-- Código: `agente.py` ~37,5 mil linhas (1.216 funções de topo, 513 ferramentas @tool), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json) + esquecer específico + deps pinadas; r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele deve pular da r64 pra r73; aguardar prints; (2) usuário vai escolher NÚMEROS da LISTA-100 (`esqueletos_ideias/2026-09-13-lista100-funcoes-e-ferramentas.md`, SÓ PROPOSTA, 50 funções + 50 ferramentas) para implementar no padrão da casa; (3) maiores futuros: RAG dos documentos do usuário (o maior), STT local, manual do usuário (`esqueletos_ideias/2026-09-13-analise-de-lacunas.md`).
+- Releases publicados: **r21 → r74**. Suíte: **788 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r74 = ponta do log desta branch.
+- Código: `agente.py` ~38,2 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r74; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 = 28, 29, 30, 39, 40, 41; r76 = 14, 15, 42, 43, 44; r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maiores futuros: RAG dos documentos do usuário (o maior), manual do usuário (`esqueletos_ideias/2026-09-13-analise-de-lacunas.md`).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,7 +116,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73 **765 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74 **788 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -944,6 +944,45 @@ ou relatórios reais sem revisão e autorização.
   +8 testes (test_boas_vindas_r73.py). **765 testes OK**. Selo `-r73`. Não
   testado no Windows real. Junto: lista-100 (50 funções + 50 ferramentas do
   dia a dia, SÓ PROPOSTA, nº 50 = esta r73) em esqueletos_ideias/.
+- **r74 — RITMO E CÉU (7 melhorias da LISTA-IMPOSSIVEL na IA local, leva
+  autorizada pelo dono: 19 itens em 4 releases)**: 31 COMPACTADOR DE
+  HISTÓRICO — os turnos antigos que o orçamento cortaria viram 1 linha de
+  resumo local DETERMINÍSTICO (top de termos por frequência, sem modelo;
+  "nada foi apagado do arquivo") no `_montar_contexto_local` (kill-switch
+  'compactar_historico': false; conversa < 4 trocas não compacta).
+  32 WARM-UP PROGRAMADO — 'aquecer as 07:50' sobe o motor local ANTES de
+  você sentar (thread de fundo; 1 disparo por hora/dia; SÓ sobe, NUNCA
+  baixa arquivo — exige motor+modelo já presentes; config
+  'aquecer_horas': [] = desligado; comandos 'aquecer' / 'aquecer limpar';
+  agendado no nível do módulo na abertura). 33 REPLAY DE ERROS — comando
+  que nenhuma rota pegou e caiu no modelo vai para `candidatos_rota.json`
+  (2 hooks: acao_sem_rota na trava anti-vazamento e tarefa_sem_rota no
+  fim do `processar_atalho_rapido`); 'replay erros' mostra os top
+  candidatos (kill-switch 'replay_erros': false; payload com ':' e
+  frases < 4 não registram). 34 TESTADOR DE MALHA — 'testar malha [N]'
+  simula frases contra as rotas ativas em DRY-RUN (NUNCA executa) e
+  relata os buracos (frases reais do replay + corpus padrão). 35 GUARDIÃO
+  DE GATILHOS — 2 comandos conhecidos igualmente próximos da mesma frase
+  (≥ 0.72) registram a disputa em `gatilhos_conflito.json` (diagnóstico:
+  a rota que já está no ar continua vencendo; kill-switch
+  'guardiao_gatilhos': false). 36 TRADUTOR DE ROTA — 'traduzir rota
+  <frase>' / 'por que nao funcionou: <frase>' em leitura pura: caso
+  exato, candidatos próximos (difflib sobre o catálogo r21 + atalhos
+  aprendidos + rotinas), ferramentas que combinam (só cita, não executa)
+  e BURACO. 37 ROTA EM BRANCO GUIADA — 'criar rota' (sem payload) ensina
+  o formato; 'criar rota <gatilho>: <ação>' reaproveita o mecanismo de
+  atalhos aprendidos (ação destrutiva segue o fluxo normal com 'sim').
+  Novos comandos: 'replay erros', 'guardiao gatilhos', 'testar malha',
+  'traduzir rota', 'criar rota', 'aquecer'. Rotas inseridas ANTES da
+  ponte p/ ferramentas (nada rouba comando do seletor). +23 testes
+  (test_ritmo_ceu_r74.py). **788 testes OK**. Selo `-r74`. Não testado no
+  Windows real. Faltam da leva: r75 = 28 fila de fundo, 29 cron 2.0,
+  30 diário de lentidão, 39 sandbox, 40 cofre de chaves, 41 modo
+  convidado; r76 = 14 exportar/importar cérebro, 15 diff do cérebro,
+  42 auditoria estendida, 43 visão local, 44 manual; r77 = 38 STT local
+  (obra grande, release à parte). Lição da casa: o loader de AST
+  AUTO-CARREGA funções com prefixo `_rNN_` — stubs de função nos testes
+  precisam ser aplicados no dict do ambiente DEPOIS do `carregar()`.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
