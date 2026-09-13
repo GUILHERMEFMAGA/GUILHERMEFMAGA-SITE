@@ -200,7 +200,7 @@ class CompactadorHistorico(unittest.TestCase):
     def test_hook_no_montar_contexto_e_selo_r74(self):
         fonte = SOURCE.read_text(encoding='utf-8')
         self.assertIn('compactar_historico', fonte)
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r78]', fonte)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r79]', fonte)
         for rota in ('replayerros', 'guardaogatilhos', 'testarmalha',
                      'traduzir rota', 'criar rota', 'aquecer as'):
             self.assertIn(rota, fonte)

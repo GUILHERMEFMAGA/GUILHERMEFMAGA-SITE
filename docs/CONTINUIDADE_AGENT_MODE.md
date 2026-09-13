@@ -1,6 +1,6 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r78**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r79**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
@@ -8,10 +8,10 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 
 ## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r78** (r77 = STT, reservada). Suíte: **855 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r78 = ponta do log desta branch.
-- Código: `agente.py` ~39,5 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual + r78 de automação c/ Agendador do Windows), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código); r78 AUTOMAÇÃO PROFISSIONAL ('agendar windows ...' no Agendador de Tarefas do Windows — roda com o agente fechado; + correção real do parse da rota cron da r75).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r78; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 publicada (14, 15, 42, 43, 44); r77 = 38 STT (obra grande, release à parte); r78 publicada (automação profissional, a pedido do dono); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
+- Releases publicados: **r21 → r79** (o número r77 não foi usado — o STT saiu na ordem de publicação). Suíte: **871 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r79 = ponta do log desta branch.
+- Código: `agente.py` ~39,7 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual + r78 de automação c/ Agendador do Windows + r79 de voz/STT local), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código); r78 AUTOMAÇÃO PROFISSIONAL ('agendar windows ...' no Agendador de Tarefas do Windows — roda com o agente fechado; + correção real do parse da rota cron da r75); r79 VOZ (STT local whisper.cpp — 'falar' transcreve e o comando segue o fluxo normal; 'baixar stt' com 'sim' explícito).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r79; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — **COMPLETA**: r74 (31–37), r75 (28,29,30,39,40,41), r76 (14,15,42,43,44), r78 (automação profissional, a pedido), r79 (38 STT — o 'sim' explícito p/ o download foi dado pelo dono em 13/09); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,9 +116,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78 **855 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79 **871 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r53 + r75 + r76 + r78).
+  prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -1078,6 +1078,24 @@ ou relatórios reais sem revisão e autorização.
   (test_automacao_windows_r78.py). **855 testes OK**. Selo `-r78`. Não
   testado no Windows real (o schtasks de verdade roda no PC do dono — o
   primeiro 'agendar windows' dele e a prova).
+- **r79 — VOZ: STT LOCAL (whisper.cpp) — o item 38 da leva de 19 (a 'obra
+  grande'; era a RESERVA r77, publicada como r79 porque o selo segue a
+  ordem de publicacao — o numero r77 nao foi usado, registrado aqui com
+  honestidade)**: 'falar'/'ouvir' (hook no MAIN LOOP, antes das rotas: a
+  transcricao vira o proprio comando e segue o fluxo normal — rotas,
+  ferramentas e modelo) — grava o microfone (sounddevice, wav 16kHz mono,
+  ~6s) e roda o whisper-cli local; 'stt' mostra o status (o que tem/falta);
+  'baixar stt' baixa o PROGRAMA (whisper-bin-x64.zip v1.8.6, release
+  OFICIAL do ggml-org/whisper.cpp) + o MODELO (ggml-base.bin ~142 MB,
+  huggingface ggerganov/whisper.cpp) para `_stt/` — SEMPRE com 'sim'
+  explicito (regra combinada com o dono; o modo convidado tambem bloqueia
+  'baixar stt'). O audio NUNCA sai do PC. Timeout configuravel
+  ('stt_timeout_s', padrao 120s); audio mudo avisado; CPU fraca avisada
+  (frases curtas). sounddevice>=0.2,<1.0 entrou no requirements.txt
+  (entregue pelo 'atualizar agora'). +16 testes (test_voz_stt_r79.py).
+  **871 testes OK**. Selo `-r79`. Não testado no PC real (microfone e
+  whisper-cli se provam no PC do dono: 'atualizar agora' -> 'baixar stt'
+  (sim) -> 'falar').
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e

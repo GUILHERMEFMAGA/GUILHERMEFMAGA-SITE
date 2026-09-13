@@ -48,7 +48,7 @@ class TestAutomacaoWindowsR78(unittest.TestCase):
     def test_selo_r78(self):
         with open(AGENTE_PY, encoding='utf-8') as f:
             fonte = f.read()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r78]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r79]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r76]'), 0)
 
     def test_bloco_r78_completo(self):

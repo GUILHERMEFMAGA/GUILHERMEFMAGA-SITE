@@ -1,3 +1,5 @@
 # r71: dependencias de runtime com faixa fixada (nunca mais quebra em silencio)
 langchain-openai>=1.0,<2.0
 langchain-google-genai>=4.0,<5.0
+# r79: STT local (whisper.cpp) — gravacao do microfone
+sounddevice>=0.2,<1.0

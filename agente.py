@@ -8923,6 +8923,27 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r79: VOZ — STT local (whisper.cpp, 100% local) ----
+    if n == "stt" or cmd.startswith("stt "):
+        _rel(_r79_stt_status())
+        return True
+    if cmd.startswith("baixar stt"):
+        _urls_bt = _r79_stt_urls()
+        _ok_bt = None
+        _pedir = globals().get('pedir_confirmacao')
+        _tamanho = ("Baixar o STT local? Vem do whisper.cpp OFICIAL: o programa (zip) + o modelo de fala "
+                    "(ggml-base, ~%d MB). Vai para a pasta _stt do agente e NUNCA sai do seu PC." % _urls_bt['modelo_mb'])
+        if _pedir:
+            _ok_bt = _pedir(_tamanho)
+        else:
+            _ok_bt = input("Baixar o STT? (sim/nao): ").strip().lower() in ('sim', 's')
+        if not _ok_bt:
+            _rel("Nada foi baixado.")
+            return True
+        _r = _r79_stt_baixar()
+        _rel(_r or "STT desligado (config 'stt_local': false).")
+        return True
+
     # ---- r78: AUTOMACAO PROFISSIONAL — Agendador de Tarefas do Windows ----
     if cmd.startswith("agendar windows"):
         _resto_aw = cmd[len("agendar windows"):].strip()
@@ -15843,6 +15864,192 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
         return False
 
 
+# ================= r79: VOZ — STT LOCAL (whisper.cpp, 100% local) =================
+# O item 38 da LISTA-IMPOSSIVEL (a "obra grande" da leva de 19): FALAR com o
+# agente. O reconhecimento roda no PC (whisper.cpp + modelo base multilíngue)
+# — o áudio NUNCA sai da máquina. Nada de nuvem. Download SÓ com 'sim'
+# explícito (regra combinada com o dono). Kill-switch: config 'stt_local'.
+# Nota de numeração: este item era a "reserva r77"; publicado como r79
+# porque o selo segue a ordem de publicação (o r77 não foi usado).
+# Selo: 2026-09-11-r79.
+
+def _r79_pasta_stt(pasta=None):
+    """r79: pasta do STT na casa do agente (programa + modelo + temporários)."""
+    raiz = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), '_stt')
+    try:
+        os.makedirs(raiz, exist_ok=True)
+    except Exception:
+        pass
+    return raiz
+
+
+def _r79_stt_urls(pasta=None):
+    """r79: de onde o download vem (fontes OFICIAIS) + para onde vai (local)."""
+    raiz = _r79_pasta_stt(pasta)
+    return {
+        'bin_zip': 'https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-bin-x64.zip',
+        'modelo': 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+        'modelo_mb': 142,
+        'bin_zip_local': os.path.join(raiz, 'whisper-bin-x64.zip'),
+        'bin_dir': os.path.join(raiz, 'bin'),
+        'modelo_local': os.path.join(raiz, 'ggml-base.bin'),
+    }
+
+
+def _r79_stt_achar_programa(pasta=None):
+    """r79: localiza o whisper-cli extraído (ou '')."""
+    raiz = _r79_pasta_stt(pasta)
+    nomes = ('whisper-cli.exe', 'whisper-cli')
+    try:
+        for _r, _d, _arqs in os.walk(raiz):
+            for a in _arqs:
+                if a in nomes:
+                    return os.path.join(_r, a)
+    except Exception:
+        pass
+    return ''
+
+
+def _r79_stt_status(pasta=None):
+    """r79: o que o STT tem e o que falta (honesto, sem promessa)."""
+    prog = _r79_stt_achar_programa(pasta=pasta)
+    urls = _r79_stt_urls(pasta=pasta)
+    modelo = urls['modelo_local']
+    tem_prog = bool(prog)
+    tem_modelo = os.path.isfile(modelo)
+    if tem_prog and tem_modelo:
+        return ('STT pronto (r79): programa e modelo presentes, 100% local.\n'
+                'Use: falar  (ou ouvir). O áudio fica no PC.')
+    faltam = []
+    if not tem_prog:
+        faltam.append('o PROGRAMA (whisper-cli, zip oficial do whisper.cpp)')
+    if not tem_modelo:
+        faltam.append('o MODELO de fala (ggml-base.bin, ~%d MB)' % urls['modelo_mb'])
+    return ('O STT ainda NAO esta completo: falta %s.\nBaixe com: baixar stt '
+            '(pede \'sim\' antes; fontes oficiais, download fica na pasta _stt).'
+            % ' e '.join(faltam))
+
+
+def _r79_stt_args(binary, modelo, wav, saida, lang='pt'):
+    """r79: argumentos do whisper-cli (LOGICA PURA, testada)."""
+    return ['-m', modelo, '-f', wav, '-l', lang, '-nt', '-of', saida]
+
+
+def _r79_gravar_wav(segundos=6, pasta=None):
+    """r79: grava o microfone em wav 16kHz mono (o formato do whisper)."""
+    raiz = _r79_pasta_stt(pasta)
+    wav = os.path.join(raiz, 'ultimo.wav')
+    try:
+        import sounddevice as _sd
+        import wave as _wave
+        samplerate = 16000
+        frames = _sd.rec(int(max(1, int(segundos)) * samplerate), samplerate=samplerate,
+                         channels=1, dtype='int16')
+        with _wave.open(wav, 'wb') as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(samplerate)
+            f.writeframes(frames.tobytes())
+        return wav
+    except Exception as e:
+        print('[STT r79]: nao consegui gravar o microfone (%s).' % type(e).__name__)
+        print('        (a dependencia de gravacao e o sounddevice — \'atualizar agora\'')
+        print('        entrega o requirements novo; confira tambem se o microfone esta liberado)')
+        return None
+
+
+def _r79_stt_transcrever(wav=None, gravar=None, rodar=None, pasta=None, lang='pt'):
+    """r79: FALA -> TEXTO, 100% local. Grava (se wav=None), roda o whisper-cli
+    e devolve o texto (ou None/mensagem honesta). O audio NUNCA sai do PC.
+    Kill-switch: config 'stt_local': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('stt_local', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    urls = _r79_stt_urls(pasta=pasta)
+    prog = _r79_stt_achar_programa(pasta=pasta)
+    if not prog or not os.path.isfile(urls['modelo_local']):
+        return _r79_stt_status(pasta=pasta)
+    raiz = _r79_pasta_stt(pasta)
+    saida = os.path.join(raiz, 'saida.txt')
+    if not wav:
+        _gravar = gravar or _r79_gravar_wav
+        wav = _gravar(pasta=pasta)
+        if not wav:
+            return None
+    args = _r79_stt_args(prog, urls['modelo_local'], wav, saida, lang=lang)
+    try:
+        if ler:
+            _t = ler('stt_timeout_s', pasta=pasta, padrao=120)
+            timeout = max(10, min(600, int(_t))) if isinstance(_t, (int, float)) else 120
+        else:
+            timeout = 120
+    except Exception:
+        timeout = 120
+
+    def _rodar_real(binary, argumentos, _timeout):
+        import subprocess as _sp
+        return _sp.run([binary] + argumentos, capture_output=True, text=True,
+                       encoding='utf-8', errors='ignore', timeout=_timeout)
+
+    try:
+        r = (rodar or _rodar_real)(prog, args, timeout)
+    except Exception as e:
+        if 'Timeout' in type(e).__name__:
+            return ('Levou mais de %ds para transcrever (o modelo base e lento em CPU fraca). '
+                    'Tente frases mais curtas.' % timeout)
+        return 'O programa de transcricao falhou: %s' % type(e).__name__
+    if getattr(r, 'returncode', 1) != 0:
+        return ('A transcricao nao saiu: %s' % str((getattr(r, 'stderr', '') or '').strip()[:200] or 'sem detalhe'))
+    if not os.path.isfile(saida):
+        return 'A transcricao nao gerou texto (o audio pode ter ficado mudo — fale mais perto do microfone).'
+    try:
+        with open(saida, 'r', encoding='utf-8', errors='ignore') as f:
+            txt = ' '.join(l.strip() for l in f.read().splitlines() if l.strip())
+    except Exception:
+        return 'A transcricao falhou ao ler o resultado.'
+    return txt or None
+
+
+def _r79_stt_baixar(baixar=None, extrair=None, pasta=None):
+    """r79: baixa o PROGRAMA (zip oficial do whisper.cpp) + o MODELO (base,
+    ~142 MB) para _stt/. SEMPRE com 'sim' antes (a rota cuida). Devolve resumo
+    ou mensagem honesta. Kill-switch: 'stt_local': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('stt_local', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    urls = _r79_stt_urls(pasta=pasta)
+
+    def _baixar_real(url, destino):
+        import shutil as _sh
+        import urllib.request as _ur
+        with _ur.urlopen(url, timeout=60) as r:
+            with open(destino, 'wb') as f:
+                _sh.copyfileobj(r, f)
+
+    def _extrair_real(zipcaminho, dir_destino):
+        import zipfile as _zf
+        with _zf.ZipFile(zipcaminho) as z:
+            z.extractall(dir_destino)
+
+    try:
+        (baixar or _baixar_real)(urls['bin_zip'], urls['bin_zip_local'])
+        (extrair or _extrair_real)(urls['bin_zip_local'], urls['bin_dir'])
+        (baixar or _baixar_real)(urls['modelo'], urls['modelo_local'])
+    except Exception as e:
+        return 'O download falhou (%s) — nada foi gravado como pronto. Confira a conexao e repita: baixar stt' % type(e).__name__
+    prog = _r79_stt_achar_programa(pasta=pasta)
+    if not prog or not os.path.isfile(urls['modelo_local']):
+        return 'O download terminou mas nao encontrei as pecas no lugar — repita: baixar stt'
+    return ('STT instalado (r79): programa e modelo na pasta _stt, 100% local.\n'
+            'Agora pode: falar')
+
+
 # ================= r78: AUTOMACAO PROFISSIONAL — AGENDADOR DO WINDOWS =================
 # A "obra" que o dono pediu apos a auditoria de honestidade da r77: tarefas que
 # rodam MESMO COM O AGENTE FECHADO, porque o garantidor e o proprio Windows
@@ -16916,6 +17123,7 @@ def _r75_convidado_bloqueia(comando):
         'listar aprendizado',
         'ligar ia', 'desligar ia', 'configurar ia', 'ajustes ia',
         'cofre', 'cron', 'minha agenda', 'aquecer', 'fila', 'sandbox',
+        'baixar stt',
         'criar checkpoint', 'restaurar checkpoint',
     )
     for bloq in bloqueios:
@@ -39257,7 +39465,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r78] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r79] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -39325,6 +39533,17 @@ while True:
         # Enter sem nada digitado: não envia mensagem vazia pro modelo (isso
         # causava o erro "última mensagem precisa ser do usuário").
         continue
+
+    # r79: VOZ — 'falar'/'ouvir' transcreve um comando DITO (whisper.cpp, 100% local)
+    if comando_usuario.strip().lower() in ('falar', 'ouvir', 'meouve', 'falaai'):
+        try:
+            _t9 = (globals().get('_r79_stt_transcrever') or (lambda *a, **k: None))()
+        except Exception:
+            _t9 = None
+        if not _t9:
+            continue
+        print('[Voz r79]: entendi: "%s"' % _t9)
+        comando_usuario = _t9
 
     if comando_usuario.strip().lower() in ("revalidar", "revalidar ias", "revalidar chaves", "resetar ias", "testar ias"):
         # Limpa o castigo das IAs (mortas persistidas + cooldowns de cota/rede)
