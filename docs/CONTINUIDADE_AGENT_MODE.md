@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65 **645 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66 **649 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -773,6 +773,16 @@ ou relatórios reais sem revisão e autorização.
   "bateria"). Conversa normal passa ilesa. **645 testes OK** (+5:
   test_guarda_anti_invencao_r65.py). Selo `-r65`. Não testado no Windows
   real.
+- **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
+  digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
+  o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
+  `_r50_comandos` agora usam a mesma tupla de variantes normalizadas
+  (atualizaragora/atualizaagora/atualisaagora/atualisaragora/atualiseagora/
+  atualizaroagente/atualizeoagente/atualizaragente/atualizagente/atualiza/
+  atualizar/atualize); "atualizar o defender" etc. continuam com as rotas
+  deles (tupla EXATA, sem startswith solto). +4 testes
+  (test_gatilhos_atualizar_r66.py). **649 testes OK**. Selo `-r66`. Não
+  testado no Windows real.
 - A avaliação bruta continua podendo errar. O usuário mostrou RAM incluída em
   armazenamento persistente e código inventado `create_ia`/`CreateIA`. Não mascarar
   resultados brutos com respostas prontas nem apresentar isso como ganho do GGUF.
