@@ -8923,6 +8923,48 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r78: AUTOMACAO PROFISSIONAL — Agendador de Tarefas do Windows ----
+    if cmd.startswith("agendar windows"):
+        _resto_aw = cmd[len("agendar windows"):].strip()
+        if not _resto_aw:
+            _r = _r78_tarefas_listar()
+            _rel(_r if _r else "Nenhuma tarefa criada no Agendador do Windows ainda (r78).\nCrie: agendar windows <nome> as HH:MM: <o que eu faco> (dias opcionais: as 08:00 seg, ter)")
+            return True
+        if _resto_aw.startswith("apagar"):
+            _nome_ap = _resto_aw[len("apagar"):].strip().lstrip(":")
+            if not _nome_ap:
+                _rel("Mostra assim: agendar windows apagar <nome>")
+                return True
+            _ok_aw = None
+            _pedir = globals().get('pedir_confirmacao')
+            if _pedir:
+                _ok_aw = _pedir("Apagar esta tarefa do Agendador do Windows? %s" % _nome_ap)
+            else:
+                _ok_aw = input("Apagar esta tarefa? (sim/nao): ").strip().lower() in ('sim', 's')
+            if not _ok_aw:
+                _rel("Nada foi apagado.")
+                return True
+            _r = _r78_sch_apagar(_nome_ap)
+            _rel(_r or "Feature desligada (config 'tarefas_windows': false).")
+            return True
+        _parse_aw = _r78_parse_agenda(_resto_aw)
+        if not _parse_aw:
+            _rel("Formato: agendar windows <nome> as HH:MM: <o que eu faco>\nEx.: agendar windows backup as 08:00: zipa a pasta projetos\n(dias opcionais: as 08:00 seg, ter). A tarefa roda mesmo com o agente FECHADO.")
+            return True
+        _nome_aw, _quando_aw, _dias_aw, _cmd_aw = _parse_aw
+        _ok_aw = None
+        _pedir = globals().get('pedir_confirmacao')
+        if _pedir:
+            _ok_aw = _pedir("Criar no Agendador do WINDOWS (roda mesmo com o agente fechado): %s as %s -> %s" % (_nome_aw, _quando_aw, _cmd_aw[:80]))
+        else:
+            _ok_aw = input("Criar esta tarefa no Windows? (sim/nao): ").strip().lower() in ('sim', 's')
+        if not _ok_aw:
+            _rel("Nada foi criado.")
+            return True
+        _r = _r78_sch_criar(_nome_aw, _quando_aw, _cmd_aw, dias=_dias_aw)
+        _rel(_r or "Feature desligada (config 'tarefas_windows': false).")
+        return True
+
     # ---- r76: CONHECIMENTO E CASA AMPLIADA — cerebro v1, auditoria, visao, manual ----
     if n.startswith("exportarcerebro") or cmd.startswith("exportar cerebro"):
         _resto_xc = cmd.split(":", 1)[1].strip() if ":" in cmd else ""
@@ -9029,16 +9071,16 @@ def _processar_cerebro_local(comando: str) -> bool:
                 _rel("Formato: cron adicionar <nome> as HH:MM: <o que eu faco> — ex.: cron adicionar backup as 08:00: zipa a pasta projetos")
                 return True
             _nome_c, _cauda_c = _r.split(" as ", 1)
-            _head_c, _cmd_c = _cauda_c.split(":", 1)
             import re as _re_c
-            _m_c = _re_c.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*(.*?)\s*$', _head_c)
-            if not _m_c or not _cmd_c.strip():
-                _rel("Hora invalida. Use HH:MM (ex.: as 08:00; opcional dias: as 08:00 seg, ter)")
+            _m_c = _re_c.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*([A-Za-z, ]*?)\s*:\s*(.+)', _cauda_c)
+            if not _m_c or not _m_c.group(4).strip():
+                _rel("Formato: cron adicionar <nome> as HH:MM: <o que eu faco> (ex.: cron adicionar backup as 08:00: zipa a pasta projetos)")
                 return True
             _quando_c = '%02d:%s' % (int(_m_c.group(1)), _m_c.group(2))
-            _dias_c = _r75_cron_dias(_m_c.group(3))
+            _dias_c = _r75_cron_dias(_m_c.group(3).strip())
+            _cmd_c = _m_c.group(4).strip()
             _d = [e for e in _r75_cron_dados() if e.get('nome') != _nome_c.strip()]
-            _d.append({'nome': _nome_c.strip(), 'quando': _quando_c, 'dias': _dias_c, 'comando': _cmd_c.strip()[:200], 'ativo': True})
+            _d.append({'nome': _nome_c.strip(), 'quando': _quando_c, 'dias': _dias_c, 'comando': _cmd_c[:200], 'ativo': True})
             _r75_cron_gravar(_d)
             _dias_txt = ", ".join(_R75_NOMES_DIAS[x] for x in _dias_c) if _dias_c else "todo dia"
             _rel("Agendado (r75): '%s' as %s, %s -> %s (roda so com o agente aberto)" % (_nome_c.strip(), _quando_c, _dias_txt, _cmd_c.strip()[:60]))
@@ -15799,6 +15841,215 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
     except Exception:
         globals()['_r74_aquecer_agendado'] = False
         return False
+
+
+# ================= r78: AUTOMACAO PROFISSIONAL — AGENDADOR DO WINDOWS =================
+# A "obra" que o dono pediu apos a auditoria de honestidade da r77: tarefas que
+# rodam MESMO COM O AGENTE FECHADO, porque o garantidor e o proprio Windows
+# (schtasks / Agendador de Tarefas). O agente e a FRENTE (vocal, leigo,
+# confere tudo); o Windows e o MOTOR (nao falha na hora). 100% local; o
+# chaves.txt e o GGUF principal nunca sao tocados. Kill-switch: config
+# 'tarefas_windows': false. Selo: 2026-09-11-r78.
+
+def _r78_pasta_tarefas(pasta=None):
+    """r78: pasta dos arquivos gerados pela feature (na pasta do agente)."""
+    raiz = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), '_tarefas_windows')
+    try:
+        os.makedirs(raiz, exist_ok=True)
+    except Exception:
+        pass
+    return raiz
+
+
+def _r78_arquivo_tarefas(pasta=None):
+    """r78: registro do que o agente criou (honestidade: o que ele gerou)."""
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'tarefas_windows.json')
+
+
+def _r78_slug(nome):
+    """r78: nome de arquivo seguro (so letras/numeros/traco, sem acento)."""
+    import re as _re
+    s = _re.sub(r'[^A-Za-z0-9]+', '-', str(nome or '')).strip('-').lower()
+    return s or 'tarefa'
+
+
+def _r78_nome_sch(nome):
+    """r78: nome da tarefa no Agendador do Windows (sempre com o prefixo)."""
+    import re as _re
+    s = _re.sub(r'[^A-Za-z0-9]+', '_', str(nome or '')).strip('_')
+    return ('SuperAgente_%s' % s) if s else 'SuperAgente_tarefa'
+
+
+def _r78_dias_para_sch(dias):
+    """r78: [0, 2] -> 'MON,WED' (o formato do schtasks); None/vazio -> None."""
+    mapa = {0: 'MON', 1: 'TUE', 2: 'WED', 3: 'THU', 4: 'FRI', 5: 'SAT', 6: 'SUN'}
+    if not dias:
+        return None
+    seq = [mapa[d] for d in dias if d in mapa]
+    return ','.join(seq) if seq else None
+
+
+def _r78_parse_agenda(texto):
+    """r78: LOGICA PURA do formato 'agendar windows'.
+    'backup as 08:00: zipa a pasta x' -> ('backup', '08:00', None, 'zipa a pasta x')
+    'backup as 08:00 seg, ter: ...'   -> dias opcionais no fim da hora.
+    Devolve (nome, quando, dias, comando) ou None se nao bater o formato."""
+    import re as _re
+    t = str(texto or '').strip()
+    if ' as ' not in t:
+        return None
+    nome, cauda = t.split(' as ', 1)
+    nome = nome.strip()
+    if not nome or len(nome) > 30:
+        return None
+    # a hora tem ':' dentro — regex fullmatch (o ':' separador vem DEPOIS da hora/dias)
+    m = _re.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*([A-Za-z, ]*?)\s*:\s*(.+)', cauda)
+    if not m:
+        return None
+    quando = '%02d:%s' % (int(m.group(1)), m.group(2))
+    comando = m.group(4).strip()
+    if not comando:
+        return None
+    dias = globals().get('_r75_cron_dias')
+    dias = dias(m.group(3).strip()) if dias else None
+    return (nome, quando, dias, comando)
+
+
+def _r78_escrever_bat(nome, comando, pasta=None):
+    """r78: gera o par <slug>.txt (o comando + 'sair') e <slug>.bat (CRLF puro,
+    minimo, SEM blocos if e SEM REM — regra 7 da casa). O .bat liga o agente
+    com o modo tarefa (silencioso, sem voz) e o comando entra pelo stdin."""
+    raiz = _r78_pasta_tarefas(pasta)
+    slug = _r78_slug(nome)
+    txt = os.path.join(raiz, slug + '.txt')
+    bat = os.path.join(raiz, slug + '.bat')
+    conteudo = comando + '\nsair\n'
+    try:
+        with open(txt, 'wb') as f:
+            try:
+                f.write(conteudo.encode('cp1252'))  # o console do Windows le cp1252
+            except Exception:
+                f.write(conteudo.encode('ascii', 'replace'))
+    except Exception:
+        return None
+    linhas = [
+        '@echo off',
+        'set AGENTE_TAREFA_WINDOWS=1',
+        'cd /d "%s"' % (pasta or globals().get('PASTA_BASE') or os.getcwd()),
+        'python "%s" < "%s"' % (os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'agente.py'), txt),
+    ]
+    try:
+        with open(bat, 'wb') as f:
+            f.write(('\r\n'.join(linhas) + '\r\n').encode('ascii', 'replace'))
+    except Exception:
+        return None
+    return bat
+
+
+def _r78_rodar_sch(args):
+    """r78: executora REAL do schtasks (so Windows). Devolve (ok, mensagem)."""
+    import subprocess as _sp
+    import sys as _sys
+    if not _sys.platform.startswith('win'):
+        return False, 'schtasks so existe no Windows — nada foi criado aqui.'
+    try:
+        r = _sp.run(['schtasks'] + list(args), capture_output=True, text=True, timeout=60)
+    except Exception as e:
+        return False, type(e).__name__
+    msg = ((r.stderr or '') + (r.stdout or '')).strip()
+    return (r.returncode == 0), msg[:300]
+
+
+def _r78_sch_criar(nome, quando, comando, dias=None, rodar=None, pasta=None):
+    """r78: CRIA a tarefa no Agendador do Windows (o motor e o Windows, nao o
+    agente — entao roda mesmo com o agente fechado). Sempre com 'sim' antes
+    (a chamada de rota cuida disso). Devolve resumo (str) ou None (kill-switch)."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('tarefas_windows', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    if not comando or str(comando).strip().lower().startswith(('fila:', 'em segundo plano:')):
+        return 'Essa tarefa usa a fila de fundo, que precisa do agente aberto. Para o Agendador do Windows, use um comando direto (ex.: zipe a pasta projetos).'
+    bat = _r78_escrever_bat(nome, comando, pasta=pasta)
+    if not bat:
+        return 'Nao consegui escrever os arquivos da tarefa na pasta do agente.'
+    dias_sch = _r78_dias_para_sch(dias)
+    args = ['/Create', '/TN', _r78_nome_sch(nome), '/TR', '"%s"' % bat,
+            '/SC', 'DAILY', '/ST', quando, '/F']
+    if dias_sch:
+        args += ['/D', dias_sch]
+    ok, msg = (rodar or _r78_rodar_sch)(args)
+    if not ok:
+        return 'O Agendador do Windows nao aceitou a tarefa: %s' % (msg or 'sem detalhe')
+    import datetime as _dt
+    registro = {'nome': str(nome).strip(), 'quando': quando, 'dias': dias,
+                'comando': comando, 'criado_em': _dt.datetime.now().isoformat(timespec='seconds'),
+                'tarefa_sch': _r78_nome_sch(nome), 'bat': bat}
+    dados = _r74_ler_json(_r78_arquivo_tarefas(pasta), [])
+    if not isinstance(dados, list):
+        dados = []
+    dados = [e for e in dados if e.get('nome') != registro['nome']]
+    dados.append(registro)
+    _r74_escrever_json(_r78_arquivo_tarefas(pasta), dados[-50:])
+    _dias_txt = ', '.join(['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'][d] for d in dias) if dias else 'todo dia'
+    return ('Tarefa criada no AGENDADOR DO WINDOWS: "%s" as %s, %s -> %s.\n'
+            'Agora ela roda mesmo com o agente fechado (o Windows garante a hora). '
+            'Veja tambem no Windows: win+R, digite taskschd.msc.'
+            % (registro['nome'], quando, _dias_txt, comando[:60]))
+
+
+def _r78_sch_apagar(nome, rodar=None, pasta=None):
+    """r78: APAGA a tarefa do Agendador do Windows + os arquivos que a feature
+    gerou (registro, .bat e .txt — os nossos, nao dados do dono)."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('tarefas_windows', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    registro = None
+    dados = _r74_ler_json(_r78_arquivo_tarefas(pasta), [])
+    if isinstance(dados, list):
+        for e in dados:
+            if isinstance(e, dict) and e.get('nome') == str(nome).strip():
+                registro = e
+                break
+    if not registro:
+        return 'Nao achei essa tarefa criada por mim. Veja a lista: agendar windows'
+    ok, msg = (rodar or _r78_rodar_sch)(['/Delete', '/TN', registro.get('tarefa_sch', _r78_nome_sch(nome)), '/F'])
+    if not ok:
+        return 'O Agendador do Windows nao apagou a tarefa: %s' % (msg or 'sem detalhe')
+    for arq in (registro.get('bat'),):
+        try:
+            if arq and os.path.isfile(arq):
+                os.remove(arq)
+        except Exception:
+            pass
+    try:
+        _txt = (registro.get('bat') or '').replace('.bat', '.txt')
+        if _txt and os.path.isfile(_txt):
+            os.remove(_txt)
+    except Exception:
+        pass
+    dados = [e for e in dados if not (isinstance(e, dict) and e.get('nome') == registro['nome'])]
+    _r74_escrever_json(_r78_arquivo_tarefas(pasta), dados[-50:])
+    return 'Tarefa apagada do Agendador do Windows: "%s" (e os arquivos que eu gerei para ela).' % registro['nome']
+
+
+def _r78_tarefas_listar(pasta=None):
+    """r78: o que o agente criou no Agendador do Windows."""
+    dados = _r74_ler_json(_r78_arquivo_tarefas(pasta), [])
+    if not isinstance(dados, list) or not dados:
+        return None
+    linhas = ['Tarefas criadas por mim no Agendador do Windows (r78): %d' % len(dados)]
+    for i, e in enumerate(dados[-10:], 1):
+        _dias = ', '.join(['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'][d] for d in e.get('dias', [])) if e.get('dias') else 'todo dia'
+        linhas.append('  %d. %s as %s (%s): %s' % (i, e.get('nome', '?'), e.get('quando', '?'),
+                                                   _dias, str(e.get('comando', '?'))[:60]))
+    linhas.append('(elas rodam mesmo com o agente fechado; para ver no Windows: win+R, taskschd.msc)')
+    return '\n'.join(linhas)
 
 
 # ================= r76: CONHECIMENTO E CASA AMPLIADA =================
@@ -39006,7 +39257,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r76] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r78] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -39063,7 +39314,7 @@ if _bemvindo73:
     except Exception:
         pass  # r73: boas-vindas nunca derrubam a abertura
 print("")
-if not _r67_voz_silenciada():  # r67: silenciar/nao me perturbe pausa a voz
+if not _r67_voz_silenciada() and not os.environ.get('AGENTE_TAREFA_WINDOWS'):  # r78: tarefa agendada nao fala
     threading.Thread(target=falar, args=("Agente pronto para uso.",), daemon=True).start()  # r47: voz nao segura o arranque
 
 while True:

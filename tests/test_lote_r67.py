@@ -344,8 +344,8 @@ class Estrutura(unittest.TestCase):
                         texto.index('if _r62_comandos(comando):'))
         self.assertIn('LOTE SAUDE (r67)', texto)
         self.assertEqual(texto.count('\n_r67_abertura()'), 1)
-        self.assertIn('if not _r67_voz_silenciada():', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r76]'), 1)
+        self.assertIn("if not _r67_voz_silenciada() and not os.environ.get('AGENTE_TAREFA_WINDOWS'):", texto)  # r78: modo tarefa silencia a voz
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r78]'), 1)
 
 
 if __name__ == '__main__':

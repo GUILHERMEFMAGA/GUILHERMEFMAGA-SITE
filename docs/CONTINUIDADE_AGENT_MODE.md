@@ -1,6 +1,6 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r76**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r78**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
@@ -8,10 +8,10 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 
 ## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r76**. Suíte: **839 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r76 = ponta do log desta branch.
-- Código: `agente.py` ~39,2 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r76; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 publicada (14, 15, 42, 43, 44); r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
+- Releases publicados: **r21 → r78** (r77 = STT, reservada). Suíte: **855 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r78 = ponta do log desta branch.
+- Código: `agente.py` ~39,5 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual + r78 de automação c/ Agendador do Windows), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código); r78 AUTOMAÇÃO PROFISSIONAL ('agendar windows ...' no Agendador de Tarefas do Windows — roda com o agente fechado; + correção real do parse da rota cron da r75).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r78; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 publicada (14, 15, 42, 43, 44); r77 = 38 STT (obra grande, release à parte); r78 publicada (automação profissional, a pedido do dono); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,9 +116,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76 **839 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78 **855 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r53 + r75 + r76).
+  prefixos r20-r45 + r50-r53 + r75 + r76 + r78).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -1054,6 +1054,30 @@ ou relatórios reais sem revisão e autorização.
   38 STT local (obra grande, release à parte). Lições da casa: fake de
   agente.py em teste precisa ser PYTHON VALIDO (selo dentro de string);
   `%d % (x or 'n/a')` quebra quando x==0.
+- **r78 — AUTOMAÇÃO PROFISSIONAL (a pedido do dono, após a auditoria de
+  honestidade sobre a automação; o número r77 fica reservado p/ STT)**:
+  'agendar windows <nome> as HH:MM: <comando>' (dias opcionais: 'as 08:00
+  seg, ter') cria a tarefa no AGENDADOR DE TAREFAS DO WINDOWS (schtasks
+  /Create /SC DAILY /ST HH:MM [/D MON,TUE]) — a automação roda MESMO COM O
+  AGENTE FECHADO: o motor e o Windows, o agente e a frente. Como: a feature
+  gera em '_tarefas_windows/' um .txt (o comando + 'sair') e um .bat (CRLF
+  puro, minimo, SEM if/SEM REM — regra 7) que roda 'python agente.py <
+  arquivo' com a env AGENTE_TAREFA_WINDOWS=1; na abertura, esse env
+  SILENCIA a voz 'agente pronto' (tarefa as 6h da manha nao grita).
+  'agendar windows' lista (registro em tarefas_windows.json + taskschd.msc);
+  'agendar windows apagar <nome>' (c/ 'sim') tira do Windows + apaga os
+  arquivos que a feature gerou (so os nossos; dados do dono jamais).
+  Recusa honesta: comando 'fila:' nao vira tarefa de Windows (a fila precisa
+  do agente aberto). Fora do Windows: 'schtasks so existe no Windows — nada
+  foi criado' (a executora real e isolada e injetavel nos testes).
+  CORRECAO REAL (r75): o parse da rota 'cron adicionar' quebrava a hora —
+  split(' : ') no meio do '08:00' dava '08' + '00: comando' e respondia
+  'hora invalida' para TUDO; agora e regex fullmatch (a rota nao e testada
+  pelo loader, por isso passou batido — lição: parse de rota vai em FUNCAO
+  PURA testavel, como o _r78_parse_agenda). +16 testes
+  (test_automacao_windows_r78.py). **855 testes OK**. Selo `-r78`. Não
+  testado no Windows real (o schtasks de verdade roda no PC do dono — o
+  primeiro 'agendar windows' dele e a prova).
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
