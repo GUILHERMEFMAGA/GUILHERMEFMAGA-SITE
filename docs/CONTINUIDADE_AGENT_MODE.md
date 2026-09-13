@@ -108,7 +108,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69 **724 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70 **737 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -823,6 +823,29 @@ ou relatórios reais sem revisão e autorização.
   diferentes); typos pegos: 'graciosapos', gatilho duplo. +15 testes
   (test_nucleo_r69.py). **724 testes OK**. Selo `-r69`. Não testado no
   Windows real.
+- **r70 — FORA DO PADRÃO (modo protótipo, exclusivo do dono da branch; pedido:
+  "mais inteligente que todas as IAs, algo que empresas nunca pensaram")**: 5
+  ganchos novos SOBRE o núcleo r69, nada apagado: (1) **FATOS ANTES DO
+  MODELO** — `_r70_responder_por_fato` (RAG caseiro: `_r70_tokenizar` +
+  `_r70_recuperar_fatos`, overlap/sqrt, limiar 0.34) responde NA HORA o que o
+  usuário ensinou, com FONTE, sem chamar o GGUF (gancho no topo do
+  _processar_cerebro_local, após as fases r69); 'o que voce sabe sobre X'
+  lista fatos casados; (2) **REVISOR DE 2ª PASSADA** — `_r70_revisar`
+  enxertado no ÚNICO return da geração local (antes do cache r24): anti-
+  evasiva ('sou apenas uma ia'/'nao tenho acesso' é MENTIRA nesta casa →
+  [Correção do núcleo]), anti-frase-repetida, nota de vazio; heurística de
+  corte por pontuação REJEITADA de propósito (falso positivo com a r51 —
+  corte real é por finish_reason); (3) **DICA DO PRÓXIMO COMANDO** —
+  `_r70_dica_de_proximo` (bigramas sobre o registro r67; feito() imprime a
+  dica); (4) **MODO DETALHADO** — 'modo detalhado' grava config
+  resposta_detalhada e o teto turbo CEDE (config explícita vence; alavanca
+  elif no degrau r43); (5) **INJEÇÃO RANQUEADA** — o pack A2 da r69 agora
+  ordena fatos por relevância à pergunta (mesma métrica do RAG). Aulas: a
+  CADEIA r70 foi esquecida no 1º patch (rota morta — a estrutura-teste
+  pegou); _r67_ler/definir_config com PASTA_BASE fallback; _norm_pt em
+  ambiente sem _garantir_tools desliga anti-evasiva (correto: sem tools não
+  há o que corrigir). +13 testes (test_fora_do_padrao_r70.py). **737 testes
+  OK**. Selo `-r70`. Não testado no Windows real.
 - **r68 — LOTE EXTREMO (as 30 ideias da lista-30; pré-checagem anti-duplicata
   SUBSTITUIU 3: pomodoro (ferramenta 19), rastreio de hábitos
   (rastreador_habitos) e área de transferência (area_transferencia) JÁ
