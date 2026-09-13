@@ -1,15 +1,23 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 10/09/2026. Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r73**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
 Ele não substitui a inspeção do código, do histórico Git e dos comentários posteriores.
 
+## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
+
+- Releases publicados: **r21 → r73**. Suíte: **765 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa), `70a42fa` (r72), `f75e6ab` (r71).
+- Código: `agente.py` ~37,5 mil linhas (1.216 funções de topo, 513 ferramentas @tool), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json) + esquecer específico + deps pinadas; r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele deve pular da r64 pra r73; aguardar prints; (2) usuário vai escolher NÚMEROS da LISTA-100 (`esqueletos_ideias/2026-09-13-lista100-funcoes-e-ferramentas.md`, SÓ PROPOSTA, 50 funções + 50 ferramentas) para implementar no padrão da casa; (3) maiores futuros: RAG dos documentos do usuário (o maior), STT local, manual do usuário (`esqueletos_ideias/2026-09-13-analise-de-lacunas.md`).
+- Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
+
 ## Onde continuar
 
 - Repositório: https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE
-- PR ativo **#3**: https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/pull/3
+- PR ativo HOJE **#4**: https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/pull/4 (continuação do PR #3, que permanece aberto e intacto)
 - Título: **Super Agente PC: atualização completa — substitui o PR #2**.
 - Branch da entrega r21: `arena/01a08d8e-guilhermefmaga-site`, base `main` — PR de
   continuação do PR #3 (título "Super Agente PC r21: confiabilidade das respostas locais").
