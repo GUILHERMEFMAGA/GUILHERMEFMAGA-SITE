@@ -1199,6 +1199,16 @@ def _chave_ia(nome_env):
     valor = os.environ.get(nome_env, "")
     if valor:
         return valor.strip()
+    # r75 (40): COFRE — chaves protegidas por DPAPI primeiro; o chaves.txt
+    # continua intato como backup (regra da casa: nunca apagar nada).
+    _cofre75 = globals().get('_r75_cofre_ler')
+    if _cofre75:
+        try:
+            _v75 = _cofre75(nome_env)
+            if _v75:
+                return _v75
+        except Exception:
+            pass
     for nome_arq in ("chaves.txt", ".env"):
         caminho_arq = os.path.join(PASTA_BASE, nome_arq)
         if os.path.exists(caminho_arq):
@@ -8913,6 +8923,138 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r75: CASA — fila de fundo, cron, lentidao, sandbox, cofre, convidado ----
+    if n in ("fila",) or cmd.startswith("fila") or cmd.startswith("em segundo plano"):
+        _resto_fl = cmd.split("fila", 1)[-1].strip() if cmd.startswith("fila") else cmd.split("em segundo plano", 1)[-1].strip()
+        _resto_fl = _resto_fl.lstrip(":").strip()
+        if not _resto_fl:
+            _r = _r75_fila_listar()
+            _rel(_r if _r else "Fila vazia. Use: fila: <o que eu faco em segundo plano>")
+        else:
+            _r = _r75_fila_enviar(_resto_fl)
+            _rel("Na fila de fundo (r75): \"%s\" — sigo conversando; \"fila\" mostra o resultado." % _resto_fl[:80]
+                 if _r else "Fila de fundo desligada (config 'fila_de_fundo': false).")
+        return True
+    if cmd.startswith("cron") or cmd.startswith("minha agenda"):
+        _resto_cr = cmd[len("cron"):].strip() if cmd.startswith("cron") else cmd[len("minha agenda"):].strip()
+        def _r75_cron_caminho():
+            return os.path.join(globals().get('PASTA_BASE') or os.getcwd(), 'agenda_cron.json')
+        def _r75_cron_dados():
+            _d = _r74_ler_json(_r75_cron_caminho(), [])
+            return _d if isinstance(_d, list) else []
+        def _r75_cron_gravar(_d):
+            _r74_escrever_json(_r75_cron_caminho(), _d)
+        if not _resto_cr:
+            _d = _r75_cron_dados()
+            if not _d:
+                _rel("Agenda cron vazia (r75). Crie: cron adicionar <nome> as HH:MM: <o que eu faco> (dias opcionais: as 08:00 seg, ter)")
+            else:
+                _linhas = ["Agenda cron (r75): %d tarefa(s):" % len(_d)]
+                for _i, _e in enumerate(_d, 1):
+                    _dias = ", ".join(_R75_NOMES_DIAS[x] for x in _e.get('dias', [])) if _e.get('dias') else 'todo dia'
+                    _linhas.append("  %d. %s as %s (%s): %s" % (_i, _e.get('nome', '?'), _e.get('quando', '?'), _dias, str(_e.get('comando', '?'))[:60]))
+                _rel("\n".join(_linhas) + "\n(Rodam so com o agente aberto; desliga: config 'agenda_cron': false)")
+            return True
+        if _resto_cr.startswith("adicionar"):
+            _r = _resto_cr[len("adicionar"):].strip().lstrip(":").strip()
+            if " as " not in _r or ":" not in _r.split(" as ", 1)[1]:
+                _rel("Formato: cron adicionar <nome> as HH:MM: <o que eu faco> — ex.: cron adicionar backup as 08:00: zipa a pasta projetos")
+                return True
+            _nome_c, _cauda_c = _r.split(" as ", 1)
+            _head_c, _cmd_c = _cauda_c.split(":", 1)
+            import re as _re_c
+            _m_c = _re_c.fullmatch(r'\s*([01]?\d|2[0-3]):([0-5]\d)\s*(.*?)\s*$', _head_c)
+            if not _m_c or not _cmd_c.strip():
+                _rel("Hora invalida. Use HH:MM (ex.: as 08:00; opcional dias: as 08:00 seg, ter)")
+                return True
+            _quando_c = '%02d:%s' % (int(_m_c.group(1)), _m_c.group(2))
+            _dias_c = _r75_cron_dias(_m_c.group(3))
+            _d = [e for e in _r75_cron_dados() if e.get('nome') != _nome_c.strip()]
+            _d.append({'nome': _nome_c.strip(), 'quando': _quando_c, 'dias': _dias_c, 'comando': _cmd_c.strip()[:200], 'ativo': True})
+            _r75_cron_gravar(_d)
+            _dias_txt = ", ".join(_R75_NOMES_DIAS[x] for x in _dias_c) if _dias_c else "todo dia"
+            _rel("Agendado (r75): '%s' as %s, %s -> %s (roda so com o agente aberto)" % (_nome_c.strip(), _quando_c, _dias_txt, _cmd_c.strip()[:60]))
+            return True
+        if _resto_cr.startswith("remover"):
+            _nome_rm = _resto_cr[len("remover"):].strip().lstrip(":")
+            _d = _r75_cron_dados()
+            _antes = len(_d)
+            _d = [e for e in _d if e.get('nome') != _nome_rm]
+            _r75_cron_gravar(_d)
+            _rel("Removido da agenda." if len(_d) < _antes else "Nao achei essa tarefa. Veja: cron")
+            return True
+        import re as _re_d
+        _m_d = _re_d.match(r'^(\S+)\s+dias\s+(.+)$', _resto_cr)
+        if _m_d:
+            _dias_d = _r75_cron_dias(_m_d.group(2))
+            _d = _r75_cron_dados()
+            _achou = False
+            for _e in _d:
+                if _e.get('nome') == _m_d.group(1):
+                    _e['dias'] = _dias_d
+                    _achou = True
+            _r75_cron_gravar(_d)
+            _rel("Dias atualizados." if _achou else "Nao achei '%s'. Veja: cron" % _m_d.group(1))
+            return True
+        _rel("Cron local (r75): 'cron' lista | 'cron adicionar <nome> as HH:MM: <comando>' cria | 'cron <nome> dias seg, ter' muda os dias | 'cron remover <nome>' apaga. Roda so com o agente aberto.")
+        return True
+    if n in ("diariolentidao", "diariodelentidao", "lentidoes") or cmd.startswith("diario lentidao") or cmd.startswith("diario de lentidao"):
+        _r = _r75_lentidao_listar()
+        _rel(_r if _r else "Nenhuma geracao lenta registrada ainda (limiar: config 'limiar_lentidao_s', padrao 15s).")
+        return True
+    if cmd.startswith("sandbox"):
+        _resto_sb = cmd[len("sandbox"):].strip()
+        if _resto_sb:
+            _codigo_sb = _resto_sb.lstrip(":").strip()
+            if not _codigo_sb:
+                _rel("Mostra assim: sandbox: print(1+1)")
+                return True
+            _ok = None
+            _pedir = globals().get('pedir_confirmacao')
+            if _pedir:
+                _ok = _pedir("Executar este codigo em SANDBOX isolada (subprocesso separado, limite de tempo): %s" % _codigo_sb[:120])
+            else:
+                _ok = input("Executar em sandbox? (sim/nao): ").strip().lower() in ('sim', 's')
+            if not _ok:
+                _rel("Nada foi executado.")
+                return True
+            _r = _r75_sandbox_rodar(_codigo_sb)
+            _rel(_r if _r else "Sandbox desligada (config 'sandbox_codigo': false).")
+            return True
+        _rel("Sandbox (r75): codigo roda em QUARENTENA — subprocesso separado, diretorio temporario, sem acesso ao agente, com limite de tempo.\nUse: sandbox: print(2+2)  | limite: config 'sandbox_timeout_s' (padrao 30s). Sempre com 'sim'.")
+        return True
+    if cmd.startswith("cofre"):
+        _resto_cf = cmd[len("cofre"):].strip()
+        if _resto_cf.startswith("chaves"):
+            _arq_ch = os.path.join(globals().get('PASTA_BASE') or os.getcwd(), 'chaves.txt')
+            _linhas = []
+            try:
+                with open(_arq_ch, 'r', encoding='utf-8-sig') as _f_ch:
+                    _linhas = _f_ch.readlines()
+            except Exception:
+                _rel("Nao achei chaves.txt na pasta do agente. Crie primeiro (veja chaves_EXEMPLO.txt).")
+                return True
+            _r = _r75_cofre_guardar(_linhas)
+            if _r is None:
+                _rel("Nao encontrei chaves no chaves.txt (linhas NOME=valor).")
+            elif isinstance(_r, dict):
+                _rel("Cofre criado (r75): %d chave(s) protegida(s) com DPAPI (so voce, so neste PC).\nO chaves.txt continua intato como backup — o agente agora le do cofre primeiro." % len(_r))
+            else:
+                _rel(_r)
+            return True
+        _qtd_cf = _r75_cofre_status()
+        _rel("Cofre (r75): %d chave(s) protegida(s) com DPAPI.\nUse: cofre chaves (protege o chaves.txt; ele fica intato como backup)." % _qtd_cf)
+        return True
+    if n in ("modoconvidado",) or cmd.startswith("modo convidado"):
+        globals()['_r75_convidado_ativo'] = True
+        _rel("Modo convidado LIGADO (r75, so nesta sessao): visitas podem conversar e usar acoes basicas, mas nada mexe em config, rotas, cerebro, atualizacao ou chaves. Fim: 'sair do modo convidado'.")
+        return True
+    if n in ("sairdomodoconvidado",) or cmd.startswith("sair do modo convidado"):
+        globals()['_r75_convidado_ativo'] = False
+        _rel("Modo convidado desligado. A casa ficou toda liberada de novo.")
+        return True
+
+
     # ---- r74: RITMO E CEU — diagnostico de rotas (dry-run) + ritmo do motor ----
     if n in ("replayerros", "replay", "errosderota", "candidatosarota") or cmd.startswith("replay "):
         _r = _r74_replay_top(10)
@@ -15590,6 +15732,407 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
         return False
 
 
+# ================= r75: FILA, CRON, LENTIDAO, SANDBOX, COFRE E CONVIDADO =================
+# 6 melhorias da LISTA-IMPOSSIVEL (itens 28, 29, 30, 39, 40, 41) — a "casa" do
+# agente: tarefas em segundo plano, agenda com dias da semana, diagnostico de
+# lentidao, execucao de codigo em quarentena, chaves protegidas e modo visita.
+# 100% local; tudo com kill-switch na config: 'fila_de_fundo', 'agenda_cron'
+# (vazio/falso desliga), 'diario_lentidao', 'sandbox_codigo', 'cofre_chaves',
+# 'modo_convidado'. Selo: 2026-09-11-r75.
+
+def _r75_arquivo_fila(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'tarefas_fundo.json')
+
+
+def _r75_fila_enviar(comando, despachar=None, pasta=None, inline=False):
+    """r75 (28): FILA DE FUNDO — 'enquanto conversamos, zipe isso': o comando
+    roda numa thread separada (o agente segue conversando) e o resultado vai
+    para tarefas_fundo.json ('fila' mostra o status). inline=True executa sem
+    thread (usado em testes). Kill-switch: config 'fila_de_fundo': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('fila_de_fundo', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    if not isinstance(comando, str) or not comando.strip():
+        return None
+    despachar = despachar or globals().get('processar_atalho_rapido')
+    if not despachar:
+        return None
+    import contextlib as _cl
+    import datetime as _dt
+    import io as _io
+    import threading as _th
+    entrada = {'comando': comando.strip()[:200],
+               'inicio': _dt.datetime.now().isoformat(timespec='seconds'),
+               'status': 'na fila', 'fim': None, 'saida': ''}
+    caminho = _r75_arquivo_fila(pasta)
+    dados = _r74_ler_json(caminho, [])
+    if not isinstance(dados, list):
+        dados = []
+    dados.append(entrada)
+    _r74_escrever_json(caminho, dados[-50:])
+
+    def _rodar():
+        buf = _io.StringIO()
+        try:
+            with _cl.redirect_stdout(buf):
+                despachar(comando)
+        except Exception as _e:
+            buf.write('\n[erro: %s]' % type(_e).__name__)
+        entrada['status'] = 'concluida'
+        entrada['fim'] = _dt.datetime.now().isoformat(timespec='seconds')
+        entrada['saida'] = buf.getvalue()[-2000:]
+        try:
+            atual = _r74_ler_json(caminho, [])
+            if isinstance(atual, list):
+                for i, e in enumerate(atual):
+                    if (isinstance(e, dict) and e.get('inicio') == entrada['inicio']
+                            and e.get('comando') == entrada['comando']):
+                        atual[i] = entrada
+                        _r74_escrever_json(caminho, atual[-50:])
+                        break
+        except Exception:
+            pass
+
+    if inline:
+        _rodar()
+    else:
+        _th.Thread(target=_rodar, daemon=True).start()
+    return entrada
+
+
+def _r75_fila_listar(pasta=None):
+    """r75 (28): status da fila de fundo (ultimas 10)."""
+    dados = _r74_ler_json(_r75_arquivo_fila(pasta), [])
+    if not isinstance(dados, list) or not dados:
+        return None
+    linhas = ['Fila de fundo (r75): %d tarefa(s):' % len(dados)]
+    for i, e in enumerate(dados[-10:], 1):
+        linhas.append('  %d. [%s] "%s" (%s)' % (i, e.get('status', '?'), e.get('comando', '?'),
+                                                str(e.get('inicio', '?'))[11:16]))
+        if e.get('status') == 'concluida' and e.get('saida'):
+            linhas.append('       saida: ' + str(e['saida']).strip().replace('\n', ' ')[:160])
+    return '\n'.join(linhas)
+
+
+def _r75_arquivo_cron(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'agenda_cron.json')
+
+
+_R75_NOMES_DIAS = ('seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom')
+
+
+def _r75_cron_dias(texto):
+    """r75 (29): 'seg, qua, sex' -> [0, 2, 4]; vazio/'todos' -> None (todo dia)."""
+    if not texto:
+        return None
+    t = str(texto).lower().strip()
+    if t in ('todos', 'todas', 'todos os dias', 'sempre'):
+        return None
+    dias = []
+    for parte in t.replace('.', ',').split(','):
+        p = parte.strip()
+        if p in _R75_NOMES_DIAS and _R75_NOMES_DIAS.index(p) not in dias:
+            dias.append(_R75_NOMES_DIAS.index(p))
+    return dias or None
+
+
+def _r75_cron_deve_disparar(entrada, agora, disparados):
+    """r75 (29): LOGICA PURA — dispara se a hora bate, o dia da semana e
+    permitido e a tarefa ainda nao disparou hoje nesta hora."""
+    import datetime as _dt
+    agora = agora or _dt.datetime.now()
+    if not isinstance(entrada, dict) or entrada.get('ativo') is False:
+        return False
+    dias = entrada.get('dias')
+    if dias is not None and agora.weekday() not in dias:
+        return False
+    if agora.strftime('%H:%M') != str(entrada.get('quando', '')):
+        return False
+    chave = '%s|%s|%s' % (agora.strftime('%Y-%m-%d'), entrada.get('quando', ''),
+                          entrada.get('nome', ''))
+    return chave not in set(disparados or set())
+
+
+def _r75_cron_loop(disparados, despachar=None, dormir=None, max_rodadas=None,
+                   pasta=None, agora=None, ler_cron=None):
+    """r75 (29): o cote do loop (testavel) — confere agenda_cron.json e dispara
+    as tarefas no horario. 'so se o PC estiver ligado' e intrinseco: o agendador
+    so existe com o agente aberto."""
+    import datetime as _dt
+    _dormir = dormir or (lambda s: None)
+    _ler_cron = ler_cron or (lambda: _r74_ler_json(_r75_arquivo_cron(pasta), []))
+    rodadas = 0
+    while True:
+        try:
+            _agora = agora or _dt.datetime.now()
+            dados = _ler_cron()
+            if isinstance(dados, list):
+                for e in dados:
+                    if _r75_cron_deve_disparar(e, _agora, disparados):
+                        alvo = despachar or globals().get('processar_atalho_rapido')
+                        try:
+                            if alvo:
+                                alvo(str(e.get('comando', '')))
+                        except Exception:
+                            pass
+                        disparados.add('%s|%s|%s' % (_agora.strftime('%Y-%m-%d'),
+                                                     e.get('quando', ''), e.get('nome', '')))
+        except Exception:
+            pass
+        rodadas += 1
+        if max_rodadas is not None and rodadas >= max_rodadas:
+            return rodadas
+        _dormir(30)
+
+
+def _r75_cron_agendar(agendador=None, despachar=None, dormir=None):
+    """r75 (29): agenda a thread de fundo do cron local (1x por sessao).
+    Config 'agenda_cron': false desliga o disparo (a lista continua editavel)."""
+    import threading as _th
+    if globals().get('_r75_cron_agendado'):
+        return False
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('agenda_cron', padrao=True):
+            return False
+    except Exception:
+        pass
+    globals()['_r75_cron_agendado'] = True
+    disparados = set()
+
+    def _loop():
+        _r75_cron_loop(disparados, despachar=despachar, dormir=dormir)
+
+    def _spawn():
+        _th.Thread(target=_loop, daemon=True).start()
+
+    try:
+        (agendador or _spawn)()
+        return True
+    except Exception:
+        globals()['_r75_cron_agendado'] = False
+        return False
+
+
+def _r75_arquivo_lentidao(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'lentidao.json')
+
+
+def _r75_causa_lentidao(segundos, tok_s=None, contexto_chars=None, primeira=False):
+    """r75 (30): causa PROVAVEL (heuristica local honesta) de uma geracao lenta."""
+    if (contexto_chars or 0) > 12000:
+        return 'contexto grande'
+    if primeira:
+        return 'motor frio (primeira geracao da sessao)'
+    if isinstance(tok_s, (int, float)) and tok_s < 8:
+        return 'maquina carregada (tok/s baixo)'
+    return 'sem causa clara (veja RAM/CPU em uso no PC)'
+
+
+def _r75_lentidao_registrar(segundos, tok_s=None, contexto_chars=None, primeira=False,
+                            pasta=None):
+    """r75 (30): DIARIO DE LENTIDAO — geracao local acima do limiar (config
+    'limiar_lentidao_s', padrao 15s) vira dado local com causa provavel.
+    Diagnostico puro: nunca bloqueia nem muda a geracao.
+    Kill-switch: config 'diario_lentidao': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('diario_lentidao', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    limiar = 15.0
+    try:
+        if ler:
+            _l = ler('limiar_lentidao_s', pasta=pasta, padrao=15)
+            if isinstance(_l, (int, float)) and _l > 0:
+                limiar = float(_l)
+    except Exception:
+        pass
+    if not isinstance(segundos, (int, float)) or segundos < limiar:
+        return None
+    import datetime as _dt
+    caminho = _r75_arquivo_lentidao(pasta)
+    dados = _r74_ler_json(caminho, [])
+    if not isinstance(dados, list):
+        dados = []
+    dados.append({'hora': _dt.datetime.now().isoformat(timespec='seconds'),
+                  'segundos': round(float(segundos), 1),
+                  'tok_s': round(float(tok_s), 1) if isinstance(tok_s, (int, float)) else None,
+                  'contexto_chars': int(contexto_chars or 0),
+                  'causa': _r75_causa_lentidao(segundos, tok_s, contexto_chars, primeira)})
+    _r74_escrever_json(caminho, dados[-100:])
+    return None
+
+
+def _r75_lentidao_listar(pasta=None, n=5):
+    """r75 (30): mostra as geracoes mais lentas registradas + media."""
+    dados = _r74_ler_json(_r75_arquivo_lentidao(pasta), [])
+    if not isinstance(dados, list) or not dados:
+        return None
+    top = sorted(dados, key=lambda d: float(d.get('segundos', 0)), reverse=True)[:max(1, int(n))]
+    meds = [float(d.get('segundos', 0)) for d in dados if isinstance(d.get('segundos'), (int, float))]
+    linhas = ['Diario de lentidao (r75): %d geracao(oes) lenta(s); media %.1fs:'
+              % (len(dados), (sum(meds) / len(meds)) if meds else 0.0)]
+    for i, d in enumerate(top, 1):
+        linhas.append('  %d. %.1fs — %s — %s' % (i, float(d.get('segundos', 0)),
+                                                 d.get('causa', '?'),
+                                                 str(d.get('hora', '?'))[5:16]))
+    return '\n'.join(linhas)
+
+
+def _r75_sandbox_rodar(codigo, rodar=None, timeout=30, pasta=None):
+    """r75 (39): SANDBOX COM LIMITES — codigo Python (sugerido pelo modelo ou
+    digitado por voce) roda em SUBPROCESSO separado, em diretorio temporario,
+    sem acesso as variaveis/arquivos do agente, com limite de tempo (config
+    'sandbox_timeout_s', padrao 30s). Sempre com 'sim' antes. Nao ha limite de
+    memoria no Windows (honestidade da casa). Kill-switch: 'sandbox_codigo': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('sandbox_codigo', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    if not isinstance(codigo, str) or not codigo.strip():
+        return None
+    try:
+        if ler:
+            _t = ler('sandbox_timeout_s', pasta=pasta, padrao=30)
+            if isinstance(_t, (int, float)) and _t > 0:
+                timeout = max(1, min(300, float(_t)))
+    except Exception:
+        pass
+
+    def _rodar_local(_codigo, _timeout):
+        import subprocess as _sp
+        import sys as _sys
+        import tempfile as _tf
+        arq = os.path.join(_tf.gettempdir(), '_agente_sandbox_r75.py')
+        with open(arq, 'w', encoding='utf-8') as f:
+            f.write(_codigo)
+        try:
+            r = _sp.run([_sys.executable, arq], capture_output=True, text=True,
+                        encoding='utf-8', errors='ignore', timeout=_timeout,
+                        cwd=_tf.gettempdir())
+        except _sp.TimeoutExpired:
+            return 'O codigo passou de %.0fs e foi interrompido (limite: sandbox_timeout_s).' % _timeout
+        partes = []
+        if (r.stdout or '').strip():
+            partes.append('Saida:\n' + r.stdout.strip()[-2000:])
+        if (r.stderr or '').strip():
+            partes.append('Erro:\n' + r.stderr.strip()[-1000:])
+        if not partes:
+            partes.append('Codigo executado (sem saida de texto — use print para ver).')
+        partes.append('(isolado: sem acesso ao agente; limite de tempo; Windows nao permite limite de memoria)')
+        return '\n'.join(partes)
+
+    return (rodar or _rodar_local)(codigo, timeout)
+
+
+def _r75_arquivo_cofre(pasta=None):
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'chaves_cofre.dat')
+
+
+def _r75_cofre_guardar(linhas, proteger=None, pasta=None):
+    """r75 (40): COFRE DE CHAVES — as linhas do chaves.txt passam a ficar
+    protegidas com o DPAPI da r51 (so o mesmo usuario no mesmo Windows le) em
+    chaves_cofre.dat. O chaves.txt NUNCA e apagado (regra da casa) — fica como
+    backup; o agente passa a ler do cofre primeiro.
+    Kill-switch: config 'cofre_chaves': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('cofre_chaves', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    proteger = proteger or globals().get('_r51_dpapi_proteger')
+    if not proteger:
+        return 'DPAPI indisponivel (so existe no Windows).'
+    import base64 as _b64
+    blocos = {}
+    try:
+        for linha in linhas:
+            linha = str(linha).strip()
+            if not linha or linha.startswith('#') or '=' not in linha:
+                continue
+            chave, _, conteudo = linha.partition('=')
+            chave = chave.strip().upper()
+            conteudo = conteudo.strip().strip('"').strip("'")
+            if not chave or not conteudo:
+                continue
+            blocos[chave] = _b64.b64encode(proteger(conteudo.encode('utf-8'))).decode('ascii')
+    except Exception as e:
+        return 'nao consegui proteger (%s) — o chaves.txt continua intato.' % type(e).__name__
+    if not blocos:
+        return None
+    _r74_escrever_json(_r75_arquivo_cofre(pasta), blocos)
+    return blocos
+
+
+def _r75_cofre_ler(chave, revelar=None, pasta=None):
+    """r75 (40): le UMA chave do cofre (ou None). Nao toca no chaves.txt."""
+    revelar = revelar or globals().get('_r51_dpapi_revelar')
+    if not revelar:
+        return None
+    blocos = _r74_ler_json(_r75_arquivo_cofre(pasta), {})
+    if not isinstance(blocos, dict):
+        return None
+    bruto = blocos.get(str(chave or '').strip().upper())
+    if not bruto:
+        return None
+    import base64 as _b64
+    try:
+        return revelar(_b64.b64decode(bruto)).decode('utf-8')
+    except Exception:
+        return None
+
+
+def _r75_cofre_status(pasta=None):
+    blocos = _r74_ler_json(_r75_arquivo_cofre(pasta), {})
+    if not isinstance(blocos, dict):
+        return 0
+    return len(blocos)
+
+
+def _r75_convidado_bloqueia(comando):
+    """r75 (41): MODO CONVIDADO — no modo visita, comandos que mexem NA CASA
+    (config, rotas, cerebro, atualizacao, chaves, agendamentos) sao bloqueados;
+    conversa e acoes basicas seguem. Sessao so (nao persiste ao fechar); o
+    dono sai com 'sair do modo convidado' (nunca bloqueado).
+    Kill-switch: config 'modo_convidado': false desliga o recurso."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('modo_convidado', padrao=True):
+            return None
+    except Exception:
+        pass
+    if not globals().get('_r75_convidado_ativo'):
+        return None
+    if not isinstance(comando, str):
+        return None
+    norm = globals().get('_norm_pt')
+    nc = norm(comando) if norm else comando.lower().replace(' ', '')
+    bloqueios = (
+        'modo admin', 'modo basico', 'modo padrao',
+        'atualizar agora', 'atualiza agora', 'atualize', 'sair e atualizar',
+        'criar rotina', 'criar atalho', 'apagar rotina', 'apagar atalho',
+        'quando eu falar', 'quando eu disser', 'criar rota',
+        'conhecimento ensinar', 'conhecimento esquecer', 'esquecer',
+        'listar aprendizado',
+        'ligar ia', 'desligar ia', 'configurar ia', 'ajustes ia',
+        'cofre', 'cron', 'minha agenda', 'aquecer', 'fila', 'sandbox',
+        'criar checkpoint', 'restaurar checkpoint',
+    )
+    for bloq in bloqueios:
+        nb = norm(bloq) if norm else bloq.replace(' ', '')
+        if nb and nc.startswith(nb):
+            return bloq
+    return None
+
+
 def _r62_entregar_lancador(baixar=None, pasta=None):
     """r62: 'atualizar agora' agora entrega TUDO: main.py (troca direta, com
     backup) e iniciar.bat (vai para _atualizacao_iniciar.tmp para o proprio
@@ -17906,6 +18449,17 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
                 _st69 = globals().setdefault('_R69_NUCLEO', {})
                 _antigo = _st69.get('ema')
                 _st69['ema'] = round(0.3 * _t + 0.7 * _antigo, 2) if _antigo else round(_t, 2)  # r69: EMA 0.3
+        # r75 (30): DIARIO DE LENTIDAO — geracao lenta vira dado local (causa provavel)
+        try:
+            _reg75 = globals().get('_r75_lentidao_registrar')
+            if _reg75 and tempos_r24 and isinstance(tempos_r24[-1].get('segundos'), (int, float)):
+                _seg75 = tempos_r24[-1]['segundos']
+                _tok75 = (tempos_r24[-1]['tokens'] / _seg75) if (tempos_r24[-1].get('tokens') and _seg75) else None
+                _ctx75 = sum(len(str(m.get('content', ''))) for m in msgs)
+                _primeira75 = int((globals().get('_R69_NUCLEO') or {}).get('n_geracoes', 0)) <= 1
+                _reg75(_seg75, _tok75, _ctx75, _primeira75)
+        except Exception:
+            pass
         _r20_estado('pronto', 'Ultima geracao concluida')
         return texto
     except BaseException as erro:
@@ -18177,6 +18731,16 @@ def processar_atalho_rapido(comando: str) -> bool:
         )
         print(f"\n{mensagem_panico}")
         return True
+
+    # r75 (41): MODO CONVIDADO — visitas nao mexem na casa (config/rotas/cerebro)
+    try:
+        _bloq75 = _r75_convidado_bloqueia(comando)
+        if _bloq75:
+            print("\n[Convidado]: essa acao mexe na configuracao da casa — no modo convidado eu nao executo.")
+            print("        (o dono digita 'sair do modo convidado' para liberar tudo de novo)")
+            return True
+    except Exception:
+        pass
 
     if cmd == "status":
         mostrar_status()
@@ -37901,7 +38465,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r74] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r75] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -37919,6 +38483,12 @@ else:
 # r74: WARM-UP PROGRAMADO — 'aquecer as 07:50' sobe o motor antes de voce sentar
 try:
     _r74_aquecer_agendar()
+except Exception:
+    pass
+
+# r75: CRON LOCAL 2.0 — agenda_cron.json (horas + dias da semana)
+try:
+    _r75_cron_agendar()
 except Exception:
     pass
 

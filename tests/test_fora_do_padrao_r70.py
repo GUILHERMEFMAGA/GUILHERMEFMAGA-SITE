@@ -136,7 +136,7 @@ class Estrutura(unittest.TestCase):
         self.assertLess(texto.index('if _r69_comandos(comando):'),
                         texto.index('if _r70_comandos(comando):'))
         self.assertIn('PROTOTIPO r70', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r74]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r75]'), 1)
 
 
 if __name__ == '__main__':

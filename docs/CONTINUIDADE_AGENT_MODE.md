@@ -1,6 +1,6 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r74**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r75**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
@@ -8,10 +8,10 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 
 ## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r74**. Suíte: **788 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r74 = ponta do log desta branch.
-- Código: `agente.py` ~38,2 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r74; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 = 28, 29, 30, 39, 40, 41; r76 = 14, 15, 42, 43, 44; r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maiores futuros: RAG dos documentos do usuário (o maior), manual do usuário (`esqueletos_ideias/2026-09-13-analise-de-lacunas.md`).
+- Releases publicados: **r21 → r75**. Suíte: **817 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r75 = ponta do log desta branch.
+- Código: `agente.py` ~38,7 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r75; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 = 14, 15, 42, 43, 44; r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,9 +116,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74 **788 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75 **817 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r53).
+  prefixos r20-r45 + r50-r53 + r75).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -983,6 +983,46 @@ ou relatórios reais sem revisão e autorização.
   (obra grande, release à parte). Lição da casa: o loader de AST
   AUTO-CARREGA funções com prefixo `_rNN_` — stubs de função nos testes
   precisam ser aplicados no dict do ambiente DEPOIS do `carregar()`.
+- **r75 — A CASA (6 melhorias da LISTA-IMPOSSIVEL: 28, 29, 30, 39, 40, 41)**:
+  28 FILA DE FUNDO — 'fila: <tarefa>' (ou 'em segundo plano: <tarefa>') roda o
+  comando numa THREAD separada (o agente segue conversando) e grava o
+  resultado em `tarefas_fundo.json`; 'fila' mostra o status (cap 50).
+  29 CRON LOCAL 2.0 — 'cron adicionar <nome> as HH:MM: <tarefa>' com DIAS DA
+  SEMANA opcionais ('as 08:00 seg, ter'); `agenda_cron.json`; thread de
+  fundo (30s) dispara 1x por dia/hora (config 'agenda_cron': false);
+  'cron' lista, 'cron <nome> dias seg, ter' muda dias, 'cron remover <nome>';
+  'so se o PC estiver ligado' e intrinseco. 30 DIÁRIO DE LENTIDÃO — hook
+  após o EMA no `_chamar_neural`: geração acima do limiar (config
+  'limiar_lentidao_s', padrão 15s) grava em `lentidao.json` (cap 100) com
+  causa provável (contexto grande / motor frio / máquina carregada);
+  'diario lentidao' mostra o top 5 + média; diagnóstico puro, nunca
+  bloqueia. 39 SANDBOX COM LIMITES — 'sandbox: <código>' roda Python em
+  SUBPROCESSO separado + dir temporário, SEM acesso às variáveis do agente,
+  com timeout configurável ('sandbox_timeout_s', padrão 30s, máx 300s) e
+  SEMPRE com 'sim'; honestidade da casa: Windows não permite limite de
+  memória (a ferramenta `executar_python` antiga segue intocada).
+  40 COFRE DE CHAVES — 'cofre chaves' protege as linhas do chaves.txt com o
+  DPAPI da r51 em `chaves_cofre.dat` (só o mesmo usuário no mesmo Windows
+  lê); o `_chave_ia` agora consulta o cofre ANTES do chaves.txt; o
+  chaves.txt NUNCA é apagado (regra da casa) — fica como backup; em SO sem
+  DPAPI o aviso é honesto e nada quebra. 41 MODO CONVIDADO — 'modo
+  convidado' (sessão só, não persiste) bloqueia mexidas na casa (admin,
+  atualizar, rotinas/rotas, ensinar/esquecer, cofre, cron, sandbox,
+  fila...), deixando conversa e ações básicas; 'sair do modo convidado'
+  nunca é bloqueado; guarda no dispatcher mestre ANTES das rotas (o modo
+  pânico segue funcionando em cima). Novos comandos: 'fila', 'em segundo
+  plano', 'cron', 'minha agenda', 'diario lentidao', 'sandbox', 'cofre',
+  'modo convidado', 'sair do modo convidado'. Rotas inseridas ANTES do
+  bloco r74 (que segue ANTES da ponte p/ ferramentas — nada rouba comando
+  do seletor; 'agenda' segue com a ferramenta antiga). +29 testes
+  (test_ritmo_casa_r75.py). **817 testes OK**. Selo `-r75`. Não testado no
+  Windows real. Faltam da leva: r76 = 14 exportar/importar cérebro, 15
+  diff do cérebro, 42 auditoria estendida, 43 visão local, 44 manual;
+  r77 = 38 STT local (obra grande, release à parte). Lições da casa: o
+  ambiente do loader de AST não tem `json` (injetar nos testes — funções
+  `_rNN_ler_json/escrever_json` engolem o NameError); `proteger=None` no
+  cofre cai no `_r51_dpapi_proteger` REAL (auto-carregado) e no Linux dá
+  RuntimeError honesto.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
