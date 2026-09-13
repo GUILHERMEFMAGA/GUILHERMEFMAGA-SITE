@@ -71,7 +71,7 @@ class ElevateSemArgumentos(unittest.TestCase):
 
 class Selo(unittest.TestCase):
     def test_banner_r58(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r64]', texto('agente.py'))
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r65]', texto('agente.py'))
 
 
 if __name__ == '__main__':

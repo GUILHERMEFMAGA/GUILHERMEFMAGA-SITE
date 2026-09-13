@@ -7799,6 +7799,7 @@ def _menu_ajuda_local():
     print("DIAGNOSTICO (r61): 'diagnostico do iniciar' confere os arquivos de arranque de verdade (sem chutar)")
     print("DEFENDER (r63): 'historico de protecao' mostra as deteccoes reais do Windows Defender (sem inventar)")
     print("AUTO-DIAGNOSTICO (r64): cada abertura confere os arquivos de arranque em silencio; se achar problema eu te aviso na hora (cura: 'atualizar agora')")
+    print("HONESTIDADE (r65): 'o agente nao abre/funciona' e falhas da casa eu respondo com FATOS do disco - nunca com chute")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
     print("PODER DAS FERRAMENTAS: usar <nome> com {json} | ajuda ferramenta: <nome> | estatisticas ferramentas | diagnostico ferramentas")
@@ -12640,6 +12641,37 @@ def _r63_comandos(comando):
     return False
 
 
+def _r65_comandos(comando):
+    """r65: guarda anti-invencao — perguntas de FALHA sobre a casa (agente/
+    iniciar/main.py) que nenhuma rota de fatos pegou NAO caem no modelo bruto
+    (o GGUF ja inventou 'renomeia pra .exe'). Resposta: o diagnostico real do
+    disco (r61) ou, na pior das hipoteses, honestidade — nunca chute."""
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    falhas = ('naofunciona', 'naoabre', 'naoinicia', 'naoliga', 'naoresponde',
+              'naoestafuncionando', 'estaquebrado', 'taquebrado', 'naoentra',
+              'naopassa')
+    if not any(f in n for f in falhas):
+        return False
+    casa = ('iniciarbat' in n or 'iniciar' in n or 'agente' in n
+            or 'agentepc' in n or 'mainpy' in n)
+    if not casa:
+        return False
+    diagnosticar = globals().get('_r61_diagnostico_iniciar')
+    if diagnosticar:
+        try:
+            texto = diagnosticar() or ''
+        except Exception:
+            texto = ''
+        if texto:
+            print(texto)
+    print("Sobre ESTE PC eu respondo com FATOS (acima), nunca com chute.")
+    print("Se o exame achou problema: 'atualizar agora'."
+          " Quer os detalhes? 'diagnostico do iniciar'.")
+    return True
+
+
 def _r64_aviso_de_boot(diagnosticar=None):
     """r64: auto-diagnostico de arranque NA ABERTURA — roda o exame r61 em
     silencio. Tudo certo = nao imprime NADA (abertura limpa e rapida).
@@ -15204,6 +15236,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r62_comandos(comando):
         return True
     if _r61_comandos(comando):
+        return True
+    if _r65_comandos(comando):
         return True
     if _r53_comandos(comando):
         return True
@@ -34886,7 +34920,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r64] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r65] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
