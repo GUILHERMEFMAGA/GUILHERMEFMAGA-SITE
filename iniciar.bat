@@ -35,12 +35,18 @@ goto ja_admin
 
 :pedir_admin
 echo Pedindo permissao de Administrador...
-REM r59: %* vazio nao pode virar -ArgumentList vazio (o PowerShell rejeita) e
-REM r59: REM com parenteses DENTRO de bloco fecha o bloco antes da hora (bug r58).
+REM r59: %* vazio nao pode virar -ArgumentList vazio - o PowerShell rejeita
+REM r59: REM com parenteses dentro de bloco fecha o bloco antes da hora - bug r58
 REM r59: Por isso esta secao NAO usa blocos: so goto, if de uma linha e set.
 set "R58_ARGS="
 if not "%~1"=="" set "R58_ARGS=-ArgumentList '%*'"
 powershell -NoProfile -Command "Start-Process -FilePath '%~f0' %R58_ARGS% -Verb RunAs"
+if errorlevel 1 (
+    echo.
+    echo FALHOU o pedido de Administrador - veja o erro acima.
+    echo A janela fica aberta para voce me mandar o print.
+    pause
+)
 exit /b
 
 :ja_admin

@@ -47,21 +47,31 @@ class ElevateSemArgumentos(unittest.TestCase):
         # o teste r45 continua valendo: -ArgumentList '%*' segue no arquivo
         self.assertIn("-ArgumentList '%*'", self.bat)
 
+    def test_falha_de_admin_nao_pisca_e_some(self):
+        secao = self.bat[self.bat.index(':pedir_admin'):self.bat.index(':ja_admin')]
+        self.assertIn('if errorlevel 1 (', secao)          # Start-Process falhou?
+        self.assertIn('pause', secao)                      # janela fica aberta
+        self.assertIn('FALHOU o pedido de Administrador', secao)
+
     def test_escudo_do_bloco_de_comentario(self):
         # o padrao exato que quebrou na r58 nao pode voltar
         self.assertNotIn('(Start-Process', self.bat)
         self.assertNotIn('%%20', self.bat)
-        # a secao de admin nao tem bloco: nenhuma linha so' com '(' ou ')' nela
+        # a licao r58: REM com parentese DENTRO da secao de admin = mina
+        # (o ) do comentario fechava o bloco antes da hora). Comentarios ali
+        # ficam SEM parenteses; o resto segue o BAT legitimo.
         secao = self.bat[self.bat.index('net session'):self.bat.index(':ja_admin')]
         for linha in secao.split('\n'):
-            if not linha.strip().upper().startswith('REM'):
-                self.assertFalse(linha.strip() in ('(', ')'), repr(linha))
+            if linha.strip().upper().startswith('REM'):
+                self.assertNotIn('(', linha, repr(linha))
+                self.assertNotIn(')', linha, repr(linha))
+            else:
                 self.assertNotIn(') else (', linha)
 
 
 class Selo(unittest.TestCase):
     def test_banner_r58(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r59]', texto('agente.py'))
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r60]', texto('agente.py'))
 
 
 if __name__ == '__main__':
