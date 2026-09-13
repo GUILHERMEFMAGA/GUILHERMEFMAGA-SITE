@@ -2593,6 +2593,39 @@ def _norm_pt(s: str) -> str:
     if len(cache) > 512:
         cache.clear()
     cache[s] = resultado
+    # ==================== r69: A1 MEMORIA/EMA/FASES/PALETAS ====================
+    _st = globals().setdefault('_R69_NUCLEO', {})
+    if not _st:
+        _st.update({'pesos': {}, 'fase': 0, 'desde': 0, 'desconhecidos': [],
+                    'paletas': {}, 'confiancas': {}, 'consecutivos': {},
+                    'historico': [], 'ema': None, 'n_geracoes': 0,
+                    'conhecimento': {}, 'aprendidas': {}, 'erros_consecutivos': 0,
+                    'prefixos_graciosos': {}})
+    _hist = _st['historico']
+    _hist.append(resultado)
+    del _hist[:-64]
+    _dest = _st['pesos'].setdefault(resultado, {})
+    if _hist and len(_hist) > 1 and _hist[-2]:
+        _dest[_hist[-2]] = _dest.get(_hist[-2], 0.10) + 0.02
+        _erodir69 = globals().get('_r69_erodir')
+        if _erodir69:
+            _erodir69(_hist[-2])
+    _rotulo_real = globals().get('_R69_ULTIMA_ROTA')
+    if callable(_rotulo_real):
+        _rotulo_real = _rotulo_real()
+    if _rotulo_real:
+        _dest[_rotulo_real] = _dest.get(_rotulo_real, 0.05) + 0.12
+        _dest[resultado] = _dest.get(resultado, 0.05)
+        _st['confiancas'][resultado] = {'rota': _rotulo_real, 'peso': _dest[_rotulo_real]}
+    _st['consecutivos'][resultado] = _st['consecutivos'].get(resultado, 0) + 1
+    for _outra in list(_st['consecutivos']):
+        if _outra != resultado:
+            _st['consecutivos'][_outra] = max(0, _st['consecutivos'][_outra] - 1)
+            if not _st['consecutivos'][_outra]:
+                del _st['consecutivos'][_outra]
+    _tema = globals().get('_R69_TEMA_ATIVO')
+    if _tema and resultado in _st['paletas'].get(_tema, ()): 
+        pass  # paleta casada: roteador pode dar prioridade (gancho futuro)
     return resultado
 
 
@@ -2891,6 +2924,10 @@ def _invocar_local(nome_fn, **params):
     o diagnostico geral sem alterar nenhuma ferramenta)."""
     _r20_origem('ferramenta_local', ferramenta=nome_fn)
     fn = globals().get(nome_fn)
+    if fn is None:
+        _gracioso = globals().get('_r69_conferir_gracioso')  # r69: espera 1x 0.2s
+        if _gracioso and _gracioso(nome_fn):
+            fn = globals().get(nome_fn)
     if fn is None:
         _r25_registrar_uso(nome_fn, 0.0, False, 'indisponivel')
         sugestao = _r25_sugerir_ferramenta(nome_fn)
@@ -7803,6 +7840,7 @@ def _menu_ajuda_local():
     print("LOTE SAUDE (r67): 'diagnostico do python/defender/disco' | 'quem e este pc' | 'modo aviao' | 'criar checkpoint'/'restaurar checkpoint' | 'velocimetro' | 'teste de estresse'")
     print("LOTE PODER (r67): 'resumo da sessao' | 'raio-x da decisao' | 'meus poderes' | 'economia' | 'traduz erro <erro>' | 'conferir atalho' | 'me chama de <nome>' | 'silenciar' | 'sair e atualizar' | 'salvar/voltar configuracao'")
     print("LOTE EXTREMO (r68): 'cerebro indexar'/'onde esta <arquivo>' | 'cacar duplicatas' | 'comparar pastas' | 'por que o pc esta lento' | 'quiz' | 'raio-x do pdf' | 'o que cozinhar' | 'organizar downloads'/'desfazer organizacao' | 'prova' | 'rpg comecar' | 'aniversarios' | 'me mostra seu codigo' (e mais no ajuda)")
+    print("NUCLEO r69: 'nucleo' | 'diagnostico do cerebro' | 'conhecimento ensinar topico: fato' | 'aprender palavras' | 'confianca <pergunta>' — o cerebro aprende, reflete e se audita sozinho")
     print("ATUALIZAR (r66): digite como vier - 'atualizar agora', 'atualiza agora', 'atualize' - eu entendo e atualizo tudo")
     print("ATALHOS (r56): 'atalho do agente' | 'atalho para/na <programa ou pasta>' (chrome, bloco de notas, vscode...) | 'atalho para este pc' ou 'atalho na tela principal' abre a raiz C:\\ | 'criar atalho' vago: eu pergunto")
     print("LOTE PODER (r52): +30 ferramentas inteligentes — plano_de_tarefa, avaliar_risco_comando, guardiao_de_arquivo, vigia_de_preco, leitor_rss, gerar_flashcards, cofre_de_notas... (detalhe: ajuda ferramenta: <nome>)")
@@ -7914,6 +7952,16 @@ def _processar_cerebro_local(comando: str) -> bool:
     n = _norm_pt(cmd)
     if not n:
         return False
+
+    # r69: CORE INTROSPECTION + FASES + LEXICO (antes de qualquer rota antiga)
+    _aviso_fase = globals().get('_r69_fase_para')
+    if _aviso_fase:
+        try:
+            _nota = _aviso_fase(n)
+            if _nota:
+                print(_nota)
+        except Exception:
+            pass
 
     # MENU DE AJUDA: mostra tudo (como ligar IA local/nuvem e exemplos).
     if n in ("ajuda", "menu", "comandos", "help", "opcoes", "oqueeufaco",
@@ -9114,6 +9162,12 @@ def _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream=Fals
     import urllib.error
     import urllib.request
     usar_formato_json = bool(formato_json) and globals().get('_r21_suporte_json', True)
+    globals()['_r69_nonce'] = True   # r69: nao re-injeta o pack dentro do proprio transporte
+    try:
+        _r69_injetar_conhecimento(msgs)  # r69: A2 CONHECIMENTO ensinado entra no system
+        _r69_decay()                     # r69: meia-vida da memoria (a cada 100 geracoes)
+    finally:
+        globals()['_r69_nonce'] = False
     corpo = {'model':'local', 'messages':msgs, 'temperature':temperatura, 'max_tokens':max_tokens,
              'stream':stream, 'top_p':0.9,
              'repeat_penalty':1.05 if repeat_penalty is None else max(1.0, min(2.0, float(repeat_penalty))),
@@ -9126,6 +9180,8 @@ def _r20_transporte(msgs, max_tokens, temperatura, timeout_segundos, stream=Fals
         corpo['seed'] = seed
     if stream:
         corpo['stream_options'] = {'include_usage':True}
+    if not stream and not formato_json:
+        corpo['r69_nonce'] = 'nao-repetir-esta-geracao'  # r69: nonce-INTENCAO no corpo
     req = urllib.request.Request(_url_ia_local + '/v1/chat/completions', data=json.dumps(corpo).encode(),
                                  headers={'Content-Type':'application/json', 'User-Agent':'SuperAgentePC'})
     inicio = time.monotonic(); meta = {'finish_reason':None, 'usage':{}, 'timings':{}, 'stream':stream}
@@ -9418,7 +9474,9 @@ def _r24_resumo_velocidade():
     if ultimo.get('tokens') and ultimo['segundos']:
         tps = round(ultimo['tokens'] / ultimo['segundos'], 2)
     return {'geracoes_registradas': len(tempos), 'ultimo_segundos': ultimo['segundos'],
-            'media_ultimos10_segundos': round(media, 3), 'tokens_por_segundo_ultimo': tps}
+            'media_ultimos10_segundos': round(media, 3), 'tokens_por_segundo_ultimo': tps,
+            'ema_tokens_por_segundo': round(
+                ((globals().get('_R69_NUCLEO') or {}).get('ema') or 0.0), 2) or None}
 
 
 def _r25_achar_funcao(nome):
@@ -12671,6 +12729,9 @@ def _r65_comandos(comando):
         if texto:
             print(texto)
     print("Sobre ESTE PC eu respondo com FATOS (acima), nunca com chute.")
+    _saber = (globals().get('_R69_NUCLEO') or {}).get('conhecimento') or {}
+    if _saber:
+        print("E com o que voce me ensinou: %s." % ', '.join(sorted(_saber)[:4]))
     print("Se o exame achou problema: 'atualizar agora'."
           " Quer os detalhes? 'diagnostico do iniciar'.")
     return True
@@ -14299,6 +14360,273 @@ def _r67_comandos(comando):
     if n in ('voltarconfiguracao', 'voltarconfig', 'restaurarconfig', 'desfazerconfiguracao'):
         print(_r67_voltar_config())
         return feito('voltar configuracao')
+    return False
+
+
+def _r69_instalar_estado():
+    """r69: monta o estado do nucleo (pesos palido a palido)."""
+    st = globals().setdefault('_R69_NUCLEO', {})
+    if not st:
+        st.update({
+            'pesos': {}, 'fase': 0, 'desde': 0, 'desconhecidos': [],
+            'paletas': {}, 'confiancas': {}, 'consecutivos': {},
+            'historico': [], 'ema': None, 'n_geracoes': 0,
+            'conhecimento': {}, 'aprendidas': {}, 'erros_consecutivos': 0,
+            'prefixos_graciosos': {}})
+    return st
+
+
+def _r69_erodir(chave, taxa=0.02):
+    """r69: pesos por EROSAO (inspiracao: fuzzy art / decay de memoria) —
+    todo acerto desgasta os rivais daquela palavra. Nunca zera de todo."""
+    st = _r69_instalar_estado()
+    pesos = st['pesos']
+    for rot, peso in list(pesos.get(chave, {}).items()):
+        pesos[chave][rot] = peso * (1.0 - taxa)
+    if chave in pesos and pesos[chave].get(chave, 0) < 0.05:
+        pesos[chave][chave] = 0.05
+
+
+def _r69_fase_para(n):
+    """r69: desempate por FASE de frequencia (r20/r46 conservador + r68:
+    1 repeticao = provavel, 2 = quase certo, 3+ = dedicada)."""
+    st = _r69_instalar_estado()
+    fase, desde, desconhecidos = st['fase'], st['desde'], st['desconhecidos']
+    if n in ('status', 'ajuda', 'menu', 'sair', 'ligaria', 'desligaria'):
+        return False
+    se_conhecida = _norm_pt._r69_route_for(n) if hasattr(_norm_pt, '_r69_route_for') else None
+    if not se_conhecida and n not in desconhecidos:
+        if len(desconhecidos) >= 120:
+            desconhecidos.pop(0)
+        desconhecidos.append(n)
+        return False
+    if se_conhecida:
+        if desde != 'conhecida':
+            st['fase'], st['desde'] = 0, 'conhecida'
+        return False
+    if desde != n:
+        st['fase'], st['desde'] = 0, n
+    else:
+        st['fase'] += 1
+    if st['fase'] in (1, 2):
+        return False  # fases suaves ficam em silencio (observacao discreta)
+    if st['fase'] >= 3:
+        st['fase'] = 0  # avisa 1x por ciclo de 3; sem spam
+        return ('r69: "%s" repetiu varias vezes: merece ROTA PROPRIA de fatos.'
+                ' Me diga "meus poderes" para ver como propor.' % n[:40])
+    return False
+
+
+def _r69_decay():
+    """r69: esquecimento por MEIA-VIDA (a cada 100 rotacoes, peso cai ~7%)."""
+    st = _r69_instalar_estado()
+    st['n_geracoes'] += 1
+    if st['n_geracoes'] % 100 == 0:
+        fator = 0.93
+        for chave, destino in st['pesos'].items():
+            for rot in list(destino):
+                destino[rot] *= fator
+
+
+def _r69_injetar_conhecimento(mensagens):
+    """r69: injeta o PACK DE CONHECIMENTO no system (evolucao r29/r40; packing
+    estilo LangChain/LlamaIndex: contexto curto, denso e sobdemanda)."""
+    if globals().get('_r69_nonce'):
+        return
+    st = _r69_instalar_estado()
+    fatos = []
+    for topico, itens in st['conhecimento'].items():
+        for entrada in itens:
+            fatos.append('%s: %s' % (topico, entrada['texto'][:80]))
+    for padrao, rotulo in st['aprendidas'].items():
+        fatos.append('quando o usuario diz "%s", intenção: %s' % (padrao, rotulo))
+    if fatos:
+        mensagens.insert(0, {'role': 'system', 'content': 'CONHECIMENTO ENSINADO POR REGRAS (vale como fato): ' + ' | '.join(fatos[:24])})
+
+
+def _r69_refletir():
+    """r69: resumo da propria aprendizagem (introspeccao honesta)."""
+    st = _r69_instalar_estado()
+    p = st['pesos']
+    dominantes = sorted(((rot, w) for dest in p.values() for rot, w in dest.items()),
+                        key=lambda x: -x[1])[:5]
+    linhas = ['Nucleo cognitivo r69 (auto-retrato):',
+              '  mapeamentos fortes: %s' % (', '.join('%s=%.2f' % x for x in dominantes) or '(nenhum ainda)'),
+              '  conhecimento ensinado: %d topico(s); padroes aprendidos: %d' % (len(st['conhecimento']), len(st['aprendidas'])),
+              '  frases novas repetindo: %d' % len(st['desconhecidos'])]
+    top = st['consecutivos']
+    if top:
+        campeao = max(top.items(), key=lambda x: x[1])
+        linhas.append('  dominante agora: %s (%d vez(es) consecutivas)' % campeao)
+    ema = st.get('ema')
+    if ema:
+        linhas.append('  velocidadeema do motor: %.1f tokens/s' % ema)
+    return '\n'.join(linhas)
+
+
+def _r69_lexico(novo_padrao, rotulo):
+    """r69: lexico do usuario (padrao -> intencao). Deletavel com 'esquecer aprendizado'."""
+    st = _r69_instalar_estado()
+    novo_padrao = novo_padrao.strip().lower()[:60]
+    rotulo = (rotulo or 'rota personalizada').strip()[:60]
+    if not novo_padrao:
+        return '[Aviso]: padrao vazio.'
+    st['aprendidas'][novo_padrao] = rotulo
+    return "[OK] aprendi: '%s' -> %s (digite 'esquecer aprendizado' para apagar)" % (novo_padrao, rotulo)
+
+
+def _r69_audit(caminho=None):
+    """r69: AUDITORIA AUTOMATICA DO NUCLEO — 7 camadas conferidas por AST
+    (A0..A6). Roda 1x na inicializacao; so fala se algo estiver errado."""
+    import ast as _ast
+    caminho = caminho or os.path.join(globals().get('PASTA_BASE') or os.getcwd(), 'agente.py')
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            arvore = _ast.parse(f.read())
+    except Exception as erro:
+        print('[Nucleo r69]: auditoria nao rodou (%s); o agente segue normal.' % type(erro).__name__)
+        return False
+    funcoes = {n2.name: n2 for n2 in arvore.body if isinstance(n2, _ast.FunctionDef)}
+    camadas = [
+        ('A0 motor', ['_r20_transporte']),
+        ('A1 memoria', ['_norm_pt']),
+        ('A2 knowhow', ['_r20_transporte', '_r69_injetar_conhecimento']),
+        ('A3 caracter', ['_norm_pt', '_invocar_local']),
+        ('A4ritmo', ['_r24_tempos' in funcoes and '_r24_tempos' or '_r24_resumo_velocidade']),
+        ('A5 ceu', ['_processar_cerebro_local']),
+        ('A6 fisico', ['_invocar_local'])]
+    falhas = []
+    for rotulo, nomes in camadas:
+        for nome in nomes:
+            if nome not in funcoes:
+                falhas.append('%s: %s ausente' % (rotulo, nome))
+    if falhas:
+        print('[Nucleo r69]: %d camada(s) com problema: %s' % (len(falhas), '; '.join(falhas)))
+        return False
+    return True
+
+
+def _r69_conferir_gracioso(nome_fn):
+    """r69 (ideia registry-do-registry): ferramenta conhecida 'indisponivel'?
+    espera graciosamente 0.2s 1x (startup de subsistemas) antes de desistir."""
+    import time as _time
+    st = _r69_instalar_estado()
+    if nome_fn in st['prefixos_graciosos']:
+        return False
+    st['prefixos_graciosos'][nome_fn] = True
+    _time.sleep(0.2)
+    return globals().get(nome_fn) is not None
+
+
+def _r69_painel():
+    st = _r69_instalar_estado()
+    linhas = ['NUCLEO COGNITIVO r69 — status das 7 camadas:']
+    linhas.append('  A0 motor: EMA %s | geracoes: %d' % (
+        ('%.1f tok/s' % st['ema']) if st['ema'] else '(sem geracoes ainda)', st['n_geracoes']))
+    linhas.append('  A1 memoria: %d mapeamento(s), %d padrao(oes) aprendidos' % (
+        len(st['pesos']), len(st['aprendidas'])))
+    linhas.append('  A2 conhecimento: %d topico(s) ensinado(s) por voce' % len(st['conhecimento']))
+    linhas.append('  A3 caracter: %d vies(es) de rota ativos' % len(st['paletas']))
+    linhas.append('  A4 ritmo: confiancas guardadas p/ %d pergunta(s)' % len(st['confiancas']))
+    linhas.append('  A5 ceu: %d frase(s) em observacao (fase de frequencia)' % len(st['desconhecidos']))
+    linhas.append('  A6 fisico: %d ferramenta(s) com espera graciosa' % len(st['prefixos_graciosos']))
+    return '\n'.join(linhas)
+
+
+def _r69_confianca(pergunta):
+    """r69: quao confiante o roteamento esta desta pergunta (top rota + margem)."""
+    st = _r69_instalar_estado()
+    n = _norm_pt(pergunta)
+    dest = st['pesos'].get(n)
+    if not dest:
+        return 'Sobre "%s" nao tenho mapeamento proprio ainda (responderia pela rotina normal).' % (n or pergunta[:30])
+    ordem = sorted(dest.items(), key=lambda x: -x[1])
+    top_rotulo, top_peso = ordem[0]
+    margem = top_peso - (ordem[1][1] if len(ordem) > 1 else 0.0)
+    nivel = 'alta' if margem > 0.5 else ('media' if margem > 0.2 else 'baixa (vou perguntar antes de agir)')
+    return ('Confianca no roteamento de "%s": %s — rota dominante "%s" (peso %.2f, margem %.2f).'
+            % (n[:40], nivel, top_rotulo, top_peso, margem))
+
+
+def _r69_comandos(comando):
+    """r69: NUCLEO ABSURDO — comandos do cerebro (painel, introspeccao,
+    conhecimento, lexico, confianca, auditoria)."""
+    n = _norm_pt(comando)
+    if not n:
+        return False
+    if n in ('nucleo', 'statusdonucleo', 'paineldonucleo', 'cerebro'):
+        print(_r69_painel())
+        return True
+    if n in ('diagnosticodocerebro', 'integridadedocerebro', 'auditoriador69'):
+        resultado = _r69_audit()
+        print('[OK] nucleo integra: 7 camadas presentes (A0 motor, A1 memoria, A2 conhecimento,'
+              ' A3 caracter, A4 ritmo, A5 ceu, A6 fisico).' if resultado else
+              '[PROBLEMA] o nucleo achou camada faltando (veja o aviso acima).')
+        print(_r69_refletir())
+        return True
+    if n in ('reflexaodasemana', 'reflexao', 'introspecao', 'introspecaodonucleo'):
+        print(_r69_refletir())
+        return True
+    if n.startswith('aprenderpalavras') or n.startswith('aprendapalavras'):
+        import json as _json
+        import re as _re
+        m_json = _re.search(r'palavras\s*(\{.*\})', comando or '', _re.S)
+        bruto = m_json.group(1) if m_json else ''
+        try:
+            dados = _json.loads(bruto)
+            itens = [(str(k)[:60], str(v)[:60]) for k, v in dados.items()]
+        except Exception:
+            return_msg = "Formato: aprender palavras {\"oi\":\"saudacao\"} (JSON simples)"
+            print(return_msg)
+            return True
+        for padrao, rotulo in itens:
+            _r69_lexico(padrao, rotulo)
+        print('[OK] %d padrao(oes) no lexico do nucleo.' % len(itens))
+        return True
+    if n in ('esqueceraprendizado', 'esquecerlexico'):
+        st = _r69_instalar_estado()
+        qtd = len(st['aprendidas'])
+        st['aprendidas'].clear()
+        print('[OK] %d padrao(oes) aprendidos apagados (o resto do nucleo fica).' % qtd)
+        return True
+    if n.startswith('conhecimentoensinar'):
+        import re as _re
+        bruto = _re.sub(r'^conhecimento\s+ensinar\s*', '', comando or '', flags=_re.I).strip()
+        m = _re.match(r'(.+?)\s*[:=]\s*(.+)', bruto)
+        if not m:
+            print('Formato: conhecimento ensinar <topico>: <fato curto>')
+            return True
+        topico = m.group(1).strip()[:40]
+        st = _r69_instalar_estado()
+        lista = st['conhecimento'].setdefault(topico.lower(), [])
+        lista.append({'texto': m.group(2).strip()[:200]})
+        del lista[:-8]
+        print("[OK] ensinado (%s: %s). O modelo local le isto ANTES de responder." % (topico, m.group(2).strip()[:60]))
+        return True
+    if n in ('conhecimentolistar', 'verconhecimento'):
+        st = _r69_instalar_estado()
+        if not st['conhecimento']:
+            print('Nada ensinado ainda. Exemplo: conhecimento ensinar minha casa: moro em Ribeirao Preto')
+            return True
+        for topico, itens in sorted(st['conhecimento'].items()):
+            for e in itens:
+                print('  %s: %s' % (topico, e['texto']))
+        return True
+    if n.startswith('conhecimentoesquecer'):
+        import re as _re
+        alvo = _re.sub(r'^conhecimento\s+esquecer\s*', '', comando or '', flags=_re.I).strip().lower()
+        st = _r69_instalar_estado()
+        if alvo in st['conhecimento']:
+            st['conhecimento'].pop(alvo)
+            print('[OK] topico "%s" esquecido.' % alvo)
+        else:
+            print('Topicos ensinados: %s' % (', '.join(st['conhecimento']) or '(nenhum)'))
+        return True
+    if n.startswith('confianca'):
+        import re as _re
+        resto = _re.sub(r'^confianca\s*(de\s*)?', '', comando or '', flags=_re.I).strip()
+        print(_r69_confianca(resto or (globals().get('_ULTIMO_COMANDO') or {}).get('texto', '')))
+        return True
     return False
 
 
@@ -16579,6 +16907,11 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
             tempos_r24.append({'segundos': meta['segundos'],
                                'tokens': (meta.get('usage') or {}).get('completion_tokens')})
             del tempos_r24[:-20]
+            if isinstance(tempos_r24[-1].get('tokens'), (int, float)) and tempos_r24[-1].get('segundos'):
+                _t = tempos_r24[-1]['tokens'] / tempos_r24[-1]['segundos']
+                _st69 = globals().setdefault('_R69_NUCLEO', {})
+                _antigo = _st69.get('ema')
+                _st69['ema'] = round(0.3 * _t + 0.7 * _antigo, 2) if _antigo else round(_t, 2)  # r69: EMA 0.3
         _r20_estado('pronto', 'Ultima geracao concluida')
         return texto
     except BaseException as erro:
@@ -16861,6 +17194,8 @@ def processar_atalho_rapido(comando: str) -> bool:
     if _r67_comandos(comando):
         return True
     if _r68_comandos(comando):
+        return True
+    if _r69_comandos(comando):
         return True
     if _r62_comandos(comando):
         return True
@@ -36549,7 +36884,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r68] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r69] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -36723,3 +37058,10 @@ while True:
     salvar_historico()
     registrar_memoria_longa(f"P: {comando_usuario} R: {resposta_texto}")
     falar(resposta_texto)
+
+# r69: AUDITORIA AUTOMATICA DO NUCLEO (fim do arquivo, 1x por abertura):
+# confere as 7 camadas por AST e so fala se algo estiver errado.
+try:
+    _r69_audit()
+except Exception:
+    pass
