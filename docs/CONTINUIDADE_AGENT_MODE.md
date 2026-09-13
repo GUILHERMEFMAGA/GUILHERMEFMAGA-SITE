@@ -1,6 +1,6 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r75**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 13/09/2026 (cobre **r21 → r76**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
@@ -8,10 +8,10 @@ Ele não substitui a inspeção do código, do histórico Git e dos comentários
 
 ## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r75**. Suíte: **817 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r75 = ponta do log desta branch.
-- Código: `agente.py` ~38,7 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r75; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 = 14, 15, 42, 43, 44; r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
+- Releases publicados: **r21 → r76**. Suíte: **839 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r76 = ponta do log desta branch.
+- Código: `agente.py` ~39,2 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código).
+- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r76; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — r74 publicada (31–37); r75 publicada (28, 29, 30, 39, 40, 41); r76 publicada (14, 15, 42, 43, 44); r77 = 38 STT (obra grande, release à parte); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,9 +116,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75 **817 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76 **839 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r53 + r75).
+  prefixos r20-r45 + r50-r53 + r75 + r76).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -1023,6 +1023,37 @@ ou relatórios reais sem revisão e autorização.
   `_rNN_ler_json/escrever_json` engolem o NameError); `proteger=None` no
   cofre cai no `_r51_dpapi_proteger` REAL (auto-carregado) e no Linux dá
   RuntimeError honesto.
+- **r76 — CONHECIMENTO E CASA AMPLIADA (5 melhorias da LISTA-IMPOSSIVEL:
+  14, 15, 42, 43, 44)**: 14 EXPORTAR/IMPORTAR CEREBRO — 'exportar cerebro'
+  grava `cerebro_export_<data>.json` (versao, exportado_em, selo lido do
+  proprio codigo, dados = as 5 chaves que a r71 grava); 'importar cerebro:
+  <arquivo>' (com 'sim') MESCLA no cerebro atual aceitando o wrapper da r76
+  ou um cerebro.json bruto — regra da casa: NUNCA apaga fato existente
+  (novo topico entra, fato novo em topico existente entra, igual ja
+  estava). 15 DIFF DO CEREBRO — 'diff cerebro' / 'o que aprendeu': nos
+  ultimos 7 dias (fatos COM data); aprimoramento honesto: fatos novos
+  ganham o campo 'quando' no ensinar (os antigos sem data sao avisados,
+  nunca inventados); 'diff' estrutural contra outro cerebro (novos/ausentes).
+  42 AUDITORIA ESTENDIDA — 'auditoria completa' gera
+  `auditoria_<data>.md` unico: motor (servidor+GGUF+visao), rotas/ferramentas
+  (AST do proprio codigo), gatilhos (guardiao r74), cerebro (contagens +
+  tamanho) e arquivos da casa — evolucao da auditoria r69 (que so conferia
+  as camadas). 43 VISAO LOCAL REAL — 'ver <imagem>': modelo de visao GGUF
+  SEPARADO na pasta `modelos_visao/` (o GGUF principal segue intacto, por
+  principio); sem modelo, mensagem honesta (NAO baixa nada sem 'sim');
+  com modelo mas sem servidor separado, explica o que falta (porta
+  'visao_porta', padrao 8081). 44 MANUAL DO USUARIO — 'manual' gera
+  `manual_do_agente.md` em portugues simples a partir do AST do proprio
+  codigo (catalogo completo de ferramentas + comandos + atalhos aprendidos
+  + interruptores). Fatos ensinados agora guardam a data ('quando') —
+  base honesta do diff semanal. Rotas inseridas ANTES do bloco r75;
+  'ver ' nao rouba 'ver conhecimento' (r69). +22 testes
+  (test_cerebro_casa_r76.py). **839 testes OK**. Selo `-r76`. Não testado no
+  Windows real (visao: deteccao + mensagens honestas; chamada real do
+  servidor de visao sera conferida no PC do dono). Faltam da leva: r77 =
+  38 STT local (obra grande, release à parte). Lições da casa: fake de
+  agente.py em teste precisa ser PYTHON VALIDO (selo dentro de string);
+  `%d % (x or 'n/a')` quebra quando x==0.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e

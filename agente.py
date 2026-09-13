@@ -8923,6 +8923,74 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r76: CONHECIMENTO E CASA AMPLIADA — cerebro v1, auditoria, visao, manual ----
+    if n.startswith("exportarcerebro") or cmd.startswith("exportar cerebro"):
+        _resto_xc = cmd.split(":", 1)[1].strip() if ":" in cmd else ""
+        _caminho_xc = _r76_exportar_cerebro(caminho=_resto_xc if _resto_xc else None)
+        if _caminho_xc:
+            _rel("Cerebro exportado (r76): %s\n(backup versionado — em outro PC use 'importar cerebro: <esse arquivo>'. O cerebro original segue intacto.)" % _caminho_xc)
+        else:
+            _rel("Nada pra exportar ainda (ensine algo primeiro: conhecimento ensinar <assunto>: <fato>) ou a feature esta desligada (config 'exportar_cerebro': false).")
+        return True
+    if n.startswith("importarcerebro") or n.startswith("restaurarcerebro") or cmd.startswith("importar cerebro") or cmd.startswith("restaurar cerebro"):
+        _resto_ic = cmd.split("cerebro", 1)[1].strip()
+        _resto_ic = _resto_ic.lstrip(":").strip()
+        if not _resto_ic:
+            _rel("Mostra assim: importar cerebro: <caminho-do-arquivo.json>\n(Os backups sao criados com 'exportar cerebro'.)")
+            return True
+        _ok_ic = None
+        _pedir = globals().get('pedir_confirmacao')
+        if _pedir:
+            _ok_ic = _pedir("Importar este cerebro no atual (mescla: NUNCA apaga o que ja existe): %s" % _resto_ic[:120])
+        else:
+            _ok_ic = input("Importar este cerebro? (sim/nao): ").strip().lower() in ('sim', 's')
+        if not _ok_ic:
+            _rel("Nada foi importado.")
+            return True
+        _r = _r76_importar_cerebro(_resto_ic)
+        if isinstance(_r, dict):
+            _rel("Cerebro importado (r76): %d novo(s), %d ja estava(m), %d ignorado(s) por formato.\nA regra da casa valeu: nada foi apagado." % (_r['adicionados'], _r['jaexistiam'], _r['ignorados']))
+        else:
+            _rel(_r or "Importacao indisponivel.")
+        return True
+    if n in ("diffcerebro", "oqueaprendeu", "oquevocaprendeu") or cmd.startswith("diff cerebro"):
+        _r = _r76_diff_cerebro()
+        if not _r:
+            _rel("Diff do cerebro desligado (config 'diff_cerebro': false).")
+            return True
+        if _r['recentes']:
+            _lin = ["O que eu aprendi nos ultimos 7 dias (r76):"]
+            for e in _r['recentes'][:15]:
+                _lin.append("  - " + e)
+            if _r['sem_data']:
+                _lin.append("  (+ %d fato(s) mais antigos sem data — ensinos antes da r76)" % _r['sem_data'])
+            _rel("\n".join(_lin))
+        else:
+            _rel("Nada de novo nos ultimos 7 dias (r76). %s" % (("+ %d fato(s) sem data (antes da r76) — veja: conhecimento listar" % _r['sem_data']) if _r['sem_data'] else "Veja tudo: conhecimento listar"))
+        return True
+    if n == "auditoriacompleta" or cmd.startswith("auditoria completa"):
+        _c = _r76_auditoria_completa()
+        if _c:
+            _rel("Auditoria estendida (r76): relatorio completo em %s\n(motor + rotas + gatilhos + cerebro + arquivos da casa — 100% local.)" % _c)
+        else:
+            _rel("Auditoria completa desligada (config 'auditoria_completa': false).")
+        return True
+    if (cmd.startswith("ver ") or cmd.startswith("visao ")) and n != "verconhecimento":
+        _resto_v = cmd[len("ver "):].strip() if cmd.startswith("ver ") else cmd[len("visao "):].strip()
+        if not _resto_v:
+            _rel("Visao local (r76): eu leio uma imagem com um modelo de visao SEPARADO (o GGUF principal segue intacto).\nUse: ver <caminho-da-imagem.jpg>  (sem modelo ainda, eu digo o que falta — sem baixar nada sem o seu 'sim'.)")
+            return True
+        _r = _r76_visao_descrever(_resto_v)
+        _rel(_r or "Visao local desligada (config 'visao_local': false).")
+        return True
+    if n == "manual" or cmd.startswith("manual "):
+        _c = _r76_gerar_manual()
+        if _c:
+            _rel("Manual gerado (r76): %s\n(portugues simples, feito do proprio codigo — rode 'manual' de novo sempre que quiser atualizar.)" % _c)
+        else:
+            _rel("Manual desligado (config 'manual_usuario': false).")
+        return True
+
     # ---- r75: CASA — fila de fundo, cron, lentidao, sandbox, cofre, convidado ----
     if n in ("fila",) or cmd.startswith("fila") or cmd.startswith("em segundo plano"):
         _resto_fl = cmd.split("fila", 1)[-1].strip() if cmd.startswith("fila") else cmd.split("em segundo plano", 1)[-1].strip()
@@ -14879,7 +14947,8 @@ def _r69_comandos(comando):
         topico = m.group(1).strip()[:40]
         st = _r69_instalar_estado()
         lista = st['conhecimento'].setdefault(topico.lower(), [])
-        lista.append({'texto': m.group(2).strip()[:200]})
+        import datetime as _dt76  # r76 (15): fato novo ganha data (p/ 'diff cerebro')
+        lista.append({'texto': m.group(2).strip()[:200], 'quando': _dt76.datetime.now().isoformat(timespec='seconds')})
         del lista[:-8]
         print("[OK] ensinado (%s: %s). O modelo local le isto ANTES de responder." % (topico, m.group(2).strip()[:60]))
         _salvar71 = globals().get('_r71_salvar_cerebro')
@@ -15730,6 +15799,478 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
     except Exception:
         globals()['_r74_aquecer_agendado'] = False
         return False
+
+
+# ================= r76: CONHECIMENTO E CASA AMPLIADA =================
+# 5 melhorias da LISTA-IMPOSSIVEL (itens 14, 15, 42, 43, 44): exportar/importar
+# cerebro versionado, diff do cerebro ("o que aprendi esta semana?"), auditoria
+# estendida num relatorio unico, visao local real (modelo SEPARADO) e manual do
+# usuario gerado do proprio codigo. 100% local; nada e removido. Kill-switches
+# na config: 'exportar_cerebro', 'diff_cerebro', 'auditoria_completa',
+# 'visao_local', 'manual_usuario'. Selo: 2026-09-11-r76.
+
+def _r76_selorFonte(pasta=None):
+    """r76: lê o selo REAL do agente.py (honestidade: o que o código diz)."""
+    import re as _re
+    fonte = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'agente.py')
+    try:
+        with open(fonte, 'r', encoding='utf-8') as f:
+            m = _re.search(r'\[Motor e avaliacao local ([^\]]+)\]', f.read())
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+    return ''
+
+
+def _r76_cerebro_chaves():
+    """r76 (14/15): as 5 chaves do cerebro (as mesmas que a r71 grava)."""
+    return ('conhecimento', 'aprendidas', 'pesos', 'confiancas', 'desconhecidos')
+
+
+def _r76_exportar_cerebro(pasta=None, caminho=None):
+    """r76 (14): EXPORTAR CEREBRO — backup versionado do que o agente aprendeu
+    em <caminho> (padrao: cerebro_export_<data-hora>.json na pasta do agente).
+    Estrutura: {versao, exportado_em, selo, dados:{as 5 chaves}}. NUNCA mexe
+    no cerebro original (só lê). Kill-switch: 'exportar_cerebro': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('exportar_cerebro', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    import datetime as _dt
+    st = (globals().get('_R69_NUCLEO') or {})
+    dados = {k: st.get(k) for k in _r76_cerebro_chaves()}
+    if not any(isinstance(v, (dict, list)) and v for v in dados.values()):
+        return None
+    pacote = {'versao': 1,
+              'exportado_em': _dt.datetime.now().isoformat(timespec='seconds'),
+              'selo': _r76_selorFonte(pasta),
+              'dados': dados}
+    if not caminho:
+        caminho = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(),
+                               'cerebro_export_%s.json' % _dt.datetime.now().strftime('%Y-%m-%d_%H%M'))
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            json.dump(pacote, f, ensure_ascii=True, indent=1)
+    except Exception:
+        return None
+    return caminho
+
+
+def _r76_importar_cerebro(caminho, pasta=None):
+    """r76 (14): IMPORTAR CEREBRO — mescla um backup (wrapper da r76 ou um
+    cerebro.json bruto) no cerebro ATUAL. Regras da casa: NUNCA apaga fato que
+    ja existe; novo topico entra; fato novo em topico existente entra; fato
+    igual ja estava. Devolve resumo (dict) ou None/erro (str).
+    Kill-switch: 'exportar_cerebro': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('exportar_cerebro', pasta=pasta, padrao=True):
+            return 'Importacao desligada (config \'exportar_cerebro\': false).'
+    except Exception:
+        pass
+    if not isinstance(caminho, str) or not os.path.isfile(caminho):
+        return 'Nao achei o arquivo: %s' % str(caminho)[:120]
+    try:
+        with open(caminho, 'r', encoding='utf-8') as f:
+            pacote = json.load(f)
+    except Exception:
+        return 'O arquivo nao e um JSON valido — nada foi alterado.'
+    if isinstance(pacote, dict) and isinstance(pacote.get('dados'), dict):
+        dados = pacote['dados']
+    elif isinstance(pacote, dict) and any(k in pacote for k in _r76_cerebro_chaves()):
+        dados = pacote  # cerebro.json bruto: aceitamos e avisamos
+    else:
+        return 'O arquivo nao parece um cerebro (faltam as chaves esperadas) — nada foi alterado.'
+    st = globals().get('_R69_NUCLEO')
+    if not isinstance(st, dict):
+        return 'O cerebro ainda nao esta pronto nesta sessao — nada foi alterado.'
+    resumo = {'adicionados': 0, 'jaexistiam': 0, 'ignorados': 0}
+    for chave in _r76_cerebro_chaves():
+        novo = dados.get(chave)
+        if not isinstance(novo, (dict, list)) or not novo:
+            continue
+        atual = st.get(chave)
+        if not isinstance(atual, (dict, list)):
+            st[chave] = {} if isinstance(novo, dict) else []
+            atual = st[chave]
+        if isinstance(novo, dict) and isinstance(atual, dict):
+            for k, v in novo.items():
+                if isinstance(v, list) and chave == 'conhecimento' and isinstance(atual.get(k), list):
+                    _texto = lambda e: str(e.get('texto', '')) if isinstance(e, dict) else str(e)
+                    _tem = set(_texto(e) for e in atual[k])
+                    for e in v:
+                        if _texto(e) in _tem:
+                            resumo['jaexistiam'] += 1
+                        else:
+                            atual[k].append(e)
+                            resumo['adicionados'] += 1
+                elif k not in atual:
+                    atual[k] = v
+                    resumo['adicionados'] += 1
+                else:
+                    resumo['jaexistiam'] += 1
+        elif isinstance(novo, dict) and isinstance(atual, list):
+            resumo['ignorados'] += 1  # formatos diferentes: preservamos o atual
+        else:
+            resumo['ignorados'] += 1
+    _salvar = globals().get('_r71_salvar_cerebro')
+    if _salvar:
+        try:
+            _salvar(pasta=pasta)
+        except Exception:
+            pass
+    return resumo
+
+
+def _r76_diff_cerebro(dias=7, pasta=None, agora=None, dados_outro=None):
+    """r76 (15): DIFF DO CEREBRO — sem arquivo: 'o que aprendi nos ultimos
+    N dias?' (fatos com data; os sem data sao avisados como 'sem data').
+    Com dados_outro (dict de outro cerebro): diff estrutural (novos/ausentes).
+    Kill-switch: 'diff_cerebro': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('diff_cerebro', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    import datetime as _dt
+    agora = agora or _dt.datetime.now()
+    st = (globals().get('_R69_NUCLEO') or {})
+    conhecimento = st.get('conhecimento') or {}
+    if dados_outro is not None:
+        outro = dados_outro.get('conhecimento') if isinstance(dados_outro.get('conhecimento'), dict) else {}
+        _texto = lambda e: str(e.get('texto', '')) if isinstance(e, dict) else str(e)
+        novos, ausentes = [], []
+        for topico, itens in conhecimento.items():
+            base = set(_texto(e) for e in (outro.get(topico) or []))
+            for e in itens:
+                if _texto(e) not in base:
+                    novos.append('%s: %s' % (topico, _texto(e)[:80]))
+        for topico, itens in outro.items():
+            base = set(_texto(e) for e in (conhecimento.get(topico) or []))
+            for e in itens:
+                if _texto(e) not in base:
+                    ausentes.append('%s: %s' % (topico, _texto(e)[:80]))
+        return {'novos': novos, 'ausentes': ausentes}
+    corte = agora - _dt.timedelta(days=max(1, int(dias)))
+    recentes, sem_data, fora = [], 0, 0
+    for topico, itens in conhecimento.items():
+        for e in itens:
+            quando = e.get('quando') if isinstance(e, dict) else None
+            if not quando:
+                sem_data += 1
+                continue
+            try:
+                t = _dt.datetime.fromisoformat(str(quando))
+            except Exception:
+                sem_data += 1
+                continue
+            if t >= corte:
+                recentes.append('%s: %s (%s)' % (topico, str(e.get('texto', ''))[:80], str(quando)[:10]))
+            else:
+                fora += 1
+    return {'recentes': recentes, 'sem_data': sem_data, 'fora': fora}
+
+
+def _r76_auditoria_completa(pasta=None, motor=None, gguf=None, conflito=None):
+    """r76 (42): AUDITORIA ESTENDIDA — motor + rotas + gatilhos + cerebro num
+    RELATORIO UNIQUE em auditoria_<data-hora>.md (pasta do agente). Evolucao
+    da auditoria r69 (que so conferia as camadas do nucleo). Devolve o
+    caminho do relatorio ou None. Kill-switch: 'auditoria_completa': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('auditoria_completa', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    import ast as _ast
+    import datetime as _dt
+    pasta = pasta or globals().get('PASTA_BASE') or os.getcwd()
+    selo = _r76_selorFonte(pasta)
+    fonte = os.path.join(pasta, 'agente.py')
+    linhas = ['# RELATORIO DE AUDITORIA ESTENDIDA (r76)', '',
+              '- Gerado em: %s' % _dt.datetime.now().isoformat(timespec='seconds'),
+              '- Selo do codigo: %s' % (selo or 'nao lido'), '']
+    # --- motor ---
+    linhas.append('## 1. Motor local')
+    _motor = (motor if motor is not None else (globals().get('_acha_llama_server') or (lambda: ''))())
+    _gguf = (gguf if gguf is not None else (globals().get('_acha_modelo_gguf') or (lambda: ''))())
+    linhas.append('- Servidor (llama-server): %s' % (_motor or 'NAO encontrado'))
+    linhas.append('- Modelo GGUF: %s' % (_gguf or 'NAO encontrado'))
+    linhas.append('- Visao (separado): %s' % (
+        _r76_visao_achar_modelo(pasta=pasta) or 'sem modelo de visao (o principal segue intacto)'))
+    linhas.append('')
+    # --- rotas / ferramentas ---
+    linhas.append('## 2. Rotas e ferramentas')
+    qtd_tools, nomes_tools, duplicadas, qtd_rotas = 0, {}, 0, 0
+    try:
+        with open(fonte, 'r', encoding='utf-8') as f:
+            arvore = _ast.parse(f.read())
+        for nodo in arvore.body:
+            if isinstance(nodo, _ast.FunctionDef):
+                doc = (_ast.get_docstring(nodo) or '').strip().splitlines()
+                nomes_tools[nodo.name] = (doc[0][:100] if doc else '')
+                qtd_tools += 1
+        # nomes de ferramenta registrados via @tool (decorator) — duplicatas
+        vistos = set()
+        for nodo in arvore.body:
+            if isinstance(nodo, _ast.FunctionDef) and nodo.decorator_list:
+                for dec in nodo.decorator_list:
+                    src = dec.id if isinstance(dec, _ast.Name) else getattr(dec, 'attr', '')
+                    if src in ('tool', 'ferramenta'):
+                        if nodo.name in vistos:
+                            duplicadas += 1
+                        vistos.add(nodo.name)
+    except Exception as erro:
+        linhas.append('- NAO consegui ler o proprio codigo (%s) — o resto do relatorio segue.' % type(erro).__name__)
+    if nomes_tools:
+        qtd_rotas = len(nomes_tools)
+    try:
+        with open(fonte, 'r', encoding='utf-8') as f:
+            _fonte_txt = f.read()
+            qtd_rotas_txt = _fonte_txt.count('cmd.startswith(') + _fonte_txt.count('cmd == ')
+    except Exception:
+        qtd_rotas_txt = 0
+    linhas.append('- Funcoes no codigo (topo do modulo): %d' % len(nomes_tools))
+    if duplicadas:
+        linhas.append('- Nomes com decorator duplicado: %d (precisa de olhar no chat)' % duplicadas)
+    else:
+        linhas.append('- Nomes de ferramenta duplicados: 0')
+    linhas.append('- Trechos de rota no cerebro local (aproximado): %d' % qtd_rotas_txt)
+    linhas.append('')
+    # --- gatilhos ---
+    linhas.append('## 3. Gatilhos (guardiao r74)')
+    _conf = conflito
+    if _conf is None:
+        try:
+            with open(os.path.join(pasta, 'gatilhos_conflito.json'), 'r', encoding='utf-8') as f:
+                _conf = json.load(f)
+        except Exception:
+            _conf = None
+    if isinstance(_conf, list) and _conf:
+        linhas.append('- %d disputa(s) registrada(s) em gatilhos_conflito.json' % len(_conf))
+        for e in _conf[-5:]:
+            linhas.append('  - %s' % str(e)[:120])
+    elif isinstance(_conf, dict) and _conf.get('disputas'):
+        linhas.append('- %d disputa(s) registrada(s) em gatilhos_conflito.json' % len(_conf['disputas']))
+    else:
+        linhas.append('- Nenhum conflito de gatilho registrado.')
+    linhas.append('')
+    # --- cerebro ---
+    linhas.append('## 4. Cerebro (r71)')
+    st = (globals().get('_R69_NUCLEO') or {})
+    _arq = os.path.join(pasta, 'cerebro.json')
+    try:
+        tamanho = os.path.getsize(_arq)
+    except Exception:
+        tamanho = 0
+    linhas.append('- Topicos ensinados: %d' % len(st.get('conhecimento') or {}))
+    linhas.append('- Padroes aprendidos: %d' % len(st.get('aprendidas') or {}))
+    linhas.append('- Pesos: %d | Confiancas: %d | Desconhecidos: %d' % (
+        len(st.get('pesos') or {}), len(st.get('confiancas') or {}), len(st.get('desconhecidos') or {})))
+    linhas.append('- Arquivo cerebro.json: %d KB' % max(1, tamanho // 1024))
+    linhas.append('')
+    # --- arquivos da casa ---
+    linhas.append('## 5. Arquivos da casa')
+    for nome in ('config.json', 'chaves.txt', 'chaves_cofre.dat', 'cerebro.json',
+                 'sessao.json', 'agenda_cron.json', 'atalhos_aprendidos.json',
+                 'tarefas_fundo.json', 'lentidao.json'):
+        linhas.append('- %-24s %s' % (nome, 'ok' if os.path.isfile(os.path.join(pasta, nome)) else 'ausente'))
+    linhas.append('')
+    linhas.append('---')
+    linhas.append('Relatorio 100% local (r76). Nada saiu deste PC.')
+    caminho = os.path.join(pasta, 'auditoria_%s.md' % _dt.datetime.now().strftime('%Y-%m-%d_%H%M'))
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(linhas))
+    except Exception:
+        return None
+    return caminho
+
+
+def _r76_visao_pasta(pasta=None):
+    """r76 (43): pasta do modelo de visao — SEPARADA do GGUF principal."""
+    return os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'modelos_visao')
+
+
+def _r76_visao_achar_modelo(pasta=None):
+    """r76 (43): procura .gguf de visao na pasta separada (ou '')."""
+    raiz = _r76_visao_pasta(pasta)
+    try:
+        for _r, _d, _arqs in os.walk(raiz):
+            for a in _arqs:
+                if a.lower().endswith('.gguf'):
+                    _cam = os.path.join(_r, a)
+                    try:
+                        if os.path.getsize(_cam) > 20_000_000:
+                            return _cam
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return ''
+
+
+def _r76_visao_descrever(caminho_imagem, chamar=None, pasta=None, porta=None):
+    """r76 (43): VISAO LOCAL REAL — descreve uma imagem com um modelo de
+    visao GGUF SEPARADO (o GGUF principal segue intacto). Sem modelo: mensagem
+    honesta (nao baixa nada sem 'sim'). Com modelo mas sem servidor: explica
+    o que falta, sem mentir. Kill-switch: 'visao_local': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('visao_local', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    if not isinstance(caminho_imagem, str) or not caminho_imagem.strip():
+        return 'Mostra assim: ver <caminho-da-imagem.jpg>'
+    caminho_imagem = caminho_imagem.strip()
+    if os.path.exists(caminho_imagem):
+        caminho_imagem = os.path.expanduser(caminho_imagem)
+    if not os.path.isfile(caminho_imagem):
+        return 'Nao achei a imagem: %s (veja o caminho no Explorer e repassa).' % caminho_imagem[:120]
+    ext = os.path.splitext(caminho_imagem)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp', '.bmp'):
+        return 'Formato que a visao local le: .jpg, .jpeg, .png, .webp ou .bmp (a sua e %s).' % ext
+    modelo = _r76_visao_achar_modelo(pasta=pasta)
+    if not modelo:
+        return ('Sua maquina ainda NAO tem um modelo de visao local (e tudo bem — o modelo '
+                'principal de texto segue intacto, por principio). Para ligar a visao: baixe um '
+                'GGUF de visao (ex.: Moondream) para a pasta %s — eu NUNCA baixo nada sem o seu '
+                "'sim' explicito." % _r76_visao_pasta(pasta))
+    try:
+        if ler:
+            _p = ler('visao_porta', pasta=pasta, padrao=8081)
+            if isinstance(_p, int) and _p > 0:
+                porta = _p
+    except Exception:
+        pass
+    porta = porta or 8081
+    if chamar is None:
+        def chamar(caminho_imagem, porta):
+            import base64 as _b64
+            import json as _js
+            import urllib.request as _ur
+            with open(caminho_imagem, 'rb') as f:
+                b64 = _b64.b64encode(f.read()).decode('ascii')
+            mime = {'jpg': 'jpeg', 'jpeg': 'jpeg', 'png': 'png', 'webp': 'webp', 'bmp': 'bmp'}[ext.lstrip('.')]
+            corpo = _js.dumps({'model': 'visao', 'messages': [{'role': 'user', 'content': [
+                {'type': 'image_url', 'image_url': {'url': 'data:image/%s;base64,%s' % (mime, b64)}},
+                {'type': 'text', 'text': 'Descreva esta imagem em 3 frases curtas, em portugues do Brasil.'}]}
+            ]}).encode('utf-8')
+            req = _ur.Request('http://127.0.0.1:%d/v1/chat/completions' % porta, data=corpo,
+                              headers={'Content-Type': 'application/json'})
+            with _ur.urlopen(req, timeout=90) as r:
+                dado = _js.loads(r.read().decode('utf-8'))
+            return str(dado['choices'][0]['message']['content']).strip()
+    try:
+        return chamar(caminho_imagem, porta) or '(o modelo de visao nao respondeu texto)'
+    except Exception as erro:
+        return ('O modelo de visao existe (%s) mas o SERVIDOR dele nao respondeu na porta %d. '
+                'A visao usa um servidor SEPARADO do principal (o texto segue funcionando). '
+                'Suba o servidor com o modelo de visao na porta %d e repita o comando. (%s)'
+                % (os.path.basename(modelo), porta, porta, type(erro).__name__))
+
+
+def _r76_gerar_manual(pasta=None):
+    """r76 (44): MANUAL DO USUARIO — guia em portugues simples gerado do
+    PROPRIO CODIGO (AST de agente.py: todas as ferramentas + as rotas
+    documentadas + atalhos aprendidos). Grava manual_do_agente.md.
+    Kill-switch: 'manual_usuario': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('manual_usuario', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    import ast as _ast
+    import datetime as _dt
+    pasta = pasta or globals().get('PASTA_BASE') or os.getcwd()
+    selo = _r76_selorFonte(pasta)
+    fonte = os.path.join(pasta, 'agente.py')
+    ferramentas = {}
+    try:
+        with open(fonte, 'r', encoding='utf-8') as f:
+            arvore = _ast.parse(f.read())
+        for nodo in arvore.body:
+            if isinstance(nodo, _ast.FunctionDef) and nodo.decorator_list:
+                doc = (_ast.get_docstring(nodo) or '').strip().splitlines()
+                ferramentas[nodo.name] = (doc[0][:120] if doc else '')
+    except Exception:
+        pass
+    atalhos = {}
+    try:
+        with open(os.path.join(pasta, 'atalhos_aprendidos.json'), 'r', encoding='utf-8') as f:
+            _a = json.load(f)
+            if isinstance(_a, dict):
+                atalhos = _a
+    except Exception:
+        pass
+    linhas = ['# MANUAL DO AGENTE (gerado do proprio codigo — r76)', '',
+              '- Versao do codigo: %s' % (selo or 'nao lida'),
+              '- Gerado em: %s' % _dt.datetime.now().isoformat(timespec='seconds'),
+              '- Este manual se atualiza: rode `manual` de novo a qualquer momento.', '']
+    linhas.append('## Comandos principais (portugues simples)')
+    comandos = [
+        ('conversa livre', 'so fale com ele — ele responde e age quando da'),
+        ('menu', 'tela com tudo que ele faz'),
+        ('status', 'como a maquina esta (RAM, disco, motor local)'),
+        ('conhecimento ensinar <assunto>: <fato>', 'ensina um fato (fica salvo no cerebro.json)'),
+        ('conhecimento listar', 'tudo que ele sabe de voce'),
+        ('esquecer <frase>', 'apaga UM padrao aprendido'),
+        ('fila: <tarefa>', 'executa em segundo plano enquanto voce conversa (r75)'),
+        ('cron adicionar <nome> as HH:MM: <tarefa>', 'agenda com dias da semana (r75)'),
+        ('diario lentidao', 'por que a IA local atrasou (r75)'),
+        ('sandbox: <codigo>', 'roda codigo Python trancado em quarentena (r75, com sim)'),
+        ('cofre chaves', 'protege suas chaves com o cadeado do Windows (r75)'),
+        ('modo convidado / sair do modo convidado', 'visita usa sem mexer na config (r75)'),
+        ('exportar cerebro', 'backup versionado do que ele aprendeu (r76)'),
+        ('importar cerebro: <arquivo>', 'restaura o backup neste/otro PC (r76, com sim)'),
+        ('diff cerebro', 'o que ele aprendeu esta semana (r76)'),
+        ('auditoria completa', 'relatorio unico: motor + rotas + gatilhos + cerebro (r76)'),
+        ('ver <imagem>', 'descreve uma imagem com visao local SEPARADA (r76)'),
+        ('manual', 'gera este arquivo de novo'),
+        ('replay erros / testar malha / guardiao gatilhos / traduzir rota', 'diagnosticos de rotas (r74)'),
+        ('criar rota <gatilho>: <acao>', 'ensina um comando novo (r74)'),
+        ('aquecer as HH:MM', 'sobe o motor local antes de voce sentar (r74)'),
+        ('velocimetro / checkpoints / modo aviao', 'diagnostico e seguranca (r67)'),
+        ('defender', 'configura o antivirus do Windows (r63)'),
+        ('atualizar agora', 'baixa as versoes novas do agente'),
+        ('sair e atualizar', 'fecha o agente e atualiza'),
+        ('modo panico', 'cancela tudo que esta na fila e pausa agendados'),
+    ]
+    for c, d in comandos:
+        linhas.append('- **%s** — %s' % (c, d))
+    linhas.append('')
+    if atalhos:
+        linhas.append('## Atalhos que voce ensinou')
+        for g, a in sorted(atalhos.items()):
+            linhas.append('- **%s** — %s' % (g, str(a)[:100]))
+        linhas.append('')
+    linhas.append('## Configuracoes (interruptores) na config.json')
+    linhas.append('Toda feature nova pode ser desligada com `false`: `fila_de_fundo`, `agenda_cron`, '
+                  '`diario_lentidao`, `sandbox_codigo`, `cofre_chaves`, `modo_convidado`, '
+                  '`exportar_cerebro`, `diff_cerebro`, `auditoria_completa`, `visao_local`, '
+                  '`manual_usuario`, `compactar_historico`, `replay_erros`, `guardiao_gatilhos`, '
+                  '`aquecer_horas`, `cerebro_persistente`, `boas_vindas`, `dica_de_ensinar`.')
+    linhas.append('')
+    if ferramentas:
+        linhas.append('## Catalogo completo de ferramentas (%d)' % len(ferramentas))
+        for nome in sorted(ferramentas):
+            linhas.append('- `%s` — %s' % (nome, ferramentas[nome] or '(sem descricao)'))
+        linhas.append('')
+    linhas.append('---')
+    linhas.append('Feito pelo proprio agente, a partir do proprio codigo. 100% local.')
+    caminho = os.path.join(pasta, 'manual_do_agente.md')
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(linhas))
+    except Exception:
+        return None
+    return caminho
 
 
 # ================= r75: FILA, CRON, LENTIDAO, SANDBOX, COFRE E CONVIDADO =================
@@ -38465,7 +39006,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r75] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r76] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
