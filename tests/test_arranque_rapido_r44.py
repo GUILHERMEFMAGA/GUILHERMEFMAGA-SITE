@@ -10,7 +10,7 @@ from contextlib import redirect_stdout
 
 from test_roteamento_conversa import SOURCE
 
-BRANCH = 'arena/01a08d8e-guilhermefmaga-site'
+BRANCH = 'arena/01a09bca-guilhermefmaga-site'
 
 
 def texto_bat():
@@ -95,7 +95,7 @@ class AgenteSemImportPesadoNoArranque(unittest.TestCase):
     def test_selo_r73_no_banner(self):
         with io.open(str(SOURCE), encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r80]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r81]', texto)
 
 
 class LazyGemini(unittest.TestCase):

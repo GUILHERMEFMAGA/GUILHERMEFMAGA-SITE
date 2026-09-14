@@ -2178,8 +2178,13 @@ threading.Thread(target=worker_agendador, daemon=True).start()
 # MANUTENCAO POR ENTREGA: esta URL precisa apontar para a MESMA branch usada
 # nas URLs do iniciar.bat (passo permanente em docs/CONTINUIDADE_AGENT_MODE.md);
 # divergencia gera falso alarme e um corretor que reverteria a entrega.
+# Licao r81: em 13/09 a branch da sessao trocou (01a08d8e -> 01a09bca) e as
+# URLs ficaram paradas na antiga (parada na r73) - o PC do dono dizia
+# 'conteudo identico, nada foi trocado' para sempre. Agora o RAMO_OFICIAL e
+# unico e um teste trava a branch em agente.py E no iniciar.bat.
+RAMO_OFICIAL = 'arena/01a09bca-guilhermefmaga-site'
 URL_AGENTE_OFICIAL = ("https://raw.githubusercontent.com/GUILHERMEFMAGA/"
-                      "GUILHERMEFMAGA-SITE/arena/01a08d8e-guilhermefmaga-site/agente.py")
+                      "GUILHERMEFMAGA-SITE/" + RAMO_OFICIAL + "/agente.py")
 URL_INICIAR_OFICIAL = URL_AGENTE_OFICIAL.replace("/agente.py", "/iniciar.bat")
 
 
@@ -15908,6 +15913,47 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
         return False
 
 
+# ================= r81: ESCUDO — TEXTO DO PROPRIO PROGRAMA NUNCA VIRA COMANDO =================
+# Bug real do PC do dono (log r73): thread de fundo imprime banners DURANTE o
+# input() e, no console Windows, o texto do banner fica misturado na linha de
+# entrada — o 'comando' era o proprio texto do programa e ia pro modelo, que
+# respondia banner por banner ('O numero 2 e igual a dois' sobre o rodape de
+# previa, respostas sobre 'Cerebro restaurado', etc.). O escudo e DETERMINISTICO
+# e barato: se o texto tem cara de saida interna, IGNORA e pede de novo —
+# nunca envia pro modelo. Nunca bloqueia comando humano de verdade.
+_R81_SINAIS_SAIDA = (
+    '[previa da geracao', '[fim da previa',
+    '[local]:', '[ia local]:', '[modo]', '[ok]', '[aviso]', '[limpeza]',
+    '[analise local]:', '[honestidade', '[roteiro alternativo', '[voz r79]',
+    '[revalidar]', '[modo] atual',
+    'nuvem desligada', 'tudo roda no seu pc',
+    'para usar o rodizio de ias', 'para voltar para a ia local',
+    'configurando o super agente', 'super agente pronto',
+    'modo local ativo', 'cerebro restaurado de',
+    'verificando atualizacoes', 'pressione qualquer tecla',
+    'o que o agente deve fazer no pc?', "digite 'ajuda' para ver",
+    'ia neural local ligada', 'agente ja esta atualizado',
+    'lancador main.py em dia', 'requirements.txt em dia',
+    'iniciar.bat ja esta em dia', 'voce ja esta na versao oficial mais nova',
+    'agente foi encerrado', 'o processo esta elevado como',
+)
+
+
+def _r81_saida_interna(texto):
+    """r81: FUNCAO PURA — True se o texto parece saida interna do proprio
+    programa (banner/status/previa) misturado na linha de entrada do console.
+    Comandos humanos de verdade SEMPRE retornam False."""
+    if not isinstance(texto, str):
+        return False
+    t = ' ' + texto.strip().lower() + ' '
+    if not t.strip():
+        return False
+    for sinal in _R81_SINAIS_SAIDA:
+        if (' ' + sinal) in t:
+            return True
+    return False
+
+
 # ================= r80: RESPOSTA ORGANIZADA — TABELAS, GRAFICOS E IDEIAS BONITOS =================
 # A pedido do dono (13/09): "alta organizacao na resposta, na IA LOCAL ele vai
 # poder construir graficos, tabelas... tudo bonitinho e organizado".
@@ -17538,7 +17584,7 @@ def _r62_entregar_lancador(baixar=None, pasta=None):
         import random
         import urllib.request
         base = ('https://raw.githubusercontent.com/GUILHERMEFMAGA/'
-                'GUILHERMEFMAGA-SITE/arena/01a08d8e-guilhermefmaga-site/')
+                'GUILHERMEFMAGA-SITE/' + RAMO_OFICIAL + '/')
 
         def baixar(nome):
             with urllib.request.urlopen(base + nome + '?cache=%d'
@@ -39866,7 +39912,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r80] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r81] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -39933,6 +39979,13 @@ while True:
     if not comando_usuario.strip():
         # Enter sem nada digitado: não envia mensagem vazia pro modelo (isso
         # causava o erro "última mensagem precisa ser do usuário").
+        continue
+    # r81: ESCUDO — texto do proprio programa misturado no console NUNCA vira
+    # comando (bug real do PC do dono: banners respondidos um a um pelo modelo)
+    if _r81_saida_interna(comando_usuario):
+        print("\n[Aviso r81]: isso nao e um comando — parece texto do proprio programa")
+        print("            misturado no console (interferencia de fundo). Ignorei;")
+        print("            digite o comando de novo, por favor.")
         continue
 
     # r79: VOZ — 'falar'/'ouvir' transcreve um comando DITO (whisper.cpp, 100% local)

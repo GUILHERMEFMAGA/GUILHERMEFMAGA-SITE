@@ -1,17 +1,17 @@
 # Continuidade do Super Agente PC — leitura inicial para outro Agent Mode
 
-Atualizado em 13/09/2026 (cobre **r21 → r80**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
+Atualizado em 14/09/2026 (cobre **r21 → r81**; releases posteriores a esta data: veja `git log` e os comentários do PR #4). Este documento descreve a **r21** (confiabilidade das respostas
 locais), posterior à r20 (0c343c0) e à base r19 (494482a). Consulte `git log` e o PR de
 continuação mais recente (a partir da r21 as entregas seguem em PRs de continuação do PR #3,
 que permanece aberto e intacto).
 Ele não substitui a inspeção do código, do histórico Git e dos comentários posteriores.
 
-## ESTADO ATUAL (13/09/2026 — LEIA PRIMEIRO)
+## ESTADO ATUAL (14/09/2026 — LEIA PRIMEIRO)
 
-- Releases publicados: **r21 → r80** (o número r77 não foi usado — o STT saiu como r79, na ordem de publicação). Suíte: **871 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r80 = ponta do log desta branch.
-- Código: `agente.py` ~39,7 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual + r78 de automação c/ Agendador do Windows + r79 de voz/STT local + r80 de resposta organizada), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
-- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código); r78 AUTOMAÇÃO PROFISSIONAL ('agendar windows ...' no Agendador de Tarefas do Windows — roda com o agente fechado; + correção real do parse da rota cron da r75); r79 VOZ (STT local whisper.cpp — 'falar' transcreve e o comando segue o fluxo normal; 'baixar stt' com 'sim' explícito); r80 RESPOSTA ORGANIZADA ('construir_tabela'/'construir_grafico'/'construir_ideias' como ferramentas + rotas leigo 'tabela'/'grafico'/'ideias'; tela ASCII + arquivo bonito HTML/SVG/.md; organizador automático).
-- Pendências vivas: (1) usuário ainda NÃO rodou 'atualizar agora' nesta fase — o agente dele pulará da r71 pra r80; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — **COMPLETA**: r74 (31–37), r75 (28,29,30,39,40,41), r76 (14,15,42,43,44), r78 (automação profissional, a pedido), r79 (38 STT — o 'sim' explícito p/ o download foi dado pelo dono em 13/09); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
+- Releases publicados: **r21 → r81** (o número r77 não foi usado — o STT saiu como r79, na ordem de publicação). Suíte: **898 testes OK** (skipped=3). Commits de referência: `255faab` (r73), `a8ba70b` (lista-100), `e8072fb` (auditoria completa); r81 = ponta do log da branch da sessão atual (`arena/01a09bca-guilhermefmaga-site` — a branch de ENTREGA do atualizador).
+- Código: `agente.py` ~39,7 mil linhas (513 ferramentas @tool + funções r74 de ritmo/céu + r75 de casa/fila/cron/sandbox/cofre/convidado + r76 de cerebro/auditoria/visao/manual + r78 de automação c/ Agendador do Windows + r79 de voz/STT local + r80 de resposta organizada + r81 de entrega certa/escudo de entrada), `main.py`, `iniciar.bat` (CRLF puro), `requirements.txt` (faixas major: langchain-openai>=1.0,<2.0; langchain-google-genai>=4.0,<5.0).
+- Últimas releases: r71 cérebro persistente (cerebro.json); r72 honestidade ('não sei — me ensina'); r73 BOAS-VINDAS DE VOLTA (sessao.json); r74 RITMO E CÉU (compactador de histórico, warm-up programado, replay de erros, malha, guardião de gatilhos, tradutor de rota, rota guiada — tudo dry-run/leitura); r75 A CASA (fila de fundo, cron 2.0 c/ dias da semana, diário de lentidão c/ causa, sandbox c/ limites e 'sim', cofre de chaves c/ DPAPI, modo convidado de sessão); r76 CONHECIMENTO E CASA AMPLIADA (exportar/importar cerebro versionado c/ mescla, diff 'o que aprendi esta semana?', auditoria estendida em relatório único, visão local com modelo SEPARADO, manual gerado do próprio código); r78 AUTOMAÇÃO PROFISSIONAL ('agendar windows ...' no Agendador de Tarefas do Windows — roda com o agente fechado; + correção real do parse da rota cron da r75); r79 VOZ (STT local whisper.cpp — 'falar' transcreve e o comando segue o fluxo normal; 'baixar stt' com 'sim' explícito); r80 RESPOSTA ORGANIZADA ('construir_tabela'/'construir_grafico'/'construir_ideias' como ferramentas + rotas leigo 'tabela'/'grafico'/'ideias'; tela ASCII + arquivo bonito HTML/SVG/.md; organizador automático); r81 ATUALIZAÇÃO CERTA + ESCUDO (RAMO_OFICIAL único — agente.py e iniciar.bat entregam da branch da sessão; teste trava a branch nos dois arquivos; `_r81_saida_interna` ignora o texto do próprio programa misturado no input — bug real do PC do dono: o modelo respondia banner por banner).
+- Pendências vivas: (1) PC do dono CONSTA na r73 (log real de 14/09: selo r73 + 'atualizar agora' dizendo 'conteudo identico, nada foi trocado' — as URLs antigas apontavam para a branch 01a08d8e congelada na r73; r81 corrigiu as URLs); o salto r73 → r81 é feito UMA VEZ SÓ com um comando PowerShell de copiar/colar (entregue ao dono em 14/09) e, a partir da r81, o 'atualizar agora' funciona para sempre; aguardar prints; (2) LEVA AUTORIZADA: 19 itens da LISTA-IMPOSSIVEL — **COMPLETA**: r74 (31–37), r75 (28,29,30,39,40,41), r76 (14,15,42,43,44), r78 (automação profissional, a pedido), r79 (38 STT — o 'sim' explícito p/ o download foi dado pelo dono em 13/09); (3) LISTA-100 segue à disposição (SÓ PROPOSTA); (4) maior futuro: RAG dos documentos do usuário (o maior); (5) diretriz do dono (13/09): padrão "super-agente" — novas ferramentas/funções + aprimorar tudo (nada é tirado) e, ao fim das próximas releases, lista de ideias do próprio agente (SÓ PROPOSTA).
 - Prompt pronto pra retomar esta conversa numa nova: `docs/PROMPT_CONTINUACAO.md`.
 
 ## Onde continuar
@@ -116,9 +116,9 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80 **891 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81 **898 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
-  prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80).
+  prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80 + r81).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
   `docs/CATALOGO_PROPOSTAS_FERRAMENTAS.md`.
   Testes isolados não equivalem a testes completos no Windows/serviços externos.
@@ -1117,6 +1117,27 @@ ou relatórios reais sem revisão e autorização.
   construtores seguem). Parse de rota em funcao pura testavel; colisor zero
   (construir_* e prefixos tabela/grafico/ideias livres). +20 testes
   (test_resposta_organizada_r80.py). **891 testes OK**. Selo `-r80`.
+- **r81 — ATUALIZAÇÃO CERTA + ESCUDO DE ENTRADA (dois bugs reais do PC do dono,
+  descobertos no log de 14/09)**: (1) O PC ficava PARADO na r73 para sempre:
+  'atualizar agora' dizia 'conteudo identico, nada foi trocado' porque TODAS as
+  URLs de entrega (2 em agente.py + 3 no iniciar.bat) apontavam para a branch
+  ANTIGA da sessao anterior (01a08d8e), que parou na r73 quando a sessao
+  atual comecou (01a09bca). Correcao: RAMO_OFICIAL unico em agente.py
+  (URL_AGENTE_OFICIAL e _r62_entregar_lancador derivam dele) + as 3 URLs do
+  iniciar.bat trocadas (CRLF puro preservado em bytes) + NOVO TESTE que trava
+  a branch nos dois arquivos (drift silencioso nunca mais — lição registrada
+  no comentario da URL). (2) O modelo respondia UM A UM os BANNERS do proprio
+  programa ('Verificando atualizacoes...', 'Cerebro restaurado...',
+  '[Fim da previa...]', 'Pressione qualquer tecla'): no console Windows, uma
+  thread de fundo que imprime DURANTE o input() mistura o texto na linha de
+  entrada e o 'comando' era saida interna. Correcao: _r81_saida_interna
+  (FUNCAO PURA, ~26 sinais de saida interna) — se o 'comando' tem cara de
+  banner, IGNORA e pede de novo; SEMPRE deixa passar comando humano de
+  verdade (20 casos de negativo cobertos em teste). +7 testes
+  (test_escudo_atualizacao_r81.py). **898 testes OK**. Selo `-r81`.
+  Ponte para o PC do dono: UMA VEZ SÓ, comando PowerShell de copiar/colar
+  (baixa agente.py/main.py/requirements.txt/iniciar.bat da branch nova para a
+  pasta do agente); a partir da r81 o 'atualizar agora' volta a funcionar.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
@@ -1195,7 +1216,9 @@ para documentos/dados. Alterações confirmadas foram autorizadas, não autonomi
 > View all changes. Não peça nem exponha chaves reais. Confira a branch permitida
 > pela sessão antes de editar; a origem é o PR #3 (r20, arena/01a082fd-guilhermefmaga-site) e as
 > entregas seguem em PRs de continuação — confira o PR mais recente (r21: PR #4,
-> arena/01a08d8e-guilhermefmaga-site). Não faça merge na main nem feche os PRs #2/#3/#4.
+> arena/01a08d8e-guilhermefmaga-site; a partir de 13/09 a ENTREGA migrou para
+> arena/01a09bca-guilhermefmaga-site — branch da sessão atual e do atualizador; o PR #4
+> continua aberto na antiga, que ficou congelada na r73). Não faça merge na main nem feche os PRs #2/#3/#4.
 > IA local é GGUF pré-treinado via llama.cpp no PC, mais regras e ferramentas
 > Python; não foi treinada do zero. Preserve meu modelo e priorize correção.
 > IA nuvem é o rodízio de provedores/cotas disponíveis, especialmente Groq e

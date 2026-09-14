@@ -9,7 +9,7 @@ TREE = ast.parse(SOURCE.read_text(encoding='utf-8'))
 
 
 def carregar(*nomes, **ambiente):
-    nos = [n for n in TREE.body if isinstance(n, ast.FunctionDef) and (n.name in nomes or n.name == '_norm_pt' or n.name.startswith(('_r20_', '_r21_', '_r22_', '_r23_', '_r24_', '_r25_', '_r26_', '_r28_', '_r29_', '_r30_', '_r31_', '_r32_', '_r33_', '_r34_', '_r38_', '_r40_', '_r43_', '_r44_', '_r45_', '_r50_', '_r51_', '_r52_', '_r53_', '_r61_', '_r62_', '_r63_', '_r64_', '_r65_', '_r66_', '_r67_', '_r68_', '_r69_', '_r70_', '_r71_', '_r72_', '_r73_', '_r74_', '_r75_', '_r76_', '_r78_', '_r79_', '_r80_')))]
+    nos = [n for n in TREE.body if isinstance(n, ast.FunctionDef) and (n.name in nomes or n.name == '_norm_pt' or n.name.startswith(('_r20_', '_r21_', '_r22_', '_r23_', '_r24_', '_r25_', '_r26_', '_r28_', '_r29_', '_r30_', '_r31_', '_r32_', '_r33_', '_r34_', '_r38_', '_r40_', '_r43_', '_r44_', '_r45_', '_r50_', '_r51_', '_r52_', '_r53_', '_r61_', '_r62_', '_r63_', '_r64_', '_r65_', '_r66_', '_r67_', '_r68_', '_r69_', '_r70_', '_r71_', '_r72_', '_r73_', '_r74_', '_r75_', '_r76_', '_r78_', '_r79_', '_r80_', '_r81_')))]
     exec(compile(ast.Module(body=nos, type_ignores=[]), str(SOURCE), 'exec'), ambiente)
     return ambiente
 
@@ -77,8 +77,8 @@ class RoteamentoConversa(unittest.TestCase):
         # atualizar aqui junto com as URLs do iniciar.bat.
         bat = (SOURCE.parent / 'iniciar.bat').read_text()
         self.assertNotIn('arena/01a07ce2-guilhermefmaga-site', bat)
-        self.assertIn('arena/01a08d8e-guilhermefmaga-site/agente.py', bat)
-        self.assertIn('arena/01a08d8e-guilhermefmaga-site/iniciar.bat', bat)
+        self.assertIn('arena/01a09bca-guilhermefmaga-site/agente.py', bat)
+        self.assertIn('arena/01a09bca-guilhermefmaga-site/iniciar.bat', bat)
         self.assertIn('?cache=', bat)  # anti-cache CDN do raw.githubusercontent
         self.assertIn('python -m py_compile agente_novo.py', bat)
         self.assertIn('SEM_ATUALIZAR.txt', bat)
@@ -87,12 +87,14 @@ class RoteamentoConversa(unittest.TestCase):
         # r21: a checagem interna do agente (URL_AGENTE_OFICIAL) precisa apontar
         # para a MESMA branch das URLs do iniciar.bat; divergencia gerava falso
         # alarme no PC real e um ATUALIZAR_INICIAR.bat que reverteria a entrega.
+        # r81: o agente.py usa a constante RAMO_OFICIAL (as URLs sao derivadas
+        # dela); o iniciar.bat usa a branch por literal — o teste compara as duas.
         import re as _re
-        no_agente = _re.search(r'GUILHERMEFMAGA-SITE/(arena/[a-z0-9-]+)/agente\.py',
-                               SOURCE.read_text())
+        no_agente = _re.search(r"^RAMO_OFICIAL = '(arena/[a-z0-9-]+)'",
+                               SOURCE.read_text(), _re.M)
+        self.assertIsNotNone(no_agente, 'RAMO_OFICIAL ausente em agente.py')
         bat = (SOURCE.parent / 'iniciar.bat').read_text()
         no_bat = _re.search(r'GUILHERMEFMAGA-SITE/(arena/[a-z0-9-]+)/agente\.py', bat)
-        self.assertIsNotNone(no_agente)
         self.assertIsNotNone(no_bat)
         self.assertEqual(no_agente.group(1), no_bat.group(1))
 
