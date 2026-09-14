@@ -8975,8 +8975,12 @@ def _processar_cerebro_local(comando: str) -> bool:
         return True
 
     # ---- r79: VOZ — STT local (whisper.cpp, 100% local) ----
-    # r83: diagnostico de microfone (so leitura) — ver o que falta antes do 'falar'
-    if n.startswith('diagnosticomicrofone') or n.startswith('testarmicrofone'):
+    # r83 (robusto na r84): diagnostico de microfone (so leitura) — entender o
+    # PT-BR natural: 'diagnostico microfone', 'diagnostico de/do microfone',
+    # 'testar microfone', 'microfone nao funciona', 'microfone' sozinho.
+    # (bug real 14/09: 'diagnostico de microfone' escapava pro modelo)
+    if (('diagnostico' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)
+            or n.startswith('microfone')):
         _devs_mf, _ind_mf, _err_mf = _r83_microfones()
         _rel(_r83_resumo_microfone(_devs_mf, _ind_mf, _err_mf))
         return True
@@ -39974,7 +39978,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r83] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r84] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

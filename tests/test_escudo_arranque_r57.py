@@ -89,7 +89,7 @@ class ReparoNoBat(unittest.TestCase):
 
 class Selo(unittest.TestCase):
     def test_banner_r57(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r83]', texto('agente.py'))
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r84]', texto('agente.py'))
 
 
 if __name__ == '__main__':

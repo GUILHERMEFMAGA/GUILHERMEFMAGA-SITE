@@ -28,7 +28,7 @@ def _fonte():
 class TestMicrofoneR83(unittest.TestCase):
 
     def test_selo_r83(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r83]'), 1)
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r84]'), 1)
 
     def test_microfones_falha_da_biblioteca(self):
         amb = carregar()
@@ -91,7 +91,8 @@ class TestMicrofoneR83(unittest.TestCase):
 
     def test_rota_diagnostico_no_codigo(self):
         fonte = _fonte()
-        self.assertIn("n.startswith('diagnosticomicrofone') or n.startswith('testarmicrofone')", fonte)
+        # r84: a rota ficou robusta ao PT-BR natural (ver test_rota_microfone_robusta_r84)
+        self.assertIn("('diagnostico' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)", fonte)
         # a rota 'stt' agora mostra tambem a linha do microfone
         self.assertIn('_rel(_r79_stt_status())\n        _devs_mf, _ind_mf, _err_mf = _r83_microfones()', fonte)
 

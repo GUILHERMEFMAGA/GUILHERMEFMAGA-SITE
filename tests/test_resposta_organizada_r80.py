@@ -42,7 +42,7 @@ class TestRespostaOrganizadaR80(unittest.TestCase):
     def test_selo_r80(self):
         with open(AGENTE_PY, encoding='utf-8') as f:
             fonte = f.read()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r83]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r84]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r79]'), 0)
 
     def test_bloco_r80_completo(self):
