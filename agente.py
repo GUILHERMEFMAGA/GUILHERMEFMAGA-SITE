@@ -8543,12 +8543,39 @@ def _processar_cerebro_local(comando: str) -> bool:
             if pre in _nome:
                 _nome = _nome.split(pre)[-1]; break
         _nome = _nome.strip(" :,")
+        _r87_backup_contatos()  # r87: snapshot p/ 'desfazer contato'
         if _nome and contatos.pop(_nome.lower(), None) is not None:
             salvar_json(ARQ_CONTATOS, contatos)
             _rel(f"Contato '{_nome}' removido.")
         else:
             _rel(f"Nao achei o contato '{_nome}'. Digite 'meus contatos' para ver a lista.")
         return True
+    # r87: desfazer a ultima mudanca de contato (o 'desfazer' generico ja e
+    # usado pela edicao de projetos — por isso comando especifico)
+    if n in ("desfazercontato", "desfazaultimocontato", "voltarcontato",
+             "desfazercontatossalvo", "desfazersalvarcontato"):
+        _rel(_r87_desfazer_contato()); return True
+    # r87: procurar contato — por NOME ("qual o numero do joao") ou por
+    # NUMERO completo/parte final ("quem e +55 16 99132-8338" / "quem e 991328338")
+    if cmd.startswith(("qual o numero", "numero do", "numero da",
+                       "procurar contato", "buscar contato", "achar contato",
+                       "pesquisar contato")) or (cmd.startswith("quem e") and any(c.isdigit() for c in cmd)):
+        _resto87 = cmd
+        for _pre87 in ("qual o numero de ", "qual o numero do ", "qual o numero da ",
+                       "qual o numero dos ", "qual o numero das ",
+                       "qual o numero", "numero do ", "numero da ",
+                       "procurar contato", "buscar contato", "achar contato",
+                       "pesquisar contato", "quem e"):
+            if _resto87.startswith(_pre87):
+                _resto87 = _resto87[len(_pre87):]; break
+        _resto87 = _resto87.strip(" :,.?")
+        _rel(_r87_procurar_contato(_resto87, contatos)); return True
+    # r87: historico de envios — o log JA existia (logs_whatsapp.json);
+    # agora existe o jeito de VER
+    if any(p in cmd for p in ("minhas mensagens", "o que eu mandei", "o que mandei no whatsapp",
+                              "o que eu enviei", "historico do whatsapp", "historico whatsapp",
+                              "ultimos envios", "envios feitos")):
+        _rel(_r87_ultimos_envios_wpp(logs_whatsapp)); return True
     # Enviar WhatsApp por NOME (busca no app) ou direto para NUMERO (r86):
     # "manda whatsapp pro Joao: oi" | "manda whatsapp pro Fulano, oi" |
     # "mande mensagem pra +55 16 99132-8338, se vai jogar?" (parse: _r86_parse_whatsapp)
@@ -8562,7 +8589,28 @@ def _processar_cerebro_local(comando: str) -> bool:
             _rel(f"Voce quer mandar WhatsApp para '{_alvo86}', mas faltou a mensagem. Ex.: "
                  f"'manda whatsapp pro {_alvo86}: oi, tudo bem?'")
             return True
-        _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_alvo86, mensagem=_msg86))
+        _res86 = _invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_alvo86, mensagem=_msg86)
+        _rel(_res86)
+        # r87: enviou para um NUMERO cru que nao esta na agenda -> sugere salvar
+        # com nome (pergunta UMA vez) para as proximas serem mais rapidas
+        if _tipo86 == "numero" and str(_res86).startswith("Mensagem enviada"):
+            import re as _r87re2
+            _dig87 = _r87re2.sub(r"\D", "", _alvo86)
+            _ja_salvo87 = False
+            for _val87 in contatos.values():
+                _n87 = _val87.get("whatsapp") or _val87.get("numero") if isinstance(_val87, dict) else _val87
+                if _dig87 and _r87re2.sub(r"\D", "", str(_n87 or "")) == _dig87:
+                    _ja_salvo87 = True
+                    break
+            if not _ja_salvo87:
+                try:
+                    _nome87 = input("Mandei para " + _alvo86 + ". Quer salvar esse numero com um nome? Digite o nome (ou Enter para pular): ").strip()
+                except Exception:
+                    _nome87 = ""
+                if _nome87:
+                    _salvar_contato_wpp(_nome87, _alvo86)
+                    _rel("Pronto: '" + _r87_str_nome(_nome87) + "' (" + _alvo86 + ") salvo na sua agenda. "
+                         "Agora basta dizer: 'manda whatsapp pro " + _nome87 + ": mensagem'.")
         return True
 
     # ---- VERSOES DO PROJETO (ponto de restauracao do seu site) ----
@@ -18642,6 +18690,106 @@ def _r86_parse_whatsapp(cmd: str):
     return ("nome", _nome, _msg.strip())
 
 
+def _r87_str_nome(nome):
+    """r87: capitaliza 'joao iser' -> 'Joao Iser' (cosmetico p/ exibicao)."""
+    return " ".join(w.capitalize() for w in str(nome or "").split()) or str(nome or "")
+
+
+def _r87_ultimos_envios_wpp(registros, quantidade=10):
+    """r87: FORMATA o historico de envios de WhatsApp (logs_whatsapp.json) —
+    os ultimos N envios, mais recente primeiro. Funcao pura: recebe a lista e
+    devolve texto (a rota 'minhas mensagens' passa o log real)."""
+    _regs = list(registros or [])
+    if not _regs:
+        return ("Nenhum envio registrado ainda. Quando voce mandar mensagem pelo "
+                "agente, tudo fica registrado aqui ('minhas mensagens').")
+    _q = max(1, int(quantidade))
+    _regs = _regs[-_q:][::-1]
+    _linhas = []
+    for r in _regs:
+        _data = str(r.get("data", ""))[:16].replace("T", " ")
+        _dest = str(r.get("destino") or r.get("numero") or "").strip()
+        if not _dest:
+            _modo = str(r.get("modo", ""))
+            if "busca por nome: " in _modo:
+                _dest = _modo.split("busca por nome: ", 1)[-1].strip()
+            else:
+                _dest = _modo
+        _msg = str(r.get("mensagem", "")).strip()
+        _linhas.append("- " + _data + " -> " + (_dest or "?") + ": " + _msg)
+    return ("Ultimos envios feitos por mim (%d de %d):\n" % (len(_linhas), len(_regs))) + "\n".join(_linhas)
+
+
+def _r87_procurar_contato(texto, contatos_dict):
+    """r87: PROCURA na agenda de contatos salvos por NOME (exato ou parecido)
+    ou por NUMERO (completo ou pela parte final, ex.: '991328338').
+    Funcao pura: recebe o dicionario de contatos e devolve texto."""
+    _t = str(texto or "").strip()
+    _cont = contatos_dict or {}
+    if not _t:
+        return ("Diga o nome ou o numero. Ex.: 'qual o numero do Joao' ou "
+                "'quem e +55 16 99132-8338'.")
+    if not _cont:
+        return "Sua agenda esta vazia. Cadastre com 'salvar contato Nome: numero'."
+    import re as _r87re
+    _alvo = _t.lower()
+    if _alvo[:1].isdigit() or _alvo.startswith("+"):
+        # inversa: numero -> nome (numero completo OU so a parte final:
+        # '991328338' acha +55 16 99132-8338)
+        _dig = _r87re.sub(r"\D", "", _alvo)
+        _achados = []
+        for _nome, _val in _cont.items():
+            _num = _val.get("whatsapp") or _val.get("numero") if isinstance(_val, dict) else _val
+            _ndig = _r87re.sub(r"\D", "", str(_num or ""))
+            if _ndig and _dig and (_ndig == _dig or _ndig.endswith(_dig) and len(_dig) >= 8):
+                _achados.append((_r87_str_nome(_nome), str(_num)))
+        if not _achados:
+            return ("Nao encontrei o numero " + _t + " na sua agenda. "
+                    "Cadastre com 'salvar contato Nome: numero'.")
+        return "Encontrei " + str(len(_achados)) + ":\n" + "\n".join(
+            "- " + n + ": " + m for n, m in _achados)
+    # direta: nome -> numero (exato, depois parecido)
+    _chave = _alvo.strip(" .,")
+    def _num_de(_val):
+        return _val.get("whatsapp") or _val.get("numero") if isinstance(_val, dict) else _val
+    if _chave in _cont:
+        return _r87_str_nome(_chave) + ": " + str(_num_de(_cont[_chave]) or "(sem numero)")
+    import difflib as _df
+    _parecido = _df.get_close_matches(_chave, list(_cont.keys()), n=1, cutoff=0.6)
+    if _parecido:
+        _nome = _parecido[0]
+        return "Mais parecido: " + _r87_str_nome(_nome) + " (" + str(_num_de(_cont[_nome]) or "(sem numero)") + ")."
+    return ("Nao achei '" + _t + "' na sua agenda. Veja 'meus contatos' ou cadastre "
+            "com 'salvar contato Nome: numero'.")
+
+
+def _r87_backup_contatos():
+    """r87: ANTES de mudar a agenda de contatos, guarda um snapshot do estado
+    atual em contatos.json.ultimo (backup de 1 passo). 'desfazer contato'
+    restaura. Falha silenciosa: o backup nunca impede salvar."""
+    try:
+        salvar_json(ARQ_CONTATOS + ".ultimo", contatos)
+    except Exception:
+        pass
+
+
+def _r87_desfazer_contato():
+    """r87: restaura o ultimo snapshot da agenda (contatos.json.ultimo).
+    Devolve a lista restaurada para exibicao."""
+    _ultimo = ARQ_CONTATOS + ".ultimo"
+    if not os.path.isfile(_ultimo):
+        return "Nao ha nada para desfazer (nenhuma mudanca de contato registrada ainda)."
+    _anterior = carregar_json(_ultimo, {})
+    contatos.clear()
+    contatos.update(_anterior)
+    salvar_json(ARQ_CONTATOS, contatos)
+    try:
+        os.remove(_ultimo)
+    except Exception:
+        pass
+    return _listar_contatos_wpp()
+
+
 def _pedido_ideias_do_agente(comando: str) -> bool:
     """Somente pedidos de sugestoes sobre o proprio agente, nunca autoedicao."""
     n = _norm_pt(comando)
@@ -20752,6 +20900,7 @@ def _salvar_contato_wpp(nome: str, numero: str) -> str:
     numero = _normalizar_telefone(numero)
     if not nome or not numero:
         return ""
+    _r87_backup_contatos()  # r87: snapshot p/ 'desfazer contato'
     chave = nome.lower()
     atual = contatos.get(chave)
     if isinstance(atual, dict):
@@ -20791,14 +20940,17 @@ def _achar_numero_contato(destino: str):
     return None, None
 
 
-def _confirmar_envio_wpp(numero: str, mensagem: str, modo: str = "web") -> dict:
+def _confirmar_envio_wpp(numero: str, mensagem: str, modo: str = "web", destino: str = "") -> dict:
     """Registra uma tentativa de envio e devolve um status claro. Como a
     automacao do WhatsApp (pywhatkit/pyautogui) nao devolve um recibo de
     entrega, confiamos no fluxo SEM excecao + avisamos o usuario a conferir os
-    tiques azuis. Registramos tudo em logs_whatsapp para rastreabilidade."""
+    tiques azuis. Registramos tudo em logs_whatsapp para rastreabilidade.
+    r87: 'destino' guarda o nome/grupo usado na busca do app — sem isso o
+    historico ('minhas mensagens') nao mostraria pra quem foi a mensagem."""
     registro = {
         "data": datetime.now().isoformat(),
         "numero": numero,
+        "destino": destino,
         "mensagem": mensagem,
         "modo": modo,
         "status": "enviado (conferir tiques azuis no WhatsApp)",
@@ -20884,7 +21036,7 @@ def enviar_mensagem_whatsapp(destinatario: str, mensagem: str) -> str:
     def _enviar():
         import pywhatkit as kit  # r44: import tardio (arranque nao paga OpenCV)
         kit.sendwhatmsg_instantly(numero, mensagem, wait_time=15, tab_close=True)
-        _confirmar_envio_wpp(numero, mensagem, modo="whatsapp web (pywhatkit)")
+        _confirmar_envio_wpp(numero, mensagem, modo="whatsapp web (pywhatkit)", destino=nome_usado or destino)
         # se veio um nome e ainda nao estava salvo, garante o cadastro
         if nome_usado:
             _salvar_contato_wpp(nome_usado, numero)
@@ -20898,10 +21050,12 @@ def enviar_mensagem_whatsapp(destinatario: str, mensagem: str) -> str:
 def gerenciar_contatos(acao: str, nome: str = "", numero: str = "") -> str:
     """Gerencia a agenda de contatos do WhatsApp. Ações: 'adicionar', 'remover', 'listar'."""
     if acao == "adicionar":
+        _r87_backup_contatos()  # r87: snapshot p/ 'desfazer contato'
         contatos[nome.lower()] = numero
         salvar_json(ARQ_CONTATOS, contatos)
         return f"Contato '{nome}' adicionado com número {numero}."
     elif acao == "remover":
+        _r87_backup_contatos()  # r87: snapshot p/ 'desfazer contato'
         contatos.pop(nome.lower(), None)
         salvar_json(ARQ_CONTATOS, contatos)
         return f"Contato '{nome}' removido."
@@ -20983,7 +21137,7 @@ def enviar_whatsapp_por_nome(nome_contato_ou_grupo: str, mensagem: str) -> str:
         # 6) envia
         _pg.press("enter")
         time.sleep(1)
-        _confirmar_envio_wpp("", mensagem, modo=f"whatsapp app (busca por nome: {alvo})")
+        _confirmar_envio_wpp("", mensagem, modo=f"whatsapp app (busca por nome: {alvo})", destino=alvo)
         return (f"Mensagem enviada para '{alvo}' pelo app do WhatsApp. "
                 "Confira na tela (e os tiques azuis) se foi para o contato/grupo certo. "
                 "Se for um contato, salve o numero dele com 'salvar contato Nome: numero' "
@@ -40070,7 +40224,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r86] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r87] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

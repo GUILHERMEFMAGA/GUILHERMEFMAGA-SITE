@@ -29,7 +29,7 @@ def _condicao_rota(n):
 class TestRotaMicrofoneRobustaR84(unittest.TestCase):
 
     def test_selo_r85(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r86]'), 1)
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r87]'), 1)
 
     def test_condicao_na_fonte(self):
         self.assertIn("(('diagnost' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)\n"

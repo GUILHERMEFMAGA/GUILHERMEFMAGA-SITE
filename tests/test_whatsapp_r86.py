@@ -28,8 +28,13 @@ class TestParseWhatsappR86(unittest.TestCase):
         amb = carregar('_r86_parse_whatsapp')
         self.parse = amb['_r86_parse_whatsapp']
 
-    def test_selo_r86(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r86]'), 1)
+    def test_selo_avancou_pelo_r86(self):
+        # canario do selo atual fica em test_r85_fixes; aqui so trava que a
+        # release r86 JÁ saiu (o selo nunca volta atras)
+        import re
+        m = re.search(r'\[Motor e avaliacao local 2026-09-11-r(\d+)\]', _fonte())
+        self.assertIsNotNone(m, 'selo ausente')
+        self.assertGreaterEqual(int(m.group(1)), 86)
 
     def test_rota_usa_o_parse_puro(self):
         self.assertIn('_r86_parse_whatsapp(cmd)', _fonte())

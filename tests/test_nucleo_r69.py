@@ -179,8 +179,8 @@ class GanchoFinal(unittest.TestCase):
         self.assertIn('NUCLEO r69', texto)
         self.assertEqual(texto.count('\n    _r69_audit()'), 1)  # gancho EOF (chamada indentada)
         self.assertGreater(texto.index('\ntry:\n    _r69_audit()'),
-                           texto.index('[Motor e avaliacao local 2026-09-11-r86]'))
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r86]'), 1)
+                           texto.index('[Motor e avaliacao local 2026-09-11-r87]'))
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r87]'), 1)
         self.assertIn('r69_nonce', texto)
 
 
