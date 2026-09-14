@@ -44,7 +44,7 @@ class TestVozSttR79(unittest.TestCase):
     def test_selo_r79(self):
         with open(AGENTE_PY, encoding='utf-8') as f:
             fonte = f.read()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r87]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r88]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r78]'), 0)
 
     def test_bloco_r79_completo(self):

@@ -8489,6 +8489,106 @@ def _processar_cerebro_local(comando: str) -> bool:
             _rel(_abrir_e_tocar_spotify(_termo)); return True
 
     # ============ WHATSAPP / CONTATOS (comandos locais) ============
+    # r88: MODO CONVERSA — parar/status primeiro (o 'para de conversar' nunca
+    # pode ser engolido por outra rota enquanto o modo esta ativo)
+    if n in ("paradeconversar", "paramodoconversa", "sairdomodoconversa",
+             "desligamodoconversa", "parowhatsapp", "paraconversa"):
+        _parar88 = globals().get("_R88_PARAR")
+        _th88 = globals().get("_R88_THREAD")
+        if _parar88 is not None and _th88 is not None and _th88.is_alive():
+            _parar88.set()
+            _rel("Parando o modo conversa... ele encerra apos o ciclo em andamento.")
+        else:
+            _rel("O modo conversa nao esta ativo. Para comecar: 'modo conversa NOME'.")
+        return True
+    if n in ("statusdomodoconversa", "statusmodoconversa", "modokonversa",
+             "comoestamodoconversa", "modokonversaativo"):
+        _est88 = _r88_estado()
+        _th88 = globals().get("_R88_THREAD")
+        _ativo88 = _th88 is not None and _th88.is_alive()
+        if _ativo88 and _est88:
+            _rel("Modo conversa ATIVO com '%s' (desde %s) — %d resposta(s) dada(s). "
+                 "Ultima: '%s'. Para parar: 'para de conversar'." %
+                 (_est88.get("chat", "?"), str(_est88.get("inicio", ""))[:16],
+                  int(_est88.get("respondidas", 0)), str(_est88.get("ultima_resposta", ""))[:80]))
+        elif _est88:
+            _rel("Modo conversa pausado (ultima conversa: '%s', %d resposta(s)). "
+                 "Para retomar: 'modo conversa %s'." %
+                 (_est88.get("chat", "?"), int(_est88.get("respondidas", 0)), _est88.get("chat", "?")))
+        else:
+            _rel("O modo conversa nunca foi usado. Para comecar: 'modo conversa NOME' "
+                 "(ex.: 'modo conversa Joao Iser').")
+        return True
+    if cmd.startswith(("modo conversa whatsapp", "modo conversa", "whatsapp conversa",
+                       "conversa no whatsapp", "modo conversacao")):
+        _ler88 = globals().get("_r67_ler_config")
+        try:
+            _lig88 = _ler88("modo_conversa_wpp", padrao=True) if _ler88 else True
+        except Exception:
+            _lig88 = True
+        if not _lig88:
+            _rel("O modo conversa esta desligado no config.json (kill-switch). "
+                 "Para ligar: 'modo_conversa_wpp': true")
+            return True
+        _alvo88 = cmd
+        for _pre88 in ("modo conversa whatsapp", "modo conversa", "whatsapp conversa",
+                       "conversa no whatsapp", "modo conversacao"):
+            if _alvo88.startswith(_pre88):
+                _alvo88 = _alvo88[len(_pre88):]
+                break
+        _alvo88 = _alvo88.strip(" :,-/")
+        if not _alvo88:
+            try:
+                _alvo88 = input("Com quem eu devo conversar no WhatsApp? (nome ou grupo): ").strip()
+            except Exception:
+                _alvo88 = ""
+        if not _alvo88:
+            _rel("Diga com quem. Ex.: 'modo conversa Joao Iser'")
+            return True
+        _th_ant88 = globals().get("_R88_THREAD")
+        if _th_ant88 is not None and _th_ant88.is_alive():
+            _rel("Ja estou conversando (%s). Para trocar de pessoa: 'para de conversar' "
+                 "e depois 'modo conversa NOVO'." % str(_r88_estado().get("chat", "?")))
+            return True
+        if not pedir_confirmacao(
+            "Vou conversar SOZINHO com '%s' no WhatsApp: leio a conversa e respondo com humor, "
+            "enquanto voce usa o PC (a janela do WhatsApp vem a frente por alguns segundos a cada "
+            "verificacao). Para parar a qualquer momento: 'para de conversar'. Confirma?" % _alvo88):
+            _rel("Cancelei. O modo conversa nao foi iniciado.")
+            return True
+        _rel("Abrindo a conversa com '%s'..." % _alvo88)
+        try:
+            _r88_abrir_chat_wpp(_alvo88)
+        except Exception as _e88:
+            _rel("Nao consegui abrir o WhatsApp: " + type(_e88).__name__ +
+                 " (deixe o app do WhatsApp instalado e logado).")
+            return True
+        try:
+            _int88 = _ler88("modo_conversa_intervalo", padrao=30) if _ler88 else 30
+            if not isinstance(_int88, int) or not (5 <= _int88 <= 600):
+                _int88 = 30
+        except Exception:
+            _int88 = 30
+        _parar88 = globals().get("_R88_PARAR")
+        if _parar88 is None:
+            _parar88 = threading.Event()
+            globals()["_R88_PARAR"] = _parar88
+        _parar88.clear()
+        _r88_guardar_estado({"chat": _alvo88, "inicio": datetime.now().isoformat(),
+                             "respondidas": 0, "tratada": None, "intervalo": _int88})
+        def _log88(m):
+            print("[Modo conversa r88] " + m)
+        _th88 = threading.Thread(
+            target=_r88_loop_conversa,
+            args=(_parar88.is_set, _int88,
+                  lambda: _r88_ciclo(_alvo88, _log88), _log88),
+            daemon=True)
+        _th88.start()
+        globals()["_R88_THREAD"] = _th88
+        _rel("MODO CONVERSA LIGADO com '%s' (verifica a cada %d s). Eu leio e respondo; "
+             "voce segue usando o PC. Comandos: 'status do modo conversa' e 'para de conversar'."
+             % (_alvo88, _int88))
+        return True
     # Salvar/cadastrar contato: "salvar contato Joao: 11 99999-9999" ou em lote.
     # r86: formas com 'salve' e 'esse/este' ("salve esse contato +55 16 99132-8338").
     if any(p in cmd for p in ("salvar contato", "salva contato", "cadastrar contato", "cadastra contato",
@@ -8533,7 +8633,8 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel("Diga no formato: salvar contato Nome: numero (ex.: 'salvar contato Joao: 11 99999-9999'). "
              "Pode ser varios separados por ;."); return True
     if any(p in cmd for p in ("lista contatos", "listar contatos", "meus contatos", "ver contatos",
-                              "contatos salvos", "agenda de contatos", "quais contatos")):
+                              "contatos salvos", "agenda de contatos", "quais contatos",
+                              "quantos contatos")):
         _rel(_listar_contatos_wpp()); return True
     if any(p in cmd for p in ("apagar contato", "apaga contato", "remover contato", "remove contato",
                               "excluir contato", "exclui contato")):
@@ -18788,6 +18889,294 @@ def _r87_desfazer_contato():
     except Exception:
         pass
     return _listar_contatos_wpp()
+
+
+ARQ_MODO_CONVERSA = os.path.join(PASTA_BASE, "modo_conversa.json")
+
+
+def _r88_leitura_prompt():
+    """r88: prompt do LEITOR (visao) — transcreve a conversa em JSON estrito."""
+    return ("Voce ve um print da conversa do WhatsApp Desktop (Windows). "
+            "Transcreva as mensagens visiveis, da MAIS ANTIGA (topo) para a MAIS "
+            "RECENTE (fundo). Bolhas do lado DIREITO (verde) sao suas (de='eu'); "
+            "do lado ESQUERDO (branca/cinza) sao da outra pessoa (de='outro'). "
+            "Responda SOMENTE este JSON, sem nenhum comentario: "
+            '{"mensagens":[{"de":"eu","texto":"...","hora":"..."},'
+            '{"de":"outro","texto":"...","hora":"..."}]}')
+
+
+def _r88_extrair_ultima_externa(texto_leitura):
+    """r88: PURA — recebe o texto do leitor (JSON com a conversa) e devolve a
+    ultima mensagem da OUTRA pessoa como (texto, hora) ou (None, None).
+    Tolerante a visao que embrulha o JSON em comentario. Mensagens suas
+    (de='eu') nunca viram alvo de resposta — nao se responde a si mesmo."""
+    _t = str(texto_leitura or "")
+    if not _t.strip():
+        return None, None
+    import json as _js
+    _dados = None
+    _i = _t.find("{")
+    while _i >= 0:
+        _j = _t.rfind("}")
+        if _j > _i:
+            try:
+                _dados = _js.loads(_t[_i:_j + 1])
+                break
+            except Exception:
+                _prox = _t.find("{", _i + 1)
+                if _prox == _i:
+                    break
+                _i = _prox
+        else:
+            break
+    if not isinstance(_dados, dict):
+        return None, None
+    _ultima = None
+    for _m in _dados.get("mensagens") or []:
+        if not isinstance(_m, dict):
+            continue
+        if str(_m.get("de", "")).lower() in ("outro", "ele", "ela", "eles", "elas", "contato"):
+            _ultima = _m
+    if not _ultima:
+        return None, None
+    return str(_ultima.get("texto", "")).strip(), str(_ultima.get("hora", "")).strip()
+
+
+def _r88_decidir(texto_externo, hora_externo, estado):
+    """r88: PURA — decide se responde a ultima mensagem da outra pessoa.
+    estado: dict com 'tratada' = [texto, hora] da ultima ja respondida.
+    Devolve ('responder', motivo) ou ('ignorar', motivo) — nunca responde
+    duas vezes a mesma mensagem (anti-loop de eco)."""
+    if not (texto_externo or "").strip():
+        return ("ignorar", "leitura nao trouxe mensagem da outra pessoa")
+    _tratada = (estado or {}).get("tratada") or []
+    if _tratada and str(_tratada[0]).strip() == str(texto_externo).strip():
+        if len(_tratada) < 2 or not _tratada[1] or not hora_externo or str(_tratada[1]) == hora_externo:
+            return ("ignorar", "esta mensagem ja foi respondida")
+    return ("responder", "mensagem nova da outra pessoa")
+
+
+def _r88_prompt_resposta(chat, contexto, ultima_externa):
+    """r88: PURA — monta as mensagens da geracao da resposta. Persona pedida
+    pelo dono: humor humano, 'biologicamente' natural — curto, direto, ritmo
+    de gente de verdade no WhatsApp, sem cara de robot."""
+    _sistema = (
+        "Voce esta respondendo no WhatsApp de uma pessoa de verdade, por ela. "
+        "Fale COMO HUMANO: curto (1 a 3 linhas), direto, no tom da pessoa, com "
+        "humor leve quando a conversa pedir, sem formalidade, sem markdown, sem "
+        "lista, sem 'como IA' ou 'eu sou um agente' e sem revelar que e um "
+        "sistema automatico. Se a mensagem nao pedir nada, devolva algo bem "
+        "curto. Se nao souber a resposta, diga com naturalidade, sem inventar. "
+        "Seja brasileiro. Responda SOMENTE com o texto da mensagem de "
+        "WhatsApp — nada antes nem depois.")
+    return (
+        [{"role": "system", "content": _sistema},
+         {"role": "user", "content":
+            "Conversa com '%s'.\nContexto (transcricao da tela, mais recente no fim):\n%s\n\n"
+            "Ultima mensagem da outra pessoa: %s\n\nSua resposta:" %
+            (str(chat), str(contexto or "(vazio)")[:1500], str(ultima_externa)[:600])}])
+
+
+def _r88_dormir(segundos, parar, dormir=None):
+    """r88: dorme em fatias de 1s para o 'parar' valer na hora (dormir
+    injetavel p/ teste)."""
+    import time as _t88
+    _d = dormir or _t88.sleep
+    for _ in range(max(1, int(float(segundos)))):
+        if parar():
+            return
+        _d(1.0)
+
+
+def _r88_loop_conversa(parar, intervalo, ciclo, log, dormir=None):
+    """r88: loop da thread de fundo do modo conversa. A cada ciclo: ciclo().
+    Erro em um ciclo NUNCA mata o loop (registra e continua) — o modo so
+    para com 'para de conversar'."""
+    while not parar():
+        try:
+            ciclo()
+        except Exception as _e88:
+            log("erro no ciclo (%s) — o modo continua" % type(_e88).__name__)
+        _r88_dormir(intervalo, parar, dormir=dormir)
+    log("modo conversa parado")
+
+
+def _r88_estado():
+    """r88: estado atual do modo conversa (arquivo local da casa)."""
+    return carregar_json(ARQ_MODO_CONVERSA, {})
+
+
+def _r88_guardar_estado(dados):
+    salvar_json(ARQ_MODO_CONVERSA, dados)
+
+
+def _r88_abrir_chat_wpp(alvo):
+    """r88: abre o app do WhatsApp e a conversa de 'alvo' — MESMO caminho
+    provado da r86 (app -> Ctrl+F -> colar -> Enter no 1o resultado)."""
+    import pyautogui as _pg88
+    _pg88.FAILSAFE = True
+    try:
+        os.startfile("whatsapp://")
+    except Exception:
+        subprocess.Popen('start "" "https://web.whatsapp.com/"', shell=True)
+    time.sleep(8)
+    _pg88.hotkey("ctrl", "f")
+    time.sleep(1.5)
+    if _colar_texto_clipboard(alvo):
+        _pg88.hotkey("ctrl", "v")
+    else:
+        _pg88.write(alvo, interval=0.05)
+    time.sleep(3.5)
+    _pg88.press("enter")
+    time.sleep(2.5)
+
+
+def _r88_focar_wpp():
+    """r88: traz o app do WhatsApp a frente (rapido) — a conversa ja esta
+    aberta; se a janela estava coberta/minimizada, ela volta a aparecer."""
+    try:
+        os.startfile("whatsapp://")
+    except Exception:
+        subprocess.Popen('start "" "https://web.whatsapp.com/"', shell=True)
+    time.sleep(2.0)
+
+
+def _r88_capturar_conversa():
+    """r88: print da tela (o chat precisa estar a frente) — devolve o
+    caminho do PNG para o leitor (visao) transcrever."""
+    import pyautogui as _pg88
+    import tempfile as _tf88
+    _cam88 = os.path.join(_tf88.gettempdir(), "modo_conversa_r88.png")
+    _pg88.screenshot(_cam88)
+    return _cam88
+
+
+def _r88_gerente_leitura(caminho_imagem):
+    """r88: transcreve a conversa do print, em ordem: (1) VISAO LOCAL
+    (r76 — GGUF separado, 100% offline, se existir e estiver no ar);
+    (2) Gemini na nuvem (GEMINI_API_KEY). Devolve o texto do leitor ou
+    None (a rota explica o que falta — sem mentir)."""
+    _prompt88 = _r88_leitura_prompt()
+    try:
+        if _r76_visao_achar_modelo():
+            def _chamar_visao_local(_c88, _porta88):
+                import base64 as _b64
+                import json as _js88
+                import urllib.request as _ur88
+                with open(_c88, "rb") as _f88:
+                    _b88 = _b64.b64encode(_f88.read()).decode("ascii")
+                _corpo88 = _js88.dumps({"model": "visao", "messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,%s" % _b88}},
+                    {"type": "text", "text": _prompt88}]},
+                ]}).encode("utf-8")
+                _req88 = _ur88.Request("http://127.0.0.1:%d/v1/chat/completions" % _porta88,
+                                       data=_corpo88, headers={"Content-Type": "application/json"})
+                with _ur88.urlopen(_req88, timeout=120) as _r88:
+                    _d88 = _js88.loads(_r88.read().decode("utf-8"))
+                return str(_d88["choices"][0]["message"]["content"]).strip()
+            _porta88 = 8081
+            try:
+                _ler88 = globals().get("_r67_ler_config")
+                if _ler88:
+                    _p88 = _ler88("visao_porta", padrao=8081)
+                    if isinstance(_p88, int) and _p88 > 0:
+                        _porta88 = _p88
+            except Exception:
+                pass
+            _res88 = _chamar_visao_local(caminho_imagem, _porta88)
+            if _res88:
+                return _res88
+    except Exception:
+        pass
+    _chave88 = os.environ.get("GEMINI_API_KEY", "").strip()
+    if _chave88:
+        try:
+            import base64 as _b64
+            import json as _js88
+            import urllib.request as _ur88
+            with open(caminho_imagem, "rb") as _f88:
+                _b88 = _b64.b64encode(_f88.read()).decode("ascii")
+            _corpo88 = _js88.dumps({"contents": [{"parts": [
+                {"inline_data": {"mime_type": "image/png", "data": _b88}},
+                {"text": _prompt88}]}]}).encode("utf-8")
+            _req88 = _ur88.Request(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + _chave88,
+                data=_corpo88, headers={"Content-Type": "application/json"})
+            with _ur88.urlopen(_req88, timeout=60) as _r88:
+                _d88 = _js88.loads(_r88.read().decode("utf-8"))
+            for _c88 in _d88.get("candidates", []):
+                for _pa88 in _c88.get("content", {}).get("parts", []):
+                    if _pa88.get("text"):
+                        return str(_pa88["text"]).strip()
+        except Exception:
+            pass
+    return None
+
+
+def _r88_gerar_resposta(chat, contexto, ultima_externa):
+    """r88: compoe a resposta — IA LOCAL primeiro (privado/offline/custo
+    zero, o posicionamento da casa), depois a nuvem. Devolve '' se nenhuma
+    IA estiver disponivel (o ciclo avisa, sem enviar nada)."""
+    _msgs88 = _r88_prompt_resposta(chat, contexto, ultima_externa)
+    try:
+        if ia_local_disponivel():
+            _res88 = _chamar_neural(_msgs88, max_tokens=220, temperatura=0.8, timeout_segundos=90)
+            if _res88 and str(_res88).strip():
+                return str(_res88).strip()
+    except Exception:
+        pass
+    try:
+        _fallback88 = globals().get("invocar_com_fallback")
+        if _fallback88:
+            _obj88 = _fallback88(_msgs88)
+            _txt88 = getattr(_obj88, "content", "")
+            if _txt88 and str(_txt88).strip():
+                return str(_txt88).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _r88_ciclo(alvo, log):
+    """r88: UM ciclo do modo conversa: foca o WhatsApp, le a tela, decide e,
+    se chegou mensagem nova da outra pessoa, compoe e envia a resposta."""
+    _est88 = _r88_estado()
+    try:
+        _r88_focar_wpp()
+    except Exception as _e88:
+        log("nao consegui trazer o WhatsApp a frente (%s)" % type(_e88).__name__)
+        return
+    try:
+        _img88 = _r88_capturar_conversa()
+        _leitura88 = _r88_gerente_leitura(_img88)
+    except Exception as _e88:
+        log("falha ao ler a tela (%s)" % type(_e88).__name__)
+        return
+    if not _leitura88:
+        log("leitor indisponivel (visao local r76 ou GEMINI_API_KEY) — aguardando")
+        return
+    _txt88, _hora88 = _r88_extrair_ultima_externa(_leitura88)
+    _dec88, _mot88 = _r88_decidir(_txt88, _hora88, _est88)
+    if _dec88 == "ignorar":
+        return
+    _res88 = _r88_gerar_resposta(alvo, _leitura88, _txt88)
+    if not _res88:
+        log("sem IA para compor a resposta (local ou nuvem) — a mensagem ficou sem resposta")
+        return
+    import pyautogui as _pg88
+    _res88 = " ".join(str(_res88).split())[:500]
+    if _colar_texto_clipboard(_res88):
+        _pg88.hotkey("ctrl", "v")
+    else:
+        _pg88.write(_res88, interval=0.03)
+    time.sleep(0.8)
+    _pg88.press("enter")
+    time.sleep(0.5)
+    _est88["tratada"] = [_txt88, _hora88]
+    _est88["respondidas"] = int(_est88.get("respondidas", 0)) + 1
+    _est88["ultima_resposta"] = _res88
+    _r88_guardar_estado(_est88)
+    log("respondi: " + _res88[:140])
 
 
 def _pedido_ideias_do_agente(comando: str) -> bool:
@@ -40224,7 +40613,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r87] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r88] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

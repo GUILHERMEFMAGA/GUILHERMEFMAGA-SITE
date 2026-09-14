@@ -34,8 +34,13 @@ def _fonte():
 
 
 class TestSeloR87(unittest.TestCase):
-    def test_selo_r87(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r87]'), 1)
+    def test_selo_avancou_pelo_r87(self):
+        # canario do selo atual fica em test_r85_fixes; aqui so trava que a
+        # release r87 JÁ saiu (o selo nunca volta atras)
+        import re
+        m = re.search(r'\[Motor e avaliacao local 2026-09-11-r(\d+)\]', _fonte())
+        self.assertIsNotNone(m, 'selo ausente')
+        self.assertGreaterEqual(int(m.group(1)), 87)
 
 
 class TestStrNomeR87(unittest.TestCase):
