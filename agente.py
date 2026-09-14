@@ -8975,8 +8975,15 @@ def _processar_cerebro_local(comando: str) -> bool:
         return True
 
     # ---- r79: VOZ — STT local (whisper.cpp, 100% local) ----
+    # r83: diagnostico de microfone (so leitura) — ver o que falta antes do 'falar'
+    if n.startswith('diagnosticomicrofone') or n.startswith('testarmicrofone'):
+        _devs_mf, _ind_mf, _err_mf = _r83_microfones()
+        _rel(_r83_resumo_microfone(_devs_mf, _ind_mf, _err_mf))
+        return True
     if n == "stt" or cmd.startswith("stt "):
         _rel(_r79_stt_status())
+        _devs_mf, _ind_mf, _err_mf = _r83_microfones()
+        _rel(_r83_resumo_microfone(_devs_mf, _ind_mf, _err_mf))
         return True
     if cmd.startswith("baixar stt"):
         _urls_bt = _r79_stt_urls()
@@ -15915,6 +15922,60 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
         return False
 
 
+# ================= r83: DIAGNOSTICO DE MICROFONE — ver por que a gravacao falha =================
+# Bug real do PC do dono (log 14/09, r82): 'falar' devolveu um 'PortAudioError'
+# OPAQUO — sem forma de ver quais microfones o PC expoe. O diagnostico e so
+# LEITURA (lista de dispositivos) e diz em PT-BR simples se o microfone e
+# visivel, se e o padrao e o que fazer no Windows. Compativel com qualquer
+# sounddevice >=0.2 (filtra por max_input_channels em vez de kind='input').
+def _r83_microfones(listar=None, padrao=None):
+    """r83: devolve (dispositivos_de_entrada, indice_padrao_ou_None, erro_ou_None).
+    `listar`/`padrao` sao injetaveis p/ teste; por padrao usam sounddevice (SO leitura)."""
+    if listar is None or padrao is None:
+        try:
+            import sounddevice as _sd
+            if listar is None:
+                def listar():
+                    devs = _sd.query_devices()
+                    return [d for d in devs if int(d.get('max_input_channels', 0) or 0) > 0]
+            if padrao is None:
+                def padrao():
+                    d = _sd.default.device
+                    return d[1] if isinstance(d, (list, tuple)) else None
+        except Exception as e:
+            return [], None, 'sounddevice indisponivel (%s)' % type(e).__name__
+    try:
+        devs = list(listar() or [])
+        return devs, padrao(), None
+    except Exception as e:
+        return [], None, type(e).__name__
+
+
+def _r83_resumo_microfone(dispositivos, indice_padrao, erro):
+    """r83: FUNCAO PURA — vira o diagnostico em mensagem PT-BR simples.
+    Sempre diz o que fazer no Windows quando algo falta (dono e leigo)."""
+    if erro:
+        return ('Diagnostico do microfone: a biblioteca de gravacao (sounddevice) nao '
+                'disponivel — erro: ' + erro + '.\nCorrecao: rode "atualizar agora" (ele '
+                'entrega o requirements novo) ou, num terminal: pip install sounddevice')
+    if not dispositivos:
+        return ('Diagnostico do microfone: NENHUM microfone visivel para o programa.\n'
+                'Correcao (Windows): Configuracoes > Sistema > Som > Entrada — habilite/'
+                'selecione um microfone (microfone de notebook pode ficar desativado por '
+                'um tecla ou pelo Gerenciador de Dispositivos). Teste tambem com o proprio '
+                'Windows (Gravador de Voz). Depois rode de novo: diagnostico microfone')
+    if indice_padrao is None or not any(d.get('index') == indice_padrao for d in dispositivos):
+        nomes = '; '.join(str(d.get('name', d.get('index', '?'))) for d in dispositivos[:5])
+        return (('Diagnostico do microfone: %d microfone(s) visivel(is), mas NENHUM '
+                 'selecionado como PADRAO: ' % len(dispositivos)) + nomes +
+                '.\nCorrecao (Windows): '
+                'Configuracoes > Sistema > Som > Entrada — selecione o microfone que '
+                'vai usar. Depois rode: falar')
+    nome = next((str(d.get('name', '?')) for d in dispositivos if d.get('index') == indice_padrao), '?')
+    return ('Microfone OK: ' + nome + ' (padrao, indice ' + str(indice_padrao) + ').\n'
+            'Pode usar: falar')
+
+
 # ================= r81: ESCUDO — TEXTO DO PROPRIO PROGRAMA NUNCA VIRA COMANDO =================
 # Bug real do PC do dono (log r73): thread de fundo imprime banners DURANTE o
 # input() e, no console Windows, o texto do banner fica misturado na linha de
@@ -16394,9 +16455,8 @@ def _r79_gravar_wav(segundos=6, pasta=None):
             f.writeframes(frames.tobytes())
         return wav
     except Exception as e:
-        print('[STT r79]: nao consegui gravar o microfone (%s).' % type(e).__name__)
-        print('        (a dependencia de gravacao e o sounddevice — \'atualizar agora\'')
-        print('        entrega o requirements novo; confira tambem se o microfone esta liberado)')
+        print('[STT r79]: nao consegui gravar o microfone (%s: %s)' % (type(e).__name__, str(e)[:160]))
+        print('        Veja o que falta: diagnostico microfone  (mostra quais microfones o Windows expoe)')
         return None
 
 
@@ -39914,7 +39974,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r82] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r83] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
