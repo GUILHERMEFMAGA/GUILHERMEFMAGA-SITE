@@ -1143,10 +1143,15 @@ ou relatórios reais sem revisão e autorização.
   texto ORIGINAL (caixa preservada); a condição da rota continua usando o
   minúsculo. +4 testes (test_caixa_original_r82.py — reproduzem o pipeline
   exato da rota + trava na fonte). **903 testes OK**. Selo `-r82`.
-  O PC do dono JÁ PROVOU o ciclo completo na prática: abriu a r81 pelo
-  passo de PowerShell de 14/09, rodou 'tabela' com sucesso (tela + .html)
-  e os papos com banner sumiram (escudo r81). Próximo: 'atualizar agora'
-  pela primeira vez de verdade (deve pular r81 -> r82).
+  O PC do dono PROVOU O CICLO COMPLETO NA PRÁTICA (14/09): abriu a r81 pelo
+  passo de PowerShell, rodou 'tabela' com sucesso (tela + .html), os papos
+  com banner sumiram (escudo r81), e o 'atualizar agora' CORRETO (r81)
+  levou r81 -> r82 de verdade — depois disso ele diz 'conteudo identico'
+  com VERDADE (já na ponta). A r82 provada no PC real: 'tabela MEU PC:
+  CPU, RAM | i5, 16GB | i7, 32GB' saiu com a CAIXA DO DONO (CPU/RAM/16GB)
+  + novo .html por execução (2026-09-14_0113_meu-pc.html). Próximas provas:
+  'grafico'/'ideias' (r80), 'baixar stt' + 'falar' (r79), 'agendar windows'
+  (r78), e conversa livre pedindo tabela/gráfico pra IA local montar sozinha.
   Ponte para o PC do dono: UMA VEZ SÓ, comando PowerShell de copiar/colar
   (baixa agente.py/main.py/requirements.txt/iniciar.bat da branch nova para a
   pasta do agente); a partir da r81 o 'atualizar agora' volta a funcionar.
