@@ -8490,21 +8490,43 @@ def _processar_cerebro_local(comando: str) -> bool:
 
     # ============ WHATSAPP / CONTATOS (comandos locais) ============
     # Salvar/cadastrar contato: "salvar contato Joao: 11 99999-9999" ou em lote.
+    # r86: formas com 'salve' e 'esse/este' ("salve esse contato +55 16 99132-8338").
     if any(p in cmd for p in ("salvar contato", "salva contato", "cadastrar contato", "cadastra contato",
                               "salvar o contato", "salva o numero", "salvar numero", "cadastrar numero",
-                              "gravar contato", "anotar contato")):
+                              "gravar contato", "anotar contato",
+                              "salve contato", "salve o contato", "salve esse contato", "salve este contato",
+                              "salva esse contato", "salvar esse contato", "salvar este contato",
+                              "salva este contato", "salve esse numero", "salva esse numero",
+                              "salvar esse numero", "salvar este numero", "salve o numero")):
         _resto = cmd
         for pre in ("salvar contato", "salva contato", "cadastrar contato", "cadastra contato",
                     "salvar o contato", "salva o contato", "salvar o numero", "salva o numero",
                     "salvar numero", "cadastrar numero", "gravar contato", "anotar contato",
-                    "salvar", "salva", "cadastrar", "cadastra"):
+                    "salve esse contato", "salva esse contato", "salvar esse contato",
+                    "salve este contato", "salvar este contato", "salva este contato",
+                    "salve esse numero", "salva esse numero", "salvar esse numero",
+                    "salvar este numero", "salve o numero", "salve o contato", "salve contato",
+                    "salvar", "salva", "salve", "cadastrar", "cadastra"):
             if _resto.startswith(pre):
                 _resto = _resto[len(pre):]; break
         _resto = _resto.strip(" :")
         if ":" in _resto or ";" in _resto or _resto.count(",") >= 1 and any(c.isdigit() for c in _resto):
             _rel(_adicionar_contato_em_lote(_resto)); return True
-        # "salvar contato Joao 11 99999..." sem dois pontos: tenta separar nome/numero
+        # r86: so o numero, sem nome ("salve esse contato +55 16 99132-8338"):
+        # pergunta o nome UMA vez e salva (bug real 14/09: caia no modelo, que
+        # respondeu 'nao posso salvar contatos').
         import re as _rw
+        if _rw.match(r"^\+?\d[\d\s()\-]{8,}$", _resto):
+            try:
+                _nm86 = input("Qual o nome para salvar " + _resto.strip() + "? (ex.: Joao Iser): ").strip()
+            except Exception:
+                _nm86 = ""
+            if not _nm86:
+                _rel("Nada foi salvo (sem nome). Formato: salvar contato Nome: numero")
+                return True
+            _rel(_adicionar_contato_em_lote(_nm86 + ": " + _resto.strip()))
+            return True
+        # "salvar contato Joao 11 99999..." sem dois pontos: tenta separar nome/numero
         _m = _rw.match(r"(.+?)\s*(\+?\d[\d\s()\-]{7,})$", _resto)
         if _m:
             _rel(_adicionar_contato_em_lote(f"{_m.group(1).strip()}: {_m.group(2).strip()}")); return True
@@ -8527,32 +8549,20 @@ def _processar_cerebro_local(comando: str) -> bool:
         else:
             _rel(f"Nao achei o contato '{_nome}'. Digite 'meus contatos' para ver a lista.")
         return True
-    # Enviar WhatsApp por NOME (usa a automacao do app): "manda whatsapp pro Joao: oi"
-    _env = None
-    for _gat in ("manda whatsapp", "manda zap", "envia whatsapp", "enviar whatsapp",
-                 "whatsapp pro", "whatsapp para", "zap pro", "manda mensagem no whatsapp",
-                 "mandar whatsapp", "envia zap"):
-        if _gat in cmd:
-            _env = cmd.split(_gat, 1)[-1]; break
-    if _env is not None:
-        _env = _env.strip()
-        for _p in ("pro ", "para ", "pro", "para"):
-            if _env.startswith(_p):
-                _env = _env[len(_p):].strip(); break
-        _nome, _msg = _env, ""
-        for _sep in (" falando ", " dizendo ", ":", " - "):
-            if _sep in _nome:
-                _nome, _msg = _nome.split(_sep, 1)
-                break
-        _nome, _msg = _nome.strip(" ,."), _msg.strip()
-        if not _nome:
+    # Enviar WhatsApp por NOME (busca no app) ou direto para NUMERO (r86):
+    # "manda whatsapp pro Joao: oi" | "manda whatsapp pro Fulano, oi" |
+    # "mande mensagem pra +55 16 99132-8338, se vai jogar?" (parse: _r86_parse_whatsapp)
+    _r86 = _r86_parse_whatsapp(cmd)
+    if _r86 is not None:
+        _tipo86, _alvo86, _msg86 = _r86
+        if _tipo86 == "vazio":
             _rel("Diga pra quem e a mensagem, ex.: 'manda whatsapp pro Joao: oi, tudo bem?'")
             return True
-        if not _msg:
-            _rel(f"Voce quer mandar WhatsApp para '{_nome}', mas faltou a mensagem. Ex.: "
-                 f"'manda whatsapp pro {_nome}: oi, tudo bem?'")
+        if not _msg86:
+            _rel(f"Voce quer mandar WhatsApp para '{_alvo86}', mas faltou a mensagem. Ex.: "
+                 f"'manda whatsapp pro {_alvo86}: oi, tudo bem?'")
             return True
-        _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_nome, mensagem=_msg))
+        _rel(_invocar_local("enviar_whatsapp_por_nome", nome_contato_ou_grupo=_alvo86, mensagem=_msg86))
         return True
 
     # ---- VERSOES DO PROJETO (ponto de restauracao do seu site) ----
@@ -18571,9 +18581,65 @@ def _r85_parece_pedido_de_mensagem(cmd: str) -> bool:
     respondeu 'se quiser, adicione essa acao' — a acao JA existe e funciona
     100% local: 'manda whatsapp pro NOME: a mensagem'."""
     _c = str(cmd or '').lower()
-    _tem_alvo = any(p in _c for p in ('mensagem', 'messagem', 'whats', 'zap'))
+    _tem_alvo = any(p in _c for p in ('mensagem', 'messagem', 'menssagem', 'whats', 'zap'))
     _tem_verbo = any(p in _c for p in ('mand', 'envi', 'passa', 'passe'))
     return _tem_alvo and _tem_verbo
+
+
+def _r86_parse_whatsapp(cmd: str):
+    """r86: parse de pedido de WhatsApp em (tipo, alvo, mensagem) ou None.
+    tipo: 'numero' (manda direto para o numero), 'nome' (busca no app) ou
+    'vazio' (pediu mas nao disse pra quem).
+    Gatilhos: manda/mande/mandar/envia/enviar + whatsapp/zap/mensagem (e os
+    erros de digita reais do dono: 'menssagem'). Separadores nome/mensagem:
+    ':', ',' (r86 — bug real: 'pro CORVOS, ola tudo bem' virava nome inteiro),
+    ' falando ', ' dizendo ', ' - '.
+    Alvo que COMECA com numero (+55... / 11 99999-9999) = manda para o numero;
+    numero DEPOIS do separador fica na mensagem ('pro Joao: te ligo no 11 ...')."""
+    _c = str(cmd or '').lower().strip()
+    _env = None
+    for _gat in ("manda whatsapp", "manda zap", "envia whatsapp", "enviar whatsapp",
+                 "whatsapp pro", "whatsapp para", "zap pro", "manda mensagem no whatsapp",
+                 "mandar whatsapp", "envia zap", "manda mensagem", "mande mensagem",
+                 "mandar mensagem", "envia mensagem", "enviar mensagem",
+                 "manda menssagem", "mande menssagem", "mandar menssagem"):
+        if _gat in _c:
+            _env = _c.split(_gat, 1)[-1]
+            break
+    if _env is None:
+        _det = globals().get('_r85_parece_pedido_de_mensagem')
+        if not (_det and _det(_c)):
+            return None
+        for _pp in ("pro ", "pra ", "para "):
+            if _pp in _c:
+                _env = _c.split(_pp, 1)[-1]
+                break
+        if _env is None:
+            return None
+    _env = _env.strip()
+    for _p in ("pro ", "pra ", "para ", "pro", "pra", "para"):
+        if _env.startswith(_p):
+            _env = _env[len(_p):].strip()
+            break
+    if not _env:
+        return ("vazio", "", "")
+    if _env.startswith("+") or _env[:1].isdigit():
+        import re as _r86re
+        _m = _r86re.match(r"(\+?\d[\d\s()\-]{8,15}\d)", _env)
+        if _m:
+            _num = _m.group(1).strip()
+            _msg = _env[_m.end():].lstrip(" ,:;-").strip()
+            return ("numero", _num, _msg)
+        return None
+    _nome, _msg = _env, ""
+    for _sep in (" falando ", " dizendo ", ":", ",", " - "):
+        if _sep in _nome:
+            _nome, _msg = _nome.split(_sep, 1)
+            break
+    _nome = _nome.strip(" ,.")
+    if not _nome:
+        return None
+    return ("nome", _nome, _msg.strip())
 
 
 def _pedido_ideias_do_agente(comando: str) -> bool:
@@ -40004,7 +40070,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r85] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r86] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
