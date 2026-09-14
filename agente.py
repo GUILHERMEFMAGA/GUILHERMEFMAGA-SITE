@@ -8930,7 +8930,9 @@ def _processar_cerebro_local(comando: str) -> bool:
 
     # ---- r80: RESPOSTA ORGANIZADA — tabela, grafico e ideias bonitos ----
     if n == "tabela" or (cmd.startswith("tabela ") and (":" in cmd or "|" in cmd)):
-        _resto_tb = cmd[len("tabela"):].strip().lstrip(":").strip()
+        # r82: os dados vem do texto ORIGINAL (caixa do dono); cmd minúsculo
+        # serve só para a condição da rota
+        _resto_tb = comando.strip()[len("tabela"):].strip().lstrip(":").strip()
         if not _resto_tb:
             _rel("Tabela bonita (r80): mostra assim: tabela MEU PC: CPU, RAM | i5, 16GB | i7, 32GB\n(título opcional; colunas por vírgula, linhas por pipe). Eu também gravo a versão bonita pra abrir no navegador.")
             return True
@@ -8944,7 +8946,7 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel("Versao bonita (abra no navegador): %s" % _f_tb if _f_tb else "Nao consegui gravar o arquivo bonito — a tabela acima segue valendo.")
         return True
     if n == "grafico" or (cmd.startswith("grafico ") and (":" in cmd or "|" in cmd)):
-        _resto_gf = cmd[len("grafico"):].strip().lstrip(":").strip()
+        _resto_gf = comando.strip()[len("grafico"):].strip().lstrip(":").strip()
         if not _resto_gf:
             _rel("Grafico bonito (r80): mostra assim: grafico VENDAS: jan 100 | fev 150 | mar 90\n(título opcional; rotulo + numero por barra). Eu também gravo a versão bonita (SVG) pra abrir no navegador.")
             return True
@@ -8958,7 +8960,7 @@ def _processar_cerebro_local(comando: str) -> bool:
         _rel("Versao bonita (abra no navegador): %s" % _f_gf if _f_gf else "Nao consegui gravar o arquivo bonito — o grafico acima segue valendo.")
         return True
     if n == "ideias" or (cmd.startswith("ideias ") and (":" in cmd or "|" in cmd)):
-        _resto_id = cmd[len("ideias"):].strip().lstrip(":").strip()
+        _resto_id = comando.strip()[len("ideias"):].strip().lstrip(":").strip()
         if not _resto_id:
             _rel("Ideias organizadas (r80): mostra assim: ideias APP DE ENTREGA: app X | app Y | app Z\nEu numera, alinha e guarda em um arquivo .md.")
             return True
@@ -39912,7 +39914,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r81] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r82] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
