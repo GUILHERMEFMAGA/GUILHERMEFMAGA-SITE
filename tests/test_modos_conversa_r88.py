@@ -218,6 +218,15 @@ class TestWiringR88(unittest.TestCase):
     def test_estado_local(self):
         self.assertIn('modo_conversa.json', _fonte())
 
+    def test_interaja_com_gatilho(self):
+        # log real r89: 'intareja com Náutica gooner' (typo real do dono)
+        # caia no modelo — a forma natural 'interaja com NOME' agora abre
+        # o MODO CONVERSA (check startswith + extracao do alvo, 2 tuplas)
+        fonte = _fonte()
+        for g in ('"interaja com"', '"interage com"', '"interagir com"',
+                  '"intareja com"'):
+            self.assertGreaterEqual(fonte.count(g), 2, g)
+
 
 if __name__ == '__main__':
     unittest.main()

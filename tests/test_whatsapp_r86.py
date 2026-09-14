@@ -103,5 +103,36 @@ class TestDetectorMenssagemR86(unittest.TestCase):
         self.assertFalse(f('abre o whatsapp web'))
 
 
+class TestParseMensagemPrimeiraR90(unittest.TestCase):
+    """r90: 'mande MENSAGEM para NÚMERO' — a mensagem ANTES do 'para'
+    (log real r87 no PC do dono: 'mande oi para +55 51 9268-6262' caia na
+    trava generica; o numero cru torna o alvo inequivoco)."""
+
+    def setUp(self):
+        amb = carregar('_r86_parse_whatsapp', '_r85_parece_pedido_de_mensagem')
+        self.parse = amb['_r86_parse_whatsapp']
+
+    def test_mensagem_antes_do_para_com_numero(self):
+        self.assertEqual(self.parse("mande oi para +55 51 9268-6262"),
+                         ("numero", "+55 51 9268-6262", "oi"))
+
+    def test_mensagem_antes_do_para_com_cauda(self):
+        self.assertEqual(self.parse("mande oi para +55 51 9268-6262, tudo bem?"),
+                         ("numero", "+55 51 9268-6262", "oi tudo bem?"))
+
+    def test_formas_verbo_e_separador(self):
+        self.assertEqual(self.parse("manda bom dia pra 11 99999-8888"),
+                         ("numero", "11 99999-8888", "bom dia"))
+        self.assertEqual(self.parse("Mande oi para +55 51 9268-6262"),
+                         ("numero", "+55 51 9268-6262", "oi"))
+
+    def test_nome_continua_fora(self):
+        # alvo NAO-numerico sem a palavra 'mensagem' segue ambiguo (trava)
+        self.assertIsNone(self.parse("mande oi para João"))
+
+    def test_sem_mensagem_nao_e_parse(self):
+        self.assertIsNone(self.parse("mande para +55 51 9268-6262"))
+
+
 if __name__ == '__main__':
     unittest.main()

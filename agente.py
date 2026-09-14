@@ -8524,7 +8524,9 @@ def _processar_cerebro_local(comando: str) -> bool:
                  "(ex.: 'modo conversa Joao Iser').")
         return True
     if cmd.startswith(("modo conversa whatsapp", "modo conversa", "whatsapp conversa",
-                       "conversa no whatsapp", "modo conversacao")):
+                       "conversa no whatsapp", "modo conversacao",
+                       "interaja com", "interage com", "interagir com",
+                       "intareja com")):
         _ler88 = globals().get("_r67_ler_config")
         try:
             _lig88 = _ler88("modo_conversa_wpp", padrao=True) if _ler88 else True
@@ -8536,7 +8538,9 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _alvo88 = cmd
         for _pre88 in ("modo conversa whatsapp", "modo conversa", "whatsapp conversa",
-                       "conversa no whatsapp", "modo conversacao"):
+                       "conversa no whatsapp", "modo conversacao",
+                       "interaja com", "interage com", "interagir com",
+                       "intareja com"):
             if _alvo88.startswith(_pre88):
                 _alvo88 = _alvo88[len(_pre88):]
                 break
@@ -18760,6 +18764,21 @@ def _r86_parse_whatsapp(cmd: str):
             _env = _c.split(_gat, 1)[-1]
             break
     if _env is None:
+        # r90: a forma com a mensagem ANTES do 'para' e alvo NUMERO cru
+        # (log real r87: 'mande oi para +55 51 9268-6262' caia na trava
+        # generica) — o numero torna o alvo inequivoco, sem precisar da
+        # palavra 'mensagem'. Nomes continuam fora (ambiguo).
+        import re as _r90re
+        _m90 = _r90re.match(
+            r"^\s*(mande|manda|mandar|envie|envia|enviar|passe|passa)\s+"
+            r"(?P<msg>\S.*?)\s+(?:pro|pra|para)\s+"
+            r"(?P<num>\+?\d[\d\s()\-]{8,15}\d)\s*(?:[,;:]\s*(?P<rest>.*))?$", _c)
+        if _m90 and _m90.group("msg").strip() not in ("pro", "pra", "para"):
+            _num90 = _m90.group("num").strip()
+            _msg90 = _m90.group("msg").strip()
+            if _m90.group("rest"):
+                _msg90 = (_msg90 + " " + _m90.group("rest").strip()).strip()
+            return ("numero", _num90, _msg90)
         _det = globals().get('_r85_parece_pedido_de_mensagem')
         if not (_det and _det(_c)):
             return None
@@ -40617,7 +40636,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r89] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r90] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

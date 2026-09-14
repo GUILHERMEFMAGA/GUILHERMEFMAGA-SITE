@@ -27,8 +27,8 @@ def _fonte():
 
 class TestAtualizarFalaAntesDeFecharR85(unittest.TestCase):
 
-    def test_selo_r89(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r89]'), 1)
+    def test_selo_r90(self):
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r90]'), 1)
 
     def test_imprime_antes_de_reiniciar(self):
         # a mensagem da troca tem que aparecer ANTES do Popen/os._exit
