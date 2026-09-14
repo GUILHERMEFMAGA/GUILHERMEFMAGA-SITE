@@ -1,2 +1,0 @@
-# Somente testes das comparacoes PEP 440/508. O agente nao instala automaticamente.
-packaging>=24,<27

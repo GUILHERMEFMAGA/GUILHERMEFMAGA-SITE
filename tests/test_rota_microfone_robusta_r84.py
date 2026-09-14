@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-"""r84 — DIAGNÓSTICO DE MICROFONE ENTENDE O PORTUGUÊS NATURAL.
+"""r85 — DIAGNÓSTICO DE MICROFONE ENTENDE O PORTUGUÊS NATURAL.
 
 Bug real do PC do dono (log 14/09, r83): a rota da r83 só casava
 'diagnostico microfone' exato; o dono digitou a forma natural
 ('diagnostico de/do microfone') e o comando ESCAPOU para o modelo, que
-respondeu 'não tenho acesso a informações do microfone'. Correção: condição
-robusta por palavras (diagnostico/testar + microfone, ou microfone no início),
-sem ordem fixa e sem preposições.
+respondeu 'não tenho acesso a informações do microfone'. Correção r84:
+condição robusta por palavras (diagnostico/testar + microfone, ou
+microfone no início). r85: o caule 'diagnost' cobre também o verbo
+conjugado ('diagnostica o microfone').
 """
 import unittest
 
@@ -19,19 +20,19 @@ def _fonte():
 
 
 def _condicao_rota(n):
-    # replica EXATA da condição da rota em agente.py (r84)
-    return (('diagnostico' in n and 'microfone' in n)
+    # replica EXATA da condição da rota em agente.py (r85: caule 'diagnost')
+    return (('diagnost' in n and 'microfone' in n)
             or ('testar' in n and 'microfone' in n)
             or n.startswith('microfone'))
 
 
 class TestRotaMicrofoneRobustaR84(unittest.TestCase):
 
-    def test_selo_r84(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r84]'), 1)
+    def test_selo_r85(self):
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r85]'), 1)
 
     def test_condicao_na_fonte(self):
-        self.assertIn("(('diagnostico' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)\n"
+        self.assertIn("(('diagnost' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)\n"
                       "            or n.startswith('microfone')):", _fonte())
 
     def test_formas_naturais_brasileiras_casam(self):
@@ -44,6 +45,7 @@ class TestRotaMicrofoneRobustaR84(unittest.TestCase):
             'Diagnostico Microfone',
             'diagnostico  microfone',
             'diagnostico-microfone',
+            'diagnostica o microfone',      # r85: verbo conjugado
             'testar microfone',
             'testar o microfone',
             'microfone',
@@ -64,6 +66,7 @@ class TestRotaMicrofoneRobustaR84(unittest.TestCase):
             'atualizar agora',
             'tabela MEU PC: CPU, RAM | i5, 16GB',
             'o que e um microfone',          # pergunta -> modelo (sem diagnostico/testar)
+            'diagnostico do sistema',        # sem 'microfone': nao e a rota do microfone
             'ligar ia',
         ]
         for f in livres:

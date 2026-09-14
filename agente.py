@@ -8978,8 +8978,10 @@ def _processar_cerebro_local(comando: str) -> bool:
     # r83 (robusto na r84): diagnostico de microfone (so leitura) — entender o
     # PT-BR natural: 'diagnostico microfone', 'diagnostico de/do microfone',
     # 'testar microfone', 'microfone nao funciona', 'microfone' sozinho.
-    # (bug real 14/09: 'diagnostico de microfone' escapava pro modelo)
-    if (('diagnostico' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)
+    # r85: usa o CAULE 'diagnost' (cobre tambem o verbo: 'diagnostica o
+    # microfone'). Bug real 14/09: as formas com artigo/verbo escapavam pro
+    # modelo, que respondeu 'nao tenho acesso ao microfone'.
+    if (('diagnost' in n and 'microfone' in n) or ('testar' in n and 'microfone' in n)
             or n.startswith('microfone')):
         _devs_mf, _ind_mf, _err_mf = _r83_microfones()
         _rel(_r83_resumo_microfone(_devs_mf, _ind_mf, _err_mf))
@@ -17819,6 +17821,11 @@ def _r50_atualizar_agente(downloader=None, confirmar=None, reiniciar=None,
     if reiniciar is None:
         import subprocess
         import sys as _sys
+        # r85: bug real 14/09 — a troca acontecia EM SILENCIO (os._exit antes do
+        # print): o dono veia os 3 [OK] do lancador e achou que nada tinha sido
+        # trocado. Agora a mensagem da troca aparece ANTES do reinicio.
+        print(saida + 'O agente vai reiniciar em 2 segundos para aplicar (conversa fica salva).')
+        time.sleep(2)
         subprocess.Popen([_sys.executable, origem])
         os._exit(0)
     reiniciar()
@@ -18555,6 +18562,18 @@ def _parece_pedido_de_acao(cmd: str) -> bool:
                                               "configurar", "atualizar", "fechar")):
         return True
     return False
+
+
+def _r85_parece_pedido_de_mensagem(cmd: str) -> bool:
+    """r85: True se o comando pede MANDAR MENSAGEM (whatsapp/zap/mensagem),
+    em qualquer verbo (mandar/mande/manda/enviar/envia/passa). Bug real 14/09:
+    o dono digitou 'Mande o messagem pro Joao Iser' e a trava generica r70
+    respondeu 'se quiser, adicione essa acao' — a acao JA existe e funciona
+    100% local: 'manda whatsapp pro NOME: a mensagem'."""
+    _c = str(cmd or '').lower()
+    _tem_alvo = any(p in _c for p in ('mensagem', 'messagem', 'whats', 'zap'))
+    _tem_verbo = any(p in _c for p in ('mand', 'envi', 'passa', 'passe'))
+    return _tem_alvo and _tem_verbo
 
 
 def _pedido_ideias_do_agente(comando: str) -> bool:
@@ -20586,11 +20605,18 @@ def processar_atalho_rapido(comando: str) -> bool:
         except Exception:
             _eh_acao = False
         if _eh_acao:
-            print("\n[Local]: esse comando e uma ACAO que eu ainda nao faco por regra.")
-            print("        Tente falar direto (ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads',")
-            print("        'atualiza o windows'); digite 'ajuda' para ver tudo. Se quiser que eu adicione")
-            print("        essa acao, me diga o que voce quer que ela faca. (A IA de conversa nao executa")
-            print("        acoes no PC - quem controla o Windows sao os comandos, que rodam como admin.)")
+            if _r85_parece_pedido_de_mensagem(comando):
+                print("\n[Local]: mandar mensagem eu FACO de verdade — a sua frase so nao casou com o comando.")
+                print("        O comando certo: manda whatsapp pro NOME: a mensagem")
+                print("        Ex.: manda whatsapp pro Joao: oi, tudo bem?")
+                print("        (a pessoa precisa estar cadastrada: 'salvar contato Joao: 11 99999-9999';")
+                print("        'meus contatos' mostra a lista)")
+            else:
+                print("\n[Local]: esse comando e uma ACAO que eu ainda nao faco por regra.")
+                print("        Tente falar direto (ex.: 'abre o youtube', 'otimiza tudo', 'organiza downloads',")
+                print("        'atualiza o windows'); digite 'ajuda' para ver tudo. Se quiser que eu adicione")
+                print("        essa acao, me diga o que voce quer que ela faca. (A IA de conversa nao executa")
+                print("        acoes no PC - quem controla o Windows sao os comandos, que rodam como admin.)")
             # r74 (33): REPLAY — acao pedida sem regra vira candidato a rota
             try:
                 _r74_replay_registrar(comando, 'acao_sem_rota')
@@ -39978,7 +40004,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r84] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r85] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
