@@ -8923,6 +8923,50 @@ def _processar_cerebro_local(comando: str) -> bool:
                 print("   Para usar, e so pedir em portugues (ex.: 'analise do pc') que eu acho sozinho.")
                 return True
 
+    # ---- r80: RESPOSTA ORGANIZADA — tabela, grafico e ideias bonitos ----
+    if n == "tabela" or (cmd.startswith("tabela ") and (":" in cmd or "|" in cmd)):
+        _resto_tb = cmd[len("tabela"):].strip().lstrip(":").strip()
+        if not _resto_tb:
+            _rel("Tabela bonita (r80): mostra assim: tabela MEU PC: CPU, RAM | i5, 16GB | i7, 32GB\n(título opcional; colunas por vírgula, linhas por pipe). Eu também gravo a versão bonita pra abrir no navegador.")
+            return True
+        _r_tb = _r80_parse_tabela(_resto_tb)
+        if not _r_tb:
+            _rel("Nao consegui entender os dados. Formato: tabela TÍTULO: coluna1, coluna2 | valor1, valor2 | valor3, valor4")
+            return True
+        _t_tb, _c_tb, _corpo_tb = _r_tb
+        print("\n" + _r80_tabela_texto(_t_tb, _c_tb, _corpo_tb))
+        _f_tb = _r80_tabela_html(_t_tb, _c_tb, _corpo_tb)
+        _rel("Versao bonita (abra no navegador): %s" % _f_tb if _f_tb else "Nao consegui gravar o arquivo bonito — a tabela acima segue valendo.")
+        return True
+    if n == "grafico" or (cmd.startswith("grafico ") and (":" in cmd or "|" in cmd)):
+        _resto_gf = cmd[len("grafico"):].strip().lstrip(":").strip()
+        if not _resto_gf:
+            _rel("Grafico bonito (r80): mostra assim: grafico VENDAS: jan 100 | fev 150 | mar 90\n(título opcional; rotulo + numero por barra). Eu também gravo a versão bonita (SVG) pra abrir no navegador.")
+            return True
+        _r_gf = _r80_parse_grafico(_resto_gf)
+        if not _r_gf:
+            _rel("Nao consegui entender os numeros. Formato: grafico TÍTULO: rotulo 100 | rotulo 150 | rotulo 90")
+            return True
+        _t_gf, _p_gf = _r_gf
+        print("\n" + _r80_grafico_ascii(_t_gf, _p_gf))
+        _f_gf = _r80_grafico_html(_t_gf, _p_gf)
+        _rel("Versao bonita (abra no navegador): %s" % _f_gf if _f_gf else "Nao consegui gravar o arquivo bonito — o grafico acima segue valendo.")
+        return True
+    if n == "ideias" or (cmd.startswith("ideias ") and (":" in cmd or "|" in cmd)):
+        _resto_id = cmd[len("ideias"):].strip().lstrip(":").strip()
+        if not _resto_id:
+            _rel("Ideias organizadas (r80): mostra assim: ideias APP DE ENTREGA: app X | app Y | app Z\nEu numera, alinha e guarda em um arquivo .md.")
+            return True
+        _r_id = _r80_parse_ideias(_resto_id)
+        if not _r_id:
+            _rel("Nao consegui entender as ideias. Formato: ideias TEMA: ideia1 | ideia2 | ideia3")
+            return True
+        _t_id, _ids_id = _r_id
+        print("\n" + _r80_ideias_texto(_t_id, _ids_id))
+        _f_id = _r80_ideias_md(_t_id, _ids_id)
+        _rel("Guardado em: %s" % _f_id if _f_id else "Nao consegui gravar o arquivo .md — a lista acima segue valendo.")
+        return True
+
     # ---- r79: VOZ — STT local (whisper.cpp, 100% local) ----
     if n == "stt" or cmd.startswith("stt "):
         _rel(_r79_stt_status())
@@ -15864,6 +15908,356 @@ def _r74_aquecer_agendar(agendador=None, subir=None, verificar=None, dormir=None
         return False
 
 
+# ================= r80: RESPOSTA ORGANIZADA — TABELAS, GRAFICOS E IDEIAS BONITOS =================
+# A pedido do dono (13/09): "alta organizacao na resposta, na IA LOCAL ele vai
+# poder construir graficos, tabelas... tudo bonitinho e organizado".
+# 3 construtores (funcao PURA, testada, sem libs externas): tabela alinhada,
+# grafico de barras (na tela + arquivo HTML bonito com SVG) e ideias
+# organizadas (na tela + .md). A IA LOCAL pode chamar as ferramentas
+# construir_tabela / construir_grafico / construir_ideias sozinha quando o
+# dono pedir; e o dono leigo tem os comandos diretos 'tabela', 'grafico' e
+# 'ideias'. Alem disso, o ORGANIZADOR AUTOMATICO normaliza listas e blocos
+# com cara de tabela que a IA local devolve (deterministico, sem modelo).
+# 100% local; nada de libs; nada de nuvem. Kill-switch: 'organizar_respostas'
+# (so o organizador automatico; os construtores e comandos seguem funcionando).
+# Selo: 2026-09-11-r80.
+
+def _r80_parse_tabela(payload):
+    """r80: LOGICA PURA. 'TÍTULO: c1, c2 | a, b | c, d' -> (titulo, colunas, corpo).
+    Sem título: 'c1, c2 | a, b'. O titulo não pode virgula/pipe (senao confunde
+    com os dados). Devolve None se o formato nao bater."""
+    import re as _re
+    t = str(payload or '').strip()
+    if not t:
+        return None
+    if ':' in t:
+        titulo, dados = t.split(':', 1)
+        titulo = titulo.strip()
+        if not titulo or _re.search(r'[,|]', titulo):
+            return None
+    else:
+        titulo, dados = None, t
+    linhas = [l.strip() for l in dados.split('|') if l.strip()]
+    if len(linhas) < 2:
+        return None
+    colunas = [c.strip() for c in linhas[0].split(',')]
+    if len(colunas) < 2 or any(not c for c in colunas):
+        return None
+    corpo = []
+    for l in linhas[1:]:
+        c = [x.strip() for x in l.split(',')]
+        if len(c) != len(colunas) or any(not x for x in c):
+            return None
+        corpo.append(c)
+    return (titulo, colunas, corpo)
+
+
+def _r80_tabela_texto(titulo, colunas, corpo):
+    """r80: tabela alinhada em ASCII (funciona em QUALQUER console, sem Unicode)."""
+    larg = [len(str(c)) for c in colunas]
+    for linha in corpo:
+        for i, c in enumerate(linha):
+            larg[i] = max(larg[i], len(str(c)))
+    def _linha_sep(a, b, c):
+        return a + b.join(['-' * (w + 2) for w in larg]) + c
+    linhas = []
+    if titulo:
+        linhas.append(str(titulo).upper())
+        linhas.append('=' * min(60, sum(larg) + 2 * len(larg) + 2))
+    linhas.append(_linha_sep('+', '+', '+'))
+    linhas.append('|' + '|'.join(' %-*s ' % (w, str(c)) for w, c in zip(larg, colunas)) + '|')
+    linhas.append(_linha_sep('+', '+', '+'))
+    for linha in corpo:
+        linhas.append('|' + '|'.join(' %-*s ' % (w, str(c)) for w, c in zip(larg, linha)) + '|')
+        linhas.append(_linha_sep('+', '+', '+'))
+    return '\n'.join(linhas)
+
+
+def _r80_tabela_html(titulo, colunas, corpo, pasta=None):
+    """r80: a mesma tabela em HTML autocontido (CSS embutido, nada externo)."""
+    def _esc(x):
+        return (str(x).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+    linhas = ['<html><head><meta charset="utf-8"><title>%s</title><style>'
+              'body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:32px}'
+              'h1{font-size:22px;margin-bottom:4px}p{color:#94a3b8;margin-top:0;font-size:13px}'
+              'table{border-collapse:collapse;margin-top:16px;font-size:14px}'
+              'th{background:#1e293b;color:#7dd3fc;text-align:left;padding:8px 14px;border:1px solid #334155}'
+              'td{padding:8px 14px;border:1px solid #334155}'
+              'tr:nth-child(even) td{background:#111c33}'
+              '</style></head><body><h1>%s</h1><p>Gerado pelo Super Agente PC (r80) — 100%% local.</p><table>'
+              % (_esc(titulo or 'Tabela'), _esc(titulo or 'Tabela'))]
+    linhas.append('<tr>' + ''.join('<th>%s</th>' % _esc(c) for c in colunas) + '</tr>')
+    for linha in corpo:
+        linhas.append('<tr>' + ''.join('<td>%s</td>' % _esc(c) for c in linha) + '</tr>')
+    linhas.append('</table></body></html>')
+    import datetime as _dt
+    raiz = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'tabelas')
+    try:
+        os.makedirs(raiz, exist_ok=True)
+    except Exception:
+        pass
+    slug = _r78_slug((titulo or 'tabela'))
+    caminho = os.path.join(raiz, '%s_%s.html' % (_dt.datetime.now().strftime('%Y-%m-%d_%H%M'), slug))
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(linhas))
+    except Exception:
+        return None
+    return caminho
+
+
+def _r80_parse_grafico(payload):
+    """r80: LOGICA PURA. 'TÍTULO: jan 100 | fev 150 | mar 90' -> (titulo, [(rotulo, valor)])."""
+    import re as _re
+    t = str(payload or '').strip()
+    if not t:
+        return None
+    if ':' in t:
+        titulo, dados = t.split(':', 1)
+        titulo = titulo.strip()
+        if not titulo or _re.search(r'[,|]', titulo):
+            return None
+    else:
+        titulo, dados = None, t
+    pontos = []
+    for parte in dados.split('|'):
+        p = parte.strip()
+        if not p:
+            continue
+        m = _re.match(r'^(.*\S)\s+(-?\d+(?:[.,]\d+)?)$', p)
+        if not m:
+            return None
+        try:
+            valor = float(m.group(2).replace(',', '.'))
+        except Exception:
+            return None
+        pontos.append((m.group(1).strip(), valor))
+    if len(pontos) < 2:
+        return None
+    return (titulo, pontos)
+
+
+def _r80_grafico_ascii(titulo, pontos, largura=20):
+    """r80: barras horizontais em ASCII (qualquer console)."""
+    maximo = max(v for _, v in pontos) or 1
+    rot_w = max(len(r) for r, _ in pontos)
+    linhas = [str(titulo or 'GRAFICO').upper()]
+    for rotulo, valor in pontos:
+        barra = '#' * max(1 if valor else 0, int(round((valor / maximo) * largura)))
+        linhas.append('%-*s | %s %s' % (rot_w, rotulo, barra, ('%g' % valor)))
+    return '\n'.join(linhas)
+
+
+def _r80_grafico_html(titulo, pontos, pasta=None):
+    """r80: grafico de barras em SVG embutido (HTML autocontido, nada externo)."""
+    def _esc(x):
+        return (str(x).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+    maximo = max(v for _, v in pontos) or 1
+    altura_barra, espaco, larg = 34, 12, 520
+    altura = len(pontos) * (altura_barra + espaco) + 40
+    barras = []
+    for i, (rotulo, valor) in enumerate(pontos):
+        y = 20 + i * (altura_barra + espaco)
+        w = int(round((valor / maximo) * larg)) if maximo else 0
+        cor = '#38bdf8' if i % 2 == 0 else '#818cf8'
+        barras.append('<text x="0" y="%d" fill="#e2e8f0" font-size="13">%s</text>' % (y + 20, _esc(rotulo)))
+        barras.append('<rect x="10" y="%d" width="%d" height="%d" rx="4" fill="%s"/>' % (y, max(2, w), altura_barra - 10, cor))
+        barras.append('<text x="%d" y="%d" fill="#94a3b8" font-size="12">%g</text>' % (min(larg + 14, 10 + max(2, w) + 8), y + 15, valor))
+    html = ('<html><head><meta charset="utf-8"><title>%s</title><style>'
+            'body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;padding:32px}'
+            'h1{font-size:22px;margin-bottom:4px}p{color:#94a3b8;margin-top:0;font-size:13px}'
+            'svg{background:#111c33;border-radius:10px;padding:10px}</style></head><body>'
+            '<h1>%s</h1><p>Gerado pelo Super Agente PC (r80) — 100%% local.</p>'
+            '<svg width="%d" height="%d">%s</svg></body></html>'
+            % (_esc(titulo or 'Grafico'), _esc(titulo or 'Grafico'), larg + 90, altura, '\n'.join(barras)))
+    import datetime as _dt
+    raiz = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'graficos')
+    try:
+        os.makedirs(raiz, exist_ok=True)
+    except Exception:
+        pass
+    slug = _r78_slug((titulo or 'grafico'))
+    caminho = os.path.join(raiz, '%s_%s.html' % (_dt.datetime.now().strftime('%Y-%m-%d_%H%M'), slug))
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            f.write(html)
+    except Exception:
+        return None
+    return caminho
+
+
+def _r80_parse_ideias(payload):
+    """r80: LOGICA PURA. 'TEMA: ideia1 | ideia2 | ideia3' -> (tema, [ideias])."""
+    t = str(payload or '').strip()
+    if not t:
+        return None
+    if ':' in t:
+        tema, dados = t.split(':', 1)
+        tema = tema.strip()
+        if not tema or '|' not in dados:
+            return None
+    else:
+        tema, dados = 'IDEIAS', t
+    ids = [i.strip() for i in dados.split('|') if i.strip()]
+    if len(ids) < 2:
+        return None
+    return (tema, ids)
+
+
+def _r80_ideias_texto(tema, ideias):
+    """r80: lista numerada, alinhada, com cabecalho."""
+    linhas = [str(tema).upper()]
+    linhas.append('-' * min(60, max(12, len(str(tema)) + 6)))
+    for i, ideia in enumerate(ideias, 1):
+        linhas.append('%d. %s' % (i, ideia))
+    return '\n'.join(linhas)
+
+
+def _r80_ideias_md(tema, ideias, pasta=None):
+    """r80: as ideias em .md (pra guardar/compartilhar)."""
+    import datetime as _dt
+    raiz = os.path.join(pasta or globals().get('PASTA_BASE') or os.getcwd(), 'ideias')
+    try:
+        os.makedirs(raiz, exist_ok=True)
+    except Exception:
+        pass
+    slug = _r78_slug((tema or 'ideias'))
+    caminho = os.path.join(raiz, '%s_%s.md' % (_dt.datetime.now().strftime('%Y-%m-%d_%H%M'), slug))
+    linhas = ['# %s' % str(tema).upper(), '', 'Gerado pelo Super Agente PC (r80) — 100% local.', '']
+    for i, ideia in enumerate(ideias, 1):
+        linhas.append('%d. %s' % (i, ideia))
+    try:
+        with open(caminho, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(linhas) + '\n')
+    except Exception:
+        return None
+    return caminho
+
+
+def _r80_blocos_tabela(texto):
+    """r80: acha blocos de 3+ linhas com o MESMO numero de colunas (>=2)
+    separadas por ',' ou ';' (ex.: resposta de IA com cara de tabela)."""
+    import re as _re
+    linhas = texto.splitlines()
+    blocos = []
+    i = 0
+    while i < len(linhas):
+        l = linhas[i].strip()
+        if not l:
+            i += 1
+            continue
+        colunas = [p.strip() for p in _re.split(r'[;,]', l) if p.strip()]
+        if len(colunas) >= 2:
+            j = i + 1
+            while j < len(linhas):
+                l2 = linhas[j].strip()
+                if not l2:
+                    break
+                c2 = [p.strip() for p in _re.split(r'[;,]', l2) if p.strip()]
+                if len(c2) == len(colunas):
+                    j += 1
+                else:
+                    break
+            if j - i >= 3 and len(colunas) <= 8 and all(len(linhas[k].strip()) < 120 for k in range(i, j)):
+                blocos.append((i, j))
+                i = j
+                continue
+        i += 1
+    return blocos
+
+
+def _r80_organizar_resposta(texto):
+    """r80: ORGANIZADOR AUTOMATICO — normaliza (deterministico, sem modelo):
+    (a) blocos com cara de tabela viram tabela alinhada; (b) listas com
+    marcadores mistos ('-', '*', '1.', 'o ') viram numeracao alinhada.
+    Resposta sem nenhum destes padraoes segue INTACTA. Kill-switch:
+    config 'organizar_respostas': false."""
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('organizar_respostas', padrao=True):
+            return texto
+    except Exception:
+        pass
+    if not isinstance(texto, str) or '\n' not in texto:
+        return texto
+    # (a) blocos com cara de tabela — processa de baixo p/ cima (indices estaveis)
+    for a, b in sorted(_r80_blocos_tabela(texto), reverse=True):
+        linhas = texto.splitlines()
+        colunas = _r80_sep_split(linhas[a])
+        corpo = [_r80_sep_split(l) for l in linhas[a + 1:b]]
+        corpo = [c for c in corpo if len(c) == len(colunas)]
+        if len(colunas) >= 2 and corpo:
+            _tabela = _r80_tabela_texto(None, colunas, corpo)
+            texto = '\n'.join(linhas[:a] + _tabela.splitlines() + linhas[b:])
+    # (b) listas com marcadores mistos ('-'/'*'/'•'/'1.') — SEM 'o' (prosa PT-BR!)
+    import re as _re
+    linhas = texto.splitlines()
+    marc = _re.compile(r'^(\s*)(?:[-•*]|\d+[.)-])\s+(.*)$')
+    indices = [i for i, l in enumerate(linhas) if marc.match(l)]
+    if len(indices) >= 3:
+        n = 0
+        for i in indices:
+            m = marc.match(linhas[i])
+            n += 1
+            linhas[i] = '%s%d. %s' % (m.group(1), n, m.group(2))
+        texto = '\n'.join(linhas)
+    return texto
+
+
+def _r80_sep_split(linha):
+    """r80: divide uma linha por ',' ou ';' (o que existir)."""
+    import re as _re
+    if ',' in linha:
+        return [p.strip() for p in linha.split(',')]
+    return [p.strip() for p in linha.split(';')]
+
+
+def construir_tabela(payload: str) -> str:
+    """Constrói uma TABELA ALINHADA e bonita a partir de dados.
+    payload: 'TÍTULO: coluna1, coluna2 | valor1, valor2 | ...'
+    (título opcional; colunas separadas por vírgula, linhas por pipe).
+    Use quando o usuário pedir tabela, comparativo ou dados organizados."""
+    r = _r80_parse_tabela(payload)
+    if not r:
+        return ('Formato da tabela: TÍTULO: coluna1, coluna2 | valor1, valor2 | ... '
+                '(ex.: MEU PC: CPU, RAM | i5, 16GB | i7, 32GB)')
+    titulo, colunas, corpo = r
+    return _r80_tabela_texto(titulo, colunas, corpo)
+
+
+def construir_grafico(payload: str) -> str:
+    """Constrói um GRÁFICO DE BARRAS a partir de números (na tela + arquivo
+    HTML bonito na pasta graficos/). payload: 'TÍTULO: rotulo 100 | rotulo 150 | ...'
+    (valores numéricos; título opcional). Use quando o usuário pedir gráfico,
+    evolução ou comparação visual de números."""
+    r = _r80_parse_grafico(payload)
+    if not r:
+        return ('Formato do grafico: TÍTULO: rotulo 100 | rotulo 150 | ... '
+                '(ex.: VENDAS: jan 100 | fev 150 | mar 90)')
+    titulo, pontos = r
+    caminho = _r80_grafico_html(titulo, pontos)
+    base = _r80_grafico_ascii(titulo, pontos)
+    if caminho:
+        base += '\n[Versao bonita no navegador: %s]' % caminho
+    return base
+
+
+def construir_ideias(payload: str) -> str:
+    """Organiza uma LISTA DE IDEIAS de forma bonita e numerada (na tela +
+    arquivo .md na pasta ideias/). payload: 'TEMA: ideia1 | ideia2 | ...'
+    Use quando o usuário pedir ideias, opções, alternativas ou brainstorm."""
+    r = _r80_parse_ideias(payload)
+    if not r:
+        return ('Formato das ideias: TEMA: ideia1 | ideia2 | ... '
+                '(ex.: APP: app de entrega | app de estudos | app de receitas)')
+    tema, ids = r
+    caminho = _r80_ideias_md(tema, ids)
+    base = _r80_ideias_texto(tema, ids)
+    if caminho:
+        base += '\n[Guardado em: %s]' % caminho
+    return base
+
+
 # ================= r79: VOZ — STT LOCAL (whisper.cpp, 100% local) =================
 # O item 38 da LISTA-IMPOSSIVEL (a "obra grande" da leva de 19): FALAR com o
 # agente. O reconhecimento roda no PC (whisper.cpp + modelo base multilíngue)
@@ -19458,6 +19852,13 @@ def _chamar_neural(msgs, max_tokens=350, temperatura=0.5, timeout_segundos=120,
                 _ctx75 = sum(len(str(m.get('content', ''))) for m in msgs)
                 _primeira75 = int((globals().get('_R69_NUCLEO') or {}).get('n_geracoes', 0)) <= 1
                 _reg75(_seg75, _tok75, _ctx75, _primeira75)
+        except Exception:
+            pass
+        # r80: ORGANIZACAO AUTOMATICA da resposta (listas/tabelas) — deterministica, local
+        try:
+            _org80 = globals().get('_r80_organizar_resposta')
+            if _org80 and not formato_json:
+                texto = _org80(texto)
         except Exception:
             pass
         _r20_estado('pronto', 'Ultima geracao concluida')
@@ -39465,7 +39866,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r79] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r80] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -39662,9 +40063,17 @@ while True:
         else:
             raise
 
+    # r80: resposta EXIBIDA organizada (lista/tabela) — a voz/historico usam o texto original
+    _resposta_exibir = str(resposta_texto)
+    try:
+        _org80 = globals().get('_r80_organizar_resposta')
+        if _org80:
+            _resposta_exibir = _org80(_resposta_exibir)
+    except Exception:
+        pass
     # Se o streaming JA imprimiu a resposta ao vivo, nao imprime de novo.
     if not _estado_stream.get("impresso") or not str(resposta_texto).strip():
-        print(f"\n[IA Avançada]: {resposta_texto}")
+        print(f"\n[IA Avançada]: {_resposta_exibir}")
     historico_conversas.append({"role": "assistant", "content": resposta_texto})
     salvar_historico()
     registrar_memoria_longa(f"P: {comando_usuario} R: {resposta_texto}")

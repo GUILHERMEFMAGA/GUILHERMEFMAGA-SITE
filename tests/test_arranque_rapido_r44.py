@@ -95,7 +95,7 @@ class AgenteSemImportPesadoNoArranque(unittest.TestCase):
     def test_selo_r73_no_banner(self):
         with io.open(str(SOURCE), encoding='utf-8') as f:
             texto = f.read()
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r79]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r80]', texto)
 
 
 class LazyGemini(unittest.TestCase):
