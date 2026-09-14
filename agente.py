@@ -8491,8 +8491,12 @@ def _processar_cerebro_local(comando: str) -> bool:
     # ============ WHATSAPP / CONTATOS (comandos locais) ============
     # r88: MODO CONVERSA — parar/status primeiro (o 'para de conversar' nunca
     # pode ser engolido por outra rota enquanto o modo esta ativo)
-    if n in ("paradeconversar", "paramodoconversa", "sairdomodoconversa",
-             "desligamodoconversa", "parowhatsapp", "paraconversa"):
+    if n in ("paradeconversar", "paradeconversa", "paraconversa",
+             "paramodoconversa", "paraomodoconversa", "sairdomodoconversa",
+             "desligamodoconversa", "desligaromodoconversa", "parawhatsapp",
+             "paradeinteragir", "parainteragir", "paraderesponder",
+             "pararesponder", "paraainteracao", "parainteracao",
+             "pararinteracao", "paradeinteragirnaconversa"):
         _parar88 = globals().get("_R88_PARAR")
         _th88 = globals().get("_R88_THREAD")
         if _parar88 is not None and _th88 is not None and _th88.is_alive():
@@ -40613,7 +40617,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r88] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r89] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

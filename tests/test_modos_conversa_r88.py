@@ -23,6 +23,7 @@ Como funciona (o que o código já tinha + o que a r88 acrescenta):
   (que respondeu 'não tenho acesso' — falso) — agora vai na rota local.
 """
 import unittest
+import re
 
 from test_roteamento_conversa import SOURCE as AGENTE_PY, carregar
 
@@ -33,8 +34,11 @@ def _fonte():
 
 
 class TestSeloR88(unittest.TestCase):
-    def test_selo_r88(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r88]'), 1)
+    def test_selo_r88_avanco(self):
+        # selo do arquivo de release: pode avancar (r89+), nunca voltar
+        m = re.search(r'Motor e avaliacao local 2026-09-11-r(\d+)', _fonte())
+        self.assertIsNotNone(m)
+        self.assertGreaterEqual(int(m.group(1)), 88)
 
     def test_fix_quantos_contatos(self):
         # 'quantos contatos eu tenho' (log real 14/09) vai na rota local
@@ -171,6 +175,19 @@ class TestWiringR88(unittest.TestCase):
         self.assertIn('"modo conversa"', fonte)
         self.assertIn('"paradeconversar"', fonte)
         self.assertIn('"statusdomodoconversa"', fonte)
+
+    def test_formas_naturais_de_parar(self):
+        # o dono pergunta 'e no caso para parar de interagir?' — as formas
+        # naturais de parar estao todas no gatilho
+        fonte = _fonte()
+        for g in ('"paradeconversar"', '"paradeconversa"', '"paraconversa"',
+                  '"paramodoconversa"', '"paraomodoconversa"',
+                  '"sairdomodoconversa"', '"desligamodoconversa"',
+                  '"desligaromodoconversa"', '"parawhatsapp"',
+                  '"paradeinteragir"', '"parainteragir"', '"paraderesponder"',
+                  '"pararesponder"', '"paraainteracao"', '"parainteracao"',
+                  '"pararinteracao"', '"paradeinteragirnaconversa"'):
+            self.assertIn(g, fonte)
 
     def test_kill_switch(self):
         self.assertIn('modo_conversa_wpp', _fonte())

@@ -84,7 +84,7 @@ class Estrutura(unittest.TestCase):
         # r72 NAO tem entrada na cadeia principal (de proposito!)
         self.assertNotIn('if _r72_comandos(comando):', texto)
         self.assertIn('HONESTIDADE (r72)', texto)
-        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r88]'), 1)
+        self.assertEqual(texto.count('[Motor e avaliacao local 2026-09-11-r89]'), 1)
 
 
 if __name__ == '__main__':
