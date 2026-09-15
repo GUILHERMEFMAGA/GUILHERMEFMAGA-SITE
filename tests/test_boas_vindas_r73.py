@@ -107,7 +107,7 @@ class Estrutura(unittest.TestCase):
         self.assertNotIn('if _r73_comandos(comando):', t)  # r73 nao e rota de comando
         self.assertIn("BOAS-VINDAS (r73)", t)
         self.assertIn("'boas_vindas'", t)
-        self.assertEqual(t.count('[Motor e avaliacao local 2026-09-11-r97]'), 1)
+        self.assertEqual(t.count('[Motor e avaliacao local 2026-09-11-r98]'), 1)
         self.assertIn('sessao.json', t)
 
 

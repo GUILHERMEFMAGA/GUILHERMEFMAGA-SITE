@@ -19,7 +19,7 @@ def _fonte():
 class TestCaixaPreservadaR82(unittest.TestCase):
 
     def test_selo_r82(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r97]'), 1)
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r98]'), 1)
 
     def test_rota_tabela_mantem_caixa_do_dono(self):
         # reproduz o pipeline EXATO da rota r80 (com a correção r82: texto original)

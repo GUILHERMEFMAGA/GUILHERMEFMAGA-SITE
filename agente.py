@@ -18190,6 +18190,44 @@ def _r21_comandos_conhecidos():
         'oficina local', 'parar geracao local', 'refazer com penalidade')
 
 
+def _r98_dica_comando(comando):
+    """r98: se o texto PARECE um comando local digitado de outro jeito
+    (varia de palavras/artigo/pontuacao que nenhuma rota casou), devolve
+    (dica, consumir) — consumir=True manda de volta o prompt SEM enviar ao
+    modelo (a pessoa claramente queria uma acao); frase longa/real ->
+    dica + o modelo tambem responde (aprimorar sem apagar). Falha REAL do
+    PC do dono (15/09): variacao do 'atualizar agora' caiu no modelo, que
+    respondeu conversa em vez de acao — sem nenhum aviso de que era um
+    comando."""
+    if not isinstance(comando, str):
+        return None
+    c = comando.lower().strip()
+    if not c or ':' in c:
+        return None
+    n = _norm_pt(c)
+    _mapa = (
+        (('atualiz',), 'atualizar agora'),
+        (('baixar', 'stt'), 'baixar stt'),
+        (('baixar', 'mic'), 'baixar mic'),
+        (('baixar', 'visao'), 'baixar visao'),
+        (('visao',), 'baixar visao'),
+        (('diagnost', 'microfone'), 'diagnostico microfone'),
+        (('microfone', 'diagnost'), 'diagnostico microfone'),
+        (('para', 'conversa'), 'para de conversa'),
+        (('interaja', 'com'), 'interaja com NOME'),
+        (('interage', 'com'), 'interaja com NOME'),
+        (('intareja', 'com'), 'interaja com NOME'),
+    )
+    for _chaves, _canonico in _mapa:
+        if all(_k in n for _k in _chaves):
+            _palavras = len(c.split())
+            _dica = ("[Atalho] Nao reconheci isso como comando local. Se voce quer "
+                     "dizer '" + _canonico + "', digite exatamente assim e aperte "
+                     "Enter. ('ajuda' tem a lista completa.)")
+            return (_dica, _palavras <= 6)
+    return None
+
+
 def _r21_sugerir_comando_proximo(comando):
     """Erro de digitacao (difflib sobre comandos canonicos): sugere no maximo 1
     candidato e so executa apos 'sim'. Nao sugere linhas com payload (:) nem
@@ -41197,8 +41235,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r97"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r97] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r98"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r98] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
@@ -41308,6 +41346,17 @@ while True:
 
     if processar_atalho_rapido(comando_usuario):
         continue
+
+    # r98: parece um comando local digitado de outro jeito? dica na hora
+    # (sem gastar o modelo em conversa quando a pessoa queria uma acao).
+    try:
+        _dica98 = _r98_dica_comando(comando_usuario)
+    except Exception:
+        _dica98 = None
+    if _dica98:
+        print("\n" + _dica98[0])
+        if _dica98[1]:
+            continue
 
     # --- Contexto inteligente (memoria em camadas, tipo Cline/MemGPT) ---
     # CORE: fatos permanentes que o agente nunca pode esquecer. LICOES: o que
