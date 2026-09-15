@@ -9205,7 +9205,10 @@ def _processar_cerebro_local(comando: str) -> bool:
         _r = _r79_stt_baixar()
         _rel(_r or "STT desligado (config 'stt_local': false).")
         return True
-    if cmd.startswith("baixar visao"):
+    # r97: casar pela forma NORMALIZADA (n), nao pelo texto cru — "baixar
+    # visao", "baixar visão", "baixar a visao" e "BAIXAR VISAO"
+    # sao o mesmo pedido (regra da casa, r84/r89: startswith cru e fragil).
+    if ('baixar' in n) and ('visao' in n):
         _urls_v = _r94_urls_visao()
         _pedir_v = globals().get('pedir_confirmacao')
         _t_v = ("Baixar a VISAO LOCAL? Vem do llama.cpp + Llama 3.2 Vision 11B (oficiais): "
@@ -41194,8 +41197,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r96"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r96] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r97"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r97] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

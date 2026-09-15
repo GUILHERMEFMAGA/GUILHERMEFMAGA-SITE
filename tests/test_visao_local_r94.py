@@ -256,6 +256,20 @@ class BaixarVisaoR94(unittest.TestCase):
             self.assertIn('baixar visao', str(msg))
 
 
+class RotaNormalizadaR97(unittest.TestCase):
+    """r97 (bug REAL do PC do dono, 15/09): 'baixar visao' so casava pelo
+    texto CRU — 'baixar visao' (com til, a forma natural de quem escreve em
+    portugues) ou 'baixar a visao' escapavam da rota e caíam no modelo,
+    que respondeu 'não posso ajudar'. Agora casa pela forma NORMALIZADA
+    (mesma regra da casa das rotas r84/r89/r90). As variantes de texto sao
+    provadas no E2E com o código real (ambiente completo)."""
+
+    def test_rota_usa_forma_normalizada_no_codigo(self):
+        fonte = SOURCE.read_text(encoding='utf-8')
+        i = fonte.find("if ('baixar' in n) and ('visao' in n):")
+        self.assertGreater(i, 0, 'condicao normalizada ausente da rota')
+
+
 class WiringR94(unittest.TestCase):
     """Verificacao no CODIGO (regra do dono: evidencia, nao suposicao)."""
 
@@ -263,8 +277,8 @@ class WiringR94(unittest.TestCase):
         self.fonte = SOURCE.read_text(encoding='utf-8')
 
     def test_rota_baixar_visao(self):
-        i = self.fonte.find('if cmd.startswith("baixar visao"):')
-        self.assertGreater(i, 0)
+        i = self.fonte.find("if ('baixar' in n) and ('visao' in n):")
+        self.assertGreater(i, 0, 'rota baixar visao ausente')
         trecho = self.fonte[i:i + 1500]
         self.assertIn('_r94_visao_baixar()', trecho)
         self.assertIn("sim/nao", trecho)  # confirmacao explicita
