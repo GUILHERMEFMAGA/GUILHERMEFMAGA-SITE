@@ -8526,7 +8526,8 @@ def _processar_cerebro_local(comando: str) -> bool:
     if cmd.startswith(("modo conversa whatsapp", "modo conversa", "whatsapp conversa",
                        "conversa no whatsapp", "modo conversacao",
                        "interaja com", "interage com", "interagir com",
-                       "intareja com")):
+                       "intareja com")) or n.startswith(("interajacom", "interagecom",
+                       "interagircom", "intarejacom")):
         _ler88 = globals().get("_r67_ler_config")
         try:
             _lig88 = _ler88("modo_conversa_wpp", padrao=True) if _ler88 else True
@@ -8544,6 +8545,13 @@ def _processar_cerebro_local(comando: str) -> bool:
             if _alvo88.startswith(_pre88):
                 _alvo88 = _alvo88[len(_pre88):]
                 break
+        else:
+            # r91: casou pela forma NORMALIZADA (espacos duplos, espaco
+            # especial, acentos ou typo — 'interaja  com' / 'interaja\u00a0com'
+            # / 'ínteraja com' nao casam com startswith cru; a forma
+            # normalizada sempre casa). O alvo e tudo depois do 'com'.
+            _i_com = cmd.find("com")
+            _alvo88 = cmd[_i_com + 3:] if _i_com != -1 else ""
         _alvo88 = _alvo88.strip(" :,-/")
         if not _alvo88:
             try:
@@ -18814,6 +18822,24 @@ def _r86_parse_whatsapp(cmd: str):
     return ("nome", _nome, _msg.strip())
 
 
+def _r91_preparar_envio_numero(alvo):
+    """r91: se o alvo e um NUMERO (cru: '+55 51 9268-6262' ou '11 99999-8888'),
+    devolve a URL de deep link 'whatsapp://send?phone=<somente digitos>' —
+    abre a conversa do numero DIRETO, sem busca por nome. Log real r90: a
+    busca por nome com numero cru nao encontra resultado, o Enter nao abre
+    nenhuma conversa e a mensagem era colada na caixa de BUSCA ainda focada
+    (o dono viu literalmente '+55 51 9268-6262oi'). Se nao for numero, None.
+    Funcao pura (testavel sem app)."""
+    import re as _r91re
+    _t = str(alvo or "").strip()
+    if not _t:
+        return None
+    _d = _r91re.sub(r"\D", "", _t)
+    if len(_d) < 8 or not _d[0].isdigit():
+        return None
+    return "whatsapp://send?phone=" + _d
+
+
 def _r87_str_nome(nome):
     """r87: capitaliza 'joao iser' -> 'Joao Iser' (cosmetico p/ exibicao)."""
     return " ".join(w.capitalize() for w in str(nome or "").split()) or str(nome or "")
@@ -21512,15 +21538,43 @@ def enviar_whatsapp_por_nome(nome_contato_ou_grupo: str, mensagem: str) -> str:
     do WhatsApp instalado e logado no Windows. Sempre pede confirmacao antes
     de enviar. IMPORTANTE: o usuario deve ver a tela nas primeiras vezes."""
     alvo = nome_contato_ou_grupo.strip()
+    _url_num91 = _r91_preparar_envio_numero(alvo)
     if not pedir_confirmacao(
-        f"Vou abrir o app do WhatsApp, buscar por '{alvo}' (contato ou grupo) e "
-        f"enviar: \"{mensagem}\". Confirma? (nao mexa no teclado/mouse enquanto isso)"
+        (f"Vou abrir a conversa do numero '{alvo}' direto no WhatsApp e enviar: "
+         f"\"{mensagem}\"." if _url_num91 else
+         f"Vou abrir o app do WhatsApp, buscar por '{alvo}' (contato ou grupo) e "
+         f"enviar: \"{mensagem}\".") +
+        " Confirma? (nao mexa no teclado/mouse enquanto isso)"
     ):
         return "Envio cancelado pelo usuário."
 
     def _enviar():
         import pyautogui as _pg
         _pg.FAILSAFE = True  # levar o mouse ate o canto superior-esquerdo cancela
+        if _url_num91:
+            # r91: NUMERO — abre a conversa DIRETA do numero por deep link
+            # (whatsapp://send?phone=...), SEM busca por nome. Antes a busca
+            # por nome com numero cru nao achava nada, o Enter nao abria
+            # conversa e a mensagem era colada na caixa de BUSCA ainda
+            # focada (log real: o dono viu literalmente '+55 51 9268-6262oi').
+            try:
+                os.startfile(_url_num91)
+            except Exception:
+                subprocess.Popen('start "" "https://web.whatsapp.com/send?phone=%s"' %
+                                 _url_num91.rsplit("=", 1)[-1], shell=True)
+            time.sleep(8)  # tempo do app abrir/focar a conversa do numero
+            if _colar_texto_clipboard(mensagem):
+                _pg.hotkey("ctrl", "v")
+            else:
+                _pg.write(mensagem, intervalo=0.03)
+            time.sleep(1)
+            _pg.press("enter")
+            time.sleep(1)
+            _confirmar_envio_wpp("", mensagem, modo="whatsapp (link direto do numero)", destino=alvo)
+            return (f"Mensagem enviada para '{alvo}' pelo link direto do numero no WhatsApp. "
+                    "Confira na tela (e os tiques azuis) se chegou. ATENCAO: se o app "
+                    "mostrar a tela de CONVIDAR (o numero ainda nao esta no WhatsApp), "
+                    "nada foi enviado — me diga o nome para salvar o numero.")
         # 1) abre o app do WhatsApp instalado (se nao abrir, cai no WhatsApp Web)
         try:
             os.startfile("whatsapp://")  # app do Windows
@@ -40636,7 +40690,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r90] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r91] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

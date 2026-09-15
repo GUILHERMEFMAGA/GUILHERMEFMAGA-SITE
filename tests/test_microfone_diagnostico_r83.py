@@ -28,7 +28,7 @@ def _fonte():
 class TestMicrofoneR83(unittest.TestCase):
 
     def test_selo_r83(self):
-        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r90]'), 1)
+        self.assertEqual(_fonte().count('[Motor e avaliacao local 2026-09-11-r91]'), 1)
 
     def test_microfones_falha_da_biblioteca(self):
         amb = carregar()

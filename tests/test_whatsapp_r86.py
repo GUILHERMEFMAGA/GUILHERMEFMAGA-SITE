@@ -134,5 +134,47 @@ class TestParseMensagemPrimeiraR90(unittest.TestCase):
         self.assertIsNone(self.parse("mande para +55 51 9268-6262"))
 
 
+class TestEnvioNumeroR91(unittest.TestCase):
+    """r91: envio para numero cru usa link direto (log real r90: a mensagem
+    era colada na caixa de BUSCA: '+55 51 9268-6262oi') + 'interaja com'
+    pelas formas normalizadas (log r90: caía no modelo)."""
+
+    def setUp(self):
+        amb = carregar('_r91_preparar_envio_numero')
+        self.prep = amb['_r91_preparar_envio_numero']
+
+    def test_numero_com_pais(self):
+        self.assertEqual(self.prep("+55 51 9268-6262"),
+                         "whatsapp://send?phone=555192686262")
+
+    def test_numero_sem_prefixo(self):
+        self.assertEqual(self.prep("11 99999-8888"), "whatsapp://send?phone=11999998888")
+
+    def test_nome_nao_e_numero(self):
+        self.assertIsNone(self.prep("Náutica gooners"))
+        self.assertIsNone(self.prep(""))
+
+    def test_curto_nao_e_numero(self):
+        self.assertIsNone(self.prep("1234"))
+
+    def test_ramo_numero_usa_link_direto(self):
+        fonte = _fonte()
+        self.assertIn("whatsapp://send?phone=", fonte)
+        i_funcao = fonte.find("def enviar_whatsapp_por_nome")
+        i_num = fonte.find("if _url_num91:", i_funcao)
+        i_busca = fonte.find('os.startfile("whatsapp://")', i_funcao)
+        self.assertNotEqual(i_num, -1)
+        self.assertLess(i_num, i_busca)
+
+    def test_interaja_com_formas_normalizadas(self):
+        # a forma normalizada (sem espacos/acentos) sempre casa, qualquer que
+        # seja a variante digitada (espaco duplo, espaco especial, acento)
+        fonte = _fonte()
+        self.assertIn('n.startswith(("interajacom", "interagecom"', fonte)
+        for g in ('"interajacom"', '"interagecom"', '"interagircom"', '"intarejacom"'):
+            self.assertIn(g, fonte)
+        self.assertIn('_i_com = cmd.find("com")', fonte)
+
+
 if __name__ == '__main__':
     unittest.main()
