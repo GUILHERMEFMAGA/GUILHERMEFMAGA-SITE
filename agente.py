@@ -17996,6 +17996,27 @@ def _r50_atualizar_agente(downloader=None, confirmar=None, reiniciar=None,
     with open(origem, 'r', encoding='utf-8') as f:
         atual = f.read()
     if atual == novo_texto:
+        # r93: o ARQUIVO esta em dia, mas o PROCESSO rodando pode ser mais
+        # antigo que o arquivo. Log real 14/09: o dono atualizou (o arquivo
+        # foi trocado), o processo antigo continuou rodando, e o
+        # 'atualizar agora' sovia 'conteudo identico' sem nunca aplicar o
+        # codigo novo (o comportamento novo nunca aparecia).
+        import re as _re93
+        _m93 = _re93.search(r'\[Motor e avaliacao local (2026-09-11-r\d+)\]', novo_texto)
+        _selo_rodando = globals().get('_SELO_EM_EXECUCAO', '')
+        if _m93 and _selo_rodando and _m93.group(1) != _selo_rodando:
+            _antigo = ('O arquivo agente.py ja e a versao ' + _m93.group(1) + ', mas o processo '
+                       'que esta rodando agora e mais antigo (' + _selo_rodando + ') — o codigo '
+                       'novo ainda nao esta em vigor. ')
+            if reiniciar is None:
+                import subprocess
+                import sys as _sys
+                print(_antigo + 'O agente vai reiniciar em 2 segundos para aplicar (conversa fica salva).')
+                time.sleep(2)
+                subprocess.Popen([_sys.executable, origem])
+                os._exit(0)
+            reiniciar()
+            return _antigo + 'Reinicie para aplicar.'
         return 'Voce ja esta na versao oficial mais nova (conteudo identico). Nada foi trocado.'
     with open(backup, 'w', encoding='utf-8', newline='') as f:
         f.write(atual)
@@ -40767,7 +40788,11 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r92] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+# r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
+# depois do boot — o atualizador usa essa comparacao para detectar o
+# caso "arquivo novo, processo velho" e reiniciar para aplicar).
+_SELO_EM_EXECUCAO = "2026-09-11-r93"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r93] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

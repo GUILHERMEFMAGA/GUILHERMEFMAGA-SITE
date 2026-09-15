@@ -9,7 +9,12 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 
-from test_roteamento_conversa import carregar
+from test_roteamento_conversa import SOURCE as AGENTE_PY, carregar
+
+
+def _fonte():
+    with open(AGENTE_PY, encoding='utf-8') as f:
+        return f.read()
 
 NOVO_FONTE = ("# r50 simulado\n" + "# linha para atingir o tamanho minimo\n" * 8000)
 
@@ -134,13 +139,65 @@ class ComandoERoteamento(unittest.TestCase):
         self.assertIn('subprocess.Popen([_sys.executable, origem])', texto)
         self.assertIn('os._exit(0)', texto)
         self.assertIn("'atualizar agora' baixa a versao oficial", texto)  # menu
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r92]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r93]', texto)
 
     def test_caminhos_derivados_de_file(self):
         env = carregar('_r50_caminhos_agente', os=os, __file__='/x/y/agente.py')
         origem, backup = env['_r50_caminhos_agente']()
         self.assertEqual(origem.replace('\\', '/'), '/x/y/agente.py')
         self.assertEqual(backup.replace('\\', '/'), '/x/y/agente_backup.py')
+
+
+class AtualizarProcessoAntigoR93(unittest.TestCase):
+    """r93: 'atualizar agora' detecta o caso "arquivo novo, processo velho"
+    (log real 14/09: o arquivo foi trocado, o processo antigo continuou
+    rodando e o atualizador sovia 'conteudo identico' sem nunca aplicar o
+    codigo novo — o dono ficava com o comportamento antigo para sempre)."""
+
+    NOVO_R92 = ("# [Motor e avaliacao local 2026-09-11-r93]\n"
+                + "# linha para atingir o tamanho minimo\n" * 8000)
+
+    def _ambiente(self, selo_rodando):
+        pasta = tempfile.mkdtemp()
+        origem = os.path.join(pasta, 'agente.py')
+        backup = os.path.join(pasta, 'agente_backup.py')
+        with io.open(origem, 'w', encoding='utf-8') as f:
+            f.write(self.NOVO_R92)  # arquivo ja em dia
+        env = carregar('_r50_atualizar_agente', os=os,
+                       _SELO_EM_EXECUCAO=selo_rodando)
+        return env, origem, backup
+
+    def test_arquivo_novo_processo_velho_reinicia(self):
+        env, origem, backup = self._ambiente('2026-09-11-r91')
+        reinicios = []
+        saida = env['_r50_atualizar_agente'](
+            downloader=lambda: self.NOVO_R92, confirmar=lambda m: True,
+            reiniciar=lambda: reinicios.append(1),
+            origem=origem, backup=backup)
+        self.assertIn('mais antigo', saida)
+        self.assertEqual(len(reinicios), 1)
+        with io.open(origem, encoding='utf-8') as f:
+            self.assertEqual(f.read(), self.NOVO_R92)  # nada reescrito
+
+    def test_mesmo_selo_nao_reinicia(self):
+        env, origem, backup = self._ambiente('2026-09-11-r93')
+        reinicios = []
+        saida = env['_r50_atualizar_agente'](
+            downloader=lambda: self.NOVO_R92, confirmar=lambda m: True,
+            reiniciar=lambda: reinicios.append(1),
+            origem=origem, backup=backup)
+        self.assertIn('conteudo identico', saida)
+        self.assertEqual(len(reinicios), 0)
+
+    def test_selo_em_execucao_consistente_com_banner(self):
+        # o global _SELO_EM_EXECUCAO tem que casar com o selo do banner
+        import re
+        fonte = _fonte()
+        m_sel = re.search(r'_SELO_EM_EXECUCAO = "(2026-09-11-r\d+)"', fonte)
+        m_ban = re.search(r'Motor e avaliacao local (2026-09-11-r\d+)\] Nível', fonte)
+        self.assertIsNotNone(m_sel)
+        self.assertIsNotNone(m_ban)
+        self.assertEqual(m_sel.group(1), m_ban.group(1))
 
 
 if __name__ == '__main__':
