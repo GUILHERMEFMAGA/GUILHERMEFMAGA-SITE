@@ -35,7 +35,7 @@ class TestAtualizacaoCertaR81(unittest.TestCase):
 
     def test_selo_r81(self):
         fonte = _fonte()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r95]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r96]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r80]'), 0)
 
     def test_ramo_oficial_unico_e_no_novo_branch(self):

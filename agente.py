@@ -18974,17 +18974,26 @@ def _r94_urls_visao():
         # 2026: 'releases/latest' e um placeholder (v0.4.1) — os builds reais
         # sao releases bNNNN; por isso a lista dos 10 mais novos:
         'api_llama': 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=10',
-        'modelo': ('https://huggingface.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF'
-                   '/resolve/main/Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf'),
-        'mmproj': ('https://huggingface.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF'
-                   '/resolve/main/mmproj-F16.gguf'),
-        'arq_modelo': 'Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf',
-        'arq_mmproj': 'mmproj-F16.gguf',
+        # r96: o repositório 'bartowski' (usado na r94) é GATED no
+        # HuggingFace (exige conta -> HTTP 401 anônimo, falha REAL no PC do
+        # dono). Fontes PUBLICAS do mesmo modelo, na ordem:
+        'modelo_fontes': [
+            ('https://huggingface.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF'
+             '/resolve/main/Llama-3.2-11B-Vision-Instruct.Q4_K_M.gguf'),
+            ('https://huggingface.co/pbatra/Llama-3.2-11B-Vision-Instruct-GGUF'
+             '/resolve/main/llama3-2-vision-11b-instruct-q4_K_M.gguf'),
+        ],
+        'mmproj_fontes': [
+            ('https://huggingface.co/leafspark/Llama-3.2-11B-Vision-Instruct-GGUF'
+             '/resolve/main/Llama-3.2-11B-Vision-Instruct-mmproj.f16.gguf'),
+        ],
+        'arq_modelo': 'Llama-3.2-11B-Vision-Instruct.Q4_K_M.gguf',
+        'arq_mmproj': 'Llama-3.2-11B-Vision-Instruct-mmproj.f16.gguf',
         'arq_exe': 'llama-server.exe',
         'porta': 8081,
-        'modelo_gb': 8, 'mmproj_gb': 6, 'exe_mb': 60,
+        'modelo_gb': 6, 'mmproj_gb': 2, 'exe_mb': 60,
         # tamanhos minimos de saude (abaixo disso a peca esta incompleta)
-        'exe_min_mb': 10, 'modelo_min_mb': 7400, 'mmproj_min_mb': 5800,
+        'exe_min_mb': 10, 'modelo_min_mb': 5500, 'mmproj_min_mb': 1800,
     }
 
 
@@ -19238,10 +19247,24 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                         'no zip — repita: baixar visao')
             if _ach != c['exe']:
                 os.replace(_ach, c['exe'])
+        def _baixar_com_fontes(fuentes, destino):
+            _ultima = None
+            for _u in fuentes:
+                try:
+                    (baixar or _baixar_real)(_u, destino)
+                    return
+                except Exception as _e:
+                    _ultima = _e
+                    if os.path.isfile(destino):
+                        try:
+                            os.unlink(destino)
+                        except Exception:
+                            pass
+            raise _ultima
         if 'modelo' in _faltantes:
-            (baixar or _baixar_real)(urls['modelo'], c['modelo'])
+            _baixar_com_fontes(urls['modelo_fontes'], c['modelo'])
         if 'mmproj' in _faltantes:
-            (baixar or _baixar_real)(urls['mmproj'], c['mmproj'])
+            _baixar_com_fontes(urls['mmproj_fontes'], c['mmproj'])
     except Exception as e:
         _detalhe = ''
         if hasattr(e, 'code'):
@@ -19249,6 +19272,19 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
         return ('O download da visao falhou no meio (%s%s) — as pecas que ja '
                 'estavam completas ficam salvas; repita "baixar visao" que o '
                 'que ficou incompleto e baixado de novo.' % (type(e).__name__, _detalhe))
+    _limpado_mb = 0
+    try:
+        _esperados = {os.path.basename(c['modelo']), os.path.basename(c['mmproj'])}
+        for _a_ant in os.listdir(os.path.dirname(c['modelo'])):
+            if _a_ant.lower().endswith('.gguf') and _a_ant not in _esperados:
+                _cam_ant = os.path.join(os.path.dirname(c['modelo']), _a_ant)
+                try:
+                    _limpado_mb += os.path.getsize(_cam_ant) // (1024 * 1024)
+                    os.unlink(_cam_ant)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     if not all(_r94_peca_completa(c[_q], _min_mb[_q])
                for _q in ('exe', 'modelo', 'mmproj')):
         return ('O download terminou mas nao encontrei as pecas COMPLETAS no '
@@ -19259,8 +19295,11 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
             f.write(_r94_texto_visao_bat(c['porta']))
     except Exception:
         pass
-    return ('Visao local instalada (r94): programa + Llama 3.2 Vision 11B + projetor, '
-            '100% local, nada sai do PC. Quando voce ligar o modo conversa '
+    _extra = ''
+    if _limpado_mb > 50:
+        _extra = ' (tambem apaguei um arquivo de visao antigo/incompleto de ~%d MB)' % _limpado_mb
+    return ('Visao local instalada (r94): programa + Llama 3.2 Vision 11B + projetor,'
+            ' 100% local, nada sai do PC.' + _extra + ' Quando voce ligar o modo conversa '
             "('interaja com NOME'), o agente LIGA o servidor da visao sozinho "
             "(carregar o modelo leva 1 a 2 minutos na primeira vez). "
             "Alternativa manual: dar dois cliques em visao.bat.")
@@ -41155,8 +41194,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r95"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r95] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r96"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r96] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -45,10 +45,14 @@ class FuncoesPurasR94(unittest.TestCase):
         u = self.env['_r94_urls_visao']()
         self.assertIn('api.github.com/repos/ggml-org/llama.cpp/releases?per_page=10',
                       u['api_llama'])
-        self.assertIn('huggingface.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF',
-                      u['modelo'])
-        self.assertTrue(u['modelo'].endswith('Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf'))
-        self.assertTrue(u['mmproj'].endswith('mmproj-F16.gguf'))
+        # r96: fontes PUBLICAS (bartowski e gated -> 401 anônimo)
+        self.assertTrue(all('huggingface.co' in f for f in u['modelo_fontes']))
+        self.assertNotIn('bartowski', u['modelo_fontes'][0])
+        self.assertTrue(u['modelo_fontes'][0].endswith(
+            'Llama-3.2-11B-Vision-Instruct.Q4_K_M.gguf'))
+        self.assertTrue(u['mmproj_fontes'][0].endswith(
+            'Llama-3.2-11B-Vision-Instruct-mmproj.f16.gguf'))
+        self.assertTrue(len(u['modelo_fontes']) >= 2)  # tem reserva
         self.assertEqual(u['porta'], 8081)
         self.assertEqual(u['arq_exe'], 'llama-server.exe')
 
@@ -98,9 +102,9 @@ class BaixarVisaoR94(unittest.TestCase):
         def _tamanho_de(url):
             u = str(url).lower()
             if 'mmproj' in u:
-                return 6 * 1024 * 1024 * 1024
+                return 1940 * 1024 * 1024
             if 'q4_k_m' in u or '.gguf' in u:
-                return 7500 * 1024 * 1024
+                return 5960 * 1024 * 1024
             return 20 * 1024 * 1024
 
         def _escreve_sparso(caminho, tamanho):
@@ -178,7 +182,7 @@ class BaixarVisaoR94(unittest.TestCase):
             self.assertTrue(str(msg).startswith('Visao local instalada'), msg)
             # o parcial foi re-baixado com o tamanho de verdade
             self.assertGreaterEqual(os.path.getsize(c['modelo']),
-                                    7400 * 1024 * 1024)
+                                    5500 * 1024 * 1024)
 
     def test_peca_completa_pura(self):
         amb = carregar('_r94_peca_completa', os=os)
@@ -191,6 +195,46 @@ class BaixarVisaoR94(unittest.TestCase):
             with open(_f, 'wb') as fh:
                 fh.write(b'x' * 1024)
             self.assertFalse(amb['_r94_peca_completa'](_f, 10))
+
+    def test_fonte_reserva_quando_a_primaria_falha(self):
+        with tempfile.TemporaryDirectory() as td:
+            amb = self._env(td)
+            c = amb['_r94_caminhos_visao'](pasta=td)
+            _orig_baixar = amb['baixar']
+
+            def baixar_sem_primaria(url, destino):
+                u = str(url)
+                # so a fonte primaria do MODELO esta fora (o projetor segue ok)
+                if 'leafspark' in u and 'Q4_K_M' in u:
+                    raise ConnectionError('fonte primaria do modelo fora')
+                _orig_baixar(url, destino)
+
+            amb3 = carregar('_r94_urls_visao', '_r94_caminhos_visao', '_r94_visao_baixar',
+                            '_r94_peca_completa', PASTA_BASE=td, os=os, time=time,
+                            baixar=baixar_sem_primaria, extrair=amb['extrair'],
+                            api_list=amb['api_list'])
+            amb3['_r67_ler_config'] = lambda *a, **k: True
+            msg = amb3['_r94_visao_baixar'](baixar=baixar_sem_primaria,
+                                            extrair=amb['extrair'],
+                                            api_list=amb['api_list'])
+            self.assertTrue(str(msg).startswith('Visao local instalada'), msg)
+            self.assertGreaterEqual(os.path.getsize(c['modelo']),
+                                    5500 * 1024 * 1024)
+
+    def test_limpa_gguf_antigo_de_download_anterior(self):
+        with tempfile.TemporaryDirectory() as td:
+            amb = self._env(td)
+            c = amb['_r94_caminhos_visao'](pasta=td)
+            os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
+            with open(os.path.join(os.path.dirname(c['modelo']),
+                                   'Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf'), 'wb') as f:
+                f.write(b'x' * 1024 * 1024)  # parcial antigo (nome da r94)
+            msg = amb['_r94_visao_baixar'](baixar=amb['baixar'], extrair=amb['extrair'],
+                                           api_list=amb['api_list'])
+            self.assertTrue(str(msg).startswith('Visao local instalada'), msg)
+            self.assertFalse(os.path.exists(
+                os.path.join(os.path.dirname(c['modelo']),
+                             'Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf')))
 
     def test_falha_de_download_e_honesta(self):
         with tempfile.TemporaryDirectory() as td:
