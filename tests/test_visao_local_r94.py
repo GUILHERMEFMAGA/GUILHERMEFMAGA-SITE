@@ -95,14 +95,26 @@ class BaixarVisaoR94(unittest.TestCase):
     def _env(self, td, ler_config=None):
         baixados = []
 
+        def _tamanho_de(url):
+            u = str(url).lower()
+            if 'mmproj' in u:
+                return 6 * 1024 * 1024 * 1024
+            if 'q4_k_m' in u or '.gguf' in u:
+                return 7500 * 1024 * 1024
+            return 20 * 1024 * 1024
+
+        def _escreve_sparso(caminho, tamanho):
+            with open(caminho, 'wb') as f:
+                f.seek(tamanho - 1)
+                f.write(b'x')
+
         def baixar(url, destino):
             baixados.append(url)
-            with open(destino, 'wb') as f:
-                f.write(b'x' * 16)
+            _escreve_sparso(destino, _tamanho_de(url))
 
         def extrair(zipcaminho, dir_destino):
-            with open(os.path.join(dir_destino, 'llama-server.exe'), 'wb') as f:
-                f.write(b'x')
+            _escreve_sparso(os.path.join(dir_destino, 'llama-server.exe'),
+                            20 * 1024 * 1024)
 
         def api_list():
             return [
@@ -117,7 +129,8 @@ class BaixarVisaoR94(unittest.TestCase):
             ]
 
         amb = carregar('_r94_urls_visao', '_r94_caminhos_visao', '_r94_visao_baixar',
-                       PASTA_BASE=td, os=os, time=time, baixar=baixar, extrair=extrair, api_list=api_list)
+                       '_r94_peca_completa', PASTA_BASE=td, os=os, time=time,
+                       baixar=baixar, extrair=extrair, api_list=api_list)
         amb['_r67_ler_config'] = ler_config or (lambda *a, **k: True)
         amb['_BAIXADOS'] = baixados
         return amb
@@ -153,6 +166,32 @@ class BaixarVisaoR94(unittest.TestCase):
                            api_list=amb['api_list'])
             self.assertEqual(len(amb['_BAIXADOS']), n_antes)
 
+    def test_peca_parcial_e_rebaixada(self):
+        with tempfile.TemporaryDirectory() as td:
+            amb = self._env(td)
+            c = amb['_r94_caminhos_visao'](pasta=td)
+            os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
+            with open(c['modelo'], 'wb') as f:
+                f.write(b'x' * 1024 * 1024)  # 1 MB — deveria ter ~7.5 GB
+            msg = amb['_r94_visao_baixar'](baixar=amb['baixar'], extrair=amb['extrair'],
+                                           api_list=amb['api_list'])
+            self.assertTrue(str(msg).startswith('Visao local instalada'), msg)
+            # o parcial foi re-baixado com o tamanho de verdade
+            self.assertGreaterEqual(os.path.getsize(c['modelo']),
+                                    7400 * 1024 * 1024)
+
+    def test_peca_completa_pura(self):
+        amb = carregar('_r94_peca_completa', os=os)
+        with tempfile.TemporaryDirectory() as td:
+            _f = os.path.join(td, 'peca')
+            self.assertFalse(amb['_r94_peca_completa'](_f, 10))
+            with open(_f, 'wb') as fh:
+                fh.seek(10 * 1024 * 1024 - 1); fh.write(b'x')
+            self.assertTrue(amb['_r94_peca_completa'](_f, 10))
+            with open(_f, 'wb') as fh:
+                fh.write(b'x' * 1024)
+            self.assertFalse(amb['_r94_peca_completa'](_f, 10))
+
     def test_falha_de_download_e_honesta(self):
         with tempfile.TemporaryDirectory() as td:
             amb = self._env(td)
@@ -163,8 +202,9 @@ class BaixarVisaoR94(unittest.TestCase):
             amb['baixar'] = baixar_falha
             # carregar de novo com a baixar quebrada (exec novo)
             amb2 = carregar('_r94_urls_visao', '_r94_caminhos_visao', '_r94_visao_baixar',
-                            PASTA_BASE=td, os=os, time=time, baixar=baixar_falha,
-                            extrair=amb['extrair'], api_list=amb['api_list'])
+                            '_r94_peca_completa', PASTA_BASE=td, os=os, time=time,
+                            baixar=baixar_falha, extrair=amb['extrair'],
+                            api_list=amb['api_list'])
             amb2['_r67_ler_config'] = lambda *a, **k: True
             msg = amb2['_r94_visao_baixar'](baixar=amb2['baixar'], extrair=amb2['extrair'],
                                   api_list=amb2['api_list'])

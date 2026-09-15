@@ -18930,6 +18930,18 @@ def _r92_diagnosticar_leitor(tem_modelo, porta_no_ar, tem_chave_gemini):
             "sem pular a janela).")
 
 
+def _r94_peca_completa(caminho, min_mb):
+    """r95: a peca existe e tem tamanho de saude? Um .gguf de 4 GB num
+    lugar que deveria ter 8 GB esta INCOMPLETO (download cortado) — nao
+    pode contar como instalada."""
+    try:
+        import os as _os95
+        return _os95.path.isfile(caminho) and \
+            _os95.path.getsize(caminho) >= int(min_mb) * 1024 * 1024
+    except Exception:
+        return False
+
+
 def _r94_achar_zip_windows(releases):
     """r94: funcao pura — da a lista de releases do llama.cpp (API do
     GitHub, mais novo primeiro), devolve o browser_download_url do build
@@ -18971,6 +18983,8 @@ def _r94_urls_visao():
         'arq_exe': 'llama-server.exe',
         'porta': 8081,
         'modelo_gb': 8, 'mmproj_gb': 6, 'exe_mb': 60,
+        # tamanhos minimos de saude (abaixo disso a peca esta incompleta)
+        'exe_min_mb': 10, 'modelo_min_mb': 7400, 'mmproj_min_mb': 5800,
     }
 
 
@@ -19189,15 +19203,22 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
     try:
         os.makedirs(os.path.dirname(c['exe']), exist_ok=True)
         os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
+        _min_mb = {'exe': urls.get('exe_min_mb', 10),
+                   'modelo': urls.get('modelo_min_mb', 7400),
+                   'mmproj': urls.get('mmproj_min_mb', 5800)}
         _faltantes = []
-        if not os.path.isfile(c['exe']):
-            _faltantes.append('exe')
-        if not os.path.isfile(c['modelo']):
-            _faltantes.append('modelo')
-        if not os.path.isfile(c['mmproj']):
-            _faltantes.append('mmproj')
+        for _que, _cam in (('exe', c['exe']), ('modelo', c['modelo']),
+                           ('mmproj', c['mmproj'])):
+            if not _r94_peca_completa(_cam, _min_mb[_que]):
+                if os.path.isfile(_cam):
+                    # peca parcial (download cortado): apaga e baixa de novo
+                    try:
+                        os.unlink(_cam)
+                    except Exception:
+                        pass
+                _faltantes.append(_que)
         if not _faltantes:
-            pass  # ja estava tudo baixado
+            pass  # ja estava tudo baixado COMPLETO
         if 'exe' in _faltantes:
             _api = (baixar or _baixar_real)
             _zip_url = _r94_achar_zip_windows(api_list())
@@ -19222,11 +19243,17 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
         if 'mmproj' in _faltantes:
             (baixar or _baixar_real)(urls['mmproj'], c['mmproj'])
     except Exception as e:
-        return ('O download da visao falhou no meio (%s) — o que ja tinha baixado '
-                'fica salvo; repita "baixar visao" que continua de onde parou.'
-                % type(e).__name__)
-    if not (os.path.isfile(c['exe']) and os.path.isfile(c['modelo']) and os.path.isfile(c['mmproj'])):
-        return 'O download terminou mas nao encontrei as pecas no lugar — repita: baixar visao'
+        _detalhe = ''
+        if hasattr(e, 'code'):
+            _detalhe = ' HTTP ' + str(e.code)
+        return ('O download da visao falhou no meio (%s%s) — as pecas que ja '
+                'estavam completas ficam salvas; repita "baixar visao" que o '
+                'que ficou incompleto e baixado de novo.' % (type(e).__name__, _detalhe))
+    if not all(_r94_peca_completa(c[_q], _min_mb[_q])
+               for _q in ('exe', 'modelo', 'mmproj')):
+        return ('O download terminou mas nao encontrei as pecas COMPLETAS no '
+                'lugar (alguma ficou com tamanho menor do que deveria) — '
+                'repita: baixar visao')
     try:
         with open(c['bat'], 'w', encoding='utf-8', newline='') as f:
             f.write(_r94_texto_visao_bat(c['porta']))
@@ -41128,8 +41155,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r94"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r94] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r95"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r95] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
