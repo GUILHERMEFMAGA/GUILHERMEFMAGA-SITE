@@ -228,5 +228,48 @@ class TestWiringR88(unittest.TestCase):
             self.assertGreaterEqual(fonte.count(g), 2, g)
 
 
+class TestLeitorR92(unittest.TestCase):
+    """r92: cego o modo conversa NAO mexe na tela (log real 14/09: sem
+    leitor, o modo puxava o WhatsApp a frente a cada 30s — dono no
+    YouTube) + diagnostico honesto no inicio."""
+
+    def setUp(self):
+        amb = carregar('_r92_diagnosticar_leitor')
+        self.diag = amb['_r92_diagnosticar_leitor']
+
+    def test_visao_local_no_ar(self):
+        self.assertIsNone(self.diag(True, True, False))
+
+    def test_gemini_no_ar(self):
+        self.assertIsNone(self.diag(False, False, True))
+
+    def test_modelo_sem_servidor(self):
+        msg = self.diag(True, False, False)
+        self.assertIsNotNone(msg)
+        self.assertIn('SERVIDOR', msg)
+
+    def test_sem_nada(self):
+        msg = self.diag(False, False, False)
+        self.assertIsNotNone(msg)
+        self.assertIn('GEMINI_API_KEY', msg)
+        self.assertIn('visao', msg)
+
+    def test_ciclo_verifica_leitor_antes_de_focar(self):
+        fonte = _fonte()
+        i_ciclo = fonte.find('def _r88_ciclo')
+        i_checagem = fonte.find('_r92_leitor_pronto()', i_ciclo)
+        i_foco = fonte.find('_r88_focar_wpp()', i_ciclo)
+        self.assertNotEqual(i_checagem, -1)
+        self.assertLess(i_checagem, i_foco)
+
+    def test_inicio_avisa_sem_leitor(self):
+        fonte = _fonte()
+        i_iniciar = fonte.find('if cmd.startswith(("modo conversa whatsapp"')
+        i_checagem = fonte.find('_r92_leitor_pronto()', i_iniciar)
+        i_abrir = fonte.find("Abrindo a conversa com", i_iniciar)
+        self.assertNotEqual(i_checagem, -1)
+        self.assertLess(i_checagem, i_abrir)
+
+
 if __name__ == '__main__':
     unittest.main()

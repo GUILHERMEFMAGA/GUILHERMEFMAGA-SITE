@@ -8572,6 +8572,17 @@ def _processar_cerebro_local(comando: str) -> bool:
             "verificacao). Para parar a qualquer momento: 'para de conversar'. Confirma?" % _alvo88):
             _rel("Cancelei. O modo conversa nao foi iniciado.")
             return True
+        # r92: checagem honesta ANTES de ligar — sem leitor eu nao consigo
+        # ler a conversa. O modo LIGA mesmo assim (quando o leitor for
+        # ligado, eu conecto sozinho no proximo ciclo) — mas enquanto for
+        # cego nao abro o WhatsApp. Log real 14/09: dono ligou sem leitor e
+        # o modo ficava puxando o WhatsApp a frente sem enxergar nada.
+        try:
+            _pr92, _msg92 = _r92_leitor_pronto()
+        except Exception:
+            _pr92, _msg92 = True, None
+        if not _pr92:
+            _rel("ATENCAO — " + _msg92)
         _rel("Abrindo a conversa com '%s'..." % _alvo88)
         try:
             _r88_abrir_chat_wpp(_alvo88)
@@ -18840,6 +18851,64 @@ def _r91_preparar_envio_numero(alvo):
     return "whatsapp://send?phone=" + _d
 
 
+def _r92_diagnosticar_leitor(tem_modelo, porta_no_ar, tem_chave_gemini):
+    """r92: decide o estado do LEITOR do MODO CONVERSA (funcao pura,
+    testavel sem PC). Devolve None se o leitor esta pronto, ou a mensagem
+    honesta explicando o que falta. Ordem: (1) visao local (r76 — modelo
+    GGUF + servidor na porta), (2) Gemini (GEMINI_API_KEY). Log real
+    14/09: no PC do dono o modo conversa rodava cego (sem leitor) e o
+    terminal ficava com 'leitor indisponivel' a cada ciclo."""
+    if tem_modelo and porta_no_ar:
+        return None
+    if tem_chave_gemini:
+        return None
+    if tem_modelo and not porta_no_ar:
+        return ("o modelo de visao local existe, mas o SERVIDOR dele nao esta no ar "
+                "(servidor SEPARADO na porta 'visao_porta', padrao 8081 — o de texto "
+                "nao serve para enxergar). Sem o leitor eu NAO abro o WhatsApp "
+                "(aguardo quieto, sem pular a janela).")
+    return ("nao ha LEITOR de tela ligado — preciso de um destes dois: (1) VISAO "
+            "LOCAL (r76): um modelo GGUF de visao no PC + o servidor dele rodando "
+            "na porta 'visao_porta' (padrao 8081) — 100% offline, nada sai do PC; "
+            "ou (2) 'GEMINI_API_KEY' — nuvem (o print da conversa vai ao Google "
+            "para ser lido). Sem leitor eu NAO abro o WhatsApp (aguardo quieto, "
+            "sem pular a janela).")
+
+
+def _r92_leitor_pronto():
+    """r92: confere o leitor REAL do modo conversa: (1) visao local — arquivo
+    do modelo (r76) + servidor respondendo na porta (sonda de 1,5s); (2)
+    GEMINI_API_KEY no ambiente. Devolve (pronto, mensagem_ou_None)."""
+    _tem_modelo = False
+    try:
+        _tem_modelo = bool(_r76_visao_achar_modelo())
+    except Exception:
+        _tem_modelo = False
+    _porta_no_ar = False
+    if _tem_modelo:
+        _porta = 8081
+        try:
+            _ler = globals().get('_r67_ler_config')
+            if _ler:
+                _p = _ler('visao_porta', padrao=8081)
+                if isinstance(_p, int) and _p > 0:
+                    _porta = _p
+        except Exception:
+            pass
+        try:
+            import socket as _sock92
+            _s = _sock92.socket()
+            _s.settimeout(1.5)
+            _s.connect(('127.0.0.1', _porta))
+            _s.close()
+            _porta_no_ar = True
+        except Exception:
+            _porta_no_ar = False
+    _tem_chave = bool(os.environ.get('GEMINI_API_KEY', '').strip())
+    _msg = _r92_diagnosticar_leitor(_tem_modelo, _porta_no_ar, _tem_chave)
+    return (_msg is None, _msg)
+
+
 def _r87_str_nome(nome):
     """r87: capitaliza 'joao iser' -> 'Joao Iser' (cosmetico p/ exibicao)."""
     return " ".join(w.capitalize() for w in str(nome or "").split()) or str(nome or "")
@@ -19190,6 +19259,14 @@ def _r88_ciclo(alvo, log):
     """r88: UM ciclo do modo conversa: foca o WhatsApp, le a tela, decide e,
     se chegou mensagem nova da outra pessoa, compoe e envia a resposta."""
     _est88 = _r88_estado()
+    # r92: cego eu nao toco na tela — confere o leitor ANTES de focar.
+    # Log real 14/09: sem leitor, o modo pulava o WhatsApp a frente a cada
+    # 30s (o dono estava no YouTube) sem conseguir ler nada.
+    _pr92, _msg92 = _r92_leitor_pronto()
+    if not _pr92:
+        log("leitor indisponivel (visao local r76 ou GEMINI_API_KEY) — "
+            "nao vou abrir o WhatsApp, aguardando quieto")
+        return
     try:
         _r88_focar_wpp()
     except Exception as _e88:
@@ -40690,7 +40767,7 @@ def _invocar_agente_stream(estado, ferramentas=None):
             _penalizar_ia_e_avisar(_idx, _info, _e, total)
     return SimpleNamespace(content="")  # todas falharam / vazias
 
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r91] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r92] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
