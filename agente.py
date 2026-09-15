@@ -8582,6 +8582,18 @@ def _processar_cerebro_local(comando: str) -> bool:
         except Exception:
             _pr92, _msg92 = True, None
         if not _pr92:
+            # r94: se a visao local ja foi baixada, LIGO o servidor eu mesmo
+            # (o dono nao precisa abrir visao.bat a mao).
+            try:
+                _t94 = globals().get('_r94_tentar_visao')
+                if _t94:
+                    _t94(log=lambda m: _rel(m))
+                    _pr92b, _msg92b = _r92_leitor_pronto()
+                    if _pr92b:
+                        _pr92, _msg92 = _pr92b, _msg92b
+            except Exception:
+                pass
+        if not _pr92:
             _rel("ATENCAO — " + _msg92)
         _rel("Abrindo a conversa com '%s'..." % _alvo88)
         try:
@@ -9192,6 +9204,25 @@ def _processar_cerebro_local(comando: str) -> bool:
             return True
         _r = _r79_stt_baixar()
         _rel(_r or "STT desligado (config 'stt_local': false).")
+        return True
+    if cmd.startswith("baixar visao"):
+        _urls_v = _r94_urls_visao()
+        _pedir_v = globals().get('pedir_confirmacao')
+        _t_v = ("Baixar a VISAO LOCAL? Vem do llama.cpp + Llama 3.2 Vision 11B (oficiais): "
+                "o programa (~%d MB) + o modelo de visao (~%d GB) + o projetor (~%d GB) "
+                "= ~%d GB de disco, download unico. Vai para as pastas _visao/modelos_visao "
+                "do agente e NUNCA sai do seu PC." % (
+                    _urls_v['exe_mb'], _urls_v['modelo_gb'], _urls_v['mmproj_gb'],
+                    _urls_v['modelo_gb'] + _urls_v['mmproj_gb'] + 1))
+        _ok_v = None
+        if _pedir_v:
+            _ok_v = _pedir_v(_t_v)
+        else:
+            _ok_v = input("Baixar a visao local? (sim/nao): ").strip().lower() in ('sim', 's')
+        if not _ok_v:
+            _rel("Nada foi baixado.")
+            return True
+        _rel(_r94_visao_baixar() or "Visao local desligada (config: 'visao_local': false).")
         return True
 
     # ---- r78: AUTOMACAO PROFISSIONAL — Agendador de Tarefas do Windows ----
@@ -17249,12 +17280,15 @@ def _r76_visao_pasta(pasta=None):
 
 
 def _r76_visao_achar_modelo(pasta=None):
-    """r76 (43): procura .gguf de visao na pasta separada (ou '')."""
+    """r76 (43): procura .gguf de visao na pasta separada (ou '').
+    r94: ignora o projetor (mmproj-*.gguf) — ele e .gguf >20MB tambem,
+    mas sozinho NAO faz o leitor funcionar (falso positivo real)."""
     raiz = _r76_visao_pasta(pasta)
     try:
         for _r, _d, _arqs in os.walk(raiz):
             for a in _arqs:
-                if a.lower().endswith('.gguf'):
+                _al = a.lower()
+                if _al.endswith('.gguf') and 'mmproj' not in _al:
                     _cam = os.path.join(_r, a)
                     try:
                         if os.path.getsize(_cam) > 20_000_000:
@@ -18896,15 +18930,101 @@ def _r92_diagnosticar_leitor(tem_modelo, porta_no_ar, tem_chave_gemini):
             "sem pular a janela).")
 
 
+def _r94_achar_zip_windows(releases):
+    """r94: funcao pura — da a lista de releases do llama.cpp (API do
+    GitHub, mais novo primeiro), devolve o browser_download_url do build
+    CPU x64 para Windows mais novo (llama-bNNNN-bin-win-cpu-x64.zip) ou
+    '' se nenhum existir. Ignora builds de GPU/CUDA/OpenCL/etc."""
+    _fora = ('cuda', 'opencl', 'openvino', 'rocm', 'sycl', 'vulkan', 'arm')
+    for _rel in (releases or []):
+        try:
+            _assets = _rel.get('assets') or []
+        except AttributeError:
+            continue
+        for _asset in _assets:
+            _n = str(_asset.get('name', '')).lower()
+            if not _n.endswith('.zip') or 'win' not in _n or 'x64' not in _n:
+                continue
+            if any(_f in _n for _f in _fora):
+                continue
+            _u = str(_asset.get('browser_download_url', '') or '')
+            if _u:
+                return _u
+    return ''
+
+
+def _r94_urls_visao():
+    """r94: funcao pura — URLs oficiais da visao local (100% offline depois
+    do download): build do llama.cpp (via API do GitHub — o numero do build
+    muda toda semana, por isso a API do release mais novo) + Llama 3.2
+    Vision 11B (GGUF oficial do bartowski) + projetor de visao (mmproj)."""
+    return {
+        # 2026: 'releases/latest' e um placeholder (v0.4.1) — os builds reais
+        # sao releases bNNNN; por isso a lista dos 10 mais novos:
+        'api_llama': 'https://api.github.com/repos/ggml-org/llama.cpp/releases?per_page=10',
+        'modelo': ('https://huggingface.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF'
+                   '/resolve/main/Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf'),
+        'mmproj': ('https://huggingface.co/bartowski/Llama-3.2-11B-Vision-Instruct-GGUF'
+                   '/resolve/main/mmproj-F16.gguf'),
+        'arq_modelo': 'Llama-3.2-11B-Vision-Instruct-Q4_K_M.gguf',
+        'arq_mmproj': 'mmproj-F16.gguf',
+        'arq_exe': 'llama-server.exe',
+        'porta': 8081,
+        'modelo_gb': 8, 'mmproj_gb': 6, 'exe_mb': 60,
+    }
+
+
+def _r94_planejar_visao(tem_exe, tem_modelo, tem_mmproj, porta_no_ar):
+    """r94: funcao pura — decide o estado da visao local: ['pronto'] (o
+    servidor ja esta no ar), ['ligar_servidor'] (tudo baixado, falta ligar)
+    ou a lista do que falta baixar ('exe'/'modelo'/'mmproj')."""
+    if porta_no_ar:
+        return ['pronto']
+    faltas = []
+    if not tem_exe:
+        faltas.append('exe')
+    if not tem_modelo:
+        faltas.append('modelo')
+    if not tem_mmproj:
+        faltas.append('mmproj')
+    return ['ligar_servidor'] if not faltas else ['baixar_' + f for f in faltas]
+
+
+def _r94_texto_visao_bat(porta=8081):
+    """r94: funcao pura — texto do visao.bat (CRLF puro, SEM REM com
+    parentese — regra do .bat Windows) que liga o servidor da visao."""
+    urls = _r94_urls_visao()
+    linhas = [
+        '@echo off',
+        'title Visao Local r94 (feche esta janela para desligar)',
+        'cd /d "%~dp0"',
+        ('_visao\\llama-server.exe -m "modelos_visao\\' + urls['arq_modelo'] + '"'
+         ' --mmproj "modelos_visao\\' + urls['arq_mmproj'] + '"'
+         ' --port ' + str(int(porta)) + ' --host 127.0.0.1 --no-webui'),
+        'pause',
+    ]
+    return '\r\n'.join(linhas) + '\r\n'
+
+
 def _r92_leitor_pronto():
     """r92: confere o leitor REAL do modo conversa: (1) visao local — arquivo
     do modelo (r76) + servidor respondendo na porta (sonda de 1,5s); (2)
     GEMINI_API_KEY no ambiente. Devolve (pronto, mensagem_ou_None)."""
     _tem_modelo = False
     try:
-        _tem_modelo = bool(_r76_visao_achar_modelo())
+        # r94: o projetor (mmproj) TAMBEM e .gguf >20MB — nao pode contar
+        # como "modelo de visao" (falso positivo: achava que tinha leitor)
+        _cand = _r76_visao_achar_modelo()
+        _tem_modelo = bool(_cand) and 'mmproj' not in os.path.basename(str(_cand)).lower()
     except Exception:
         _tem_modelo = False
+    if _tem_modelo:
+        try:
+            _ler92 = globals().get('_r67_ler_config')
+            if _ler92 and not _ler92('visao_local', padrao=True):
+                _tem_modelo = False  # kill-switch 'visao_local': false
+        except Exception:
+            pass
     _porta_no_ar = False
     if _tem_modelo:
         _porta = 8081
@@ -18928,6 +19048,213 @@ def _r92_leitor_pronto():
     _tem_chave = bool(os.environ.get('GEMINI_API_KEY', '').strip())
     _msg = _r92_diagnosticar_leitor(_tem_modelo, _porta_no_ar, _tem_chave)
     return (_msg is None, _msg)
+
+
+def _r94_porta_no_ar(porta, timeout=1.5):
+    """r94: sonda rapida — alguem esta ouvindo em 127.0.0.1:porta?"""
+    try:
+        import socket as _sock94
+        _s = _sock94.socket()
+        _s.settimeout(timeout)
+        _s.connect(('127.0.0.1', int(porta)))
+        _s.close()
+        return True
+    except Exception:
+        return False
+
+
+def _r94_caminhos_visao(pasta=None):
+    """r94: caminhos da visao local (mesmas pastas que o r76 enxerga)."""
+    urls = _r94_urls_visao()
+    base = pasta or globals().get('PASTA_BASE') or os.getcwd()
+    return {
+        'base': base,
+        'exe': os.path.join(base, '_visao', urls['arq_exe']),
+        'modelo': os.path.join(base, 'modelos_visao', urls['arq_modelo']),
+        'mmproj': os.path.join(base, 'modelos_visao', urls['arq_mmproj']),
+        'bat': os.path.join(base, 'visao.bat'),
+        'porta': urls['porta'],
+    }
+
+
+def _r94_ligar_visao_servidor(log=None, aguardar=90, popen=None):
+    """r94: se a visao esta toda baixada mas o servidor esta desligado,
+    LIGA o servidor (llama-server em segundo plano) e espera ate `aguardar`
+    segundos a porta abrir (carregar o modelo de ~8 GB leva 1-2 minutos).
+    Devolve True se o leitor ficou pronto. O processo fica registrado
+    (globals _R94_VISAO_PROC) para o atexit derrubar ao fechar o agente."""
+    if log is None:
+        log = lambda m: None
+    c = _r94_caminhos_visao()
+    try:
+        _ler = globals().get('_r67_ler_config')
+        if _ler:
+            _p = _ler('visao_porta', padrao=c['porta'])
+            if isinstance(_p, int) and _p > 0:
+                c['porta'] = _p
+    except Exception:
+        pass
+    if _r94_porta_no_ar(c['porta']):
+        return True
+    if not (os.path.isfile(c['exe']) and os.path.isfile(c['modelo']) and os.path.isfile(c['mmproj'])):
+        return False
+    cmd = [c['exe'], '-m', c['modelo'], '--mmproj', c['mmproj'],
+           '--port', str(c['porta']), '--host', '127.0.0.1', '--no-webui']
+    try:
+        import subprocess as _sp94
+        _detached = getattr(_sp94, 'DETACHED_PROCESS', 0)
+        _newgrp = getattr(_sp94, 'CREATE_NEW_PROCESS_GROUP', 0)
+        proc = (popen or _sp94.Popen)(cmd,
+                                      stdout=_sp94.DEVNULL, stderr=_sp94.DEVNULL,
+                                      creationflags=_detached | _newgrp)
+        globals()['_R94_VISAO_PROC'] = proc
+    except Exception as e:
+        log('nao consegui ligar o servidor da visao (%s) — rode visao.bat' % type(e).__name__)
+        return False
+    log('Ligando o servidor da visao local (carregar o modelo pode levar 1 a 2 minutos)...')
+    _ult = 0
+    for _i in range(int(aguardar)):
+        time.sleep(1)
+        if _r94_porta_no_ar(c['porta']):
+            log('Visao local PRONTA na porta %d.' % c['porta'])
+            return True
+        if _i - _ult >= 15:
+            _ult = _i
+            log('Ainda carregando o modelo da visao... (%ds)' % (_i + 1))
+    log('O servidor da visao nao abriu em %ds — repita o comando ou rode visao.bat' % int(aguardar))
+    return False
+
+
+def _r94_tentar_visao(log=None):
+    """r94: auto-ligacao com FREIO — tenta ligar o servidor da visao no
+    maximo 1x a cada 120s (o ciclo do modo conversa chama isso; sem o
+    freio, uma falha faria esperar 90s a cada 30s)."""
+    _ag = globals()
+    if _ag.get('_R94_VISAO_PROC') is not None:
+        try:
+            if _ag['_R94_VISAO_PROC'].poll() is None:
+                return  # ja esta ligado
+        except Exception:
+            pass
+    _agora = time.time()
+    if _agora - float(_ag.get('_R94_ULTIMA_TENTATIVA', 0)) < 120:
+        return
+    _ag['_R94_ULTIMA_TENTATIVA'] = _agora
+    _r94_ligar_visao_servidor(log=log)
+
+
+def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
+    """r94: baixa a VISAO LOCAL completa (padrao do 'baixar stt' da r79,
+    com 'sim' explicito na rota): (1) build do llama.cpp pela API do GitHub
+    (o nome do build muda toda semana) -> _visao/llama-server.exe; (2)
+    modelo Llama 3.2 Vision 11B (~8 GB) + (3) projetor mmproj (~6 GB) ->
+    modelos_visao/. Gera visao.bat. Kill-switch: 'visao_local': false."""
+    if api_list is None:
+        def _api_real(url):
+            import json as _jsr
+            import urllib.request as _urr
+            with _urr.urlopen(url, timeout=60) as _rr:
+                return _jsr.loads(_rr.read().decode('utf-8'))
+        api_list = lambda: _api_real(_r94_urls_visao()['api_llama'])
+    ler = globals().get('_r67_ler_config')
+    try:
+        if ler and not ler('visao_local', pasta=pasta, padrao=True):
+            return None
+    except Exception:
+        pass
+    urls = _r94_urls_visao()
+    c = _r94_caminhos_visao(pasta=pasta)
+
+    def _baixar_real(url, destino):
+        import shutil as _sh
+        import urllib.request as _ur
+        _req = _ur.Request(url, headers={'User-Agent': 'super-agente-local (r94)'})
+        with _ur.urlopen(_req, timeout=120) as r:
+            with open(destino, 'wb') as f:
+                _sh.copyfileobj(r, f)
+
+    def _extrair_real(zipcaminho, dir_destino):
+        import zipfile as _zf
+        with _zf.ZipFile(zipcaminho) as z:
+            z.extractall(dir_destino)
+
+    def _procurar_exe(base_dir):
+        import glob as _glob
+        for padrao in ('llama-server.exe', 'Release/llama-server.exe', '**/llama-server.exe'):
+            achados = _glob.glob(os.path.join(base_dir, padrao))
+            if achados:
+                return achados[0]
+        return ''
+
+    try:
+        os.makedirs(os.path.dirname(c['exe']), exist_ok=True)
+        os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
+        _faltantes = []
+        if not os.path.isfile(c['exe']):
+            _faltantes.append('exe')
+        if not os.path.isfile(c['modelo']):
+            _faltantes.append('modelo')
+        if not os.path.isfile(c['mmproj']):
+            _faltantes.append('mmproj')
+        if not _faltantes:
+            pass  # ja estava tudo baixado
+        if 'exe' in _faltantes:
+            _api = (baixar or _baixar_real)
+            _zip_url = _r94_achar_zip_windows(api_list())
+            if not _zip_url:
+                return ('Nao achei o build do Windows do llama.cpp no GitHub '
+                        '(release mais novo). Tente de novo mais tarde: baixar visao')
+            _zip_local = os.path.join(c['base'], '_visao', 'llama_cpp.zip')
+            _api(_zip_url, _zip_local)
+            (extrair or _extrair_real)(_zip_local, os.path.dirname(c['exe']))
+            try:
+                os.unlink(_zip_local)
+            except Exception:
+                pass
+            _ach = _procurar_exe(os.path.dirname(c['exe']))
+            if not _ach:
+                return ('Baixei o llama.cpp mas nao encontrei o llama-server.exe '
+                        'no zip — repita: baixar visao')
+            if _ach != c['exe']:
+                os.replace(_ach, c['exe'])
+        if 'modelo' in _faltantes:
+            (baixar or _baixar_real)(urls['modelo'], c['modelo'])
+        if 'mmproj' in _faltantes:
+            (baixar or _baixar_real)(urls['mmproj'], c['mmproj'])
+    except Exception as e:
+        return ('O download da visao falhou no meio (%s) — o que ja tinha baixado '
+                'fica salvo; repita "baixar visao" que continua de onde parou.'
+                % type(e).__name__)
+    if not (os.path.isfile(c['exe']) and os.path.isfile(c['modelo']) and os.path.isfile(c['mmproj'])):
+        return 'O download terminou mas nao encontrei as pecas no lugar — repita: baixar visao'
+    try:
+        with open(c['bat'], 'w', encoding='utf-8', newline='') as f:
+            f.write(_r94_texto_visao_bat(c['porta']))
+    except Exception:
+        pass
+    return ('Visao local instalada (r94): programa + Llama 3.2 Vision 11B + projetor, '
+            '100% local, nada sai do PC. Quando voce ligar o modo conversa '
+            "('interaja com NOME'), o agente LIGA o servidor da visao sozinho "
+            "(carregar o modelo leva 1 a 2 minutos na primeira vez). "
+            "Alternativa manual: dar dois cliques em visao.bat.")
+
+
+def _r94_matar_visao():
+    """r94: ao fechar o agente, derruba o servidor da visao que o agente ligou."""
+    _p = globals().get('_R94_VISAO_PROC')
+    if _p is None:
+        return
+    try:
+        _p.kill()
+    except Exception:
+        pass
+
+
+try:
+    import atexit as _at94
+    _at94.register(_r94_matar_visao)
+except Exception:
+    pass
 
 
 def _r87_str_nome(nome):
@@ -19284,6 +19611,16 @@ def _r88_ciclo(alvo, log):
     # Log real 14/09: sem leitor, o modo pulava o WhatsApp a frente a cada
     # 30s (o dono estava no YouTube) sem conseguir ler nada.
     _pr92, _msg92 = _r92_leitor_pronto()
+    if not _pr92:
+        # r94: tenta ligar o servidor da visao local sozinho (com freio de
+        # 120s para nao insistir numa falha a cada 30s).
+        try:
+            _t94 = globals().get('_r94_tentar_visao')
+            if _t94:
+                _t94(log=log)
+                _pr92, _msg92 = _r92_leitor_pronto()
+        except Exception:
+            pass
     if not _pr92:
         log("leitor indisponivel (visao local r76 ou GEMINI_API_KEY) — "
             "nao vou abrir o WhatsApp, aguardando quieto")
@@ -40791,8 +41128,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r93"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r93] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r94"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r94] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
