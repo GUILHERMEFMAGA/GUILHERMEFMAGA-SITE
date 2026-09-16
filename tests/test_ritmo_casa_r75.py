@@ -49,7 +49,7 @@ class TestCamaR75(unittest.TestCase):
     def test_selo_r75(self):
         with open(AGENTE_PY, encoding='utf-8') as f:
             fonte = f.read()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r98]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r99]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r74]'), 0)
 
     def test_bloco_r75_completo(self):

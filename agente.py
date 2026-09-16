@@ -18971,6 +18971,64 @@ def _r92_diagnosticar_leitor(tem_modelo, porta_no_ar, tem_chave_gemini):
             "sem pular a janela).")
 
 
+class _R99SemRange(Exception):
+    """r99: o servidor nao aceita download por fatias (Range)."""
+
+
+def _r99_baixar_paralelo(url, destino, fatias=4, timeout=120, log=None):
+    """r99: download em PARALELO — `fatias` conexoes puxam partes do
+    arquivo ao mesmo tempo (Range) e escrevem em posicoes diferentes do
+    arquivo final. Na maioria das linhas domesticas (que limitam por
+    conexao) e 2 a 4x mais rapido do que a conexao unica. Se o servidor
+    nao aceitar fatias, cai no download unico (naquele caso)."""
+    import urllib.request
+    import concurrent.futures
+    if log is None:
+        log = lambda m: None
+    _ua = {'User-Agent': 'super-agente-local (r99)'}
+    # 1) tamanho total via Content-Range (bytes=0-0)
+    _req0 = urllib.request.Request(url, headers=dict(_ua, **{'Range': 'bytes=0-0'}))
+    with urllib.request.urlopen(_req0, timeout=timeout) as _r0:
+        if getattr(_r0, 'status', 206) != 206:
+            raise _R99SemRange()
+        _cr = str(_r0.headers.get('Content-Range') or '')
+    if '/' not in _cr:
+        raise _R99SemRange()
+    total = int(_cr.rsplit('/', 1)[1])
+    if total <= 0:
+        raise IOError('tamanho invalido: ' + _cr)
+    # 2) arquivo vazio do tamanho final
+    with open(destino, 'wb') as _f0:
+        _f0.truncate(total)
+
+    def _fatia(ini, fim):
+        _req = urllib.request.Request(
+            url, headers=dict(_ua, **{'Range': 'bytes=%d-%d' % (ini, fim)}))
+        with urllib.request.urlopen(_req, timeout=timeout) as _r:
+            _dados = _r.read()
+        with open(destino, 'r+b') as _f:
+            _f.seek(ini)
+            _f.write(_dados)
+        return len(_dados)
+
+    # 3) fatias em paralelo
+    _base = max(1, total // int(fatias))
+    _tarefas = []
+    for _i in range(int(fatias)):
+        _ini = _i * _base
+        _fim = total - 1 if _i == int(fatias) - 1 else min((_i + 1) * _base - 1, total - 1)
+        if _fim >= _ini:
+            _tarefas.append((_ini, _fim))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(_tarefas)) as _ex:
+        _ex.map(lambda _t: _fatia(_t[0], _t[1]), _tarefas)
+    # 4) integridade
+    if os.path.getsize(destino) != total:
+        raise IOError('tamanho final errado (faltam %d bytes)'
+                      % (total - os.path.getsize(destino)))
+    log('Baixado em %d fatias paralelas: %s (%d MB)'
+        % (len(_tarefas), os.path.basename(destino), total // (1024 * 1024)))
+
+
 def _r94_peca_completa(caminho, min_mb):
     """r95: a peca existe e tem tamanho de saude? Um .gguf de 4 GB num
     lugar que deveria ter 8 GB esta INCOMPLETO (download cortado) — nao
@@ -19230,9 +19288,18 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
     c = _r94_caminhos_visao(pasta=pasta)
 
     def _baixar_real(url, destino):
+        # r99: paralelo (4 conexoes) com fallback p/ conexao unica
+        try:
+            _r99_baixar_paralelo(url, destino, fatias=4)
+            return
+        except _R99SemRange:
+            pass
+        except Exception as _e_par:
+            print('[Baixando] paralelo falhou (%s) — sigo com conexao unica'
+                  % type(_e_par).__name__)
         import shutil as _sh
         import urllib.request as _ur
-        _req = _ur.Request(url, headers={'User-Agent': 'super-agente-local (r94)'})
+        _req = _ur.Request(url, headers={'User-Agent': 'super-agente-local (r99)'})
         with _ur.urlopen(_req, timeout=120) as r:
             with open(destino, 'wb') as f:
                 _sh.copyfileobj(r, f)
@@ -19270,6 +19337,7 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
         if not _faltantes:
             pass  # ja estava tudo baixado COMPLETO
         if 'exe' in _faltantes:
+            print('[Baixando] programa da visao (llama-server, ~60 MB)...')
             _api = (baixar or _baixar_real)
             _zip_url = _r94_achar_zip_windows(api_list())
             if not _zip_url:
@@ -19303,8 +19371,11 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                             pass
             raise _ultima
         if 'modelo' in _faltantes:
+            print('[Baixando] modelo de visao (~6 GB) — 4 conexoes em paralelo; '
+                  'a tela fica quieta enquanto desce...')
             _baixar_com_fontes(urls['modelo_fontes'], c['modelo'])
         if 'mmproj' in _faltantes:
+            print('[Baixando] projetor de visao (~2 GB) — 4 conexoes em paralelo...')
             _baixar_com_fontes(urls['mmproj_fontes'], c['mmproj'])
     except Exception as e:
         _detalhe = ''
@@ -41235,8 +41306,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r98"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r98] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r99"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r99] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

@@ -115,7 +115,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80 + r81 + r83 + r84 + r85 + r86 + r87 + r88).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -1536,6 +1536,32 @@ ou relatórios reais sem revisão e autorização.
   **1028 testes OK**. Selo `-r98`. Próxima prova no PC (DEPOIS do
   download da visão terminar): "atualizar agora" + "baixar visao" +
   "sim" + "interaja com Náutica gooners".
+- **r99 — DOWNLOAD RÁPIDO (pedido do dono, 15/09 à noite: "TEM COMO FAZER IR RAPIDO")**:
+  o download da visão (~8 GB) que estava EM ANDAMENTO no PC do dono
+  (iniciado à noite de 15/09, rede do dono lenta, ~100~160 KB/s) levaria
+  1~2 HORAS com UMA única conexão — o download da r94/r95/r96 usava uma
+  única conexão urllib por peça. Correção (aprimorar sem apagar):
+  função pura _r99_baixar_paralelo — baixa o MESMO arquivo em **4
+  conexões paralelas** (HTTP Range: cada fatia pede seu pedaço e escreve
+  na posição certa do arquivo — truncate + seek; stdlib só: urllib +
+  threading); se o servidor não aceita Range (200 em vez de 206), lança
+  _R99SemRange e o _baixar_real do _r94_visao_baixar cai no download
+  único de antes (o caminho antigo continua funcionando — nada é
+  tirado); verificação de TAMANHO final (o arquivo completo deve ter o
+  tamanho declarado pelo Content-Range; se não tem, a peça é apagada e
+  o r94 re-baixa). Avisos de progresso antes de cada peça: "modelo
+  ~6 GB — 4 conexoes em paralelo (2~4x mais rapido)", "projetor ~2 GB
+  — 4 conexoes", "llama-server ~60 MB". Provas: 4 testes novos
+  (download paralelo REAL contra servidor HTTP local com Range em
+  thread — sha256 IDÊNTICO ao arquivo original; fatias 1/2/8; servidor
+  sem Range -> _R99SemRange; wiring no _baixar_real do
+  _r94_visao_baixar) + E2E completo no código real: "baixar visao" +
+  "sim" com servidor local Range de verdade -> "Visao local instalada
+  (r94)", as 3 peças com tamanho correto. Limite honesto: acelera em
+  2~4x o DOWNLOAD (a banda do dono é a mesma — o ganho vem de esgotar
+  a banda com 4 fluxos); NÃO acelera a primeira carga do modelo na RAM
+  (aquecimento de 1~2 min na primeira resposta continua).
+  **1032 testes OK**. Selo `-r99`.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e

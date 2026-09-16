@@ -139,7 +139,7 @@ class ComandoERoteamento(unittest.TestCase):
         self.assertIn('subprocess.Popen([_sys.executable, origem])', texto)
         self.assertIn('os._exit(0)', texto)
         self.assertIn("'atualizar agora' baixa a versao oficial", texto)  # menu
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r98]', texto)
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r99]', texto)
 
     def test_caminhos_derivados_de_file(self):
         env = carregar('_r50_caminhos_agente', os=os, __file__='/x/y/agente.py')
@@ -154,7 +154,7 @@ class AtualizarProcessoAntigoR93(unittest.TestCase):
     rodando e o atualizador sovia 'conteudo identico' sem nunca aplicar o
     codigo novo — o dono ficava com o comportamento antigo para sempre)."""
 
-    NOVO_R92 = ("# [Motor e avaliacao local 2026-09-11-r98]\n"
+    NOVO_R92 = ("# [Motor e avaliacao local 2026-09-11-r99]\n"
                 + "# linha para atingir o tamanho minimo\n" * 8000)
 
     def _ambiente(self, selo_rodando):
@@ -180,7 +180,7 @@ class AtualizarProcessoAntigoR93(unittest.TestCase):
             self.assertEqual(f.read(), self.NOVO_R92)  # nada reescrito
 
     def test_mesmo_selo_nao_reinicia(self):
-        env, origem, backup = self._ambiente('2026-09-11-r98')
+        env, origem, backup = self._ambiente('2026-09-11-r99')
         reinicios = []
         saida = env['_r50_atualizar_agente'](
             downloader=lambda: self.NOVO_R92, confirmar=lambda m: True,

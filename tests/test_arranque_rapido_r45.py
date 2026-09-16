@@ -88,7 +88,7 @@ class AgenteArranqueSemPesados(unittest.TestCase):
         self.assertEqual(t.count('_r45_embeddings_model()'), 4)  # def + comentario + 2 usos
 
     def test_selo_r73_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r98]', texto_agente())
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r99]', texto_agente())
 
 
 class ComportamentoDosAccessors(unittest.TestCase):
