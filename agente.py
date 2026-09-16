@@ -19287,12 +19287,27 @@ def _r94_caminhos_visao(pasta=None):
     }
 
 
-def _r94_ligar_visao_servidor(log=None, aguardar=90, popen=None):
+def _r102_ultimas_linhas(caminho, n=3):
+    """r102: as ultimas `n` linhas nao-vazias de um arquivo (p/ mostrar
+    a causa real quando o servidor da visao morre ao iniciar)."""
+    try:
+        with open(caminho, 'r', encoding='utf-8', errors='replace') as _f:
+            _linhas = [l.strip() for l in _f if l.strip()]
+        return ' | '.join(_linhas[-int(n):])
+    except Exception:
+        return ''
+
+
+def _r94_ligar_visao_servidor(log=None, aguardar=240, popen=None):
     """r94: se a visao esta toda baixada mas o servidor esta desligado,
     LIGA o servidor (llama-server em segundo plano) e espera ate `aguardar`
-    segundos a porta abrir (carregar o modelo de ~8 GB leva 1-2 minutos).
-    Devolve True se o leitor ficou pronto. O processo fica registrado
-    (globals _R94_VISAO_PROC) para o atexit derrubar ao fechar o agente."""
+    segundos a porta abrir (carregar o modelo de ~8 GB leva 1-4 minutos
+    num disco comum). Devolve True se o leitor ficou pronto. O processo
+    fica registrado (globals _R94_VISAO_PROC) para o atexit derrubar ao
+    fechar o agente. r102: o console do servidor vai para LOG
+    (_visao/servidor_visao.log) — se ele MORA ao iniciar, a mensagem
+    mostra a causa (linhas finais do log) em vez de um 'nao abriu' mudo
+    (DEVNULL engolia o erro — falha REAL no PC do dono, 16/09)."""
     if log is None:
         log = lambda m: None
     c = _r94_caminhos_visao()
@@ -19314,14 +19329,29 @@ def _r94_ligar_visao_servidor(log=None, aguardar=90, popen=None):
         import subprocess as _sp94
         _detached = getattr(_sp94, 'DETACHED_PROCESS', 0)
         _newgrp = getattr(_sp94, 'CREATE_NEW_PROCESS_GROUP', 0)
-        proc = (popen or _sp94.Popen)(cmd,
-                                      stdout=_sp94.DEVNULL, stderr=_sp94.DEVNULL,
-                                      creationflags=_detached | _newgrp)
+        # r102: o console do servidor vai para LOG (append) — se ele
+        # morrer ao iniciar, a causa fica no arquivo (DEVNULL engolia)
+        _log_cam = os.path.join(os.path.dirname(c['exe']),
+                                'servidor_visao.log')
+        _log_f = None
+        try:
+            _log_f = open(_log_cam, 'ab')
+        except Exception:
+            _log_cam = ''
+        if _log_f is not None:
+            proc = (popen or _sp94.Popen)(cmd, stdout=_log_f,
+                                          stderr=_sp94.STDOUT,
+                                          creationflags=_detached | _newgrp)
+        else:
+            proc = (popen or _sp94.Popen)(cmd,
+                                          stdout=_sp94.DEVNULL,
+                                          stderr=_sp94.DEVNULL,
+                                          creationflags=_detached | _newgrp)
         globals()['_R94_VISAO_PROC'] = proc
     except Exception as e:
         log('nao consegui ligar o servidor da visao (%s) — rode visao.bat' % type(e).__name__)
         return False
-    log('Ligando o servidor da visao local (carregar o modelo pode levar 1 a 2 minutos)...')
+    log('Ligando o servidor da visao local (carregar o modelo pode levar 1 a 4 minutos)...')
     _ult = 0
     for _i in range(int(aguardar)):
         time.sleep(1)
@@ -19331,7 +19361,27 @@ def _r94_ligar_visao_servidor(log=None, aguardar=90, popen=None):
         if _i - _ult >= 15:
             _ult = _i
             log('Ainda carregando o modelo da visao... (%ds)' % (_i + 1))
-    log('O servidor da visao nao abriu em %ds — repita o comando ou rode visao.bat' % int(aguardar))
+    # r102: fim da espera — diagnostico HONESTO (nao 'nao abriu', mudo)
+    _morto = True
+    try:
+        _morto = proc.poll() is not None
+    except Exception:
+        _morto = True
+    if _morto:
+        _causa = _r102_ultimas_linhas(_log_cam, 3) if _log_cam else ''
+        _msg = ('O servidor da visao MORREU ao iniciar (codigo de saida %s).'
+                % getattr(proc, 'returncode', '?'))
+        if _causa:
+            _msg += ' Ultimo log: ' + _causa[:400]
+        if 'dll' in (_causa or '').lower():
+            _msg += (' Falta o Redistribuivel do Visual C++ do Windows — '
+                     'rode visao.bat para ver a tela completa.')
+        else:
+            _msg += ' Rode visao.bat para ver a tela completa do servidor.'
+        log(_msg)
+        return False
+    log('O servidor ainda esta carregando no fundo (processo vivo) — '
+        'deixe 1 a 2 minutos: o modo conversa pega sozinho quando a porta abrir.')
     return False
 
 
@@ -41421,8 +41471,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r101"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r101] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r102"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r102] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

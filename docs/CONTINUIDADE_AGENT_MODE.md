@@ -115,7 +115,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**; na r100 **1037**; na r101 **1046**
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**; na r100 **1037**; na r101 **1046**; na r102 **1050**
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80 + r81 + r83 + r84 + r85 + r86 + r87 + r88).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -1630,6 +1630,32 @@ ou relatórios reais sem revisão e autorização.
   DO DONO — mmproj pré-existente com TAMAHO certo mas conteudo
   corrompido -> detectado pela identidade, re-baixado, modelo intacto
   ficou no lugar. **1046 testes OK**. Selo `-r101`.
+- **r102 — O SERVIDOR DA VISAO FALA (falha REAL do PC do dono, 16/09)**:
+  com a visao instalada (r101), o `interaja com Náutica gooners` LIGOU
+  o modo conversa, mas o SERVIDOR da visao (llama-server.exe) MORRIA ao
+  iniciar e o terminal repeteu 6x o ciclo: "Ligando o servidor da
+  visao local... (16s/31s/46s/61s/76s) — O servidor da visao nao abriu
+  em 90s — repita o comando ou rode visao.bat". A causa era INVISÍVEL:
+  o console do servidor ia para DEVNULL (stdout/stderr descartados) —
+  se faltava o Redistribuivel do Visual C++ (muito comum no Windows),
+  se faltava RAM p/ o modelo de 8 GB, se o mmproj recusava, NINGUEM
+  via: a mensagem era um "nao abriu" mudo. Correção (aprimorar sem
+  apagar): (1) o console do servidor agora vai para LOG
+  (_visao/servidor_visao.log, append) — Popen c/ stdout=arquivo e
+  stderr=STDOUT; (2) se o processo MORRE durante a espera, a mensagem
+  mostra o CODIGO DE SAIDA + as ULTIMAS LINHAS DO LOG (função pura
+  _r102_ultimas_linhas) — a causa real na tela (e, se o log falar em
+  DLL, a dica "instale o Redistribuivel do Visual C++"); (3) se o
+  processo ainda esta VIVO no fim da espera (carregando 8 GB num
+  disco lento nao e falha), ele fica no fundo com mensagem honesta e
+  o modo conversa pega sozinho quando a porta abrir (o freio
+  r94/proc-vivo ja evitava re-ligacao em cima); (4) a espera subiu de
+  90s para 240s (carregar 8 GB num HDD pode levar 3-5 min). Provas:
+  4 testes novos (test_servidor_visao_r102.py: servidor MORTO ->
+  mensagem c/ as linhas do log + dica DLL; servidor VIVO -> nao e
+  tratado como falha e segue registrado; _r102_ultimas_linhas pura;
+  wiring: aguardar=240, LOG na Popen, causa na mensagem).
+  **1050 testes OK**. Selo `-r102`.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
