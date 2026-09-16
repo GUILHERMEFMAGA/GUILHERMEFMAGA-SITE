@@ -115,7 +115,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**; na r100 **1037**
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80 + r81 + r83 + r84 + r85 + r86 + r87 + r88).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -1562,6 +1562,38 @@ ou relatórios reais sem revisão e autorização.
   a banda com 4 fluxos); NÃO acelera a primeira carga do modelo na RAM
   (aquecimento de 1~2 min na primeira resposta continua).
   **1032 testes OK**. Selo `-r99`.
+- **r100 — DOWNLOAD VERIFICADO BYTE A BYTE (falha REAL do PC do dono, boot r99, 15/09 à noite)**:
+  o `baixar visao` da r99 terminou SEM nenhum erro visível, mas o
+  projetor (1,94 GB) ficou incompleto: a rede cortou a conexão no meio
+  do download e o servidor fechou o stream "de boa" (sem erro). Evidência
+  (Propriedades do arquivo do dono): o modelo de 6 GB estava COMPLETO
+  byte a byte — 5.963.057.216, idêntico ao oficial (HuggingFace) — e o
+  projetor em 78% (1.46 GB de 1.94 GB). Investigação no código achou 3
+  buracos de verificação: (1) o download paralelo usava `_ex.map` SEM
+  CONSUMÍ-LO — a exceção de uma fatia ficava guardada no future e
+  NINGUÉM via (o download "terminava" normalmente com o arquivo
+  incompleto!); (2) cada fatia não conferia o status (206) nem a
+  contagem de bytes (fatia curta passava em branco, deixando FURO no
+  arquivo); (3) o download único (fallback) copiava o stream sem
+  conferir os bytes lidos contra o Content-Length declarado (corte no
+  meio = arquivo parcial aceito). Correção (aprimorar sem apagar):
+  (1) `list(_ex.map(...))` consome o map — exceção de fatia PROPAGA;
+  (2) cada fatia confere status == 206 (servidor que ignora o Range
+  não pode escrever o arquivo inteiro no meio do outro) e a contagem
+  exata ("fatia cortada: X de Y bytes"); (3) novo _r100_baixar_unico —
+  conexão única com contagem de bytes (lido != Content-Length
+  declarado -> "conexao cortada: X de Y bytes"); o _baixar_real do
+  _r94_visao_baixar usa ele no fallback. Provas: 5 testes novos
+  (test_download_verificado_r100.py: servidor local entregando 206
+  curto -> IOError "fatia cortada"; Range ignorado nas fatias (200)
+  -> IOError "ignorou o Range"; conexão cortada no meio do stream
+  (Content-Length N, corpo N/2) -> nunca vira arquivo completo;
+  download único completo -> sha256 idêntico; wiring) + E2E completo
+  no código real SEM injeção de download: (a) rede saudável ->
+  "Visao local instalada (r94)" com as peças do tamanho exato;
+  (b) rede que CORTE no meio -> "paralelo falhou (IncompleteRead)"
+  -> fallback -> "falhou no meio (OSError)" — erro HONESTO, nunca
+  sucesso falso. **1037 testes OK**. Selo `-r100`.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e

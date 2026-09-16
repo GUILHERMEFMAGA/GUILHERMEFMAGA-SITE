@@ -19005,7 +19005,17 @@ def _r99_baixar_paralelo(url, destino, fatias=4, timeout=120, log=None):
         _req = urllib.request.Request(
             url, headers=dict(_ua, **{'Range': 'bytes=%d-%d' % (ini, fim)}))
         with urllib.request.urlopen(_req, timeout=timeout) as _r:
+            if getattr(_r, 'status', 206) != 206:
+                raise IOError('servidor ignorou o Range na fatia (HTTP %s)'
+                              % getattr(_r, 'status', '?'))
             _dados = _r.read()
+        _esperado = fim - ini + 1
+        if len(_dados) != _esperado:
+            # conexao cortada no meio: o servidor pode fechar 'de boa' sem
+            # erro — sem esta checagem o arquivo ficava com FURO e nenhum
+            # tamanho acusava a falta (r100: falha na hora, nunca em branco)
+            raise IOError('fatia cortada: %d de %d bytes'
+                          % (len(_dados), _esperado))
         with open(destino, 'r+b') as _f:
             _f.seek(ini)
             _f.write(_dados)
@@ -19020,13 +19030,47 @@ def _r99_baixar_paralelo(url, destino, fatias=4, timeout=120, log=None):
         if _fim >= _ini:
             _tarefas.append((_ini, _fim))
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(_tarefas)) as _ex:
-        _ex.map(lambda _t: _fatia(_t[0], _t[1]), _tarefas)
+        # list(...) CONSome o map: sem isso a excecao da fatia ficava
+        # guardada no future e NINGUEM via — o download 'terminava' com
+        # o arquivo incompleto e sem nenhum erro (bug r99 pego no r100)
+        list(_ex.map(lambda _t: _fatia(_t[0], _t[1]), _tarefas))
     # 4) integridade
     if os.path.getsize(destino) != total:
         raise IOError('tamanho final errado (faltam %d bytes)'
                       % (total - os.path.getsize(destino)))
     log('Baixado em %d fatias paralelas: %s (%d MB)'
         % (len(_tarefas), os.path.basename(destino), total // (1024 * 1024)))
+
+
+def _r100_baixar_unico(url, destino, timeout=120, log=None):
+    """r100: download em 1 conexao com CONTAGEM de bytes — se o servidor
+    entregar menos bytes do que declarou (conexao cortada no meio), a
+    funcao ERRa na hora: o arquivo parcial nunca e aceito como completo
+    (r99: o corte no meio da conexao passava em branco e so o tamanho
+    final no final da rota pedia de novo)."""
+    import urllib.request
+    if log is None:
+        log = lambda m: None
+    _req = urllib.request.Request(
+        url, headers={'User-Agent': 'super-agente-local (r100)'})
+    with urllib.request.urlopen(_req, timeout=timeout) as _r:
+        _decl = 0
+        try:
+            _decl = int(_r.headers.get('Content-Length') or 0)
+        except Exception:
+            _decl = 0
+        _lido = 0
+        with open(destino, 'wb') as _f:
+            while True:
+                _b = _r.read(1024 * 1024)
+                if not _b:
+                    break
+                _f.write(_b)
+                _lido += len(_b)
+        if _decl and _lido != _decl:
+            raise IOError('conexao cortada: %d de %d bytes' % (_lido, _decl))
+    log('Baixado (1 conexao): %s (%d MB)'
+        % (os.path.basename(destino), _lido // (1024 * 1024)))
 
 
 def _r94_peca_completa(caminho, min_mb):
@@ -19297,12 +19341,7 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
         except Exception as _e_par:
             print('[Baixando] paralelo falhou (%s) — sigo com conexao unica'
                   % type(_e_par).__name__)
-        import shutil as _sh
-        import urllib.request as _ur
-        _req = _ur.Request(url, headers={'User-Agent': 'super-agente-local (r99)'})
-        with _ur.urlopen(_req, timeout=120) as r:
-            with open(destino, 'wb') as f:
-                _sh.copyfileobj(r, f)
+        _r100_baixar_unico(url, destino)
 
     def _extrair_real(zipcaminho, dir_destino):
         import zipfile as _zf
@@ -41306,8 +41345,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r99"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r99] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r100"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r100] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
