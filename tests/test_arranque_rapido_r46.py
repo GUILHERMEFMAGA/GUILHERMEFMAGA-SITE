@@ -55,7 +55,7 @@ class LancadorMain(unittest.TestCase):
         self.assertIn('__pycache__/', gitignore)
 
     def test_selo_r73_no_banner(self):
-        self.assertIn('[Motor e avaliacao local 2026-09-11-r100]', texto(str(SOURCE)))
+        self.assertIn('[Motor e avaliacao local 2026-09-11-r101]', texto(str(SOURCE)))
 
 
 if __name__ == '__main__':

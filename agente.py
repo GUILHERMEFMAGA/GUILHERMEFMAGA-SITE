@@ -19073,6 +19073,35 @@ def _r100_baixar_unico(url, destino, timeout=120, log=None):
         % (os.path.basename(destino), _lido // (1024 * 1024)))
 
 
+def _r101_sha256(caminho):
+    """r101: sha256 do arquivo em blocos de 1 MB (funciona com arquivos
+    de varios GB sem carregar tudo na memoria)."""
+    import hashlib
+    _h = hashlib.sha256()
+    with open(caminho, 'rb') as _f:
+        while True:
+            _b = _f.read(1024 * 1024)
+            if not _b:
+                break
+            _h.update(_b)
+    return _h.hexdigest()
+
+
+def _r101_peca_confianca(caminho, min_mb, shas=()):
+    """r101: a peca pode ser CONFIDADA? (1) existe com tamanho de saude
+    (_r94_peca_completa) E (2) se ha sha256 oficial pinado da(s) fonte(s),
+    o arquivo bate com UM deles. Arquivo do tamanho certo mas com conteudo
+    corrompido (ex.: download paralelo que ficou com FURO, bug r99) NAO
+    passa: a identidade (sha256) e a prova. Peca sem sha pinado (a que
+    muda toda semana, como o exe do build novo) so passa no tamanho."""
+    if not _r94_peca_completa(caminho, min_mb):
+        return False
+    _pins = [str(_s).lower() for _s in (shas or ()) if _s]
+    if not _pins:
+        return True
+    return _r101_sha256(caminho) in _pins
+
+
 def _r94_peca_completa(caminho, min_mb):
     """r95: a peca existe e tem tamanho de saude? Um .gguf de 4 GB num
     lugar que deveria ter 8 GB esta INCOMPLETO (download cortado) — nao
@@ -19136,7 +19165,22 @@ def _r94_urls_visao():
         'porta': 8081,
         'modelo_gb': 6, 'mmproj_gb': 2, 'exe_mb': 60,
         # tamanhos minimos de saude (abaixo disso a peca esta incompleta)
-        'exe_min_mb': 10, 'modelo_min_mb': 5500, 'mmproj_min_mb': 1800,
+        # r101: o exe do build atual e MENOR que 10 MB — o piso de 10 MB
+        # da r94 nunca passava: a peca re-descia a cada 'baixar visao' sem
+        # nunca contar como instalada (falha REAL no PC do dono, 16/09).
+        # 2 MB e um piso seguro (o exe real tem dezenas de MB)
+        'exe_min_mb': 2, 'modelo_min_mb': 5500, 'mmproj_min_mb': 1800,
+        # r101: IDENTIDADE das pecas — sha256 OFICIAL de cada arquivo, na
+        # mesma ordem das *_fontes acima (fonte HuggingFace, checado via
+        # API). Tamanho certo NAO garante conteudo: bug r99 = arquivo do
+        # tamanho certo com FURO no meio (download paralelo cortado)
+        'modelo_sha256s': [
+            '652e85aa1e14c9087a4ccc3ab516fb794cbcf152f8b4b8d3c0b828da4ada62d',
+            '11f274007f093fefeec994a5dbbb33d0733a4feb87f7ab66dcd7c1069fef0068',
+        ],
+        'mmproj_sha256s': [
+            '622429e8d31810962dd984bc98559e706db2fb1d40e99cb073beb7148d909d73',
+        ],
     }
 
 
@@ -19359,13 +19403,16 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
     try:
         os.makedirs(os.path.dirname(c['exe']), exist_ok=True)
         os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
-        _min_mb = {'exe': urls.get('exe_min_mb', 10),
+        _min_mb = {'exe': urls.get('exe_min_mb', 2),
                    'modelo': urls.get('modelo_min_mb', 7400),
                    'mmproj': urls.get('mmproj_min_mb', 5800)}
+        _shas = {'exe': (),
+                 'modelo': urls.get('modelo_sha256s', ()),
+                 'mmproj': urls.get('mmproj_sha256s', ())}
         _faltantes = []
         for _que, _cam in (('exe', c['exe']), ('modelo', c['modelo']),
                            ('mmproj', c['mmproj'])):
-            if not _r94_peca_completa(_cam, _min_mb[_que]):
+            if not _r101_peca_confianca(_cam, _min_mb[_que], _shas[_que]):
                 if os.path.isfile(_cam):
                     # peca parcial (download cortado): apaga e baixa de novo
                     try:
@@ -19384,6 +19431,22 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                         '(release mais novo). Tente de novo mais tarde: baixar visao')
             _zip_local = os.path.join(c['base'], '_visao', 'llama_cpp.zip')
             _api(_zip_url, _zip_local)
+            # r101: o zip TEM que ser inteiro (CRC de cada membro) antes
+            # de extrair — zip cortado no download vira exe quebrado
+            import zipfile as _zfw
+            _ruim_membro = None
+            try:
+                with _zfw.ZipFile(_zip_local) as _zf0:
+                    _ruim_membro = _zf0.testzip()
+            except Exception:
+                _ruim_membro = 'arquivo invalido'
+            if _ruim_membro:
+                try:
+                    os.unlink(_zip_local)
+                except Exception:
+                    pass
+                raise IOError('zip do programa corrompido no download '
+                              '(membro: %s)' % _ruim_membro)
             (extrair or _extrair_real)(_zip_local, os.path.dirname(c['exe']))
             try:
                 os.unlink(_zip_local)
@@ -19395,12 +19458,11 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                         'no zip — repita: baixar visao')
             if _ach != c['exe']:
                 os.replace(_ach, c['exe'])
-        def _baixar_com_fontes(fuentes, destino):
+        def _baixar_com_fontes(fuentes, shas, destino):
             _ultima = None
-            for _u in fuentes:
+            for _i, _u in enumerate(fuentes):
                 try:
                     (baixar or _baixar_real)(_u, destino)
-                    return
                 except Exception as _e:
                     _ultima = _e
                     if os.path.isfile(destino):
@@ -19408,14 +19470,28 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                             os.unlink(destino)
                         except Exception:
                             pass
+                    continue
+                # r101: IDENTIDADE — com sha256 oficial pinado, o arquivo
+                # baixado TEM que bater (tamanho certo nao basta: conteudo
+                # corrompido com furo passa no tamanho, bug r99)
+                _pin = (str(shas[_i]).lower()
+                        if _i < len(shas or ()) and shas[_i] else '')
+                if _pin and _r101_sha256(destino) != _pin:
+                    _ultima = IOError('sha256 da peca nao bate com o oficial')
+                    try:
+                        os.unlink(destino)
+                    except Exception:
+                        pass
+                    continue
+                return
             raise _ultima
         if 'modelo' in _faltantes:
             print('[Baixando] modelo de visao (~6 GB) — 4 conexoes em paralelo; '
                   'a tela fica quieta enquanto desce...')
-            _baixar_com_fontes(urls['modelo_fontes'], c['modelo'])
+            _baixar_com_fontes(urls['modelo_fontes'], urls.get('modelo_sha256s', ()), c['modelo'])
         if 'mmproj' in _faltantes:
             print('[Baixando] projetor de visao (~2 GB) — 4 conexoes em paralelo...')
-            _baixar_com_fontes(urls['mmproj_fontes'], c['mmproj'])
+            _baixar_com_fontes(urls['mmproj_fontes'], urls.get('mmproj_sha256s', ()), c['mmproj'])
     except Exception as e:
         _detalhe = ''
         if hasattr(e, 'code'):
@@ -19436,7 +19512,7 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
                     pass
     except Exception:
         pass
-    if not all(_r94_peca_completa(c[_q], _min_mb[_q])
+    if not all(_r101_peca_confianca(c[_q], _min_mb[_q], _shas[_q])
                for _q in ('exe', 'modelo', 'mmproj')):
         return ('O download terminou mas nao encontrei as pecas COMPLETAS no '
                 'lugar (alguma ficou com tamanho menor do que deveria) — '
@@ -41345,8 +41421,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r100"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r100] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r101"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r101] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

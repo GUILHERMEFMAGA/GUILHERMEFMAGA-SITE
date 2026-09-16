@@ -15,7 +15,7 @@ import unittest
 from test_roteamento_conversa import SOURCE as AGENTE_PY, carregar
 
 FAKE_AGENTE = '''# fake p/ teste r76
-_SELO = "[Motor e avaliacao local 2026-09-11-r100]"
+_SELO = "[Motor e avaliacao local 2026-09-11-r101]"
 
 
 def tool():
@@ -80,7 +80,7 @@ class TestCerebroCasaR76(unittest.TestCase):
     def test_selo_r76(self):
         with open(AGENTE_PY, encoding='utf-8') as f:
             fonte = f.read()
-        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r100]'), 1)
+        self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r101]'), 1)
         self.assertEqual(fonte.count('[Motor e avaliacao local 2026-09-11-r75]'), 0)
 
     def test_bloco_r76_completo(self):
@@ -121,7 +121,7 @@ class TestCerebroCasaR76(unittest.TestCase):
         self.assertIn('exportado_em', pacote)
         self.assertIn('dados', pacote)
         self.assertEqual(set(pacote['dados']), set(ambiente['_r76_cerebro_chaves']()))
-        self.assertEqual(pacote['selo'], '2026-09-11-r100')  # lido do proprio codigo (fake agora selado r79)
+        self.assertEqual(pacote['selo'], '2026-09-11-r101')  # lido do proprio codigo (fake agora selado r79)
 
     def test_exportar_vazio_retorna_none(self):
         ambiente, extra = _carregar()
@@ -227,7 +227,7 @@ class TestCerebroCasaR76(unittest.TestCase):
             txt = f.read()
         for secao in ('## 1. Motor local', '## 2. Rotas e ferramentas', '## 3. Gatilhos',
                       '## 4. Cerebro', '## 5. Arquivos da casa',
-                      'Selo do codigo: 2026-09-11-r100', 'C:/llama-server.exe', 'C:/modelo.gguf',
+                      'Selo do codigo: 2026-09-11-r101', 'C:/llama-server.exe', 'C:/modelo.gguf',
                       'Topicos ensinados: 1', '100% local'):
             self.assertIn(secao, txt, 'faltando: ' + secao)
 
@@ -313,7 +313,7 @@ class TestCerebroCasaR76(unittest.TestCase):
         self.assertTrue(caminho.endswith('manual_do_agente.md'))
         with open(caminho, encoding='utf-8') as f:
             txt = f.read()
-        for trecho in ('MANUAL DO AGENTE', 'Versao do codigo: 2026-09-11-r100',
+        for trecho in ('MANUAL DO AGENTE', 'Versao do codigo: 2026-09-11-r101',
                        '## Comandos principais', '## Atalhos que voce ensinou',
                        '## Catalogo completo de ferramentas (2)',
                        '`abrir_youtube` — Abre o YouTube no navegador padrao.',

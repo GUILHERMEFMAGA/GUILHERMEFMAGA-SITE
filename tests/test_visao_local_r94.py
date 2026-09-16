@@ -112,8 +112,16 @@ class BaixarVisaoR94(unittest.TestCase):
                 f.seek(tamanho - 1)
                 f.write(b'x')
 
+        import zipfile as _zft
+
         def baixar(url, destino):
             baixados.append(url)
+            # r101: o zip do programa e verificado por CRC (testzip) —
+            # o fake escreve um zip REAL de verdade
+            if str(url).endswith('.zip'):
+                with _zft.ZipFile(destino, 'w') as _z:
+                    _z.writestr('llama-server.exe', b'x' * 2048)
+                return
             _escreve_sparso(destino, _tamanho_de(url))
 
         def extrair(zipcaminho, dir_destino):
@@ -137,6 +145,14 @@ class BaixarVisaoR94(unittest.TestCase):
                        baixar=baixar, extrair=extrair, api_list=api_list)
         amb['_r67_ler_config'] = ler_config or (lambda *a, **k: True)
         amb['_BAIXADOS'] = baixados
+        # r101: o teste cobre a MECANICA de download (parcial/reserva/
+        # limpeza/bat), nao a identidade — os dummies esparros nao tem o
+        # sha256 oficial; sem pin, a confianca e pelo tamanho (comport.
+        # r94). A identidade tem prova propria (test_identidade_pecas_r101)
+        _u = amb['_r94_urls_visao']()
+        _u['modelo_sha256s'] = [''] * len(_u['modelo_fontes'])
+        _u['mmproj_sha256s'] = [''] * len(_u['mmproj_fontes'])
+        amb['_r94_urls_visao'] = lambda: _u
         return amb
 
     def test_kill_switch(self):
@@ -214,6 +230,10 @@ class BaixarVisaoR94(unittest.TestCase):
                             baixar=baixar_sem_primaria, extrair=amb['extrair'],
                             api_list=amb['api_list'])
             amb3['_r67_ler_config'] = lambda *a, **k: True
+            _u3 = amb3['_r94_urls_visao']()
+            _u3['modelo_sha256s'] = [''] * len(_u3['modelo_fontes'])
+            _u3['mmproj_sha256s'] = [''] * len(_u3['mmproj_fontes'])
+            amb3['_r94_urls_visao'] = lambda: _u3
             msg = amb3['_r94_visao_baixar'](baixar=baixar_sem_primaria,
                                             extrair=amb['extrair'],
                                             api_list=amb['api_list'])
