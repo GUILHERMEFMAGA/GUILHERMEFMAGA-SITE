@@ -19165,11 +19165,13 @@ def _r94_urls_visao():
         'porta': 8081,
         'modelo_gb': 6, 'mmproj_gb': 2, 'exe_mb': 60,
         # tamanhos minimos de saude (abaixo disso a peca esta incompleta)
-        # r101: o exe do build atual e MENOR que 10 MB — o piso de 10 MB
-        # da r94 nunca passava: a peca re-descia a cada 'baixar visao' sem
-        # nunca contar como instalada (falha REAL no PC do dono, 16/09).
-        # 2 MB e um piso seguro (o exe real tem dezenas de MB)
-        'exe_min_mb': 2, 'modelo_min_mb': 5500, 'mmproj_min_mb': 1800,
+        # r103: o build ATUAL do llama.cpp (16/09, checado no PC do dono)
+        # e LAUNCHER + DLLs: o llama-server.exe tem ~9 KB (o peso fica nas
+        # DLLs: llama-server-impl.dll, llama.dll, ggml-*.dll) — o piso de
+        # 10 MB (r94) e 2 MB (r101) NUNCA passava: a peca re-descia a
+        # cada 'baixar visao'. 0 = so precisa existir (a integridade do
+        # conjunto vem do CRC do zip — ZipFile.testzip, r101)
+        'exe_min_mb': 0, 'modelo_min_mb': 5500, 'mmproj_min_mb': 1800,
         # r101: IDENTIDADE das pecas — sha256 OFICIAL de cada arquivo, na
         # mesma ordem das *_fontes acima (fonte HuggingFace, checado via
         # API). Tamanho certo NAO garante conteudo: bug r99 = arquivo do
@@ -19453,7 +19455,7 @@ def _r94_visao_baixar(baixar=None, extrair=None, pasta=None, api_list=None):
     try:
         os.makedirs(os.path.dirname(c['exe']), exist_ok=True)
         os.makedirs(os.path.dirname(c['modelo']), exist_ok=True)
-        _min_mb = {'exe': urls.get('exe_min_mb', 2),
+        _min_mb = {'exe': urls.get('exe_min_mb', 0),
                    'modelo': urls.get('modelo_min_mb', 7400),
                    'mmproj': urls.get('mmproj_min_mb', 5800)}
         _shas = {'exe': (),
@@ -41471,8 +41473,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r102"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r102] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r103"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r103] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao

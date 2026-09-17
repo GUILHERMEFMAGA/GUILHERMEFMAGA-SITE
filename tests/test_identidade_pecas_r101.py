@@ -89,11 +89,13 @@ class UrlsPinadasR101(unittest.TestCase):
         self.assertEqual(len(urls['modelo_sha256s']), len(urls['modelo_fontes']))
         self.assertEqual(len(urls['mmproj_sha256s']), len(urls['mmproj_fontes']))
 
-    def test_exe_min_mb_2(self):
+    def test_exe_min_mb_0(self):
         urls = self.amb['_r94_urls_visao']()
-        # o exe do build atual tem dezenas de MB, mas MENOS que 10 MB —
-        # o piso de 10 MB da r94 nunca passava (falha REAL no PC do dono)
-        self.assertEqual(urls['exe_min_mb'], 2)
+        # r103: o build atual do llama.cpp e LAUNCHER + DLLs — o
+        # llama-server.exe tem ~9 KB (checado no PC do dono, 16/09); o
+        # peso fica nas DLLs. O piso de 10 MB (r94) e 2 MB (r101) nunca
+        # passava; a integridade do conjunto vem do CRC do zip (r101)
+        self.assertEqual(urls['exe_min_mb'], 0)
 
 
 class ZipCorrompidoR101(unittest.TestCase):

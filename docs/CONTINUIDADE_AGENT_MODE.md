@@ -115,7 +115,7 @@ ou relatórios reais sem revisão e autorização.
   de RAM/cache/armazenamento. Identificada como **sem geração do modelo**. O usuário
   confirmou os dois casos no PC real. Não resolve alucinações em perguntas livres.
 - Na r19 foram 121 testes; na r20, 150; na r21, 175; na r22, 199; na r23, 218; na r24, 230;
-  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**; na r100 **1037**; na r101 **1046**; na r102 **1050**
+  na r25, 238; na r26, 253; na r27, 286; na r28, 301; na r29, 316; na r30, 324; na r31, 328; na r32, 335; na r33, 343; na r34, 351; na r35, 359; na r36, 365; na r37, 371; na r38, 376; na r39, 381; na r40, 384; na r41, 390; na r42, 415; na r43, 467; na r44, 477; na r45, 488; na r46, 493; na r47, 501; na r48, 508; na r49, 516; na r50, 526; na r51, 545; na r52, 578; na r53, 588; na r54, 594; na r55, 599; na r56, 604; na r57, 610; na r58, 614; na r59, 615; na r60, 616; na r61, 622; na r62, 629; na r63, 635; na r64, 640; na r65, 645; na r66, 649; na r67, 679; na r68, 709; na r69, 724; na r70, 737; na r71, 749; na r72, 757; na r73, 765; na r74, 788; na r75, 817; na r76, 839; na r78, 855; na r79, 871; na r80, 891; na r81, 898; na r82, 903; na r83, 912; na r84, 916; na r85 **923 testes isolados passaram** (auditoria: 733 nomes únicos, 0 corpos idênticos; ferramentas; na r86 **937**; na r87 **961**; na r88 **984**; na r89 **985**; na r90 **991**; na r91 **997**; na r92 **1003**; na r93 **1006**; na r94 **1017**; na r95 **1019**; na r96 **1021**; na r97 **1022**; na r98 **1028**; na r99 **1032**; na r100 **1037**; na r101 **1046**; na r102 **1050**; na r103 **1050**
   antigas sempre preservadas em nomes/ordem/assinaturas; loader de testes extrai `_norm_pt` e
   prefixos r20-r45 + r50-r53 + r75 + r76 + r78 + r79 + r80 + r81 + r83 + r84 + r85 + r86 + r87 + r88).
   Matriz da r21: `docs/CONFIABILIDADE_RESPOSTAS_R21.md`; catálogo/lote 1 da r22:
@@ -1656,6 +1656,24 @@ ou relatórios reais sem revisão e autorização.
   tratado como falha e segue registrado; _r102_ultimas_linhas pura;
   wiring: aguardar=240, LOG na Popen, causa na mensagem).
   **1050 testes OK**. Selo `-r102`.
+- **r103 — O EXE É PEQUENO DE PROPÓSITO (evidência real do PC do dono, 16/09)**:
+  o dono mandou print da pasta `agente_pc/_visao` (o build do llama.cpp
+  extraído): 51 arquivos, e o `llama-server.exe` tem **9 KB** — o build
+  ATUAL do llama.cpp no Windows é LAUNCHER + DLLs: os .exe são
+  "disparadores" minúsculos (~9 KB) e o peso fica nas DLLs
+  (llama-server-impl.dll 8,7 MB, llama.dll 3 MB, llama-common.dll
+  3,3 MB, ggml-*.dll...). O piso de 2 MB do r101 (e o de 10 MB da
+  r94, antes) era MAIOR que o exe de verdade: a peça passava pela
+  extração, ficava no lugar, e o check final a rejeitava de novo
+  (loop de re-download do zip). Correção: `exe_min_mb: 0` — o exe só
+  precisa existir (arquivo de 0 byte é impossível vindo de um zip
+  com CRC verificado — a integridade do conjunto já vem do
+  `ZipFile.testzip` do r101). Com isso, no PC do dono o próximo
+  `baixar visao` não re-baixa NADA (as 3 peças estão de fato no lugar
+  e conferidas) e declara "Visao local instalada". Nota: a causa do
+  SERVIDOR morrer ao iniciar (r102) continua em investigação — o
+  console dele agora vai para _visao/servidor_visao.log e o visao.bat
+  mostra na tela. **1050 testes OK**. Selo `-r103`.
 - **r66 — GATILHO DE ATUALIZAR ENTENDE O LEIGO (bug do PC real)**: o usuário
   digitou "atualiza agora" (sem o r) no agente r64 e caiu NO MODELO BRUTO —
   o gatilho só aceitava "atualizaragora" exato. `_r62_comandos` e
