@@ -8603,11 +8603,13 @@ def _processar_cerebro_local(comando: str) -> bool:
                  " (deixe o app do WhatsApp instalado e logado).")
             return True
         try:
-            _int88 = _ler88("modo_conversa_intervalo", padrao=30) if _ler88 else 30
+            # r104: intervalo padrao 30 -> 90s (com o gate de ocosidade
+            # acima: ele so age de verdade quando o PC esta parado)
+            _int88 = _ler88("modo_conversa_intervalo", padrao=90) if _ler88 else 90
             if not isinstance(_int88, int) or not (5 <= _int88 <= 600):
-                _int88 = 30
+                _int88 = 90
         except Exception:
-            _int88 = 30
+            _int88 = 90
         _parar88 = globals().get("_R88_PARAR")
         if _parar88 is None:
             _parar88 = threading.Event()
@@ -19212,7 +19214,7 @@ def _r94_texto_visao_bat(porta=8081):
         'cd /d "%~dp0"',
         ('_visao\\llama-server.exe -m "modelos_visao\\' + urls['arq_modelo'] + '"'
          ' --mmproj "modelos_visao\\' + urls['arq_mmproj'] + '"'
-         ' --port ' + str(int(porta)) + ' --host 127.0.0.1 --no-webui'),
+         ' --port ' + str(int(porta)) + ' --host 127.0.0.1 --no-webui --threads 4'),
         'pause',
     ]
     return '\r\n'.join(linhas) + '\r\n'
@@ -19325,8 +19327,23 @@ def _r94_ligar_visao_servidor(log=None, aguardar=240, popen=None):
         return True
     if not (os.path.isfile(c['exe']) and os.path.isfile(c['modelo']) and os.path.isfile(c['mmproj'])):
         return False
+    # r104: threads LIMITADAS (padrao: metade dos nucleos — o servidor
+    # nao rouba o CPU inteiro; config 'visao_threads' p/ ajustar)
+    _th104 = 0
+    try:
+        _ler_th = globals().get('_r67_ler_config')
+        if _ler_th:
+            _th104 = int(_ler_th('visao_threads', padrao=0))
+    except Exception:
+        _th104 = 0
+    if _th104 <= 0:
+        try:
+            _th104 = max(2, (os.cpu_count() or 4) // 2)
+        except Exception:
+            _th104 = 4
     cmd = [c['exe'], '-m', c['modelo'], '--mmproj', c['mmproj'],
-           '--port', str(c['porta']), '--host', '127.0.0.1', '--no-webui']
+           '--port', str(c['porta']), '--host', '127.0.0.1', '--no-webui',
+           '--threads', str(int(_th104))]
     try:
         import subprocess as _sp94
         _detached = getattr(_sp94, 'DETACHED_PROCESS', 0)
@@ -19350,6 +19367,19 @@ def _r94_ligar_visao_servidor(log=None, aguardar=240, popen=None):
                                           stderr=_sp94.DEVNULL,
                                           creationflags=_detached | _newgrp)
         globals()['_R94_VISAO_PROC'] = proc
+        # r104: prioridade IDLE de CPU — o servidor NUNCA briga por CPU
+        # com o que o dono esta fazendo (navegar, video): o PC continua
+        # liso; em troca o 'olhar' fica mais devagar (e so age com o PC
+        # ocioso — ver _r88_ciclo). O dono nunca mais trava o desktop.
+        try:
+            import ctypes as _ct104
+            if hasattr(_ct104, 'windll'):
+                _h104 = getattr(proc, 'handle', None)
+                if _h104:
+                    _ct104.windll.kernel32.SetPriorityClass(
+                        _h104, 0x00000040)  # IDLE_PRIORITY_CLASS
+        except Exception:
+            pass
     except Exception as e:
         log('nao consegui ligar o servidor da visao (%s) — rode visao.bat' % type(e).__name__)
         return False
@@ -19948,9 +19978,58 @@ def _r88_gerar_resposta(chat, contexto, ultima_externa):
     return ""
 
 
+def _r104_ms_ult_entrada():
+    """r104: milissegundos desde o ultimo toque no teclado/mouse
+    (Windows, GetLastInputInfo — stdlib/ctypes). None se indisponivel
+    (fora do Windows ou erro)."""
+    try:
+        import ctypes
+        class _LASTINPUTINFO(ctypes.Structure):
+            _fields_ = [('cbSize', ctypes.c_uint),
+                        ('dwTime', ctypes.c_uint)]
+        _lii = _LASTINPUTINFO()
+        _lii.cbSize = ctypes.sizeof(_LASTINPUTINFO)
+        ctypes.windll.user32.GetLastInputInfo(ctypes.byref(_lii))
+        _agora = ctypes.windll.kernel32.GetTickCount()
+        return (_agora - _lii.dwTime) & 0xFFFFFFFF
+    except Exception:
+        return None
+
+
+def _r104_pc_ocioso(limite_s=60, _ms=None):
+    """r104: o PC esta OCIOSO? True se nao houve teclado/mouse ha
+    `limite_s` segundos. Fora do Windows (ou sem leitura) -> True
+    (comportamento de antes, sem gate). O modo conversa soneca enquanto
+    o dono usa o PC: sem roubar foco, sem print, sem inference (o
+    'olhar' da visao usa a CPU toda — era isso que travava o PC)."""
+    if _ms is None:
+        _ms = _r104_ms_ult_entrada()
+    if _ms is None:
+        return True
+    return int(_ms) >= int(limite_s) * 1000
+
+
 def _r88_ciclo(alvo, log):
     """r88: UM ciclo do modo conversa: foca o WhatsApp, le a tela, decide e,
     se chegou mensagem nova da outra pessoa, compoe e envia a resposta."""
+    # r104: se o dono esta USANDO o PC agora (teclado/mouse ativos nos
+    # ultimos 'visao_ociosidade_s' segundos), o ciclo inteiro e pulado —
+    # sem foco no WhatsApp, sem print, sem inference. Custo: ZERO.
+    # (falha REAL 16/09: o ciclo de 30s com o modelo de 11B travava o
+    # PC do dono enquanto ele navegava — mouse/teclado congelavam)
+    try:
+        _ocioso104 = globals().get('_r104_pc_ocioso')
+        _lim104 = 60
+        try:
+            _ler104 = globals().get('_r67_ler_config')
+            if _ler104:
+                _lim104 = int(_ler104('visao_ociosidade_s', padrao=60))
+        except Exception:
+            _lim104 = 60
+        if _ocioso104 and _lim104 > 0 and not _ocioso104(limite_s=_lim104):
+            return
+    except Exception:
+        pass
     _est88 = _r88_estado()
     # r92: cego eu nao toco na tela — confere o leitor ANTES de focar.
     # Log real 14/09: sem leitor, o modo pulava o WhatsApp a frente a cada
@@ -41473,8 +41552,8 @@ def _invocar_agente_stream(estado, ferramentas=None):
 # r93: selo deste PROCESSO em execucao (o arquivo pode ter sido atualizado
 # depois do boot — o atualizador usa essa comparacao para detectar o
 # caso "arquivo novo, processo velho" e reiniciar para aplicar).
-_SELO_EM_EXECUCAO = "2026-09-11-r103"
-print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r103] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
+_SELO_EM_EXECUCAO = "2026-09-11-r104"
+print(f" Super Agente pronto! [Motor e avaliacao local 2026-09-11-r104] Nível de permissão: '{config.get('nivel_permissao')}'. Digite 'status' a qualquer momento.")
 
 # ---- IA LOCAL AUTOMATICA: liga sozinha na abertura (se ja foi baixada) ----
 # Quando existe um modelo .gguf e o motor, a nuvem fica DESLIGADA por padrao
