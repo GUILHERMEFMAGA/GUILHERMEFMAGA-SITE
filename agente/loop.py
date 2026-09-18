@@ -11,7 +11,17 @@ def perceber():
     return sorted(nomes)
 
 
+def decidir(pastas):
+    """Regra: pasta que so tem .gitkeep dentro precisa de um arquivo base."""
+    for nome in pastas:
+        conteudo = [p.name for p in (RAIZ / nome).iterdir()]
+        if conteudo == [".gitkeep"]:
+            return ("criar_arquivo_base", nome)
+    return ("nada_a_fazer", None)
+
+
 if __name__ == "__main__":
     pastas = perceber()
+    acao, alvo = decidir(pastas)
     print("o agente viu:", pastas)
-
+    print("o agente decidiu:", acao, "->", alvo)
