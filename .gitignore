@@ -17,3 +17,5 @@ memoria/*.log
 # lixo de sistema operacional
 Thumbs.db
 .DS_Store
+
+.vscode/
