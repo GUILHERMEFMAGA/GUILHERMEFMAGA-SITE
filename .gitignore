@@ -1,0 +1,19 @@
+# cache que o Python fabrica sozinho
+__pycache__/
+*.pyc
+
+# ambiente virtual (a "caixinha separada" das bibliotecas)
+.venv/
+venv/
+
+# memoria de execucao do agente (diario, nao codigo)
+memoria/*.json
+memoria/*.log
+
+# segredos: NUNCA vao pro GitHub
+.env
+*.env
+
+# lixo de sistema operacional
+Thumbs.db
+.DS_Store
