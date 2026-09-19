@@ -7,11 +7,13 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 MEMORIA = RAIZ / "memoria" / "historico.json"
+CONTADORES = RAIZ / "memoria" / "contadores.json"
 FLUXO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
 PALCO = RAIZ / "testes" / "mundo_falso" / "ensaio"
 CHAVES_PERMITIDAS = ["id", "pasta_com_conteudo", "criar_arquivo", "conteudo"]
 LIMITE_DIARIO = 500
+LIMITE_CRONICO = 2
 
 
 def perceber():
@@ -21,7 +23,7 @@ def perceber():
 
 
 def ler_cerebro():
-    """Le o arquivo inteiro. None = ilegivel: assim nunca sobrescrevo um cerebro que nao entendi."""
+    """Le o arquivo inteiro. None = ilegivel: nunca sobrescrevo um cerebro que nao entendi."""
     if not FLUXO.exists():
         return {"auto_promocao": {"ligada": False}, "acoes": []}
     try:
@@ -49,6 +51,58 @@ def ler_diario():
     except (json.JSONDecodeError, OSError):
         return []
     return dados if isinstance(dados, list) else []
+
+
+def zerar_contadores():
+    return {"rodadas": 0, "paradas": 0, "criacoes": {}, "recusas": {}}
+
+
+def acumular(contadores, decidiu, fez, barradas):
+    """A unica conta do sistema: soma 1 no lugar certo. NINGUEM rel o diario inteiro aqui."""
+    contadores["rodadas"] += 1
+    if decidiu == "nada_a_fazer":
+        contadores["paradas"] += 1
+    elif fez.startswith("Criei "):
+        chave = fez.split(" ", 2)[1].replace("/", "|")
+        alvo, _, nome = chave.partition("|")
+        if nome:
+            contadores["criacoes"][chave] = contadores["criacoes"].get(chave, 0) + 1
+    for item in barradas:
+        id_barrado = item.split(":")[0]
+        contadores["recusas"][id_barrado] = contadores["recusas"].get(id_barrado, 0) + 1
+    return contadores
+
+
+def reconstruir_contadores():
+    """Cache que nasce vazia comeca MENTINDO POR OMISSAO: preencho com o diario que ja existe."""
+    contadores = zerar_contadores()
+    for r in ler_diario():
+        acumular(contadores, r.get("decidiu"), r.get("fez") or "", r.get("barradas") or [])
+    CONTADORES.parent.mkdir(parents=True, exist_ok=True)
+    CONTADORES.write_text(json.dumps(contadores, indent=2, ensure_ascii=False), encoding="utf-8")
+    return contadores
+
+
+def ler_contadores():
+    """Contador e ESTADO DERIVADO: corrompeu? reconstruo do diario. O cerebro nao, esse e sagrado."""
+    if not CONTADORES.exists():
+        return reconstruir_contadores()
+    try:
+        dados = json.loads(CONTADORES.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return reconstruir_contadores()
+    if not isinstance(dados, dict) or "rodadas" not in dados:
+        return reconstruir_contadores()
+    dados.setdefault("paradas", 0)
+    dados.setdefault("criacoes", {})
+    dados.setdefault("recusas", {})
+    return dados
+
+
+def atualizar_contadores(decidiu, fez, barradas):
+    contadores = acumular(ler_contadores(), decidiu, fez, barradas)
+    CONTADORES.write_text(json.dumps(contadores, indent=2, ensure_ascii=False), encoding="utf-8")
+    return contadores
 
 
 def decidir(pastas):
@@ -85,66 +139,57 @@ def lembrar(evento):
     return len(registro)
 
 
-def medir(janela=12):
-    """Só fatos contados do diario, sem nenhuma frase. Quem decide e a estrutura."""
-    registros = ler_diario()[-janela:]
-    criacoes = {}
-    bloqueios = 0
-    paradas = 0
-    for r in registros:
-        fez = r.get("fez") or ""
-        if r.get("decidiu") == "nada_a_fazer":
-            paradas += 1
-        elif fez.startswith("Criei "):
-            pedaco = fez.split(" ", 2)[1]
-            alvo, _, nome = pedaco.partition("/")
-            if not nome:
-                continue
-            chave = (alvo, nome)
-            criacoes[chave] = criacoes.get(chave, 0) + 1
-        elif fez.startswith("Pulei "):
-            bloqueios += 1
+def medir():
+    """Fatos vindos dos contadores: o que e cronico nao some quando a janela anda."""
+    contadores = ler_contadores()
     por_arquivo = {}
-    for (alvo, nome), vezes in criacoes.items():
+    cronicos = []
+    for chave, vezes in sorted(contadores["criacoes"].items()):
+        alvo, _, nome = chave.partition("|")
         por_arquivo.setdefault(nome, set()).add(alvo)
+        if vezes >= LIMITE_CRONICO:
+            cronicos.append({"alvo": alvo, "arquivo": nome, "vezes": vezes})
     return {
-        "recriacoes": [
-            {"alvo": alvo, "arquivo": nome, "vezes": vezes}
-            for (alvo, nome), vezes in sorted(criacoes.items()) if vezes > 1
-        ],
+        "cronicos": cronicos,
         "espalhadas": [
             {"arquivo": nome, "pastas": len(alvos)}
             for nome, alvos in sorted(por_arquivo.items()) if len(alvos) > 1
         ],
-        "bloqueios": bloqueios,
-        "paradas": paradas,
-        "lidos": len(registros),
+        "paradas": contadores["paradas"],
+        "rodadas": contadores["rodadas"],
+        "recusas": contadores["recusas"],
     }
 
 
 def analisar(fatos):
-    """Veste os fatos com frase legivel. O numero que esta aqui vem do medir, nao do chute."""
+    """Veste os fatos com frase legivel. Quem decide e o numero, o texto so apresenta."""
     lidas = []
-    for item in fatos["recriacoes"]:
-        lidas.append(f"recriei {item['arquivo']} em {item['alvo']} {item['vezes']}x: algo desfaz isso la")
+    for item in fatos["cronicos"]:
+        lidas.append(f"CRONICO: recriei {item['arquivo']} em {item['alvo']} {item['vezes']}x ao todo")
     for item in fatos["espalhadas"]:
-        lidas.append(f"a regra que cria {item['arquivo']} se espalhou por {item['pastas']} pastas sozinha")
-    if fatos["bloqueios"]:
-        lidas.append(f"fui bloqueado {fatos['bloqueios']}x por arquivo que ja existe")
+        lidas.append(f"a regra que cria {item['arquivo']} alcancou {item['pastas']} pastas sozinha")
     if fatos["paradas"]:
-        lidas.append(f"em {fatos['paradas']} execucoes nao havia trabalho: o mundo ja estava resolvido")
+        lidas.append(f"{fatos['paradas']} de {fatos['rodadas']} rodadas nao tinham trabalho")
+    for id_barrado, vezes in sorted(fatos["recusas"].items()):
+        if vezes >= 2:
+            lidas.append(f"{id_barrado} foi barrado {vezes}x: ideia enterrada")
     if not lidas:
-        lidas.append(f"nenhum padrao nos ultimos {fatos['lidos']} registros")
+        lidas.append(f"{fatos['rodadas']} rodadas e nada cronico")
     return lidas
 
 
 def propor(fatos):
-    """So propor onde o MESMO arquivo foi recriado no MESMO lugar. E o gatilho vem do fato observado."""
+    """Propoe o que o portao ainda nao enterrou. E avisa o que ele DECIDIU nao tentar."""
     RASCUNHOS.mkdir(parents=True, exist_ok=True)
     novos = []
-    for item in fatos["recriacoes"]:
+    ignoradas = []
+    for item in fatos["cronicos"]:
         alvo, nome = item["alvo"], item["arquivo"]
         id_novo = f"avisar_sobre_{alvo}"
+        vezes_barrado = fatos["recusas"].get(id_novo, 0)
+        if vezes_barrado >= 2:
+            ignoradas.append(f"{id_novo} (barra {vezes_barrado}x)")
+            continue
         destino = RASCUNHOS / f"{id_novo}.json"
         if destino.exists():
             continue
@@ -155,7 +200,7 @@ def propor(fatos):
                 "alvo": alvo,
                 "arquivo": nome,
                 "vezes": item["vezes"],
-                "fonte": "memoria/historico.json",
+                "fonte": "memoria/contadores.json",
             },
             "proposta": {
                 "id": id_novo,
@@ -166,7 +211,7 @@ def propor(fatos):
         }
         destino.write_text(json.dumps(rascunho, indent=2, ensure_ascii=False), encoding="utf-8")
         novos.append(id_novo)
-    return novos
+    return novos, ignoradas
 
 
 def regra_e_segura(proposta):
@@ -221,7 +266,7 @@ def promover():
             continue
         proposta = dado.get("proposta")
         if not proposta:
-            barradas.append(f"{arquivo.name}: sem 'proposta', nao e rascunho meu")
+            barradas.append(f"{arquivo.name}: sem proposta, nao e rascunho meu")
             continue
         if proposta.get("id") in existentes:
             continue
@@ -260,18 +305,21 @@ if __name__ == "__main__":
     acao, alvo, regra = decidir(pastas)
     resultado = agir(acao, alvo, regra)
     aprendizados = analisar(fatos)
-    rascunhos = propor(fatos)
+    rascunhos, ignoradas = propor(fatos)
+    atualizar_contadores(acao, resultado, barradas)
     total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado,
                      "fatos": fatos, "aprendeu": aprendizados, "rascunhou": rascunhos,
-                     "promoveu": aprovadas, "barradas": barradas})
+                     "rejeitou_propor": ignoradas, "promoveu": aprovadas, "barradas": barradas})
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
     print("o agente fez:", resultado)
-    print(f"o agente mediu: {len(fatos['recriacoes'])} repeticoes, {len(fatos['espalhadas'])} regras espalhadas")
+    print(f"o agente contou: {fatos['rodadas']} rodadas, {len(fatos['cronicos'])} cronicos, {len(fatos['espalhadas'])} regras espalhadas")
     for linha in aprendizados:
         print("   - ele aprendeu:", linha)
     for id_rascunho in rascunhos:
         print(f"   - propoe fluxos/rascunhos/{id_rascunho}.json")
+    for linha in ignoradas:
+        print("   - ele DESISTE de:", linha)
     for linha in aprovadas:
         print("   - CEREBRO GANHOU:", linha)
     for linha in barradas:
