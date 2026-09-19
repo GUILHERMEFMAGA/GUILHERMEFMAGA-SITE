@@ -4,6 +4,13 @@
     "so_acoes_de_criar": true,
     "limite_de_regras": 6
   },
+  "mundo": {
+    "ligado": true,
+    "relatorio_em": "relatorios/inventario-desktop.txt",
+    "permitido": ["ler", "contar", "escrever_dentro_do_projeto"],
+    "proibido": ["mover", "apagar", "editar_arquivo_do_mundo"],
+    "so_quando_mudar": true
+  },
   "acoes": [
     {
       "id": "criar_arquivo_base",

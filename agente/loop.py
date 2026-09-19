@@ -1,327 +1,422 @@
-# agente/loop.py
-"""Laco: perceber -> decidir -> agir -> lembrar -> medir -> analisar -> propor -> promover."""
+# -*- coding: utf-8 -*-
+# O cerebro do agente: ver -> olhar o mundo -> decidir -> fazer -> lembrar -> contar -> propor.
+# Regra de ferro: ele pode LER o mundo la de fora, mas so escreve dentro do projeto.
+# Modo agendado (--so-olhar): ele olha, anota e NAO se autopromove, porque nao ha voce ali.
+
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
-MEMORIA = RAIZ / "memoria" / "historico.json"
+DIARIO = RAIZ / "memoria" / "historico.json"
 CONTADORES = RAIZ / "memoria" / "contadores.json"
-FLUXO = RAIZ / "fluxos" / "regras.json"
+CEREBRO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
-PALCO = RAIZ / "testes" / "mundo_falso" / "ensaio"
-CHAVES_PERMITIDAS = ["id", "pasta_com_conteudo", "criar_arquivo", "conteudo"]
-LIMITE_DIARIO = 500
-LIMITE_CRONICO = 2
+PALCO = RAIZ / "testes" / "mundo_falso" / "ensaios"
+IGNORADAS = {"__pycache__", "mundo_falso", ".git"}
+
+SO_OLHAR = "--so-olhar" in os.sys.argv[1:]
 
 
-def perceber():
-    """Olha a raiz do projeto e devolve as pastas visiveis, em ordem."""
-    nomes = [p.name for p in RAIZ.iterdir() if p.is_dir() and not p.name.startswith(".")]
-    return sorted(nomes)
+def ler_json(caminho, padrao):
+    try:
+        return json.loads(Path(caminho).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return padrao
+
+
+def escrever_json(caminho, dados):
+    destino = Path(caminho)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(json.dumps(dados, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 def ler_cerebro():
-    """Le o arquivo inteiro. None = ilegivel: nunca sobrescrevo um cerebro que nao entendi."""
-    if not FLUXO.exists():
-        return {"auto_promocao": {"ligada": False}, "acoes": []}
-    try:
-        dados = json.loads(FLUXO.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return None
-    if not isinstance(dados, dict):
-        return None
-    dados.setdefault("acoes", [])
-    dados.setdefault("auto_promocao", {"ligada": False})
-    return dados
+    regras = ler_json(CEREBRO, {})
+    if not isinstance(regras.get("acoes"), list):
+        return {"acoes": []}
+    return regras
 
 
-def carregar_regras():
-    dados = ler_cerebro()
-    return [] if dados is None else dados["acoes"]
+def listar_pastas():
+    pastas = []
+    for item in sorted(RAIZ.iterdir()):
+        if item.is_dir() and item.name not in IGNORADAS:
+            if "mundo_falso" in item.parts:
+                continue
+            pastas.append(item.name)
+    return pastas
 
 
-def ler_diario():
-    """Diario e historia, nao prova: corrompeu, comeca do zero sem derrubar o agente."""
-    if not MEMORIA.exists():
-        return []
-    try:
-        dados = json.loads(MEMORIA.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return []
-    return dados if isinstance(dados, list) else []
+def arquivos_de(regra):
+    nome = regra.get("criar_arquivo") or regra.get("criar") or "?"
+    return nome if isinstance(nome, str) else "?"
+
+
+def decidir_acao(pasta, regras):
+    for regra in regras.get("acoes", []):
+        if not isinstance(regra, dict):
+            continue
+        esperado = regra.get("pasta_com_conteudo")
+        if not isinstance(esperado, list):
+            continue
+        try:
+            nomes = sorted(p.name for p in (RAIZ / pasta).iterdir() if p.is_file())
+        except OSError:
+            continue
+        if nomes == sorted(esperado):
+            return regra
+    return None
+
+
+def descobrir_acao(pastas, regras):
+    for pasta in pastas:
+        regra = decidir_acao(pasta, regras)
+        if regra is not None:
+            return regra, pasta
+    return None, None
+
+
+def executar(regra, pasta):
+    nome = arquivos_de(regra)
+    destino = RAIZ / pasta / nome
+    if destino.exists():
+        return "Nada a fazer: %s/%s ja existia." % (pasta, nome)
+    conteudo = regra.get("conteudo", "")
+    if not isinstance(conteudo, str):
+        conteudo = str(conteudo)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(conteudo, encoding="utf-8")
+    return "Criei %s/%s seguindo a regra %s" % (pasta, nome, regra.get("id", "?"))
+
+
+def lembrar(registro):
+    historico = ler_json(DIARIO, [])
+    if not isinstance(historico, list):
+        historico = []
+    historico.append(registro)
+    if len(historico) > 500:
+        historico = historico[-500:]
+    escrever_json(DIARIO, historico)
+    return len(historico)
+
+
+def chave_fato(linha):
+    pedaco = linha.replace(",", " ").split()
+    for item in pedaco:
+        if "|" in item:
+            return item.strip(":")
+    return None
 
 
 def zerar_contadores():
     return {"rodadas": 0, "paradas": 0, "criacoes": {}, "recusas": {}}
 
 
-def acumular(contadores, decidiu, fez, barradas):
-    """A unica conta do sistema: soma 1 no lugar certo. NINGUEM rel o diario inteiro aqui."""
-    contadores["rodadas"] += 1
-    if decidiu == "nada_a_fazer":
-        contadores["paradas"] += 1
-    elif fez.startswith("Criei "):
-        chave = fez.split(" ", 2)[1].replace("/", "|")
-        alvo, _, nome = chave.partition("|")
-        if nome:
-            contadores["criacoes"][chave] = contadores["criacoes"].get(chave, 0) + 1
-    for item in barradas:
-        id_barrado = item.split(":")[0]
-        contadores["recusas"][id_barrado] = contadores["recusas"].get(id_barrado, 0) + 1
-    return contadores
+def acumular(cont, fatos, rejeicoes, agiu):
+    cont["rodadas"] = cont.get("rodadas", 0) + 1
+    if not agiu:
+        cont["paradas"] = cont.get("paradas", 0) + 1
+    criacoes = cont.setdefault("criacoes", {})
+    for linha in fatos:
+        chave = chave_fato(linha)
+        if chave:
+            criacoes[chave] = criacoes.get(chave, 0) + 1
+    recusas = cont.setdefault("recusas", {})
+    for linha in rejeicoes:
+        if ": " in linha:
+            id_regra = linha.split(":")[0].strip()
+            if id_regra and id_regra != "rascunho":
+                recusas[id_regra] = recusas.get(id_regra, 0) + 1
+    return cont
 
 
 def reconstruir_contadores():
-    """Cache que nasce vazia comeca MENTINDO POR OMISSAO: preencho com o diario que ja existe."""
-    contadores = zerar_contadores()
-    for r in ler_diario():
-        acumular(contadores, r.get("decidiu"), r.get("fez") or "", r.get("barradas") or [])
-    CONTADORES.parent.mkdir(parents=True, exist_ok=True)
-    CONTADORES.write_text(json.dumps(contadores, indent=2, ensure_ascii=False), encoding="utf-8")
-    return contadores
+    cont = zerar_contadores()
+    for registro in ler_json(DIARIO, []):
+        if isinstance(registro, dict):
+            acumular(cont, registro.get("fatos", []),
+                     registro.get("rejeitou_propor", []),
+                     registro.get("decidiu") != "nada_a_fazer")
+    return cont
 
 
 def ler_contadores():
-    """Contador e ESTADO DERIVADO: corrompeu? reconstruo do diario. O cerebro nao, esse e sagrado."""
-    if not CONTADORES.exists():
-        return reconstruir_contadores()
+    cont = ler_json(CONTADORES, None)
+    if not isinstance(cont, dict) or "rodadas" not in cont:
+        cont = reconstruir_contadores()
+        escrever_json(CONTADORES, cont)
+    return cont
+
+
+def registrar_rodada(fatos, rejeicoes, agiu):
+    cont = ler_contadores()
+    acumular(cont, fatos, rejeicoes, agiu)
+    escrever_json(CONTADORES, cont)
+    return cont
+
+
+def contar_fatos(cont):
+    cronicos = {}
+    for chave, qtd in cont.get("criacoes", {}).items():
+        if qtd >= 2:
+            cronicos[chave] = qtd
+    rotulos = set()
+    for regra in ler_cerebro().get("acoes", []):
+        if isinstance(regra, dict):
+            rotulos.add(arquivos_de(regra))
+    espalhadas = {}
+    for rotulo in rotulos:
+        alcanca = [c for c in cont.get("criacoes", {}) if c.split("|")[-1] == rotulo]
+        if len(alcanca) >= 2:
+            espalhadas[rotulo] = len(alcanca)
+    enterradas = {}
+    for id_regra, qtd in cont.get("recusas", {}).items():
+        if qtd >= 2:
+            enterradas[id_regra] = qtd
+    return cronicos, espalhadas, enterradas
+
+
+def corpo(texto):
+    linhas = [l for l in texto.splitlines() if l.strip() and not l.strip().startswith("#")]
+    return "\n".join(linhas).strip()
+
+
+def dentro_do_projeto(caminho):
     try:
-        dados = json.loads(CONTADORES.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return reconstruir_contadores()
-    if not isinstance(dados, dict) or "rodadas" not in dados:
-        return reconstruir_contadores()
-    dados.setdefault("paradas", 0)
-    dados.setdefault("criacoes", {})
-    dados.setdefault("recusas", {})
-    return dados
+        Path(caminho).resolve().relative_to(RAIZ.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
 
 
-def atualizar_contadores(decidiu, fez, barradas):
-    contadores = acumular(ler_contadores(), decidiu, fez, barradas)
-    CONTADORES.write_text(json.dumps(contadores, indent=2, ensure_ascii=False), encoding="utf-8")
-    return contadores
+def descobrir_mundo():
+    casa = Path(os.environ.get("AGENTE_CASA") or os.path.expanduser("~"))
+    for nome in ("Desktop", os.path.join("OneDrive", "Desktop"),
+                 os.path.join("OneDrive", "\u00c1rea de Trabalho"), "\u00c1rea de Trabalho"):
+        teste = casa / nome
+        if teste.exists():
+            return teste
+    return casa / "Desktop"
 
 
-def decidir(pastas):
-    """Compara o mundo com as regras, com os nomes EM ORDEM: senao o mundo 'muda' sem mudar."""
-    regras = carregar_regras()
-    for nome in pastas:
-        conteudo = sorted(p.name for p in (RAIZ / nome).iterdir())
-        for regra in regras:
-            if conteudo == sorted(regra["pasta_com_conteudo"]):
-                return (regra["id"], nome, regra)
-    return ("nada_a_fazer", None, None)
-
-
-def agir(acao, alvo, regra):
-    """Executa exatamente o que a regra do arquivo mandou."""
-    if acao == "nada_a_fazer":
-        return "Nenhum trabalho: nenhuma regra bateu com o mundo."
-    nome_arquivo = regra["criar_arquivo"]
-    destino = RAIZ / alvo / nome_arquivo
-    if destino.exists():
-        return f"Pulei {alvo}/{nome_arquivo} porque ja existe."
-    destino.write_text(regra["conteudo"], encoding="utf-8")
-    return f"Criei {alvo}/{nome_arquivo} seguindo a regra {acao}"
-
-
-def lembrar(evento):
-    """Guarda o evento e limita o diario: log sem teto e o problema de amanha."""
-    MEMORIA.parent.mkdir(parents=True, exist_ok=True)
-    registro = ler_diario()
-    evento["quando"] = datetime.now().isoformat(timespec="seconds")
-    registro.append(evento)
-    registro = registro[-LIMITE_DIARIO:]
-    MEMORIA.write_text(json.dumps(registro, indent=2, ensure_ascii=False), encoding="utf-8")
-    return len(registro)
-
-
-def medir():
-    """Fatos vindos dos contadores: o que e cronico nao some quando a janela anda."""
-    contadores = ler_contadores()
-    por_arquivo = {}
-    cronicos = []
-    for chave, vezes in sorted(contadores["criacoes"].items()):
-        alvo, _, nome = chave.partition("|")
-        por_arquivo.setdefault(nome, set()).add(alvo)
-        if vezes >= LIMITE_CRONICO:
-            cronicos.append({"alvo": alvo, "arquivo": nome, "vezes": vezes})
-    return {
-        "cronicos": cronicos,
-        "espalhadas": [
-            {"arquivo": nome, "pastas": len(alvos)}
-            for nome, alvos in sorted(por_arquivo.items()) if len(alvos) > 1
-        ],
-        "paradas": contadores["paradas"],
-        "rodadas": contadores["rodadas"],
-        "recusas": contadores["recusas"],
-    }
-
-
-def analisar(fatos):
-    """Veste os fatos com frase legivel. Quem decide e o numero, o texto so apresenta."""
-    lidas = []
-    for item in fatos["cronicos"]:
-        lidas.append(f"CRONICO: recriei {item['arquivo']} em {item['alvo']} {item['vezes']}x ao todo")
-    for item in fatos["espalhadas"]:
-        lidas.append(f"a regra que cria {item['arquivo']} alcancou {item['pastas']} pastas sozinha")
-    if fatos["paradas"]:
-        lidas.append(f"{fatos['paradas']} de {fatos['rodadas']} rodadas nao tinham trabalho")
-    for id_barrado, vezes in sorted(fatos["recusas"].items()):
-        if vezes >= 2:
-            lidas.append(f"{id_barrado} foi barrado {vezes}x: ideia enterrada")
-    if not lidas:
-        lidas.append(f"{fatos['rodadas']} rodadas e nada cronico")
-    return lidas
-
-
-def propor(fatos):
-    """Propoe o que o portao ainda nao enterrou. E avisa o que ele DECIDIU nao tentar."""
-    RASCUNHOS.mkdir(parents=True, exist_ok=True)
-    novos = []
-    ignoradas = []
-    for item in fatos["cronicos"]:
-        alvo, nome = item["alvo"], item["arquivo"]
-        id_novo = f"avisar_sobre_{alvo}"
-        vezes_barrado = fatos["recusas"].get(id_novo, 0)
-        if vezes_barrado >= 2:
-            ignoradas.append(f"{id_novo} (barra {vezes_barrado}x)")
+def inventariar(pasta):
+    grupos = {}
+    pastas = []
+    for item in sorted(pasta.iterdir()):
+        if item.name.lower().startswith((".", "thumbs.db")):
             continue
-        destino = RASCUNHOS / f"{id_novo}.json"
-        if destino.exists():
+        if item.is_dir():
+            pastas.append(item)
             continue
-        rascunho = {
-            "criada_em": datetime.now().isoformat(timespec="seconds"),
-            "ativa": False,
-            "evidencia": {
-                "alvo": alvo,
-                "arquivo": nome,
-                "vezes": item["vezes"],
-                "fonte": "memoria/contadores.json",
-            },
-            "proposta": {
-                "id": id_novo,
-                "pasta_com_conteudo": sorted([".gitkeep", nome]),
-                "criar_arquivo": "LEIA-ME.txt",
-                "conteudo": f"# NAO APAGUE {nome} em {alvo}: ele e gerado pelo agente. Veja memoria/historico.json\n",
-            },
-        }
-        destino.write_text(json.dumps(rascunho, indent=2, ensure_ascii=False), encoding="utf-8")
-        novos.append(id_novo)
-    return novos, ignoradas
+        chave = item.suffix.lower() or "(sem extensao)"
+        try:
+            tamanho = item.stat().st_size
+        except OSError:
+            tamanho = 0
+        grupos.setdefault(chave, []).append((item, tamanho))
+    soltos = sum(len(v) for v in grupos.values())
+    linhas = ["# inventario do mundo real - %s" % datetime.now().isoformat(timespec="seconds"),
+              "# lido de: %s" % pasta,
+              "# arquivos soltos encontrados: %d" % soltos, ""]
+    if pastas:
+        linhas.append("pastas na Area de Trabalho: %d" % len(pastas))
+        for item in pastas:
+            linhas.append("   - %s" % item.name)
+        linhas.append("")
+    for chave in sorted(grupos, key=lambda c: (-len(grupos[c]), c)):
+        itens = grupos[chave]
+        linhas.append("%s: %d arquivo(s), %d KB" % (chave, len(itens), sum(t for _, t in itens) // 1024))
+        for item, _ in sorted(itens, key=lambda par: par[0].name):
+            linhas.append("   - %s" % item.name)
+    return "\n".join(linhas) + "\n", soltos
 
 
-def regra_e_segura(proposta):
-    """Jaula por lista de permitidos: o que nao esta na lista ja esta vetado."""
-    estranhas = [chave for chave in proposta if chave not in CHAVES_PERMITIDAS]
-    return not estranhas, estranhas
+def olhar_mundo():
+    politica = ler_cerebro().get("mundo")
+    if not isinstance(politica, dict) or not politica.get("ligado", False):
+        return None
+    pasta = descobrir_mundo()
+    if not pasta.exists():
+        return {"linha": "procurei %s e nao achei: nada feito" % pasta, "mudou": False}
+    nome_relatorio = politica.get("relatorio_em")
+    if not nome_relatorio or not dentro_do_projeto(RAIZ / nome_relatorio):
+        return {"linha": "o relatorio do mundo aponta pra fora do projeto: barrado", "mudou": False}
+    destino = RAIZ / nome_relatorio
+    novo, soltos = inventariar(pasta)
+    antigo = destino.read_text(encoding="utf-8") if destino.exists() else ""
+    if politica.get("so_quando_mudar", True) and antigo and corpo(antigo) == corpo(novo):
+        return {"linha": "nada mudou la fora: %s ja estava atualizado" % destino.name, "mudou": False}
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(novo, encoding="utf-8")
+    return {"linha": "olhei %s (%d arquivos soltos) e escrevi %s"
+                    % (pasta.name, soltos, nome_relatorio.replace("\\", "/")), "mudou": True}
 
 
 def ensaiar(proposta):
-    """Palco de mentira, decisao e acao de verdade. Devolve '' se aprovou, senao o motivo."""
+    if not dentro_do_projeto(PALCO):
+        return "palco de ensaio esta fora do projeto"
     global RAIZ
-    mundo_real = RAIZ
-    shutil.rmtree(PALCO, ignore_errors=True)
-    cena = PALCO / "cena"
-    cena.mkdir(parents=True)
-    for nome in proposta["pasta_com_conteudo"]:
-        (cena / nome).write_text("arquivo de ensaio\n", encoding="utf-8")
+    vera = RAIZ
     try:
+        if PALCO.exists():
+            shutil.rmtree(PALCO)
+        cena = PALCO / "cena"
+        cena.mkdir(parents=True)
+        for nome in proposta["pasta_com_conteudo"]:
+            (cena / os.path.basename(nome)).write_text("", encoding="utf-8")
         RAIZ = PALCO
-        acao, alvo, regra = decidir(perceber())
-        resultado = agir(acao, alvo, regra)
-        criado = cena / proposta["criar_arquivo"]
-        if acao != proposta["id"]:
-            return f"a regra nem disparou na cena feita sob medida para ela (veio: {acao})"
-        if not criado.exists():
-            return f"o arquivo prometido nao nasceu no disco (agir disse: {resultado})"
-        if criado.read_text(encoding="utf-8") != proposta["conteudo"]:
-            return "o conteudo escrito difere do prometido pela regra"
-        return ""
+        try:
+            regra, alvo = descobrir_acao(["cena"], {"acoes": [proposta]})
+            if regra is None:
+                return "a regra nem disparou na cena feita sob medida para ela (veio: nenhuma)"
+            executar(regra, alvo)
+            criado = cena / arquivos_de(proposta)
+            if not criado.exists():
+                return "disparou mas nao criou %s" % arquivos_de(proposta)
+            if criado.read_text(encoding="utf-8") != proposta.get("conteudo"):
+                return "criou %s com conteudo diferente do pedido" % arquivos_de(proposta)
+            return None
+        finally:
+            RAIZ = vera
+    except Exception as erro:
+        return "ensaio quebrou: %s" % erro
     finally:
-        RAIZ = mundo_real
+        shutil.rmtree(PALCO, ignore_errors=True)
+
+
+def propor(cronicos):
+    novos = []
+    ignoradas = []
+    enterradas = []
+    if SO_OLHAR:
+        return novos, [], [], enterradas
+    regras = ler_cerebro()
+    politica = regras.get("auto_promocao", {})
+    if not isinstance(politica, dict) or not politica.get("ligada", False):
+        return novos, ignoradas, [], enterradas
+    recusas = ler_contadores().get("recusas", {})
+    existentes = {r.get("id") for r in regras.get("acoes", []) if isinstance(r, dict)}
+    for alvo_chave, qtd in cronicos.items():
+        pasta_alvo = alvo_chave.split("|")[0]
+        id_nova = "avisar_sobre_" + pasta_alvo
+        if id_nova in existentes:
+            continue
+        if recusas.get(id_nova, 0) >= politica.get("recusas_maximas", 2):
+            enterradas.append("%s: voce recusou %dx, nao volto a perguntar" % (id_nova, recusas.get(id_nova, 0)))
+            continue
+        if qtd < politica.get("repeticoes_minimas", 2):
+            continue
+        if len(regras.get("acoes", [])) >= politica.get("limite_de_regras", 6):
+            ignoradas.append("rascunho: cerebro esta no limite de %d regras" % politica.get("limite_de_regras", 6))
+            break
+        proposta = {"id": id_nova,
+                    "pasta_com_conteudo": [".gitkeep", "base.py"],
+                    "criar_arquivo": "LEIA-ME.txt",
+                    "conteudo": "# NAO APAGUE base.py em %s: ele e gerado pelo agente. Veja memoria/historico.json\n" % pasta_alvo}
+        destino = RASCUNHOS / (id_nova + ".json")
+        if destino.exists():
+            dados = ler_json(destino, {})
+            if dados.get("motivo_da_recusa"):
+                continue
+            if dados.get("ativa"):
+                continue
+            if dados.get("proposta", {}).get("conteudo") == proposta["conteudo"]:
+                novos.append(id_nova)
+                continue
+        falha = ensaiar(proposta)
+        if falha is not None:
+            ignoradas.append("%s: %s" % (id_nova, falha))
+            escrever_json(destino, {"ativa": False, "proposta": proposta,
+                                   "origem": "recriei %s %dx" % (alvo_chave.replace("|", " em "), qtd),
+                                   "motivo_da_recusa": falha})
+            continue
+        escrever_json(destino, {"ativa": False, "proposta": proposta,
+                               "origem": "recriei %s %dx" % (alvo_chave.replace("|", " em "), qtd),
+                               "criada_em": datetime.now().isoformat(timespec="seconds")})
+        novos.append(id_nova)
+    aprovadas = promover()
+    return novos, aprovadas, ignoradas, enterradas
 
 
 def promover():
-    """Unica porta do cerebro: jaula, ensaio, limite e sua licenca. E nao escreve se nao leu."""
-    dados = ler_cerebro()
-    if dados is None:
-        return [], ["cerebro ilegivel: nao vou sobrescrever nada. Abra fluxos/regras.json e corrija"]
-    regras = dados["acoes"]
-    existentes = {regra["id"] for regra in regras}
-    politica = dados["auto_promocao"]
-    limite = int(politica.get("limite_de_regras", 6))
+    regras = ler_json(CEREBRO, {})
+    if not isinstance(regras.get("acoes"), list):
+        return []
+    politica = regras.get("auto_promocao", {})
+    if not politica.get("promover_so_apos_teste", True):
+        return []
     aprovadas = []
-    barradas = []
-    if not RASCUNHOS.exists():
-        return [], []
-    for arquivo in sorted(RASCUNHOS.glob("*.json")):
-        try:
-            dado = json.loads(arquivo.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            barradas.append(f"{arquivo.name}: rascunho ilegivel, deixo ele em paz")
+    for arquivo in sorted(RASCUNHOS.glob("*.json")) if RASCUNHOS.exists() else []:
+        dados = ler_json(arquivo, {})
+        if not isinstance(dados, dict) or not dados.get("ativa"):
             continue
-        proposta = dado.get("proposta")
-        if not proposta:
-            barradas.append(f"{arquivo.name}: sem proposta, nao e rascunho meu")
+        if dados.get("motivo_da_recusa"):
             continue
-        if proposta.get("id") in existentes:
+        proposta = dados.get("proposta")
+        if not isinstance(proposta, dict) or "id" not in proposta:
             continue
-        if dado.get("motivo_da_recusa") and not dado.get("ativa"):
-            # recusa e decisao, nao pergunta: so reavalo se voce religar ativa ou editar a proposta
+        if any(r.get("id") == proposta["id"] for r in regras["acoes"] if isinstance(r, dict)):
             continue
-        segura, estranhas = regra_e_segura(proposta)
-        if not segura:
-            motivo = f"chaves fora da jaula: {estranhas}"
-        else:
-            motivo = ensaiar(proposta)
-        liberada = bool(politica.get("ligada")) and segura and len(regras) < limite
-        if motivo:
-            barradas.append(f"{proposta['id']}: {motivo}")
-            dado["motivo_da_recusa"] = motivo
-            dado["recusada_em"] = datetime.now().isoformat(timespec="seconds")
-        elif not dado.get("ativa") and not liberada:
-            dado["ensaio"] = "aprovada no ensaio, esperando sua licenca"
-        else:
-            regras.append(proposta)
-            existentes.add(proposta["id"])
-            origem = "sua licenca" if dado.get("ativa") else "auto_promocao ligada"
-            aprovadas.append(f"{proposta['id']} ({origem})")
-            dado["promovida_em"] = datetime.now().isoformat(timespec="seconds")
-        arquivo.write_text(json.dumps(dado, indent=2, ensure_ascii=False), encoding="utf-8")
-    if aprovadas:
-        dados["acoes"] = regras
-        FLUXO.write_text(json.dumps(dados, indent=2, ensure_ascii=False), encoding="utf-8")
-    return aprovadas, barradas
+        regras["acoes"].append(proposta)
+        escrever_json(CEREBRO, regras)
+        escrever_json(arquivo, {"ativa": True, "proposta": proposta,
+                               "origem": dados.get("origem"), "criada_em": dados.get("criada_em"),
+                               "promovida_em": datetime.now().isoformat(timespec="seconds")})
+        aprovadas.append(proposta["id"])
+    return aprovadas
 
 
 if __name__ == "__main__":
-    fatos = medir()
-    aprovadas, barradas = promover()
-    pastas = perceber()
-    acao, alvo, regra = decidir(pastas)
-    resultado = agir(acao, alvo, regra)
-    aprendizados = analisar(fatos)
-    rascunhos, ignoradas = propor(fatos)
-    atualizar_contadores(acao, resultado, barradas)
-    total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado,
-                     "fatos": fatos, "aprendeu": aprendizados, "rascunhou": rascunhos,
-                     "rejeitou_propor": ignoradas, "promoveu": aprovadas, "barradas": barradas})
+    pastas = listar_pastas()
+    mundo = olhar_mundo()
+    regras = ler_cerebro()
+    acao, alvo = descobrir_acao(pastas, regras)
+    if acao is None:
+        resultado = "Nenhum trabalho: nenhuma regra bateu com o mundo."
+        decisao = "nada_a_fazer"
+    else:
+        resultado = executar(acao, alvo)
+        decisao = "%s -> %s" % (acao.get("id", "?"), alvo)
+    fatos = []
+    if acao is not None:
+        nome = arquivos_de(acao)
+        fatos = ["recriei %s em %s de: %s|%s" % (nome, alvo, alvo, nome)]
+    cont = ler_contadores()
+    cronicos, espalhadas, recusas = contar_fatos(cont)
+    rascunhos, aprovadas, ignoradas, ja_enterradas = propor(cronicos)
+    registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
+                "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
+                "mundo": (mundo or {}).get("linha"), "fatos": fatos,
+                "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
+    total = lembrar(registro)
+    cont = registrar_rodada(fatos, ignoradas, acao is not None)
+    cronicos, espalhadas, enterradas_map = contar_fatos(cont)
+    enterradas_txt = ["%s foi barrado %dx: ideia enterrada" % (i, q) for i, q in enterradas_map.items()]
     print("o agente viu:", pastas)
-    print("o agente decidiu:", acao, "->", alvo)
+    if mundo:
+        print("o agente olhou o mundo:", mundo["linha"])
+    print("o agente decidiu:", decisao)
     print("o agente fez:", resultado)
-    print(f"o agente contou: {fatos['rodadas']} rodadas, {len(fatos['cronicos'])} cronicos, {len(fatos['espalhadas'])} regras espalhadas")
-    for linha in aprendizados:
-        print("   - ele aprendeu:", linha)
-    for id_rascunho in rascunhos:
-        print(f"   - propoe fluxos/rascunhos/{id_rascunho}.json")
+    if SO_OLHAR:
+        print("o agente em modo observacao: nao se autopromove sem voce aqui")
+    print("o agente contou: %d rodadas, %d cronicos, %d regras espalhadas"
+          % (cont.get("rodadas", 0), len(cronicos), len(espalhadas)))
+    for chave, qtd in cronicos.items():
+        print("   - ele aprendeu: CRONICO: recriei %s %dx ao todo" % (chave.replace("|", " em "), qtd))
+    for rotulo, qtd in espalhadas.items():
+        print("   - ele aprendeu: a regra que cria %s alcancou %d pastas sozinha" % (rotulo, qtd))
+    if cont.get("rodadas"):
+        print("   - ele aprendeu: %d de %d rodadas nao tinham trabalho"
+              % (cont.get("paradas", 0), cont.get("rodadas", 0)))
     for linha in ignoradas:
+        print("   - O PORTAO BARROU:", linha)
+    for linha in enterradas_txt + ja_enterradas:
         print("   - ele DESISTE de:", linha)
+    for id_novo in rascunhos:
+        print("   - propoe fluxos/rascunhos/%s.json   (ativa: false)" % id_novo)
     for linha in aprovadas:
         print("   - CEREBRO GANHOU:", linha)
-    for linha in barradas:
-        print("   - O PORTAO BARROU:", linha)
     print("o agente lembra:", total, "registros em memoria/historico.json")
