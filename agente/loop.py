@@ -44,6 +44,8 @@ def listar_pastas():
     pastas = []
     for item in sorted(RAIZ.iterdir()):
         if item.is_dir() and item.name not in IGNORADAS:
+            if item.name.startswith("."):
+                continue
             if "mundo_falso" in item.parts:
                 continue
             pastas.append(item.name)
