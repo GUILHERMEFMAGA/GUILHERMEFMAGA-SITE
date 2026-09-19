@@ -1,11 +1,12 @@
 # agente/loop.py
-"""Primeiro laco do agente: perceber -> decidir -> agir -> lembrar."""
+"""Laco: perceber -> decidir (lendo o fluxo) -> agir -> lembrar."""
 import json
 from datetime import datetime
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 MEMORIA = RAIZ / "memoria" / "historico.json"
+FLUXO = RAIZ / "fluxos" / "regras.json"
 
 
 def perceber():
@@ -14,24 +15,34 @@ def perceber():
     return sorted(nomes)
 
 
+def carregar_regras():
+    """O cerebro agora e texto: cada item do arquivo e uma regra de verdade."""
+    if not FLUXO.exists():
+        return []
+    return json.loads(FLUXO.read_text(encoding="utf-8"))["acoes"]
+
+
 def decidir(pastas):
-    """Regra: pasta que so tem .gitkeep dentro precisa de um arquivo base."""
+    """Compara o mundo com as regras do arquivo, na ordem em que estao la."""
+    regras = carregar_regras()
     for nome in pastas:
         conteudo = [p.name for p in (RAIZ / nome).iterdir()]
-        if conteudo == [".gitkeep"]:
-            return ("criar_arquivo_base", nome)
-    return ("nada_a_fazer", None)
+        for regra in regras:
+            if conteudo == regra["pasta_com_conteudo"]:
+                return (regra["id"], nome, regra)
+    return ("nada_a_fazer", None, None)
 
 
-def agir(acao, alvo):
-    """Executa o que foi decidido e devolve o relato do que aconteceu."""
+def agir(acao, alvo, regra):
+    """Executa exatamente o que a regra do arquivo mandou."""
     if acao == "nada_a_fazer":
-        return "Nenhum trabalho: todas as pastas ja tem conteudo."
-    destino = RAIZ / alvo / "base.py"
+        return "Nenhum trabalho: nenhuma regra bateu com o mundo."
+    nome_arquivo = regra["criar_arquivo"]
+    destino = RAIZ / alvo / nome_arquivo
     if destino.exists():
-        return f"Pulei {alvo}/base.py porque ja existe."
-    destino.write_text("# espaco de trabalho criado pelo agente\n", encoding="utf-8")
-    return f"Criei {alvo}/base.py"
+        return f"Pulei {alvo}/{nome_arquivo} porque ja existe."
+    destino.write_text(regra["conteudo"], encoding="utf-8")
+    return f"Criei {alvo}/{nome_arquivo} seguindo a regra {acao}"
 
 
 def lembrar(evento):
@@ -48,13 +59,10 @@ def lembrar(evento):
 
 if __name__ == "__main__":
     pastas = perceber()
-    acao, alvo = decidir(pastas)
-    resultado = agir(acao, alvo)
+    acao, alvo, regra = decidir(pastas)
+    resultado = agir(acao, alvo, regra)
     total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado})
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
     print("o agente fez:", resultado)
     print("o agente lembra:", total, "registros em memoria/historico.json")
-    
-
-    

@@ -1,0 +1,10 @@
+{
+  "acoes": [
+    {
+      "id": "criar_arquivo_base",
+      "pasta_com_conteudo": [".gitkeep"],
+      "criar_arquivo": "base.py",
+      "conteudo": "# EU MUDEI SO O TEXTO DO JSON E O AGENTE OBEDECEU\n"
+    }
+  ]
+}
