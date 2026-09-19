@@ -11,6 +11,17 @@ def perceber():
     return sorted(nomes)
 
 
+def agir(acao, alvo):
+    """Executa o que foi decidido e devolve o relato do que aconteceu."""
+    if acao == "nada_a_fazer":
+        return "Nenhum trabalho: todas as pastas ja tem conteudo."
+    destino = RAIZ / alvo / "base.py"
+    if destino.exists():
+        return f"Pulei {alvo}/base.py porque ja existe."
+    destino.write_text("# espaco de trabalho criado pelo agente\n", encoding="utf-8")
+    return f"Criei {alvo}/base.py"
+
+
 def decidir(pastas):
     """Regra: pasta que so tem .gitkeep dentro precisa de um arquivo base."""
     for nome in pastas:
@@ -23,5 +34,11 @@ def decidir(pastas):
 if __name__ == "__main__":
     pastas = perceber()
     acao, alvo = decidir(pastas)
+    resultado = agir(acao, alvo)
+    print("o agente fez:", resultado)
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
+    
+    
+
+    
