@@ -225,6 +225,9 @@ def promover():
             continue
         if proposta.get("id") in existentes:
             continue
+        if dado.get("motivo_da_recusa") and not dado.get("ativa"):
+            # recusa e decisao, nao pergunta: so reavalo se voce religar ativa ou editar a proposta
+            continue
         segura, estranhas = regra_e_segura(proposta)
         if not segura:
             motivo = f"chaves fora da jaula: {estranhas}"
