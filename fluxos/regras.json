@@ -11,6 +11,18 @@
     "proibido": ["mover", "apagar", "editar_arquivo_do_mundo"],
     "so_quando_mudar": true
   },
+  "execucao": {
+    "ligada": true,
+    "so_com_humano": true,
+    "timeout": 15,
+    "teto_saida": 4000,
+    "permitidas": [
+      "git status",
+      "git log --oneline -5",
+      "python --version",
+      "pip list"
+    ]
+  },
   "acoes": [
     {
       "id": "criar_arquivo_base",

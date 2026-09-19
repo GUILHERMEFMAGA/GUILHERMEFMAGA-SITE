@@ -6,6 +6,7 @@
 import json
 import os
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -14,8 +15,9 @@ DIARIO = RAIZ / "memoria" / "historico.json"
 CONTADORES = RAIZ / "memoria" / "contadores.json"
 CEREBRO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
+FILA = RAIZ / "fila"
 PALCO = RAIZ / "testes" / "mundo_falso" / "ensaios"
-IGNORADAS = {"__pycache__", "mundo_falso", ".git"}
+IGNORADAS = {"__pycache__", "mundo_falso", "fila", ".git"}
 
 SO_OLHAR = "--so-olhar" in os.sys.argv[1:]
 
@@ -257,6 +259,107 @@ def olhar_mundo():
                     % (pasta.name, soltos, nome_relatorio.replace("\\", "/")), "mudou": True}
 
 
+def comando_permitido(cmd):
+    politica = ler_cerebro().get("execucao", {})
+    if not isinstance(politica, dict) or not politica.get("ligada", False):
+        return False
+    permitidas = politica.get("permitidas", [])
+    if not isinstance(permitidas, list):
+        return False
+    limpo = " ".join(cmd.split())
+    if any(c in limpo for c in ("&&", "||", "|", ">", "<", ";", "&", "`", '"')):
+        return False
+    return limpo in [" ".join(str(p).split()) for p in permitidas]
+
+
+def executar_comando(cmd):
+    if not comando_permitido(cmd):
+        return None, "comando fora da coleira: nao esta em execucao.permitidas (ou tem simbolo proibido)"
+    politica = ler_cerebro().get("execucao", {})
+    try:
+        proc = subprocess.run(cmd.split(), shell=False, cwd=str(RAIZ),
+                              capture_output=True, text=True,
+                              timeout=politica.get("timeout", 15))
+    except FileNotFoundError:
+        return None, "comando nao existe no PATH (lembra: dir e echo moram no cmd, nao valem aqui)"
+    except subprocess.TimeoutExpired:
+        return None, "estourou o tempo limite e foi cortado"
+    except Exception as erro:
+        return None, "falhou: %s" % erro
+    saida = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    teto = politica.get("teto_saida", 4000)
+    if len(saida) > teto:
+        saida = saida[:teto] + "\n... (saida cortada no teto)"
+    if not saida:
+        saida = "(sem saida; codigo de saida %d)" % proc.returncode
+    return proc.returncode, saida
+
+
+def ler_tarefa(caminho):
+    try:
+        texto = Path(caminho).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for linha in texto.splitlines():
+        linha = linha.strip()
+        if not linha or linha.startswith("#"):
+            continue
+        if ":" not in linha:
+            return {"tipo": None, "rest": linha}
+        tipo, resto = linha.split(":", 1)
+        return {"tipo": tipo.strip().lower(), "rest": resto.strip()}
+    return None
+
+
+def mover_fila(caminho, estado):
+    pasta = FILA / estado
+    pasta.mkdir(parents=True, exist_ok=True)
+    nome = Path(caminho).name
+    destino = pasta / nome
+    if destino.exists():
+        destino = pasta / (datetime.now().strftime("%H%M%S-") + nome)
+    try:
+        Path(caminho).rename(destino)
+        return destino
+    except OSError:
+        return None
+
+
+def tratar_fila():
+    linhas = []
+    if SO_OLHAR:
+        return linhas
+    FILA.mkdir(parents=True, exist_ok=True)
+    for tarefa in sorted(FILA.glob("*.txt")):
+        item = ler_tarefa(tarefa)
+        if item is None:
+            mover_fila(tarefa, "erros")
+            linhas.append("%s: vazio ou ilegivel -> foi pra fila\\erros" % tarefa.name)
+            continue
+        if item["tipo"] == "executar":
+            codigo, saida = executar_comando(item["rest"])
+            estado = "feitas" if codigo == 0 else "erros"
+        elif item["tipo"] == "avisar":
+            codigo, saida, estado = 0, item["rest"], "feitas"
+        else:
+            codigo = None
+            saida = "tipo que eu nao conheco: use executar:<comando> ou avisar:<recado>"
+            estado = "erros"
+        texto = ("# fila atendida em %s\n# tarefa: %s\n# pedido: %s\n# codigo de saida: %s\n\n%s\n"
+                 % (datetime.now().isoformat(timespec="seconds"), tarefa.name, item["rest"], codigo, saida))
+        relatorio = RAIZ / "relatorios" / ("fila-%s.txt" % "".join(c for c in tarefa.stem if c.isalnum() or c in "-_"))
+        try:
+            if dentro_do_projeto(relatorio):
+                relatorio.parent.mkdir(parents=True, exist_ok=True)
+                relatorio.write_text(texto, encoding="utf-8")
+        except OSError as erro:
+            linhas.append("%s: relatorio nao coube no disco (%s), mas a fila seguiu" % (tarefa.name, erro))
+        movida = mover_fila(tarefa, estado)
+        rotulo = "FEITA" if estado == "feitas" else ("PROBLEMA" if movida else "TRAVADA")
+        linhas.append("%s [%s] -> relatorio em relatorios\\fila-%s.txt" % (tarefa.name, rotulo, tarefa.stem))
+    return linhas
+
+
 def ensaiar(proposta):
     if not dentro_do_projeto(PALCO):
         return "palco de ensaio esta fora do projeto"
@@ -374,6 +477,7 @@ def promover():
 if __name__ == "__main__":
     pastas = listar_pastas()
     mundo = olhar_mundo()
+    fila_resumo = tratar_fila()
     regras = ler_cerebro()
     acao, alvo = descobrir_acao(pastas, regras)
     if acao is None:
@@ -391,7 +495,7 @@ if __name__ == "__main__":
     rascunhos, aprovadas, ignoradas, ja_enterradas = propor(cronicos)
     registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
                 "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
-                "mundo": (mundo or {}).get("linha"), "fatos": fatos,
+                "mundo": (mundo or {}).get("linha"), "fila": fila_resumo, "fatos": fatos,
                 "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
     total = lembrar(registro)
     cont = registrar_rodada(fatos, ignoradas, acao is not None)
@@ -400,6 +504,10 @@ if __name__ == "__main__":
     print("o agente viu:", pastas)
     if mundo:
         print("o agente olhou o mundo:", mundo["linha"])
+    if fila_resumo:
+        print("o agente atendeu a fila:")
+        for linha in fila_resumo:
+            print("   -", linha)
     print("o agente decidiu:", decisao)
     print("o agente fez:", resultado)
     if SO_OLHAR:
@@ -415,7 +523,11 @@ if __name__ == "__main__":
               % (cont.get("paradas", 0), cont.get("rodadas", 0)))
     for linha in ignoradas:
         print("   - O PORTAO BARROU:", linha)
-    for linha in enterradas_txt + ja_enterradas:
+    saidas = list(enterradas_txt)
+    for linha in ja_enterradas:
+        if linha.split(":")[0] not in "".join(enterradas_txt):
+            saidas.append(linha)
+    for linha in saidas:
         print("   - ele DESISTE de:", linha)
     for id_novo in rascunhos:
         print("   - propoe fluxos/rascunhos/%s.json   (ativa: false)" % id_novo)
