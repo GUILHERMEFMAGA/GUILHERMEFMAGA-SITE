@@ -23,3 +23,6 @@ testes/mundo_falso/
 relatorios/inventario-*.txt
 relatorios/fila-*.txt
 fila/
+
+# sobra do teste do raio-x (ele mesmo apaga; isto aqui e cinto de seguranca)
+relatorios/raio-x-teste.tmp

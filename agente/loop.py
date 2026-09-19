@@ -196,14 +196,23 @@ def dentro_do_projeto(caminho):
         return False
 
 
-def descobrir_mundo():
+PASTAS_CANDIDATAS = {
+    "desktop": ("Desktop", os.path.join("OneDrive", "Desktop"),
+                os.path.join("OneDrive", "\u00c1rea de Trabalho"), "\u00c1rea de Trabalho"),
+    "downloads": ("Downloads", "Transfer\u00eancias",
+                  os.path.join("OneDrive", "Downloads"),
+                  os.path.join("OneDrive", "Transfer\u00eancias")),
+}
+
+
+def descobrir_pasta(nome_olho):
     casa = Path(os.environ.get("AGENTE_CASA") or os.path.expanduser("~"))
-    for nome in ("Desktop", os.path.join("OneDrive", "Desktop"),
-                 os.path.join("OneDrive", "\u00c1rea de Trabalho"), "\u00c1rea de Trabalho"):
+    candidatos = PASTAS_CANDIDATAS.get(nome_olho, (nome_olho,))
+    for nome in candidatos:
         teste = casa / nome
         if teste.exists():
             return teste
-    return casa / "Desktop"
+    return casa / candidatos[0]
 
 
 def inventariar(pasta):
@@ -226,7 +235,7 @@ def inventariar(pasta):
               "# lido de: %s" % pasta,
               "# arquivos soltos encontrados: %d" % soltos, ""]
     if pastas:
-        linhas.append("pastas na Area de Trabalho: %d" % len(pastas))
+        linhas.append("pastas soltas na pasta vigiada: %d" % len(pastas))
         for item in pastas:
             linhas.append("   - %s" % item.name)
         linhas.append("")
@@ -241,22 +250,48 @@ def inventariar(pasta):
 def olhar_mundo():
     politica = ler_cerebro().get("mundo")
     if not isinstance(politica, dict) or not politica.get("ligado", False):
-        return None
-    pasta = descobrir_mundo()
-    if not pasta.exists():
-        return {"linha": "procurei %s e nao achei: nada feito" % pasta, "mudou": False}
-    nome_relatorio = politica.get("relatorio_em")
-    if not nome_relatorio or not dentro_do_projeto(RAIZ / nome_relatorio):
-        return {"linha": "o relatorio do mundo aponta pra fora do projeto: barrado", "mudou": False}
-    destino = RAIZ / nome_relatorio
-    novo, soltos = inventariar(pasta)
-    antigo = destino.read_text(encoding="utf-8") if destino.exists() else ""
-    if politica.get("so_quando_mudar", True) and antigo and corpo(antigo) == corpo(novo):
-        return {"linha": "nada mudou la fora: %s ja estava atualizado" % destino.name, "mudou": False}
-    destino.parent.mkdir(parents=True, exist_ok=True)
-    destino.write_text(novo, encoding="utf-8")
-    return {"linha": "olhei %s (%d arquivos soltos) e escrevi %s"
-                    % (pasta.name, soltos, nome_relatorio.replace("\\", "/")), "mudou": True}
+        return []
+    olhos = politica.get("olhos")
+    if not isinstance(olhos, list) or not olhos:
+        olhos = [{"nome": "desktop", "relatorio_em": politica.get("relatorio_em")}]
+    resultados = []
+    for olho in olhos:
+        if not isinstance(olho, dict):
+            continue
+        nome_olho = str(olho.get("nome") or "desktop").strip().lower()
+        pasta = descobrir_pasta(nome_olho)
+        if not pasta.exists():
+            resultados.append({"olho": nome_olho, "mudou": False,
+                              "linha": "procurei %s e nao achei: nada feito" % pasta})
+            continue
+        nome_relatorio = olho.get("relatorio_em") or politica.get("relatorio_em")
+        if not nome_relatorio or not dentro_do_projeto(RAIZ / nome_relatorio):
+            resultados.append({"olho": nome_olho, "mudou": False,
+                              "linha": "o relatorio do olho '%s' aponta pra fora do projeto: barrado" % nome_olho})
+            continue
+        destino = RAIZ / nome_relatorio
+        try:
+            novo, soltos = inventariar(pasta)
+        except OSError as erro:
+            resultados.append({"olho": nome_olho, "mudou": False,
+                              "linha": "quase li %s, mas o Windows nao deixou (%s)" % (nome_olho, erro)})
+            continue
+        antigo = destino.read_text(encoding="utf-8") if destino.exists() else ""
+        if politica.get("so_quando_mudar", True) and antigo and corpo(antigo) == corpo(novo):
+            resultados.append({"olho": nome_olho, "mudou": False,
+                              "linha": "nada mudou em %s: %s ja estava atualizado" % (nome_olho, destino.name)})
+            continue
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            destino.write_text(novo, encoding="utf-8")
+        except OSError as erro:
+            resultados.append({"olho": nome_olho, "mudou": False,
+                              "linha": "quase escrevi %s, mas o disco disse nao (%s)" % (destino.name, erro)})
+            continue
+        resultados.append({"olho": nome_olho, "mudou": True,
+                          "linha": "olhei %s (%d arquivos soltos) e escrevi %s"
+                                   % (pasta.name, soltos, nome_relatorio.replace("\\", "/"))})
+    return resultados
 
 
 def comando_permitido(cmd):
@@ -334,7 +369,7 @@ def tratar_fila():
         item = ler_tarefa(tarefa)
         if item is None:
             mover_fila(tarefa, "erros")
-            linhas.append("%s: vazio ou ilegivel -> foi pra fila\\erros" % tarefa.name)
+            linhas.append("%s: vazio ou ilegivel -> foi pra fila\erros" % tarefa.name)
             continue
         if item["tipo"] == "executar":
             codigo, saida = executar_comando(item["rest"])
@@ -356,8 +391,16 @@ def tratar_fila():
             linhas.append("%s: relatorio nao coube no disco (%s), mas a fila seguiu" % (tarefa.name, erro))
         movida = mover_fila(tarefa, estado)
         rotulo = "FEITA" if estado == "feitas" else ("PROBLEMA" if movida else "TRAVADA")
-        linhas.append("%s [%s] -> relatorio em relatorios\\fila-%s.txt" % (tarefa.name, rotulo, tarefa.stem))
+        linhas.append("%s [%s] -> relatorio em relatorios\fila-%s.txt" % (tarefa.name, rotulo, tarefa.stem))
     return linhas
+
+
+def fiscal_da_fila():
+    # quantas tarefas presas em fila\erros esperando decisao humana
+    try:
+        return len([p for p in (FILA / "erros").glob("*.txt") if p.is_file()])
+    except OSError:
+        return 0
 
 
 def ensaiar(proposta):
@@ -478,6 +521,7 @@ if __name__ == "__main__":
     pastas = listar_pastas()
     mundo = olhar_mundo()
     fila_resumo = tratar_fila()
+    presos = fiscal_da_fila()
     regras = ler_cerebro()
     acao, alvo = descobrir_acao(pastas, regras)
     if acao is None:
@@ -495,19 +539,23 @@ if __name__ == "__main__":
     rascunhos, aprovadas, ignoradas, ja_enterradas = propor(cronicos)
     registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
                 "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
-                "mundo": (mundo or {}).get("linha"), "fila": fila_resumo, "fatos": fatos,
+                "mundo": [m["linha"] for m in mundo] if mundo else None,
+                "fila": fila_resumo, "fila_erros": presos, "fatos": fatos,
                 "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
     total = lembrar(registro)
     cont = registrar_rodada(fatos, ignoradas, acao is not None)
     cronicos, espalhadas, enterradas_map = contar_fatos(cont)
     enterradas_txt = ["%s foi barrado %dx: ideia enterrada" % (i, q) for i, q in enterradas_map.items()]
     print("o agente viu:", pastas)
-    if mundo:
-        print("o agente olhou o mundo:", mundo["linha"])
+    for m in mundo:
+        print("o agente olhou o mundo:", m["linha"])
     if fila_resumo:
         print("o agente atendeu a fila:")
         for linha in fila_resumo:
             print("   -", linha)
+    if presos:
+        print("   - o fiscal da fila: ha %d tarefa(s) presa(s) em fila\erros; "
+              "leia o relatorio, corrija e devolva pra fila (ou apague com a sua mao)" % presos)
     print("o agente decidiu:", decisao)
     print("o agente fez:", resultado)
     if SO_OLHAR:

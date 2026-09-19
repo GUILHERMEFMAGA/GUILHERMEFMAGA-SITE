@@ -9,7 +9,11 @@
     "relatorio_em": "relatorios/inventario-desktop.txt",
     "permitido": ["ler", "contar", "escrever_dentro_do_projeto"],
     "proibido": ["mover", "apagar", "editar_arquivo_do_mundo"],
-    "so_quando_mudar": true
+    "so_quando_mudar": true,
+    "olhos": [
+      {"nome": "desktop", "relatorio_em": "relatorios/inventario-desktop.txt"},
+      {"nome": "downloads", "relatorio_em": "relatorios/inventario-downloads.txt"}
+    ]
   },
   "execucao": {
     "ligada": true,

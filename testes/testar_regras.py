@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v4: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 
 import importlib.util
+import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -109,8 +111,75 @@ print("  [%s] leitor de fila  -> pula comentario, le o primeiro pedido, vazio vi
 if not leu_certo:
     falhas.append("leitor de fila")
 
+# cena nova: dois olhos no mundo (desktop + downloads), com cerebro velho ainda valendo
+palco.mkdir(parents=True)
+casa_falsa = palco / "casa"
+(casa_falsa / "Desktop").mkdir(parents=True)
+(casa_falsa / "Desktop" / "nota.txt").write_text("oi", encoding="utf-8")
+(casa_falsa / "Downloads").mkdir(parents=True)
+(casa_falsa / "Downloads" / "pacote.zip").write_text("pesado", encoding="utf-8")
+proj_olhos = palco / "proj"
+(proj_olhos / "relatorios").mkdir(parents=True)
+(proj_olhos / "fluxos").mkdir(parents=True)
+cerebro_velho = {"acoes": [], "mundo": {"ligado": True, "relatorio_em": "relatorios/inventario-velho.txt"}}
+(proj_olhos / "fluxos" / "regras.json").write_text(json.dumps(cerebro_velho), encoding="utf-8")
+env_antigo = os.environ.get("AGENTE_CASA")
+raiz_antiga, cerebro_antigo = loop.RAIZ, loop.CEREBRO
+os.environ["AGENTE_CASA"] = str(casa_falsa)
+try:
+    loop.RAIZ = proj_olhos
+    loop.CEREBRO = proj_olhos / "fluxos" / "regras.json"
+    velho = loop.olhar_mundo()
+    compativel = (len(velho) == 1 and velho[0]["mudou"]
+                  and (proj_olhos / "relatorios" / "inventario-velho.txt").exists())
+    cerebro_novo = {"acoes": [], "mundo": {"ligado": True, "so_quando_mudar": True, "olhos": [
+        {"nome": "desktop", "relatorio_em": "relatorios/inventario-desktop.txt"},
+        {"nome": "downloads", "relatorio_em": "relatorios/inventario-downloads.txt"}]}}
+    (proj_olhos / "fluxos" / "regras.json").write_text(json.dumps(cerebro_novo), encoding="utf-8")
+    dois = loop.olhar_mundo()
+    dois_ok = (len(dois) == 2 and all(r["mudou"] for r in dois)
+               and (proj_olhos / "relatorios" / "inventario-desktop.txt").exists()
+               and (proj_olhos / "relatorios" / "inventario-downloads.txt").exists())
+    calmos = loop.olhar_mundo()
+    calmo_ok = len(calmos) == 2 and not any(r["mudou"] for r in calmos)
+    olhos_ok = compativel and dois_ok and calmo_ok
+finally:
+    loop.RAIZ, loop.CEREBRO = raiz_antiga, cerebro_antigo
+    if env_antigo is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_antigo
+print("  [%s] dois olhos no mundo  -> cerebro velho vira 1 olho, novo da 2, e a 2a passada nao reescreve"
+      % ("ok  " if olhos_ok else "FALHA"))
+if not olhos_ok:
+    falhas.append("dois olhos no mundo")
+
+# cena nova: fiscal da fila — conta presos em fila/erros, ignora o resto
+fila_antiga = loop.FILA
+fiscal_palco = palco / "fiscal"
+try:
+    (fiscal_palco / "erros").mkdir(parents=True)
+    (fiscal_palco / "erros" / "t1.txt").write_text("x", encoding="utf-8")
+    (fiscal_palco / "erros" / "t2.txt").write_text("x", encoding="utf-8")
+    (fiscal_palco / "erros" / "nota.md").write_text("x", encoding="utf-8")
+    loop.FILA = fiscal_palco
+    conta_certo = loop.fiscal_da_fila() == 2
+    (fiscal_palco / "erros" / "t1.txt").unlink()
+    (fiscal_palco / "erros" / "t2.txt").unlink()
+    zerada = loop.fiscal_da_fila() == 0
+    loop.FILA = palco / "pasta-que-nao-existe"
+    sumida = loop.fiscal_da_fila() == 0
+    fiscal_ok = conta_certo and zerada and sumida
+finally:
+    loop.FILA = fila_antiga
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] fiscal da fila  -> conta presos em fila/erros, pasta vazia ou sumida vira zero"
+      % ("ok  " if fiscal_ok else "FALHA"))
+if not fiscal_ok:
+    falhas.append("fiscal da fila")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme e fila legivel.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada e dois olhos no mundo.")
