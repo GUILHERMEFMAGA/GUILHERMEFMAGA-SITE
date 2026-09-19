@@ -1,6 +1,7 @@
 # agente/loop.py
-"""Laco: perceber -> decidir -> agir -> lembrar -> analisar -> propor."""
+"""Laco: perceber -> decidir -> agir -> lembrar -> analisar -> propor -> promover (com portao)."""
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -8,6 +9,8 @@ RAIZ = Path(__file__).resolve().parent.parent
 MEMORIA = RAIZ / "memoria" / "historico.json"
 FLUXO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
+PALCO = RAIZ / "testes" / "mundo_falso" / "ensaio"
+CHAVES_PERMITIDAS = ["id", "pasta_com_conteudo", "criar_arquivo", "conteudo"]
 
 
 def perceber():
@@ -16,11 +19,18 @@ def perceber():
     return sorted(nomes)
 
 
-def carregar_regras():
-    """O cerebro e texto: cada item do arquivo e uma regra de verdade."""
+def ler_cerebro():
+    """Le o arquivo INTEIRO: politica + regras. So assim promover nao apaga a jaula."""
     if not FLUXO.exists():
-        return []
-    return json.loads(FLUXO.read_text(encoding="utf-8"))["acoes"]
+        return {"auto_promocao": {"ligada": False}, "acoes": []}
+    dados = json.loads(FLUXO.read_text(encoding="utf-8"))
+    dados.setdefault("acoes", [])
+    dados.setdefault("auto_promocao", {"ligada": False})
+    return dados
+
+
+def carregar_regras():
+    return ler_cerebro()["acoes"]
 
 
 def decidir(pastas):
@@ -89,7 +99,7 @@ def analisar(janela=12):
 
 
 def propor(aprendizados):
-    """Transforma aprendizado em rascunho de regra DESLIGADA. Ele propoe, nao se auto-promove."""
+    """Transforma aprendizado em rascunho de regra. Ele propoe, nunca escreve direto no cerebro."""
     RASCUNHOS.mkdir(parents=True, exist_ok=True)
     novos = []
     for linha in aprendizados:
@@ -101,9 +111,9 @@ def propor(aprendizados):
         if destino.exists():
             continue
         rascunho = {
-            "ativa": False,
-            "origem": linha,
             "criada_em": datetime.now().isoformat(timespec="seconds"),
+            "origem": linha,
+            "ativa": False,
             "proposta": {
                 "id": id_novo,
                 "pasta_com_conteudo": [".gitkeep", "base.py"],
@@ -116,41 +126,96 @@ def propor(aprendizados):
     return novos
 
 
+def regra_e_segura(proposta):
+    """Jaula de verdade: lista do que e PERMITIDO. O que nao esta na lista ja esta vetado."""
+    estranhas = [chave for chave in proposta if chave not in CHAVES_PERMITIDAS]
+    return not estranhas, estranhas
+
+
+def ensaiar(proposta):
+    """Coloca o agente num palco de mentira, roda decidir+agir de verdade, e devolve '' se aprovou."""
+    global RAIZ
+    mundo_real = RAIZ
+    shutil.rmtree(PALCO, ignore_errors=True)
+    cena = PALCO / "cena"
+    cena.mkdir(parents=True)
+    for nome in proposta["pasta_com_conteudo"]:
+        (cena / nome).write_text("arquivo de ensaio\n", encoding="utf-8")
+    try:
+        RAIZ = PALCO
+        acao, alvo, regra = decidir(perceber())
+        resultado = agir(acao, alvo, regra)
+        criado = cena / proposta["criar_arquivo"]
+        if acao != proposta["id"]:
+            return f"a regra nem disparou na cena feita sob medida para ela (veio: {acao})"
+        if not criado.exists():
+            return f"o arquivo prometido nao nasceu no disco (agir disse: {resultado})"
+        if criado.read_text(encoding="utf-8") != proposta["conteudo"]:
+            return "o conteudo escrito difere do prometido pela regra"
+        return ""
+    finally:
+        RAIZ = mundo_real
+
+
 def promover():
-    """So entra no cerebro a regra que o HUMANO marcou com 'ativa': true."""
+    """Unica porta de entrada do cerebro. Passa pela jaula, pelo ensaio e pela sua licenca."""
     if not RASCUNHOS.exists():
-        return []
-    regras = carregar_regras()
-    existentes = {r["id"] for r in regras}
+        return [], []
+    dados = ler_cerebro()
+    regras = dados["acoes"]
+    existentes = {regra["id"] for regra in regras}
+    politica = dados["auto_promocao"]
+    limite = int(politica.get("limite_de_regras", 6))
     aprovadas = []
+    barradas = []
     for arquivo in sorted(RASCUNHOS.glob("*.json")):
         dado = json.loads(arquivo.read_text(encoding="utf-8"))
         proposta = dado["proposta"]
-        if dado.get("ativa") and proposta["id"] not in existentes:
+        if proposta["id"] in existentes:
+            continue
+        segura, estranhas = regra_e_segura(proposta)
+        if not segura:
+            motivo = f"chaves fora da jaula: {estranhas}"
+        else:
+            motivo = ensaiar(proposta)
+        liberada = bool(politica.get("ligada")) and segura and len(regras) < limite
+        if motivo:
+            barradas.append(f"{proposta['id']}: {motivo}")
+            dado["motivo_da_recusa"] = motivo
+            dado["recusada_em"] = datetime.now().isoformat(timespec="seconds")
+        elif not dado.get("ativa") and not liberada:
+            dado["ensaio"] = "aprovada no ensaio, esperando sua licenca"
+        else:
             regras.append(proposta)
             existentes.add(proposta["id"])
-            aprovadas.append(proposta["id"])
+            origem = "sua licenca" if dado.get("ativa") else "auto_promocao ligada"
+            aprovadas.append(f"{proposta['id']} ({origem})")
+        arquivo.write_text(json.dumps(dado, indent=2, ensure_ascii=False), encoding="utf-8")
     if aprovadas:
-        FLUXO.write_text(json.dumps({"acoes": regras}, indent=2, ensure_ascii=False), encoding="utf-8")
-    return aprovadas
+        dados["acoes"] = regras
+        FLUXO.write_text(json.dumps(dados, indent=2, ensure_ascii=False), encoding="utf-8")
+    return aprovadas, barradas
 
 
 if __name__ == "__main__":
-    movidas = promover()
+    aprovadas, barradas = promover()
     pastas = perceber()
     acao, alvo, regra = decidir(pastas)
     resultado = agir(acao, alvo, regra)
     aprendizados = analisar()
     rascunhos = propor(aprendizados)
     total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado,
-                     "aprendeu": aprendizados, "rascunhou": rascunhos, "promoveu": movidas})
+                     "aprendeu": aprendizados, "rascunhou": rascunhos, "promoveu": aprovadas,
+                     "barradas": barradas})
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
     print("o agente fez:", resultado)
     for linha in aprendizados:
         print("   - ele aprendeu:", linha)
     for id_rascunho in rascunhos:
-        print(f"   - propoe fluxos/rascunhos/{id_rascunho}.json   (ativa: false)")
-    for id_aprovada in movidas:
-        print("   - CEREBRO GANHOU regra nova:", id_aprovada)
+        print(f"   - propoe fluxos/rascunhos/{id_rascunho}.json")
+    for linha in aprovadas:
+        print("   - CEREBRO GANHOU:", linha)
+    for linha in barradas:
+        print("   - O PORTAO BARROU:", linha)
     print("o agente lembra:", total, "registros em memoria/historico.json")

@@ -10,5 +10,7 @@
     ],
     "criar_arquivo": "LEIA-ME.txt",
     "conteudo": "# NAO APAGUE base.py em testes: ele e gerado pelo agente. Veja memoria/historico.json\n"
-  }
+  },
+  "motivo_da_recusa": "a regra nem disparou na cena feita sob medida para ela (veio: avisar_sobre_config)",
+  "recusada_em": "2026-09-19T01:03:26"
 }
