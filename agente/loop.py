@@ -1,5 +1,5 @@
 # agente/loop.py
-"""Laco: perceber -> decidir (lendo o fluxo) -> agir -> lembrar."""
+"""Laco do agente: perceber -> decidir -> agir -> lembrar -> analisar."""
 import json
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +16,7 @@ def perceber():
 
 
 def carregar_regras():
-    """O cerebro agora e texto: cada item do arquivo e uma regra de verdade."""
+    """O cerebro e texto: cada item do arquivo e uma regra de verdade."""
     if not FLUXO.exists():
         return []
     return json.loads(FLUXO.read_text(encoding="utf-8"))["acoes"]
@@ -46,7 +46,7 @@ def agir(acao, alvo, regra):
 
 
 def lembrar(evento):
-    """Acrescenta um evento ao diario do agente e devolve quantos registros ha."""
+    """Acrescenta um evento ao diario e devolve quantos registros existem."""
     MEMORIA.parent.mkdir(parents=True, exist_ok=True)
     registro = []
     if MEMORIA.exists():
@@ -57,12 +57,46 @@ def lembrar(evento):
     return len(registro)
 
 
+def analisar(janela=12):
+    """Le o proprio diario e devolve o que ele ensinou. Quinto organo."""
+    if not MEMORIA.exists():
+        return ["Sem diario ainda: nada a aprender."]
+    registros = json.loads(MEMORIA.read_text(encoding="utf-8"))[-janela:]
+    lidas = []
+    criacoes = {}
+    bloqueios = []
+    paradas = 0
+    for r in registros:
+        fez = r.get("fez") or ""
+        if r.get("decidiu") == "nada_a_fazer":
+            paradas += 1
+        elif fez.startswith("Criei "):
+            alvo = r.get("alvo")
+            criacoes[alvo] = criacoes.get(alvo, 0) + 1
+        elif fez.startswith("Pulei "):
+            bloqueios.append(r.get("alvo"))
+    for alvo, vezes in sorted(criacoes.items()):
+        if vezes > 1:
+            lidas.append(f"eu recriei '{alvo}' {vezes} vezes: alguem desfaz meu trabalho ali")
+    if bloqueios:
+        lidas.append(f"fui bloqueado {len(bloqueios)}x por arquivo que ja existe: falta condicao de parada")
+    if paradas:
+        lidas.append(f"em {paradas} execucoes nao havia trabalho: o mundo ja estava resolvido")
+    if not lidas:
+        lidas.append(f"nenhum padrao repetido nos ultimos {len(registros)} registros")
+    return lidas
+
+
 if __name__ == "__main__":
     pastas = perceber()
     acao, alvo, regra = decidir(pastas)
     resultado = agir(acao, alvo, regra)
-    total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado})
+    aprendizados = analisar()
+    total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado, "aprendeu": aprendizados})
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
     print("o agente fez:", resultado)
+    print("o agente analisou:")
+    for linha in aprendizados:
+        print("   -", linha)
     print("o agente lembra:", total, "registros em memoria/historico.json")
