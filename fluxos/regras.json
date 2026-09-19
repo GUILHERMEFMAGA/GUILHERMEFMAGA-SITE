@@ -2,9 +2,20 @@
   "acoes": [
     {
       "id": "criar_arquivo_base",
-      "pasta_com_conteudo": [".gitkeep"],
+      "pasta_com_conteudo": [
+        ".gitkeep"
+      ],
       "criar_arquivo": "base.py",
       "conteudo": "# EU MUDEI SO O TEXTO DO JSON E O AGENTE OBEDECEU\n"
+    },
+    {
+      "id": "avisar_sobre_config",
+      "pasta_com_conteudo": [
+        ".gitkeep",
+        "base.py"
+      ],
+      "criar_arquivo": "LEIA-ME.txt",
+      "conteudo": "# NAO APAGUE base.py em config: ele e gerado pelo agente. Veja memoria/historico.json\n"
     }
   ]
 }

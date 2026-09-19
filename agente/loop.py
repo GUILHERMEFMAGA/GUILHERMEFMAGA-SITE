@@ -1,5 +1,5 @@
 # agente/loop.py
-"""Laco do agente: perceber -> decidir -> agir -> lembrar -> analisar."""
+"""Laco: perceber -> decidir -> agir -> lembrar -> analisar -> propor."""
 import json
 from datetime import datetime
 from pathlib import Path
@@ -7,6 +7,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 MEMORIA = RAIZ / "memoria" / "historico.json"
 FLUXO = RAIZ / "fluxos" / "regras.json"
+RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
 
 
 def perceber():
@@ -58,7 +59,7 @@ def lembrar(evento):
 
 
 def analisar(janela=12):
-    """Le o proprio diario e devolve o que ele ensinou. Quinto organo."""
+    """Le o proprio diario e devolve o que ele ensinou."""
     if not MEMORIA.exists():
         return ["Sem diario ainda: nada a aprender."]
     registros = json.loads(MEMORIA.read_text(encoding="utf-8"))[-janela:]
@@ -87,16 +88,69 @@ def analisar(janela=12):
     return lidas
 
 
+def propor(aprendizados):
+    """Transforma aprendizado em rascunho de regra DESLIGADA. Ele propoe, nao se auto-promove."""
+    RASCUNHOS.mkdir(parents=True, exist_ok=True)
+    novos = []
+    for linha in aprendizados:
+        if "recriei" not in linha:
+            continue
+        alvo = linha.split("'")[1]
+        id_novo = f"avisar_sobre_{alvo}"
+        destino = RASCUNHOS / f"{id_novo}.json"
+        if destino.exists():
+            continue
+        rascunho = {
+            "ativa": False,
+            "origem": linha,
+            "criada_em": datetime.now().isoformat(timespec="seconds"),
+            "proposta": {
+                "id": id_novo,
+                "pasta_com_conteudo": [".gitkeep", "base.py"],
+                "criar_arquivo": "LEIA-ME.txt",
+                "conteudo": f"# NAO APAGUE base.py em {alvo}: ele e gerado pelo agente. Veja memoria/historico.json\n",
+            },
+        }
+        destino.write_text(json.dumps(rascunho, indent=2, ensure_ascii=False), encoding="utf-8")
+        novos.append(id_novo)
+    return novos
+
+
+def promover():
+    """So entra no cerebro a regra que o HUMANO marcou com 'ativa': true."""
+    if not RASCUNHOS.exists():
+        return []
+    regras = carregar_regras()
+    existentes = {r["id"] for r in regras}
+    aprovadas = []
+    for arquivo in sorted(RASCUNHOS.glob("*.json")):
+        dado = json.loads(arquivo.read_text(encoding="utf-8"))
+        proposta = dado["proposta"]
+        if dado.get("ativa") and proposta["id"] not in existentes:
+            regras.append(proposta)
+            existentes.add(proposta["id"])
+            aprovadas.append(proposta["id"])
+    if aprovadas:
+        FLUXO.write_text(json.dumps({"acoes": regras}, indent=2, ensure_ascii=False), encoding="utf-8")
+    return aprovadas
+
+
 if __name__ == "__main__":
+    movidas = promover()
     pastas = perceber()
     acao, alvo, regra = decidir(pastas)
     resultado = agir(acao, alvo, regra)
     aprendizados = analisar()
-    total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado, "aprendeu": aprendizados})
+    rascunhos = propor(aprendizados)
+    total = lembrar({"viu": len(pastas), "decidiu": acao, "alvo": alvo, "fez": resultado,
+                     "aprendeu": aprendizados, "rascunhou": rascunhos, "promoveu": movidas})
     print("o agente viu:", pastas)
     print("o agente decidiu:", acao, "->", alvo)
     print("o agente fez:", resultado)
-    print("o agente analisou:")
     for linha in aprendizados:
-        print("   -", linha)
+        print("   - ele aprendeu:", linha)
+    for id_rascunho in rascunhos:
+        print(f"   - propoe fluxos/rascunhos/{id_rascunho}.json   (ativa: false)")
+    for id_aprovada in movidas:
+        print("   - CEREBRO GANHOU regra nova:", id_aprovada)
     print("o agente lembra:", total, "registros em memoria/historico.json")
