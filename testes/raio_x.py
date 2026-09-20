@@ -4,6 +4,7 @@
 # teste de escrita em relatorios/, criado e apagado na hora.
 # Saida: [OK] funciona, [DICA] pode melhorar, [AVISO] atencao, [PROBLEMA] quebrou.
 # v2: para de contar o campo legado como olho extra e radiografa o canal abrir:.
+# v3: radiografa o porteiro (--vigiar), o snapshot dele e o tick.bat.
 # Codigo de saida: 0 = sem problemas, 1 = pelo menos um PROBLEMA (pra portao usar).
 
 import ast
@@ -23,6 +24,7 @@ FERRAMENTAS_DO_CORPO = [
     "executar_comando", "ler_tarefa", "mover_fila", "tratar_fila",
     "fiscal_da_fila", "politica_abrir", "raizes_de_abrir", "dentro_de",
     "validar_abrir", "executar_abrir", "ensaiar", "propor", "promover",
+    "politica_vigilia", "snapshot_pasta", "aplicar_reacoes", "vigiar",
 ]
 
 # comandos que o raio-x reconhece como leitura pura (dicionario de seguranca)
@@ -254,11 +256,11 @@ def checar_loop():
                  % (", ".join(faltando), total),
                  "esse loop.py e de versao ANTIGA ou colado pela metade: feche a aba, cole o bloco inteiro, Ctrl+S, rode o raio-x de novo")
         return
-    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + dois olhos + abrir seguro)"
+    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + abrir + porteiro)"
        % (total, len(funcoes)))
-    if total < 645:
-        aviso("loop.py", "%d linhas e anatomia ok — versao B9a no corpo B10? (a atual tem 660)" % total,
-              "cole o loop.py v3 do bloco B10 inteiro, Ctrl+S, e rode o raio-x de novo")
+    if total < 780:
+        aviso("loop.py", "%d linhas e anatomia ok — corpo B10 com braco B11? (a atual tem 818)" % total,
+              "cole o loop.py v4 do bloco B11 inteiro, Ctrl+S, e rode o raio-x de novo")
     if extras:
         dica("loop.py", "funcoes fora do meu checklist (suas ou do proprio laco — sem problema): %s"
              % ", ".join(extras[:6]))
@@ -469,8 +471,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 14:
-        dica("portao", "%d impressoes — o portao v5 tem 14; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 15:
+        dica("portao", "%d impressoes — o portao v6 tem 15; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- rascunhos
@@ -527,6 +529,78 @@ def checar_abrir(cerebro):
            % (len(raizes), ", ".join(map(str, raizes)), len(jamais)))
 
 
+# ---------------------------------------------------------------- porteiro
+def checar_vigia(cerebro):
+    if not isinstance(cerebro, dict):
+        return
+    cfg = cerebro.get("vigilia")
+    if cfg is None:
+        problema("vigilia", "bloco vigilia sumiu do cerebro — nao ha porteiro de plantao",
+                 "cole o regras.json v12 inteiro (o bloco vigilia e a campainha)")
+        return
+    if not isinstance(cfg, dict):
+        problema("vigilia", "bloco vigilia nao e objeto { }", "confira as chaves; use o modelo entregue")
+        return
+    erros = []
+    tol = cfg.get("tolerancia_seg", 90)
+    if not (isinstance(tol, int) and not isinstance(tol, bool) and 0 <= tol <= 3600):
+        erros.append("tolerancia_seg=%r precisa ser inteiro entre 0 e 3600 segundos" % (tol,))
+    olhos = cfg.get("olhos")
+    if not (isinstance(olhos, list) and olhos):
+        erros.append("sem lista vigilia.olhos — porteiro sem porta pra vigiar")
+    for i, olho in enumerate(olhos or []):
+        if not isinstance(olho, dict):
+            erros.append("olho %d nao e objeto { }" % i)
+            continue
+        if not str(olho.get("pasta") or "").strip():
+            erros.append("olho %d sem 'pasta' (ex.: downloads)" % i)
+        for j, rc in enumerate(olho.get("ao_chegar") or ["inventario"]):
+            if isinstance(rc, str) and rc == "inventario":
+                continue
+            if isinstance(rc, dict) and set(rc) == {"anotar"} and isinstance(rc["anotar"], str):
+                continue
+            if (isinstance(rc, dict) and set(rc) == {"anotar_fila"} and isinstance(rc["anotar_fila"], str)
+                    and rc["anotar_fila"].split(":", 1)[0].strip().lower() in ("executar", "abrir", "avisar")):
+                continue
+            erros.append("reacao %d do olho %s fora do vocabulario (vale: inventario, anotar, anotar_fila)"
+                         % (j, olho.get("pasta") or i))
+    if not cfg.get("ligado", False):
+        dica("vigilia", "porteiro desligado (ligado: false) — nada sera vigiado")
+    elif erros:
+        problema("vigilia", "; ".join(erros[:3]), "conserte so os campos apontados; o modelo esta no regras.json entregue")
+    else:
+        ok("vigilia", "porteiro ligado: %d olho(s), tolerancia %ds, teto %d eventos por rodada"
+           % (len(olhos), tol, cfg.get("max_eventos", 25)))
+    snapshot = RAIZ / "memoria" / "vigilia.json"
+    if snapshot.exists():
+        try:
+            dados = ler_json_seguro(snapshot)
+            if isinstance(dados, dict):
+                ok("vigilia.snapshot", "%d pasta(s) na memoria do porteiro: %s"
+                   % (len(dados), ", ".join(sorted(dados)) or "nenhuma ainda"))
+            else:
+                problema("vigilia.snapshot", "vigilia.json nao e um objeto { }",
+                         "apague o arquivo: o porteiro recalibra sozinho na proxima visita")
+        except (json.JSONDecodeError, OSError):
+            problema("vigilia.snapshot", "vigilia.json esta ilegivel",
+                     "apague o arquivo: o porteiro recalibra sozinho na proxima visita")
+    else:
+        dica("vigilia.snapshot", "sem snapshot ainda — criado na 1a corrida com --vigiar")
+    tick = RAIZ / "tick.bat"
+    if tick.exists():
+        try:
+            texto_tick = tick.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            texto_tick = ""
+        if "--vigiar" in texto_tick and "--so-olhar" in texto_tick:
+            ok("tick", "tick.bat registrado — o porteiro bate ponto sem tocar em nada")
+        else:
+            problema("tick", "tick.bat sem --vigiar --so-olhar: porteiro de calcas curtas",
+                     "cole o tick.bat do bloco B11 inteiro")
+    else:
+        dica("tick", "ainda sem tick.bat — o duplo-clique que da vida ao porteiro (bloco B11)")
+
+
 def main():
     print("=" * 78)
     print("RAIO-X do super-agente — corpo inteiro lido com calma, sem tocar em nada")
@@ -536,6 +610,7 @@ def main():
     print("  coleira  = lista de comandos permitidos (o que ele pode tocar)")
     print("  loop.py  = o corpo: ver, olhar, decidir, fazer, lembrar, contar, propor")
     print("  fila     = ordens do dia: executar, abrir, avisar (so com voce presente)")
+    print("  vigilia  = o porteiro: detecta arquivos novos e reage so com vocabulario aprovado")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -568,6 +643,10 @@ def main():
         checar_abrir(cerebro)
     except Exception as erro:
         problema("abrir", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_vigia(cerebro)
+    except Exception as erro:
+        problema("vigilia", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

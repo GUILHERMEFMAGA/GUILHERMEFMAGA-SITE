@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
-# O cerebro do agente (v3): ver -> olhar o mundo -> decidir -> fazer -> lembrar -> contar -> propor.
+# O cerebro do agente (v4): ver -> olhar o mundo -> decidir -> fazer -> lembrar -> contar -> propor.
 # v3: a fila ganha o verbo abrir: — abre arquivo ou pasta no app padrao do Windows,
 # so dentro das areas liberadas e nunca um executavel (lista jamais_abrir).
 # Regra de ferro: ele pode LER o mundo la de fora, mas so escreve dentro do projeto.
 # Modo agendado (--so-olhar): ele olha, anota e NAO se autopromove, porque nao ha voce ali.
+# v4: o porteiro — --vigiar detecta arquivos novos nas pastas vigiadas e
+# reage so com vocabulario aprovado; a noite (com --so-olhar) ele observa e enfileira, nunca age sozinho.
 
 import json
 import os
 import shutil
 import subprocess
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -18,10 +21,12 @@ CONTADORES = RAIZ / "memoria" / "contadores.json"
 CEREBRO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
 FILA = RAIZ / "fila"
+VIGILIA = RAIZ / "memoria" / "vigilia.json"
 PALCO = RAIZ / "testes" / "mundo_falso" / "ensaios"
 IGNORADAS = {"__pycache__", "mundo_falso", "fila", ".git"}
 
 SO_OLHAR = "--so-olhar" in os.sys.argv[1:]
+VIGIAR = "--vigiar" in os.sys.argv[1:]
 
 
 def ler_json(caminho, padrao):
@@ -402,7 +407,7 @@ def tratar_fila():
             linhas.append("%s: relatorio nao coube no disco (%s), mas a fila seguiu" % (tarefa.name, erro))
         movida = mover_fila(tarefa, estado)
         rotulo = "FEITA" if estado == "feitas" else ("PROBLEMA" if movida else "TRAVADA")
-        linhas.append("%s [%s] -> relatorio em relatorios\fila-%s.txt" % (tarefa.name, rotulo, tarefa.stem))
+        linhas.append("%s [%s] -> relatorio em relatorios/fila-%s.txt" % (tarefa.name, rotulo, tarefa.stem))
     return linhas
 
 
@@ -477,6 +482,150 @@ def executar_abrir(caminho_texto):
     except OSError as erro:
         return None, "a validacao passou, mas o Windows recusou abrir (%s)" % erro
     return 0, "abri %s com o app padrao do Windows" % resposta
+
+
+def politica_vigilia():
+    cfg = ler_cerebro().get("vigilia")
+    if not isinstance(cfg, dict) or not cfg.get("ligado", False):
+        return None
+    return cfg
+
+
+def snapshot_pasta(pasta):
+    dados = {}
+    try:
+        itens = sorted(pasta.iterdir())
+    except OSError:
+        return dados
+    for item in itens:
+        if item.name.lower().startswith((".", "thumbs.db")):
+            continue
+        if item.is_file():
+            try:
+                st = item.stat()
+            except OSError:
+                continue
+            dados[item.name] = [int(st.st_mtime), st.st_size]
+    return dados
+
+
+def aplicar_reacoes(olho, nome_arquivo):
+    logs = []
+    reacoes = olho.get("ao_chegar")
+    if not isinstance(reacoes, list) or not reacoes:
+        reacoes = ["inventario"]
+    nome_olho = str(olho.get("pasta") or "desktop").strip().lower()
+    for reacao in reacoes:
+        if reacao == "inventario":
+            pasta = RAIZ if nome_olho == "projeto" else descobrir_pasta(nome_olho)
+            try:
+                texto, _ = inventariar(pasta)
+                destino = RAIZ / "relatorios" / ("inventario-%s.txt" % nome_olho)
+                if dentro_do_projeto(destino):
+                    destino.parent.mkdir(parents=True, exist_ok=True)
+                    destino.write_text(texto, encoding="utf-8")
+                    logs.append("inventario atualizado")
+                else:
+                    logs.append("inventario recusado: fora do projeto")
+            except OSError as erro:
+                logs.append("inventario falhou (%s)" % erro)
+        elif isinstance(reacao, dict) and "anotar" in reacao:
+            linha_log = "[%s] %s | %s\n" % (datetime.now().isoformat(timespec="seconds"),
+                                            nome_arquivo, reacao["anotar"])
+            try:
+                diario = RAIZ / "memoria" / "vigilia.log"
+                if dentro_do_projeto(diario):
+                    diario.parent.mkdir(parents=True, exist_ok=True)
+                    with diario.open("a", encoding="utf-8") as arquivo_log:
+                        arquivo_log.write(linha_log)
+                    logs.append("anotado em memoria/vigilia.log")
+                else:
+                    logs.append("anotacao recusada: fora do projeto")
+            except OSError as erro:
+                logs.append("anotacao falhou (%s)" % erro)
+        elif isinstance(reacao, dict) and "anotar_fila" in reacao:
+            cmd = str(reacao["anotar_fila"]).strip()
+            tipo = cmd.split(":", 1)[0].strip().lower() if ":" in cmd else ""
+            if tipo not in ("executar", "abrir", "avisar"):
+                logs.append("recusei enfileirar: tipo fora do vocabulario")
+                continue
+            destino = FILA / ("vigia-%s.txt" % datetime.now().strftime("%H%M%S"))
+            try:
+                destino.parent.mkdir(parents=True, exist_ok=True)
+                destino.write_text("# escrito pelo porteiro; obedece a coleira quando voce rodar\n%s\n" % cmd,
+                                   encoding="utf-8")
+                logs.append("enfileirado %s (roda quando voce rodar)" % cmd.split(":")[0])
+            except OSError as erro:
+                logs.append("fila nao coube no disco (%s)" % erro)
+        else:
+            logs.append("reacao fora do vocabulario: %s" % (reacao,))
+    return logs
+
+
+def vigiar(AGORA=None):
+    cfg = politica_vigilia()
+    if cfg is None:
+        return []
+    AGORA = AGORA if AGORA is not None else time.time()
+    try:
+        tolerancia = int(cfg.get("tolerancia_seg", 90))
+        teto = int(cfg.get("max_eventos", 25))
+    except (TypeError, ValueError):
+        tolerancia, teto = 90, 25
+    estado = ler_json(VIGILIA, {})
+    if not isinstance(estado, dict):
+        estado = {}
+    saidas = []
+    vistos = 0
+    for olho in cfg.get("olhos", []):
+        if not isinstance(olho, dict):
+            continue
+        nome = str(olho.get("pasta") or "").strip().lower()
+        if not nome:
+            continue
+        pasta = RAIZ if nome == "projeto" else descobrir_pasta(nome)
+        if not pasta.exists():
+            saidas.append("%s: nao achei a pasta %s, nada vigiado" % (nome, pasta))
+            continue
+        atual = snapshot_pasta(pasta)
+        reg = estado.get(nome) if isinstance(estado.get(nome), dict) else {}
+        calibrado = isinstance(reg.get("arquivos"), dict) and isinstance(reg.get("notificados"), list)
+        conhecidos = reg.get("arquivos") if isinstance(reg.get("arquivos"), dict) else {}
+        notificados = set(reg.get("notificados") or [])
+        if not calibrado:
+            estado[nome] = {"arquivos": atual, "notificados": sorted(set(atual))}
+            saidas.append("%s: primeira visita — %d arquivo(s) registrados, nada foi avisado (calibracao)"
+                          % (nome, len(atual)))
+            continue
+        mudou = {n for n in atual if n in conhecidos and atual[n] != conhecidos[n]}
+        notificados -= mudou
+        brutos = (set(atual) - set(conhecidos)) | mudou
+        candidatos = sorted(brutos - notificados)
+        maduros = [n for n in candidatos if AGORA - atual[n][0] >= tolerancia]
+        imaturos = len(candidatos) - len(maduros)
+        eventos = maduros[:max(0, teto - vistos)]
+        vistos += len(eventos)
+        for n in eventos:
+            logs = aplicar_reacoes(olho, n)
+            notificados.add(n)
+            saidas.append("%s: chegou %s -> %s" % (nome, n, "; ".join(logs) or "anotado"))
+        if len(maduros) > len(eventos):
+            saidas.append("%s: teto de %d eventos por rodada — o resto espera a proxima" % (nome, teto))
+        if imaturos:
+            saidas.append("%s: %d arquivo(s) ainda em tolerancia (chegaram ha pouco)" % (nome, imaturos))
+        anunciados = set(eventos)
+        atuais_fiaveis = {}
+        for n_olho, st_olho in atual.items():
+            if n_olho in candidatos and n_olho not in anunciados:
+                if n_olho in conhecidos:
+                    atuais_fiaveis[n_olho] = conhecidos[n_olho]
+                # novo e imaturo fica de fora: o sinal precisa sobreviver ate amadurecer
+            else:
+                atuais_fiaveis[n_olho] = st_olho
+        estado[nome] = {"arquivos": atuais_fiaveis,
+                        "notificados": sorted(notificados & set(atuais_fiaveis))}
+    escrever_json(VIGILIA, estado)
+    return saidas
 
 
 def ensaiar(proposta):
@@ -594,8 +743,14 @@ def promover():
 
 
 if __name__ == "__main__":
+    if SO_OLHAR and VIGIAR:
+        print("tick do porteiro em %s" % datetime.now().isoformat(timespec="seconds"))
+        for v in (vigiar() or ["nada novo por enquanto"]):
+            print(" -", v)
+        raise SystemExit(0)
     pastas = listar_pastas()
     mundo = olhar_mundo()
+    vigiou = vigiar() if VIGIAR else []
     fila_resumo = tratar_fila()
     presos = fiscal_da_fila()
     regras = ler_cerebro()
@@ -616,6 +771,7 @@ if __name__ == "__main__":
     registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
                 "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
                 "mundo": [m["linha"] for m in mundo] if mundo else None,
+                "vigiou": vigiou if VIGIAR else None,
                 "fila": fila_resumo, "fila_erros": presos, "fatos": fatos,
                 "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
     total = lembrar(registro)
@@ -625,6 +781,8 @@ if __name__ == "__main__":
     print("o agente viu:", pastas)
     for m in mundo:
         print("o agente olhou o mundo:", m["linha"])
+    for v in vigiou:
+        print("o agente vigiou:", v)
     if fila_resumo:
         print("o agente atendeu a fila:")
         for linha in fila_resumo:

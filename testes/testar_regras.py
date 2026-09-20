@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v5: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v6: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 
 import importlib.util
@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -222,8 +223,58 @@ print("  [%s] canal abrir  -> arquivo e pasta de dentro valem, .exe/.ps1/fuga ba
 if not abrir_ok:
     falhas.append("canal abrir")
 
+# cena nova: o porteiro — calibra na 1a visita, avisa quando o arquivo amadurece, tolerancia protege, calmo fica quieto
+portao_palco = palco / "porteiro"
+casa_p = portao_palco / "casa"
+(casa_p / "Downloads").mkdir(parents=True)
+proj_p = portao_palco / "proj"
+(proj_p / "relatorios").mkdir(parents=True)
+(proj_p / "memoria").mkdir(parents=True)
+(proj_p / "fila").mkdir(parents=True)
+(proj_p / "fluxos").mkdir(parents=True)
+regras_p = {"acoes": [], "mundo": {"ligado": False},
+            "vigilia": {"ligado": True, "tolerancia_seg": 0, "max_eventos": 5,
+                        "olhos": [{"pasta": "downloads",
+                                   "ao_chegar": ["inventario", {"anotar": "marquinha"}]}]}}
+(proj_p / "fluxos" / "regras.json").write_text(json.dumps(regras_p), encoding="utf-8")
+env_p = os.environ.get("AGENTE_CASA")
+r_p, c_p, v_p = loop.RAIZ, loop.CEREBRO, loop.VIGILIA
+os.environ["AGENTE_CASA"] = str(casa_p)
+try:
+    loop.RAIZ = proj_p
+    loop.CEREBRO = proj_p / "fluxos" / "regras.json"
+    loop.VIGILIA = proj_p / "memoria" / "vigilia.json"
+    calibrou = "calibracao" in " | ".join(loop.vigiar())
+    (casa_p / "Downloads" / "recibo.pdf").write_text("x", encoding="utf-8")
+    so = loop.vigiar()
+    avisou = any("recibo.pdf" in s for s in so)
+    invent_ok = (proj_p / "relatorios" / "inventario-downloads.txt").exists()
+    log_ok = (proj_p / "memoria" / "vigilia.log").exists() and "marquinha" in (proj_p / "memoria" / "vigilia.log").read_text(encoding="utf-8")
+    calmo = not any("recibo.pdf" in s for s in loop.vigiar())
+    (casa_p / "Downloads" / "incompleto.zip").write_text("y", encoding="utf-8")
+    regras_p["vigilia"]["tolerancia_seg"] = 3600
+    (proj_p / "fluxos" / "regras.json").write_text(json.dumps(regras_p), encoding="utf-8")
+    imaturo = any("em tolerancia" in s for s in loop.vigiar()) and not any("incompleto.zip ->" in s for s in loop.vigiar())
+    maduro = any("incompleto.zip ->" in s for s in loop.vigiar(AGORA=time.time() + 7200))
+    porteiro_ok = calibrou and avisou and invent_ok and log_ok and calmo and imaturo and maduro
+    # cena bônus: reacao que enfileira obedece so ao vocabulario
+    fila_reacoes = "; ".join(loop.aplicar_reacoes({"pasta": "downloads", "ao_chegar": [{"anotar_fila": "format c:"}]}, "x.txt"))
+    vocab_ok = "recusei enfileirar" in fila_reacoes and "inventario atualizado" in "; ".join(loop.aplicar_reacoes({"pasta": "downloads", "ao_chegar": ["inventario", {"telepatia": "abra tudo"}]}, "x.txt"))
+    vocab_ok = vocab_ok and "telepatia" in "; ".join(loop.aplicar_reacoes({"pasta": "downloads", "ao_chegar": [{"telepatia": 1}]}, "x.txt"))
+finally:
+    loop.RAIZ, loop.CEREBRO, loop.VIGILIA = r_p, c_p, v_p
+    if env_p is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_p
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] porteiro  -> calibra, espera a tolerancia, avisa 1 vez, reage so com vocabulario aprovado"
+      % ("ok  " if (porteiro_ok and vocab_ok) else "FALHA"))
+if not (porteiro_ok and vocab_ok):
+    falhas.append("porteiro")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos no mundo e canal abrir blindado.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado e porteiro de plantao.")

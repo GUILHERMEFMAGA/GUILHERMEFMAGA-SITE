@@ -32,6 +32,15 @@
     "raizes": ["projeto", "desktop", "downloads"],
     "jamais_abrir": [".exe", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp", ".scr", ".com", ".pif", ".lnk", ".url", ".reg", ".hta", ".cpl"]
   },
+  "vigilia": {
+    "ligado": true,
+    "tolerancia_seg": 30,
+    "max_eventos": 25,
+    "olhos": [
+      {"pasta": "downloads", "ao_chegar": ["inventario", {"anotar": "chegou arquivo novo"}, {"anotar_fila": "avisar:o porteiro viu novidade no Downloads — olhe o inventario"}]},
+      {"pasta": "desktop", "ao_chegar": ["inventario"]}
+    ]
+  },
   "acoes": [
     {
       "id": "criar_arquivo_base",

@@ -1,28 +1,22 @@
 # cache que o Python fabrica sozinho
 __pycache__/
 *.pyc
-
 # ambiente virtual (a "caixinha separada" das bibliotecas)
 .venv/
 venv/
-
 # memoria de execucao do agente (diario, nao codigo)
 memoria/*.json
 memoria/*.log
-
 # segredos: NUNCA vao pro GitHub
 .env
 *.env
-
 # lixo de sistema operacional
 Thumbs.db
 .DS_Store
-
 .vscode/
 testes/mundo_falso/
 relatorios/inventario-*.txt
 relatorios/fila-*.txt
 fila/
-
 # sobra do teste do raio-x (ele mesmo apaga; isto aqui e cinto de seguranca)
 relatorios/raio-x-teste.tmp
