@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v4: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v5: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 
 import importlib.util
@@ -178,8 +178,52 @@ print("  [%s] fiscal da fila  -> conta presos em fila/erros, pasta vazia ou sumi
 if not fiscal_ok:
     falhas.append("fiscal da fila")
 
+# cena nova: canal abrir: — dentro do projeto vale, .exe/.ps1/fuga barrados, cerebro sem canal vira tudo "nao"
+abrir_palco = palco / "abrir"
+casa_ab = abrir_palco / "casa"
+(casa_ab / "Desktop").mkdir(parents=True)
+(casa_ab / "Desktop" / "nota-desktop.txt").write_text("oi", encoding="utf-8")
+proj_ab = abrir_palco / "proj"
+(proj_ab / "relatorios").mkdir(parents=True)
+(proj_ab / "fluxos").mkdir(parents=True)
+(proj_ab / "relatorios" / "ok.txt").write_text("inocente", encoding="utf-8")
+(proj_ab / "evil.exe").write_text("nao", encoding="utf-8")
+(proj_ab / "relatorios" / "script.ps1").write_text("nao", encoding="utf-8")
+(abrir_palco / "escapada.txt").write_text("fora do projeto", encoding="utf-8")
+regras_abrir = {"acoes": [], "mundo": {"ligado": False},
+                "abrir": {"ligado": True, "raizes": ["projeto", "desktop"],
+                          "jamais_abrir": [".exe", ".bat", ".ps1"]}}
+(proj_ab / "fluxos" / "regras.json").write_text(json.dumps(regras_abrir), encoding="utf-8")
+env_ab = os.environ.get("AGENTE_CASA")
+raiz_ab, cerebro_ab = loop.RAIZ, loop.CEREBRO
+os.environ["AGENTE_CASA"] = str(casa_ab)
+try:
+    loop.RAIZ = proj_ab
+    loop.CEREBRO = proj_ab / "fluxos" / "regras.json"
+    dentro_txt = loop.validar_abrir("relatorios/ok.txt")[0]
+    pasta_ok = loop.validar_abrir("relatorios")[0]
+    exe_barro = not loop.validar_abrir("evil.exe")[0]
+    ps1_barro = not loop.validar_abrir(str(Path("relatorios") / "script.ps1"))[0]
+    fuga_barra = not loop.validar_abrir("../escapada.txt")[0]
+    olho_de_fora = loop.validar_abrir(str(casa_ab / "Desktop" / "nota-desktop.txt"))[0]
+    (proj_ab / "fluxos" / "regras.json").write_text(json.dumps({"acoes": [], "mundo": {"ligado": False}}), encoding="utf-8")
+    sem_canal_barra = not loop.validar_abrir("relatorios/ok.txt")[0]
+    abrir_ok = (dentro_txt and pasta_ok and exe_barro and ps1_barro and fuga_barra
+                and olho_de_fora and sem_canal_barra)
+finally:
+    loop.RAIZ, loop.CEREBRO = raiz_ab, cerebro_ab
+    if env_ab is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_ab
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] canal abrir  -> arquivo e pasta de dentro valem, .exe/.ps1/fuga barrados, sem canal tudo morre"
+      % ("ok  " if abrir_ok else "FALHA"))
+if not abrir_ok:
+    falhas.append("canal abrir")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada e dois olhos no mundo.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos no mundo e canal abrir blindado.")

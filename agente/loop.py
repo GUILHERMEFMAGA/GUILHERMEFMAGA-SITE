@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-# O cerebro do agente: ver -> olhar o mundo -> decidir -> fazer -> lembrar -> contar -> propor.
+# O cerebro do agente (v3): ver -> olhar o mundo -> decidir -> fazer -> lembrar -> contar -> propor.
+# v3: a fila ganha o verbo abrir: — abre arquivo ou pasta no app padrao do Windows,
+# so dentro das areas liberadas e nunca um executavel (lista jamais_abrir).
 # Regra de ferro: ele pode LER o mundo la de fora, mas so escreve dentro do projeto.
 # Modo agendado (--so-olhar): ele olha, anota e NAO se autopromove, porque nao ha voce ali.
 
@@ -205,6 +207,12 @@ PASTAS_CANDIDATAS = {
 }
 
 
+# extensoes que o canal abrir: jamais toca: cada uma delas pode rodar codigo
+JAMAIS_ABRIR = {".exe", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse",
+                ".wsf", ".wsh", ".msi", ".msp", ".scr", ".com", ".pif", ".lnk", ".url",
+                ".reg", ".hta", ".cpl"}
+
+
 def descobrir_pasta(nome_olho):
     casa = Path(os.environ.get("AGENTE_CASA") or os.path.expanduser("~"))
     candidatos = PASTAS_CANDIDATAS.get(nome_olho, (nome_olho,))
@@ -374,11 +382,14 @@ def tratar_fila():
         if item["tipo"] == "executar":
             codigo, saida = executar_comando(item["rest"])
             estado = "feitas" if codigo == 0 else "erros"
+        elif item["tipo"] == "abrir":
+            codigo, saida = executar_abrir(item["rest"])
+            estado = "feitas" if codigo == 0 else "erros"
         elif item["tipo"] == "avisar":
             codigo, saida, estado = 0, item["rest"], "feitas"
         else:
             codigo = None
-            saida = "tipo que eu nao conheco: use executar:<comando> ou avisar:<recado>"
+            saida = "tipo que eu nao conheco: use executar:<comando>, abrir:<arquivo ou pasta> ou avisar:<recado>"
             estado = "erros"
         texto = ("# fila atendida em %s\n# tarefa: %s\n# pedido: %s\n# codigo de saida: %s\n\n%s\n"
                  % (datetime.now().isoformat(timespec="seconds"), tarefa.name, item["rest"], codigo, saida))
@@ -401,6 +412,71 @@ def fiscal_da_fila():
         return len([p for p in (FILA / "erros").glob("*.txt") if p.is_file()])
     except OSError:
         return 0
+
+
+def politica_abrir():
+    cfg = ler_cerebro().get("abrir")
+    if not isinstance(cfg, dict) or not cfg.get("ligado", False):
+        return None
+    return cfg
+
+
+def raizes_de_abrir(cfg):
+    raizes = []
+    for nome in cfg.get("raizes", ["projeto"]):
+        rotulo = str(nome).strip().lower()
+        base = RAIZ if rotulo == "projeto" else descobrir_pasta(rotulo)
+        try:
+            base = Path(base).resolve()
+        except OSError:
+            continue
+        if base.exists() and base not in raizes:
+            raizes.append(base)
+    return raizes
+
+
+def dentro_de(caminho, raiz):
+    try:
+        Path(caminho).relative_to(raiz)
+        return True
+    except ValueError:
+        return False
+
+
+def validar_abrir(caminho_texto):
+    cfg = politica_abrir()
+    if cfg is None:
+        return False, "o canal abrir: esta desligado no cerebro (bloco abrir ausente ou ligado: false)"
+    alvo = Path(str(caminho_texto).strip().strip('"'))
+    if not alvo.is_absolute():
+        alvo = RAIZ / alvo
+    try:
+        real = alvo.resolve()
+    except OSError:
+        return False, "caminho esquisito demais pra existir"
+    if not real.exists():
+        return False, "nao encontrei %s no disco" % real
+    raizes = raizes_de_abrir(cfg)
+    if not any(dentro_de(real, r) for r in raizes):
+        return False, "%s esta fora das areas liberadas (%s)" % (real, ", ".join((r.name or str(r)) for r in raizes))
+    if real.is_file():
+        banidas = {str(e).lower() for e in cfg.get("jamais_abrir", JAMAIS_ABRIR)}
+        if real.suffix.lower() in banidas:
+            return False, "abrir %s? isso e um executavel com nome de documento: jamais" % real.suffix
+    return True, str(real)
+
+
+def executar_abrir(caminho_texto):
+    liberado, resposta = validar_abrir(caminho_texto)
+    if not liberado:
+        return None, resposta
+    if os.name != "nt":
+        return None, "o canal abrir: e um servico do Windows; aqui nao ha app padrao, nao toquei em nada"
+    try:
+        os.startfile(resposta)
+    except OSError as erro:
+        return None, "a validacao passou, mas o Windows recusou abrir (%s)" % erro
+    return 0, "abri %s com o app padrao do Windows" % resposta
 
 
 def ensaiar(proposta):

@@ -3,6 +3,7 @@
 # Ele NAO toca em nada do paciente: so le. O unico arquivo que escreve e um
 # teste de escrita em relatorios/, criado e apagado na hora.
 # Saida: [OK] funciona, [DICA] pode melhorar, [AVISO] atencao, [PROBLEMA] quebrou.
+# v2: para de contar o campo legado como olho extra e radiografa o canal abrir:.
 # Codigo de saida: 0 = sem problemas, 1 = pelo menos um PROBLEMA (pra portao usar).
 
 import ast
@@ -13,14 +14,15 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 
-# anatomia obrigatoria do loop (versao com fila + coleira + fiscal + dois olhos)
+# anatomia obrigatoria do loop v3 (fila + coleira + fiscal + dois olhos + abrir seguro)
 FERRAMENTAS_DO_CORPO = [
     "ler_json", "escrever_json", "ler_cerebro", "listar_pastas", "arquivos_de",
     "descobrir_acao", "decidir_acao", "executar", "lembrar", "ler_contadores",
     "registrar_rodada", "contar_fatos", "corpo", "dentro_do_projeto",
     "inventariar", "olhar_mundo", "descobrir_pasta", "comando_permitido",
     "executar_comando", "ler_tarefa", "mover_fila", "tratar_fila",
-    "fiscal_da_fila", "ensaiar", "propor", "promover",
+    "fiscal_da_fila", "politica_abrir", "raizes_de_abrir", "dentro_de",
+    "validar_abrir", "executar_abrir", "ensaiar", "propor", "promover",
 ]
 
 # comandos que o raio-x reconhece como leitura pura (dicionario de seguranca)
@@ -146,11 +148,12 @@ def checar_cerebro():
         problema("cerebro.mundo", "bloco mundo nao e objeto { }", "conserte as chaves do bloco mundo")
     else:
         olhos = mundo.get("olhos")
-        rels = []
         if isinstance(olhos, list) and olhos:
             rels = [o.get("relatorio_em") for o in olhos if isinstance(o, dict)]
-        if mundo.get("relatorio_em"):
-            rels.append(mundo["relatorio_em"])
+        elif mundo.get("relatorio_em"):
+            rels = [mundo["relatorio_em"]]
+        else:
+            rels = []
         fora = [r for r in rels if not (isinstance(r, str) and r.startswith("relatorios") and ".." not in r)]
         if fora:
             problema("cerebro.mundo", "relatorio aponta pra fora de relatorios/: %s" % fora,
@@ -251,11 +254,11 @@ def checar_loop():
                  % (", ".join(faltando), total),
                  "esse loop.py e de versao ANTIGA ou colado pela metade: feche a aba, cole o bloco inteiro, Ctrl+S, rode o raio-x de novo")
         return
-    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + dois olhos)"
+    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + dois olhos + abrir seguro)"
        % (total, len(funcoes)))
-    if total < 550:
-        aviso("loop.py", "%d linhas e anatomia ok — versao antiga com sorte? (a atual tem 584)" % total,
-              "se voce ainda nao colou o B9a, esse e o empurrãozinho")
+    if total < 645:
+        aviso("loop.py", "%d linhas e anatomia ok — versao B9a no corpo B10? (a atual tem 660)" % total,
+              "cole o loop.py v3 do bloco B10 inteiro, Ctrl+S, e rode o raio-x de novo")
     if extras:
         dica("loop.py", "funcoes fora do meu checklist (suas ou do proprio laco — sem problema): %s"
              % ", ".join(extras[:6]))
@@ -333,10 +336,10 @@ def checar_fila():
             vazias.append(p.name)
             continue
         primeira = next((l.strip() for l in texto.splitlines() if l.strip() and not l.strip().startswith("#")), "")
-        if ":" in primeira and primeira.split(":")[0].strip().lower() in ("executar", "avisar"):
+        if ":" in primeira and primeira.split(":")[0].strip().lower() in ("executar", "abrir", "avisar"):
             formatos_ok += 1
         else:
-            vazias.append("%s (nao comeca com executar:/avisar: — vai direto pro erros)" % p.name)
+            vazias.append("%s (nao comeca com executar:/abrir:/avisar: — vai direto pro erros)" % p.name)
     erros_dir = fila / "erros"
     presas = sorted(erros_dir.glob("*.txt")) if erros_dir.exists() else []
     feitas_dir = fila / "feitas"
@@ -345,7 +348,7 @@ def checar_fila():
         problema("fila", "tarefa vazia ou fora do formato: %s" % "; ".join(vazias),
                  "recrie com Set-Content no terminal (nunca abra no editor — foi assim que o fantasma vazia a arquivo da ultima vez)")
     if pendentes and formatos_ok == len(pendentes):
-        ok("fila.formato", "%d pendente(s), todas comecam com executar:/avisar:" % len(pendentes))
+        ok("fila.formato", "%d pendente(s), todas comecam com executar:/abrir:/avisar:" % len(pendentes))
     if presas:
         aviso("fila.erros", "o fiscal esta de plantao: %d presa(s) em fila/erros (%s)"
               % (len(presas), ", ".join(p.name for p in presas[:5])),
@@ -455,7 +458,7 @@ def checar_portao():
     portao = RAIZ / "testes" / "testar_regras.py"
     if not portao.exists():
         problema("portao", "testes/testar_regras.py nao existe — o portao sumiu do repo",
-                 "cole o testar_regras.py v4 inteiro do bloco combinado")
+                 "cole o testar_regras.py v5 inteiro do bloco B10")
         return
     try:
         arvore = ast.parse(portao.read_text(encoding="utf-8"))
@@ -466,6 +469,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
+    if cenas < 14:
+        dica("portao", "%d impressoes — o portao v5 tem 14; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- rascunhos
@@ -493,6 +498,35 @@ def checar_rascunhos():
         ok("rascunhos", "%d esperando sua decisao, %d recusados, %d ja promovidos" % (neutros, recusados, ativos))
 
 
+# ---------------------------------------------------------------- canal abrir:
+def checar_abrir(cerebro):
+    if not isinstance(cerebro, dict):
+        return
+    cfg = cerebro.get("abrir")
+    if cfg is None:
+        problema("abrir", "o cerebro nao tem bloco abrir — o verbo abrir: da fila nasceria morto",
+                 "cole o regras.json v10 inteiro do bloco B10 (o bloco abrir e o botao de ligar)")
+        return
+    if not isinstance(cfg, dict):
+        problema("abrir", "bloco abrir nao e objeto { }", "confira as chaves; use o modelo entregue")
+        return
+    if not cfg.get("ligado", False):
+        dica("abrir", "canal desligado (ligado: false) — ordens abrir: vao direto pra fila/erros")
+        return
+    jamais = {str(e).lower() for e in cfg.get("jamais_abrir", [])}
+    faltam = sorted({".exe", ".bat", ".cmd", ".ps1", ".vbs", ".msi"} - jamais)
+    raizes = cfg.get("raizes", [])
+    if faltam:
+        problema("abrir", "jamais_abrir nao cobre: %s — cada um desses pode rodar codigo" % ", ".join(faltam),
+                 "nenhum arquivo que executa pode ser aberto pelo agente; complete a lista ou cole o JSON entregue")
+    elif not isinstance(raizes, list) or not raizes:
+        problema("abrir", "sem raizes liberadas — o abrir nao saberia onde e permitido pisar",
+                 "o minimo: \"raizes\": [\"projeto\", \"desktop\", \"downloads\"]")
+    else:
+        ok("abrir", "canal ligado: %d area(s) liberada(s) (%s) e %d extensoes banidas"
+           % (len(raizes), ", ".join(map(str, raizes)), len(jamais)))
+
+
 def main():
     print("=" * 78)
     print("RAIO-X do super-agente — corpo inteiro lido com calma, sem tocar em nada")
@@ -501,7 +535,7 @@ def main():
     print("  cerebro  = regras em JSON (o que ele sabe fazer)")
     print("  coleira  = lista de comandos permitidos (o que ele pode tocar)")
     print("  loop.py  = o corpo: ver, olhar, decidir, fazer, lembrar, contar, propor")
-    print("  fila     = suas ordens do dia (funciona so com voce presente)")
+    print("  fila     = ordens do dia: executar, abrir, avisar (so com voce presente)")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -530,6 +564,10 @@ def main():
         checar_coleira(cerebro)
     except Exception as erro:
         problema("coleira", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_abrir(cerebro)
+    except Exception as erro:
+        problema("abrir", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

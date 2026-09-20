@@ -27,6 +27,11 @@
       "pip list"
     ]
   },
+  "abrir": {
+    "ligado": true,
+    "raizes": ["projeto", "desktop", "downloads"],
+    "jamais_abrir": [".exe", ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh", ".msi", ".msp", ".scr", ".com", ".pif", ".lnk", ".url", ".reg", ".hta", ".cpl"]
+  },
   "acoes": [
     {
       "id": "criar_arquivo_base",
