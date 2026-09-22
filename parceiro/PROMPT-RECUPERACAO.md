@@ -146,6 +146,10 @@ python3 testes/raio_x.py          # esperado: 0 problemas
 - Se precisar do repo da Arena: branch da sessão = espelho em `.arena-delivery/`
   (commit a cada entrega; PR #5 aberto apontando pra ele — merge só se ele pedir).
 - Arquivos dele NO sandbox: nada. Conexão direta ao PC dele = NÃO existe.
+- O espelho (`.arena-delivery/` + PR visual) pertence à SESSÃO que o criou (rampa
+  própria). Conversa nova NUNCA empurra PR velho — publica na ponte e, se o humano
+  quiser espelho do estado dela, abre PR NOVO do branch dela. Atualizar PR velho =
+  tarefa da sessão dona, puxando da ponte (que é a única fonte canônica).
 - F5 não reemite GH_TOKEN; se gh gitrear, contornar via git puro (os pushes da
   ponte funcionam pelo credential do clone).
 
@@ -231,6 +235,9 @@ python3 testes/raio_x.py          # esperado: 0 problemas
       `git log` da ponte se este arquivo está atualizado.
 - [ ] Ler os 2 últimos registros de `parceiro/ESTADO.md` (verdade fresca).
 - [ ] Perguntar a ele: "seu puxar pós-B16 já rodou? qual o placar do verificar?"
+- [ ] Se ele cobrar "passou tudo pro PR?": explicar que PR é da sessão
+      dona do branch; recuperar é pela ponte; se quiser, atualizo meu espelho e
+      abro PR novo da minha rampa.
 - [ ] Cumprimentar curto, resumir em ≤6 linhas, propor 1 tijolo (F3) e esperar o ok.
 - [ ] Qualquer entrega: ciclo da seção 6 inteiro, e atualizar ESTADO + este arquivo
       (seção 7) no MESMO push.
