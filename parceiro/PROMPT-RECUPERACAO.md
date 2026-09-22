@@ -150,9 +150,13 @@ python3 testes/raio_x.py          # esperado: 0 problemas
   ponte funcionam pelo credential do clone).
 
 ## 7. Estado atual (foto — se estiver velho, o VERDADEIRO é `git log` da ponte + ESTADO)
-- Ponte tip: `88015d5` (cápsula PROMPT-RECUPERACAO; B16 em `7975863`). Placar sandbox na fonte: **portão 17/17 cenas
-  (21 impressões); raio 25 ok | 5 dicas | 1 aviso | 0 problemas** (o aviso é o
-  planejador Windows que não existe no Linux — normal).
+- Ponte tip: `2bba1ff` (reposição da terceira ponta; cápsula em `88015d5`, B16 em `7975863`). Placar sandbox na fonte: **portão 17/17 cenas
+  (21 linhas, exit 0); raio 20 ok | 9 dicas | 1 aviso | 0 problemas** — ATENÇÃO:
+  o raio conta o estado local, então clone recém-clonado dá placar mais baixo
+  ("ainda sem diario/contadores/fila/saude/snapshot" = dica, não problema);
+  depois de rodar o corpo 3x o mesmo código dá **25 ok | 4 dicas | 1 aviso |
+  0 problemas** (= a foto antiga de 25/5). **0 problemas nos dois casos**, e o
+  aviso é o planejador Windows que não existe no Linux — normal.
 - Máquina dele: último registro dela parou em `c2f3f36`; B14/ROTEIRO/fluxos/B15/B16
   chegam com UM `puxar` — STATUS DA ATUALIZAÇÃO DELE = PERGUNTE (rodar puxar →
   verificar; esperado na máquina dele: portão 17 cenas, raio 0 problemas, linha
@@ -202,6 +206,14 @@ python3 testes/raio_x.py          # esperado: 0 problemas
     CONTEÚDO técnico (dado que vai pro cmd dele) — manter estilo.
 
 ## 9. Próximos passos (fila do ROTEIRO, ordem recomendada)
+0. **B17 lei-do-só-olhar com mão (ACHADO 22/09, candidato nº1)** — `executar()`
+   (`agente/loop.py` ~linha 165) NÃO consulta `SO_OLHAR`: `--so-olhar` cria
+   arquivo (`memoria/base.py`) apesar da ajuda prometer "observa, nao toca em
+   nada" e da lei 3.2 dizer "não escreve, não executa" (reproduzido 2x; o git vê
+   `?? memoria/base.py`). A cena "modo observacao" do portão só cobre `propor` —
+   por isso 17/17 verde convive com o furo. Tijolo: guarda em `executar()` +
+   cena no portão ("só-olhar não cria arquivo") + ajuda alinhada. **Decisão do
+   Guilherme: 1 = B17 (recomendado) ou 2 = F3 primeiro.**
 1. **F3 diário-de-evolução** — narrativa que o agente conta do que aprendeu +
    taxa de alucinação (propostas÷aprovadas). Próximo tijolo natural da ponte.
 2. **C1 matcher semântico** — difflib + TF-IDF/cosseno stdlib (a "IA de verdade"
