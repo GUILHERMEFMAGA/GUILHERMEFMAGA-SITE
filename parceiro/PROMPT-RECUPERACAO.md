@@ -150,7 +150,7 @@ python3 testes/raio_x.py          # esperado: 0 problemas
   ponte funcionam pelo credential do clone).
 
 ## 7. Estado atual (foto — se estiver velho, o VERDADEIRO é `git log` da ponte + ESTADO)
-- Ponte tip: `1b9b59c` (ESTADO B16). Placar sandbox na fonte: **portão 17/17 cenas
+- Ponte tip: `88015d5` (cápsula PROMPT-RECUPERACAO; B16 em `7975863`). Placar sandbox na fonte: **portão 17/17 cenas
   (21 impressões); raio 25 ok | 5 dicas | 1 aviso | 0 problemas** (o aviso é o
   planejador Windows que não existe no Linux — normal).
 - Máquina dele: último registro dela parou em `c2f3f36`; B14/ROTEIRO/fluxos/B15/B16
@@ -161,6 +161,16 @@ python3 testes/raio_x.py          # esperado: 0 problemas
   cortesia de trava).
 - Pendências dele conhecidas: 2 duplo-cliques pós-B16 (puxar + verificar) e o
   salvar-tudo depois (backup do repo da máquina).
+- **AS TRÊS PONTAS (confirmado por print dele 22/09 ~05:50):** existe SIM o repo
+  `github.com/GUILHERMEFMAGA/super-agente` (branch main) = BACKUP da máquina dele.
+  Fluxo de escrita: sandbox → ponte (SITE@super-agente) → puxar dele → máquina →
+  salvar dele → super-agente.git. A máquina dele é a ÚNICA que escreve no backup —
+  por isso o repo público dele pode estar atrás da ponte (ex.: tip `c2f3f36` vs
+  ponte `88015d5` com cápsula+B14→B16): se ele rodar puxar→salvar, sincroniza tudo.
+  Credenciais do sandbox NÃO alcançam super-agente.git (App/PAT só cobrem o SITE;
+  `git ls-remote` = 404) — isso é por desenho, não defeito. Nunca tentar forçar:
+  a via é sempre a máquina dele. Dizer "o repo não existe" é ERRO (aconteceu uma
+  vez, corrigido aqui): ele existe, é que está fora do meu alcance — e deve ficar.
 
 ## 8. Armadilhas já pagas a sangue (NÃO repetir)
 1. Sandbox reseta; /home/user/ponte pode sumir → refazer seção 6.1. Git do repo
