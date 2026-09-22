@@ -531,6 +531,39 @@ def checar_bats():
         ok("bats", "%d .bat conferidos — nenhum parenteses perdido dentro de bloco if" % len(bats))
 
 
+# ---------------------------------------------------------------- nao-redundancia (F2/B14)
+def checar_duplicacao():
+    """Funcao com corpo identico a outra = copia e passa a dever manutencao.
+    Normaliza via AST (docstring fora, espacos irrelevantes) e agrupa por hash do dump."""
+    corpos = {}
+    arquivos = 0
+    for py in sorted(RAIZ.rglob("*.py")):
+        if "mundo_falso" in str(py):
+            continue
+        try:
+            arvore = ast.parse(py.read_text(encoding="utf-8"))
+        except (SyntaxError, OSError):
+            continue
+        arquivos += 1
+        for no in ast.walk(arvore):
+            if isinstance(no, ast.FunctionDef):
+                corpo = [e for e in no.body
+                         if not (isinstance(e, ast.Expr) and isinstance(e.value, ast.Constant)
+                                 and isinstance(e.value.value, str))]
+                if not corpo:
+                    continue
+                chave = ast.dump(ast.Module(body=corpo, type_ignores=[]))
+                corpos.setdefault(chave, []).append("%s:%d %s()" % (py.name, no.lineno, no.name))
+    total_funcoes = sum(len(v) for v in corpos.values())
+    duplicadas = [v for v in corpos.values() if len(v) > 1]
+    if duplicadas:
+        aviso("duplicacao", "%d grupo(s) de funcoes com corpo identico: %s"
+              % (len(duplicadas), "; ".join(" | ".join(g) for g in duplicadas[:3])),
+              "cada copia e um defeito criado duas vezes: escolha uma, extraia funcao comum, apague o resto")
+    else:
+        ok("duplicacao", "%d funcoes varridas em %d .py — nenhuma copia de si mesma" % (total_funcoes, arquivos))
+
+
 # ---------------------------------------------------------------- rascunhos
 def checar_rascunhos():
     pasta = RAIZ / "fluxos" / "rascunhos"
@@ -751,6 +784,7 @@ def main():
         ("portao", checar_portao, ()),
         ("saude", checar_saude, ()),
         ("bats", checar_bats, ()),
+        ("duplicacao", checar_duplicacao, ()),
         ("rascunhos", checar_rascunhos, ()),
     ]
     for rotulo, checagem, args in checagens:

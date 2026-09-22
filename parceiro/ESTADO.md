@@ -227,3 +227,9 @@
 - portao v8: cena saude (6 assertivas: honesto/duas linhas/formato/contagem da madrugada/janela/sem-diario) = 17 impressoes; raio v5: checagem saude + LINTER DE .BAT (lição do parêntese vira teste) + exigidios do gitignore ganhou "memoria/*.txt".
 - Campo achou 2 buracos antes do push: placeholder de linha-contagem (sed real=1069) e VAZAMENTO: saude.txt nao era ignorado -> .gitignore + linha e raio passou a exigir. Teste no clone: tick escreveu "03:15 ram=6% ... fome=nao" e o git nao viu mais nada.
 - Faltando no lado dele: duplo clique no puxar (v2 vira... v3? nao: puxar nao mudou; agora ele puxa B13) + verificar-tudo. Placar esperado na maquina real: portao 14 cenas ok; raio "0 problemas" e a linha saude ok com batidas.
+
+## 22/09 01:00 — MODO SERIO ATIVADO: ROTEIRO.md (F->C->V->P) + F2/B14 publicada
+- Pedido dele: IA "real", sem API/centavo, publicar na internet, "ultrapassar o Claude". Reencaixe honesto gravado no ROTEIRO: vencer na arena que frontier model nao pisa (autonomia local, tempo real, custo zero, auditavel), nao no raciocinio geral. Meta tecnica: estatistica classica na stdlib = a "IA" daqui.
+- Plano mestre em parceiro/ROTEIRO.md: F (F1 saude ✅, F2 redundancia ✅, F3 diario-evolucao), C (C1 matcher semantico difflib+TFIDF/cosseno, C2 pesos ε-greedy, C3 planejador A*), V (V1 ReadDirectoryChangesW via ctypes, V2 SQLite stdlib, V3 relatorio matutino template), P (MIT+pyproject+CLI, repo PUBLICO demo com fixtures limpos - o dele segue privado, docs no site dele).
+- F2/B14: checar_duplicacao no raio (agrupa funcoes por dump AST normalizado sem docstring; corpo identico = AVISO com local). Auditoria da propria casa: 76 funcoes/8 arquivos, zero copia. Leis de ferro congeladas declaradas no topo do ROTEIRO.
+- Proximo tijolo na bancada: F3 diario de evolucao; depois C1 (a primeira "IA de verdade" do projeto). Entrega segue 1 tijolo/turno -> ponte -> duplo clique dele.

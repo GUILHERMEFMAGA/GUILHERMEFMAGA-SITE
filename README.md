@@ -117,6 +117,7 @@ mundo real: o porteiro copia, nunca engole.
 | 5.7 | correntes: gatilho da vigília puxa elos blindados; madrugada vira fila | ✅ |
 | 5.8 | ponte de entregas com o parceiro (push → puxar → verificar → salvar), sem colar código | ✅ |
 | 5.9 | olhos de saúde: pulso do PC a cada tick + resumo da madrugada (B13) | ✅ |
+| 5.10 | lei da não-redundância no raio-x (cópia de função = dívida detectada) + roteiro de engenharia F→C→V→P | ✅ |
 | 6 | organizar de verdade (mover/agrupar por regra) e GitHub Actions | 🔜 |
 
 ## 🧠 Frases-guia do projeto
