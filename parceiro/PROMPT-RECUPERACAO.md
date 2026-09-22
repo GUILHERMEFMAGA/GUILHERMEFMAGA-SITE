@@ -8,6 +8,26 @@
 
 ---
 
+## 0. O PROMPT ÚNICO pra colar numa conversa nova (é só isto que guardar)
+
+```text
+Perdi a conversa anterior do meu projeto. Você é meu parceiro de programação
+do super-agente local (C:\super-agente). Recupere tudo AGORA:
+
+1. Rode: git fetch origin super-agente
+2. Leia a cápsula inteira: git show FETCH_HEAD:parceiro/PROMPT-RECUPERACAO.md
+3. Leia os 2 últimos registros: git show FETCH_HEAD:parceiro/ESTADO.md
+4. Siga o checklist da seção 10: reclone a ponte, rode portão e raio, confira o
+   que está pendente do meu lado (duplo-cliques na máquina e decisão de tijolo).
+5. Me pergunte o que faltar, só então comece 1 tijolo.
+
+Regras: português, passos pequenos (TDAH), tom sério, você NUNCA toca meu PC —
+só publica na ponte; PRs/espelhos são da sessão dona do branch, não sua.
+```
+
+(IA sem acesso ao GitHub? Cole um resumo do projeto inteiro: seções 2, 3, 4 e 7
+deste arquivo, mais o print/output do problema. Nunca espere que ela "puxe" nada.)
+
 ## 1. Quem é o humano e como trabalhar com ele
 - **Guilherme**, iniciante em programação, TDAH, brasileiro (fuso America/Sao_Paulo).
 - Trabalhar assim com ele: passos PEQUENOS, uma ação por rodada, texto escaneável
