@@ -150,7 +150,7 @@ python3 testes/raio_x.py          # esperado: 0 problemas
   ponte funcionam pelo credential do clone).
 
 ## 7. Estado atual (foto — se estiver velho, o VERDADEIRO é `git log` da ponte + ESTADO)
-- Ponte tip: `2bba1ff` (reposição da terceira ponta; cápsula em `88015d5`, B16 em `7975863`). Placar sandbox na fonte: **portão 17/17 cenas
+- Ponte tip: `8907a0e` (recuperação da conversa 22/09 tarde — esta cápsula já com o achado da lei do `--so-olhar`; B16 em `7975863`; reposição das 3 pontas em `2bba1ff`; cápsula original em `88015d5`). Placar sandbox na fonte: **portão 17/17 cenas
   (21 linhas, exit 0); raio 20 ok | 9 dicas | 1 aviso | 0 problemas** — ATENÇÃO:
   o raio conta o estado local, então clone recém-clonado dá placar mais baixo
   ("ainda sem diario/contadores/fila/saude/snapshot" = dica, não problema);
