@@ -36,10 +36,11 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 ## 🚀 Uso diário (os 4 comandos que importam)
 
 ```
-python agente\loop.py          :: atende a fila, olha o mundo, decide, aprende
-python testes\raio_x.py        :: laudo de saúde do corpo inteiro (só lê)
-python testes\testar_regras.py :: portão — prova o cérebro num mundo de mentira
-.\salvar-tudo.bat              :: Git: add, commit, push, sem digitar nada
+python agente\loop.py                    :: atende a fila, olha o mundo, decide, aprende
+python agente\loop.py --vigiar --ensaiar :: dry-run: mostra o plano dos fluxos sem tocar em nada
+python testes\raio_x.py                  :: laudo de saúde do corpo inteiro (só lê)
+python testes\testar_regras.py            :: portão — prova o cérebro num mundo de mentira
+.\salvar-tudo.bat                        :: Git: add, commit, ponte + backup, sem digitar nada
 ```
 
 ### Dar uma ordem na fila (terminal, uma linha)
@@ -90,6 +91,23 @@ Cada elo tem limite por arquivo (`max_por_arquivo`, padrão 3) — corrente que
 gritaria toda hora simplesmente dorme. Corrente nenhuma apaga nem move nada do
 mundo real: o porteiro copia, nunca engole.
 
+## ⚙️ Motor de Fluxos (bloco `fluxos` — a evolução das correntes)
+
+Gatilhos **declarativos** com condição, estilo n8n, dentro do cérebro
+(`fluxos/regras.json` → bloco `fluxos`):
+
+- `quando` decide a *ficha* do arquivo: `olho`, `extensao`, `nome_contem`,
+  `tamanho_min_kb`, `tamanho_max_kb` — só `.txt` com "nota" e ≥ 1 KB, por exemplo;
+- `passos` rodam em ordem pelo **mesmo vocabulário blindado** das correntes
+  (`copiar_para_projeto`, `avisar`, `abrir`, `executar`), e cada passo pode ter
+  seu próprio `se` (condição sobre o mesmo vocabulário de `quando`);
+- herdam limites por arquivo, viram fila na madrugada, e o
+  `--vigiar --ensaiar` imprime **o plano inteiro sem escrever nada, sem
+  enfileirar e sem gastar limite** (dry-run de verdade).
+
+As correntes da B12 continuam valendo em paralelo — compatibilidade é lei de
+convivência (nada remove, tudo acrescenta).
+
 ## 🛡️ Por que dá pra confiar nele
 
 - **Allowlist**: só executa os comandos de leitura da coleira; símbolos de injeção
@@ -118,7 +136,8 @@ mundo real: o porteiro copia, nunca engole.
 | 5.8 | ponte de entregas com o parceiro (push → puxar → verificar → salvar), sem colar código | ✅ |
 | 5.9 | olhos de saúde: pulso do PC a cada tick + resumo da madrugada (B13) | ✅ |
 | 5.10 | lei da não-redundância no raio-x (cópia de função = dívida detectada) + roteiro de engenharia F→C→V→P | ✅ |
-| 6 | organizar de verdade (mover/agrupar por regra) e GitHub Actions | 🔜 |
+| 6 | **motor de fluxos**: gatilhos declarativos com condição por passo + dry-run `--ensaiar` | ✅ |
+| 6.5 | reorganizar o mundo com permissão (mover/agrupar com rollback) e CI | 🔜 |
 
 ## 🧠 Frases-guia do projeto
 

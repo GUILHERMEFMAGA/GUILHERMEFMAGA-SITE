@@ -479,8 +479,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 17:
-        dica("portao", "%d impressoes — o portao v8 tem 17; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 18:
+        dica("portao", "%d impressoes — o portao v9 tem 18; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- saude (B13)
@@ -562,6 +562,44 @@ def checar_duplicacao():
               "cada copia e um defeito criado duas vezes: escolha uma, extraia funcao comum, apague o resto")
     else:
         ok("duplicacao", "%d funcoes varridas em %d .py — nenhuma copia de si mesma" % (total_funcoes, arquivos))
+
+
+# ---------------------------------------------------------------- motor de fluxos (Fase C)
+def checar_fluxos(cerebro):
+    cfg = cerebro.get("fluxos") if isinstance(cerebro, dict) else None
+    if not isinstance(cfg, dict):
+        dica("fluxos", "sem bloco 'fluxos' no cerebro — correntes legadas no mando; o motor espera ligar")
+        return
+    vocab = {"copiar_para_projeto", "abrir", "avisar", "executar"}
+    quando_keys = {"olho", "extensao", "nome_contem", "tamanho_min_kb", "tamanho_max_kb"}
+    se_keys = {"nome_contem", "tamanho_min_kb", "tamanho_max_kb"}
+    gats = cfg.get("gatilhos") if isinstance(cfg.get("gatilhos"), list) else []
+    defeitos = []
+    for g in gats:
+        gid = str(g.get("id") or "sem-id") if isinstance(g, dict) else "sem-id"
+        q = g.get("quando") if isinstance(g, dict) and isinstance(g.get("quando"), dict) else {}
+        sobra_q = set(q) - quando_keys
+        if sobra_q:
+            defeitos.append("%s: 'quando' com chaves desconhecidas (%s)" % (gid, ", ".join(sorted(sobra_q))))
+        passos = g.get("passos") if isinstance(g, dict) and isinstance(g.get("passos"), list) else []
+        if not isinstance(g, dict) or not str(g.get("id") or "").strip():
+            defeitos.append("gatilho sem id (cada fluxo precisa de um nome proprio)")
+        for p in passos:
+            pp = p if isinstance(p, dict) else {"usar": p}
+            nome = str(pp.get("usar") or "").strip().lower()
+            if nome not in vocab:
+                defeitos.append("%s: passo '%s' fora do vocabulario blindado" % (gid, nome or "?"))
+            sobra_p = set(pp.get("se") or {}) - se_keys
+            if sobra_p:
+                defeitos.append("%s: passo '%s' com 'se' desconhecido (%s)" % (gid, nome, ", ".join(sorted(sobra_p))))
+    if defeitos:
+        problema("fluxos", "motor com defeito de fabrica: %s" % "; ".join(defeitos[:3]),
+                 "passos so aceitam copiar_para_projeto/abrir/avisar/executar; 'quando' aceita "
+                 "olho,extensao,nome_contem,tamanho_min_kb,tamanho_max_kb; 'se' aceita as tres ultimas")
+    elif not cfg.get("ligado", False):
+        dica("fluxos", "%d fluxo(s) valido(s) com ligado=false — decisao sua, nao e defeito" % len(gats))
+    else:
+        ok("fluxos", "%d fluxo(s) validado(s); passos todos blindados; plano sem risco com --vigiar --ensaiar" % len(gats))
 
 
 # ---------------------------------------------------------------- rascunhos
@@ -768,6 +806,7 @@ def main():
     print("  vigilia  = o porteiro: detecta arquivos novos e reage so com vocabulario aprovado")
     print("  correntes= fluxos de etapas: gatilho da vigilia puxa elos blindados (copiar, avisar, abrir, executar)")
     print("  saude    = B13: pulso do PC a cada tick (ram/disco/nucleos, so leitura); madrugada contada")
+    print("  fluxos   = Fase C: gatilhos declarativos com 'se' por passo e --ensaiar (dry-run sem risco)")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -811,6 +850,10 @@ def main():
         checar_correntes(cerebro)
     except Exception as erro:
         problema("correntes", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_fluxos(cerebro)
+    except Exception as erro:
+        problema("fluxos", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

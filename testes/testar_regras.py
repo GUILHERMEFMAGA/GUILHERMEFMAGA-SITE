@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v8: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v9: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 # v8: cena saude (B13) — medir nunca explode, o ponto vira linha, a janela corta e a
 # madrugada conta a fome.
+# v9: cena fluxos (Fase C) — gatilho com condicao, 'se' por passo e o --ensaiar que
+# mostra o plano sem tocar no mundo nem gastar limites.
 
 import importlib.util
 import json
@@ -377,8 +379,69 @@ print("  [%s] saude  -> medir so le, ponto vira linha, janela corta velhas, madr
 if not saude_ok:
     falhas.append("saude")
 
+# cena nova: motor de fluxos (Fase C) — gatilho com condicao de nome/tamanho, passo
+# com 'se' proprio, e o --ensaiar que mostra o plano sem escrever nada e sem cobrar
+# pedagio nos limites
+fx_palco = palco / "fluxos"
+casa_fx = fx_palco / "casa"
+(casa_fx / "Downloads").mkdir(parents=True)
+proj_fx = fx_palco / "proj"
+for _sub in ("memoria", "fila", "relatorios", "fluxos"):
+    (proj_fx / _sub).mkdir(parents=True)
+regras_fx = {"acoes": [], "mundo": {"ligado": False},
+             "vigilia": {"ligado": True, "tolerancia_seg": 0, "max_eventos": 25,
+                         "olhos": [{"pasta": "downloads", "ao_chegar": []}]},
+             "correntes": {"ligado": False, "gatilhos": []},
+             "fluxos": {"ligado": True, "gatilhos": [{
+                 "id": "txt-nota",
+                 "quando": {"olho": "downloads", "extensao": ".txt", "nome_contem": "nota"},
+                 "passos": [{"usar": "avisar", "texto": "nota vista: %arquivo%"},
+                            {"usar": "copiar_para_projeto", "para": "entrada/notas",
+                             "se": {"tamanho_min_kb": 1}}]}]}}
+(proj_fx / "fluxos" / "regras.json").write_text(json.dumps(regras_fx), encoding="utf-8")
+env_fx = os.environ.get("AGENTE_CASA")
+r_fx, ce_fx = loop.RAIZ, loop.CEREBRO
+v_fx, d_fx, f_fx, e_fx = loop.VIGILIA, loop.CORRENTES_DIARIO, loop.FILA, loop.ENSAIAR
+os.environ["AGENTE_CASA"] = str(casa_fx)
+try:
+    loop.RAIZ = proj_fx
+    loop.CEREBRO = proj_fx / "fluxos" / "regras.json"
+    loop.VIGILIA = proj_fx / "memoria" / "vigilia.json"
+    loop.CORRENTES_DIARIO = proj_fx / "memoria" / "correntes.json"
+    loop.FILA = proj_fx / "fila"
+    loop.vigiar()
+    (casa_fx / "Downloads" / "nota-curta.txt").write_text("oi", encoding="utf-8")
+    (casa_fx / "Downloads" / "nota-longa.txt").write_text("x" * 2000, encoding="utf-8")
+    (casa_fx / "Downloads" / "esquecido.txt").write_text("x" * 2000, encoding="utf-8")
+    visao_fx = " | ".join(loop.vigiar())
+    bateu_dois = visao_fx.count("fluxo txt-nota") == 2
+    copiou = (proj_fx / "entrada" / "notas" / "nota-longa.txt").exists()
+    pulou = (not (proj_fx / "entrada" / "notas" / "nota-curta.txt").exists()) and ("pulado (condicao" in visao_fx)
+    quieto = not any("esquecido.txt" in parte and "fluxo txt-nota" in parte for parte in visao_fx.split(" | "))
+    loop.ENSAIAR = True
+    (casa_fx / "Downloads" / "nota-ensaio.txt").write_text("x" * 3000, encoding="utf-8")
+    ensaio_visao = " | ".join(loop.vigiar())
+    plano_limpo = ("ensaio: passo" in ensaio_visao and "modo --ensaiar" in ensaio_visao
+                   and not (proj_fx / "entrada" / "notas" / "nota-ensaio.txt").exists())
+    loop.ENSAIAR = False
+    real_visao = " | ".join(loop.vigiar())
+    cobrou_depois = (proj_fx / "entrada" / "notas" / "nota-ensaio.txt").exists() and "fluxo txt-nota" in real_visao
+    fx_ok = bateu_dois and copiou and pulou and quieto and plano_limpo and cobrou_depois
+finally:
+    loop.RAIZ, loop.CEREBRO, loop.VIGILIA = r_fx, ce_fx, v_fx
+    loop.CORRENTES_DIARIO, loop.FILA, loop.ENSAIAR = d_fx, f_fx, e_fx
+    if env_fx is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_fx
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] fluxos  -> gatilho com condicao, 'se' por passo e --ensaiar nao cobra pedagio"
+      % ("ok  " if fx_ok else "FALHA"))
+if not fx_ok:
+    falhas.append("fluxos")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho e saude no pulso.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho, saude no pulso e fluxo com condicao.")

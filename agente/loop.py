@@ -12,6 +12,9 @@
 # v6: olhos de saude (B13) — a cada tick o PC mede ram/disco/nucleos (so LER, sem verbo
 # novo na coleira), anota o pulso em memoria/saude.txt, e de manha o resumo conta se a
 # madrugada apertou. Silencio = saude; linha com fome = decisao sua de ler de manha.
+# v7: motor de fluxos (Fase C do ROTEIRO) — gatilhos declarativos com condicoes por
+# passo (quando/passos/se), mesmo executor blindado das correntes, e --ensaiar: o
+# dry-run que mostra o plano sem tocar em disco, sem enfileirar e sem gastar limites.
 
 import json
 import os
@@ -34,6 +37,7 @@ IGNORADAS = {"__pycache__", "mundo_falso", "fila", ".git"}
 
 SO_OLHAR = "--so-olhar" in os.sys.argv[1:]
 VIGIAR = "--vigiar" in os.sys.argv[1:]
+ENSAIAR = "--ensaiar" in os.sys.argv[1:]
 
 
 def ler_json(caminho, padrao):
@@ -615,6 +619,7 @@ def vigiar(AGORA=None):
         for n in eventos:
             logs = aplicar_reacoes(olho, n)
             logs.extend(correntes_para(nome, pasta / n))
+            logs.extend(fluxos_para(nome, pasta / n))
             notificados.add(n)
             saidas.append("%s: chegou %s -> %s" % (nome, n, "; ".join(logs) or "anotado"))
         if len(maduros) > len(eventos):
@@ -632,6 +637,9 @@ def vigiar(AGORA=None):
                 atuais_fiaveis[n_olho] = st_olho
         estado[nome] = {"arquivos": atuais_fiaveis,
                         "notificados": sorted(notificados & set(atuais_fiaveis))}
+    if ENSAIAR:
+        saidas.append("modo --ensaiar: nem a vigilia nem o diario de limites foram tocados (plano e so leitura)")
+        return saidas
     escrever_json(VIGILIA, estado)
     return saidas
 
@@ -856,6 +864,10 @@ def correntes_para(nome_olho, arquivo_path):
         resultado = []
         etapas = gatilho.get("etapas") if isinstance(gatilho.get("etapas"), list) else []
         for etapa in etapas:
+            if ENSAIAR:
+                nome_e = str(etapa.get("usar") if isinstance(etapa, dict) else etapa).strip().lower()
+                resultado.append("ensaio: passo '%s' dispararia" % (nome_e or "?"))
+                continue
             rotulo = corrente_etapa(id_g, etapa, arquivo_path, disparadas)
             resultado.append(rotulo)
             agiu = all(p not in rotulo for p in ("dormiu", "barrad", "fora do vocabulario", "falhou", "recusado"))
@@ -865,9 +877,112 @@ def correntes_para(nome_olho, arquivo_path):
                 disparadas[k] = disparadas.get(k, 0) + 1
         registro["disparadas"] = disparadas
         registro["ultima"] = datetime.now().isoformat(timespec="seconds")
-        diario[chave_evt] = registro
-        escrever_json(CORRENTES_DIARIO, diario)
+        if not ENSAIAR:
+            diario[chave_evt] = registro
+            escrever_json(CORRENTES_DIARIO, diario)
         saidas.append("corrente %s: %s" % (id_g, "; ".join(resultado) or "sem etapas"))
+    return saidas
+
+
+# ---------------------------------------------------------------- Motor de fluxos (Fase C: gatilhos com condicao)
+# Herda o executor blindado das correntes (os 4 verbos do vocabulario e os limites por
+# arquivo) e acrescenta o que faltava pra virar produto: declaracao condicional por
+# passo e --ensaiar, o dry-run que le o plano sem tocar no mundo.
+
+def _txt_normal(texto):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFD", str(texto))
+                   if unicodedata.category(c) != "Mn").lower()
+
+
+def _fluxos_config():
+    cfg = ler_cerebro().get("fluxos")
+    if not isinstance(cfg, dict) or not cfg.get("ligado", False):
+        return []
+    gatilhos = cfg.get("gatilhos")
+    return gatilhos if isinstance(gatilhos, list) else []
+
+
+def _bate_quando(quando, nome_olho, arquivo_path, tamanho):
+    if not isinstance(quando, dict):
+        return False
+    olho = str(quando.get("olho") or "").strip().lower()
+    if olho and olho != str(nome_olho).strip().lower():
+        return False
+    ext = str(quando.get("extensao") or "").strip().lower()
+    if ext and ext != arquivo_path.suffix.lower():
+        return False
+    contem = str(quando.get("nome_contem") or "").strip()
+    if contem and _txt_normal(contem) not in _txt_normal(arquivo_path.name):
+        return False
+    minimo = quando.get("tamanho_min_kb")
+    if minimo is not None and (tamanho is None or tamanho < int(minimo) * 1024):
+        return False
+    maximo = quando.get("tamanho_max_kb")
+    if maximo is not None and (tamanho is None or tamanho > int(maximo) * 1024):
+        return False
+    return True
+
+
+def _bate_se(se, arquivo_path, tamanho):
+    if not isinstance(se, dict) or not se:
+        return True
+    return _bate_quando(dict(se, olho="", extensao=""), "", arquivo_path, tamanho)
+
+
+def fluxos_para(nome_olho, arquivo_path):
+    saidas = []
+    try:
+        tamanho = arquivo_path.stat().st_size
+    except OSError:
+        tamanho = None
+    for gatilho in _fluxos_config():
+        if not isinstance(gatilho, dict):
+            continue
+        id_g = str(gatilho.get("id") or "sem-id")
+        try:
+            bate = _bate_quando(gatilho.get("quando"), nome_olho, arquivo_path, tamanho)
+        except (TypeError, ValueError):
+            saidas.append("fluxo %s: 'quando' com condicao invalida (fluxo ignorado)" % id_g)
+            continue
+        if not bate:
+            continue
+        diario = corrente_diario()
+        chave_evt = "fluxo:%s|%s" % (id_g, arquivo_path.name)
+        registro = diario.get(chave_evt)
+        if not isinstance(registro, dict):
+            registro = {"disparadas": {}, "ultima": None}
+        disparadas = registro.get("disparadas") if isinstance(registro.get("disparadas"), dict) else {}
+        resultado = []
+        passos = gatilho.get("passos") if isinstance(gatilho.get("passos"), list) else []
+        for passo in passos:
+            p = passo if isinstance(passo, dict) else {"usar": passo}
+            nome = str(p.get("usar") or "?").strip().lower()
+            try:
+                ok_se = _bate_se(p.get("se"), arquivo_path, tamanho)
+            except (TypeError, ValueError):
+                resultado.append("passo '%s': 'se' invalido (passo ignorado)" % nome)
+                continue
+            if not ok_se:
+                resultado.append("passo '%s' pulado (condicao 'se' nao bateu)" % nome)
+                continue
+            if ENSAIAR:
+                resultado.append("ensaio: passo '%s' dispararia" % nome)
+                continue
+            rotulo = corrente_etapa("fluxo:" + id_g, p, arquivo_path, disparadas)
+            resultado.append(rotulo)
+            agiu = all(q not in rotulo for q in ("dormiu", "barrad", "fora do vocabulario",
+                                                 "falhou", "recusado", "pulado", "ignorado"))
+            if agiu:
+                k = "fluxo:%s|%s" % (id_g, nome)
+                disparadas[k] = disparadas.get(k, 0) + 1
+        registro["ultima"] = datetime.now().isoformat(timespec="seconds")
+        if not ENSAIAR:
+            registro["disparadas"] = disparadas
+            diario[chave_evt] = registro
+            escrever_json(CORRENTES_DIARIO, diario)
+        prefixo = "ensaio fluxo %s" if ENSAIAR else "fluxo %s"
+        saidas.append((prefixo + ": %s") % (id_g, "; ".join(resultado) or "sem passos"))
     return saidas
 
 
@@ -986,16 +1101,18 @@ def promover():
 
 
 if __name__ == "__main__":
-    if SO_OLHAR and VIGIAR:
-        print("tick do porteiro em %s" % datetime.now().isoformat(timespec="seconds"))
+    if VIGIAR and (SO_OLHAR or ENSAIAR):
+        rotulo = "ensaio do porteiro em" if ENSAIAR else "tick do porteiro em"
+        print("%s %s" % (rotulo, datetime.now().isoformat(timespec="seconds")))
         for v in (vigiar() or ["nada novo por enquanto"]):
             print(" -", v)
-        pulso, faminto = bater_ponto_saude()
-        print(" - saude:", pulso)
-        if 6 <= datetime.now().hour < 9:
-            madrugada = resumo_da_madrugada()
-            if madrugada:
-                print(" - madrugada:", madrugada)
+        if not ENSAIAR:
+            pulso, faminto = bater_ponto_saude()
+            print(" - saude:", pulso)
+            if 6 <= datetime.now().hour < 9:
+                madrugada = resumo_da_madrugada()
+                if madrugada:
+                    print(" - madrugada:", madrugada)
         raise SystemExit(0)
     pastas = listar_pastas()
     mundo = olhar_mundo()
