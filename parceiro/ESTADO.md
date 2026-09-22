@@ -233,3 +233,12 @@
 - Plano mestre em parceiro/ROTEIRO.md: F (F1 saude ✅, F2 redundancia ✅, F3 diario-evolucao), C (C1 matcher semantico difflib+TFIDF/cosseno, C2 pesos ε-greedy, C3 planejador A*), V (V1 ReadDirectoryChangesW via ctypes, V2 SQLite stdlib, V3 relatorio matutino template), P (MIT+pyproject+CLI, repo PUBLICO demo com fixtures limpos - o dele segue privado, docs no site dele).
 - F2/B14: checar_duplicacao no raio (agrupa funcoes por dump AST normalizado sem docstring; corpo identico = AVISO com local). Auditoria da propria casa: 76 funcoes/8 arquivos, zero copia. Leis de ferro congeladas declaradas no topo do ROTEIRO.
 - Proximo tijolo na bancada: F3 diario de evolucao; depois C1 (a primeira "IA de verdade" do projeto). Entrega segue 1 tijolo/turno -> ponte -> duplo clique dele.
+
+## 22/09 04:15 — C-motor FLUXOS v1 publicada na ponte (tip f82d196): a alma do produto
+- Motor de fluxos como SOBRECAMADA: correntes legadas B12 intactas e ativas em paralelo (ele nunca toca código; só `puxar` atualiza). Config no cérebro: bloco "fluxos" {ligado, gatilhos:[{id, quando:{olho,extensao,nome_contem,tamanho_min_kb/max}, passos:[{usar, ..., se:{...}}]}]}.
+- 4 verbos blindados só (copiar_para_projeto/abrir/avisar/executar); "se" que não bate → passo pulado e NÃO gasta limite; diário único memoria/correntes.json, chave "fluxo:<id>|<arquivo>"; normalização acento-case via unicodedata (_txt_normal).
+- --vigiar --ensaiar = DRY-RUN TOTAL (a arma anti-n8n): plano impresso ("passo 'X' dispararia"), zero escrita em vigilia/diário/ponto-de-saúde; correntes legadas também ensaiáveis. Main: `if VIGIAR and (SO_OLHAR or ENSAIAR)` não bate ponto.
+- Smoke real no clone: tolerancia_seg=30 do cérebro de produção segurou arquivo de 1s (guarda anti-mentira funcionando — nunca reagir a arquivo pela metade); após 31s: ensaio limpíssimo, execução copiou para entrada/notas/ ✓.
+- Placar sandbox: portão v9 15/15 (nova cena fluxos, 18 impressoes); raio v7 24 ok | 2 dicas | 1 aviso | 0 problemas (checar_fluxos valida vocabulário de quando/se). Debug ensinou: falha era asserção minha ("-> anotado" vs real "-> inventario atualizado"), motor nunca esteve errado.
+- Máquina dele segue em c2f3f36; pull (puxar v3) traz B14 + ROTEIRO + fluxos de uma vez. Pendências dela: 2 duplo-cliques (puxar → verificar). Placar esperado: portão 15 cenas, raio com fluxos OK.
+- Próximo tijolo: F3 diário-de-evolução (o agente conta o que aprendeu); depois C1 matcher semântico (difflib + TF-IDF/cosseno stdlib = a primeira "IA de verdade").
