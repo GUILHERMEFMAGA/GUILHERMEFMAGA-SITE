@@ -1,2 +1,3 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Linha de vida dos .bat no Windows: git sempre entrega CRLF, em maquina nenhuma o duplo clique "abre e fecha".
+*.bat text eol=crlf
+*.cmd text eol=crlf
