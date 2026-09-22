@@ -6,6 +6,9 @@
 # Modo agendado (--so-olhar): ele olha, anota e NAO se autopromove, porque nao ha voce ali.
 # v4: o porteiro — --vigiar detecta arquivos novos nas pastas vigiadas e
 # reage so com vocabulario aprovado; a noite (com --so-olhar) ele observa e enfileira, nunca age sozinho.
+# v5: correntes — quando a vigilia nota um arquivo, o cerebro pode disparar fluxos de etapas
+# (bloco `correntes`). Cada elo usa so ferramentas blindadas: copia so pra dentro do projeto,
+# abrir com os 3 cadeados, e na madrugada abrir/executar viram fila — nunca mao sola.
 
 import json
 import os
@@ -22,6 +25,7 @@ CEREBRO = RAIZ / "fluxos" / "regras.json"
 RASCUNHOS = RAIZ / "fluxos" / "rascunhos"
 FILA = RAIZ / "fila"
 VIGILIA = RAIZ / "memoria" / "vigilia.json"
+CORRENTES_DIARIO = RAIZ / "memoria" / "correntes.json"
 PALCO = RAIZ / "testes" / "mundo_falso" / "ensaios"
 IGNORADAS = {"__pycache__", "mundo_falso", "fila", ".git"}
 
@@ -607,6 +611,7 @@ def vigiar(AGORA=None):
         vistos += len(eventos)
         for n in eventos:
             logs = aplicar_reacoes(olho, n)
+            logs.extend(correntes_para(nome, pasta / n))
             notificados.add(n)
             saidas.append("%s: chegou %s -> %s" % (nome, n, "; ".join(logs) or "anotado"))
         if len(maduros) > len(eventos):
@@ -625,6 +630,124 @@ def vigiar(AGORA=None):
         estado[nome] = {"arquivos": atuais_fiaveis,
                         "notificados": sorted(notificados & set(atuais_fiaveis))}
     escrever_json(VIGILIA, estado)
+    return saidas
+
+
+def corrente_diario():
+    diario = ler_json(CORRENTES_DIARIO, {})
+    return diario if isinstance(diario, dict) else {}
+
+
+def corrente_gatilhos():
+    cfg = ler_cerebro().get("correntes")
+    if not isinstance(cfg, dict) or not cfg.get("ligado", False):
+        return []
+    gatilhos = cfg.get("gatilhos")
+    return gatilhos if isinstance(gatilhos, list) else []
+
+
+def _enfileirar(cmd):
+    destino = FILA / ("vigia-%s.txt" % datetime.now().strftime("%H%M%S%f"))
+    try:
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_text("# escrito por uma corrente; obedece a coleira quando voce rodar\n%s\n" % cmd,
+                           encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
+
+def corrente_etapa(gatilho_id, etapa, arquivo_path, disparadas):
+    if not isinstance(etapa, dict):
+        etapa = {"usar": etapa}
+    nome = str(etapa.get("usar") or "?").strip().lower()
+    if nome not in ("copiar_para_projeto", "abrir", "avisar", "executar"):
+        return "elo '%s' fora do vocabulario (vale: copiar_para_projeto, abrir, avisar, executar)" % nome
+    try:
+        limite = int(etapa.get("max_por_arquivo", 3))
+    except (TypeError, ValueError):
+        limite = 3
+    limite = max(1, min(limite, 50))
+    chave = "%s|%s" % (gatilho_id, nome)
+    if disparadas.get(chave, 0) >= limite:
+        return "elo '%s' dormiu (limite de %dx por arquivo alcancado)" % (nome, limite)
+    if nome == "copiar_para_projeto":
+        pasta_destino = str(etapa.get("para") or "").strip().strip("\\/")
+        if not pasta_destino or ".." in pasta_destino:
+            return "copia barrada: destino vazio ou tenta escapar do projeto"
+        destino = RAIZ / pasta_destino / arquivo_path.name
+        if not dentro_do_projeto(destino):
+            return "copia barrada: destino fora do projeto"
+        if destino.exists():
+            return "copia pulada: %s/%s ja existia" % (pasta_destino, arquivo_path.name)
+        try:
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(arquivo_path), str(destino))
+        except OSError as erro:
+            return "copia falhou (%s)" % erro
+        return "copiei para %s/%s" % (pasta_destino, destino.name)
+    if nome == "avisar":
+        texto = str(etapa.get("texto") or "(corrente sem texto)").replace("%arquivo%", arquivo_path.name)
+        linha_log = "[%s] corrente %s | %s" % (datetime.now().isoformat(timespec="seconds"),
+                                               gatilho_id, texto)
+        diario = RAIZ / "memoria" / "vigilia.log"
+        if dentro_do_projeto(diario):
+            try:
+                diario.parent.mkdir(parents=True, exist_ok=True)
+                with diario.open("a", encoding="utf-8") as arquivo_log:
+                    arquivo_log.write(linha_log + "\n")
+                return "anotado em memoria/vigilia.log"
+            except OSError as erro:
+                return "aviso falhou (%s)" % erro
+        return "aviso recusado: caderno fora do projeto"
+    if nome == "abrir":
+        if SO_OLHAR:
+            return ("abrir virou fila da madrugada (roda quando voce rodar)"
+                    if _enfileirar("abrir:" + str(arquivo_path)) else "fila nao coube no disco")
+        codigo, resposta = executar_abrir(str(arquivo_path))
+        return "abri" if codigo == 0 else "abrir barrado: %s" % resposta
+    cmd = str(etapa.get("comando") or "").replace("%arquivo%", arquivo_path.name)
+    if SO_OLHAR:
+        return ("executar virou fila da madrugada (roda quando voce rodar)"
+                if _enfileirar("executar:" + cmd) else "fila nao coube no disco")
+    codigo, resposta = executar_comando(cmd)
+    return "comando cumpriu" if codigo == 0 else "comando: %s" % resposta
+
+
+def correntes_para(nome_olho, arquivo_path):
+    saidas = []
+    for gatilho in corrente_gatilhos():
+        if not isinstance(gatilho, dict):
+            continue
+        se = gatilho.get("se") if isinstance(gatilho.get("se"), dict) else {}
+        olho_g = str(se.get("olho") or "").strip().lower()
+        if olho_g and olho_g != str(nome_olho).strip().lower():
+            continue
+        ext = str(se.get("extensao") or "").strip().lower()
+        if ext and ext != arquivo_path.suffix.lower():
+            continue
+        id_g = str(gatilho.get("id") or "sem-id")
+        diario = corrente_diario()
+        chave_evt = "%s|%s" % (id_g, arquivo_path.name)
+        registro = diario.get(chave_evt)
+        if not isinstance(registro, dict):
+            registro = {"disparadas": {}, "ultima": None}
+        disparadas = registro.get("disparadas") if isinstance(registro.get("disparadas"), dict) else {}
+        resultado = []
+        etapas = gatilho.get("etapas") if isinstance(gatilho.get("etapas"), list) else []
+        for etapa in etapas:
+            rotulo = corrente_etapa(id_g, etapa, arquivo_path, disparadas)
+            resultado.append(rotulo)
+            agiu = all(p not in rotulo for p in ("dormiu", "barrad", "fora do vocabulario", "falhou", "recusado"))
+            if agiu:
+                usar = str(etapa.get("usar") if isinstance(etapa, dict) else etapa).strip().lower()
+                k = "%s|%s" % (id_g, usar)
+                disparadas[k] = disparadas.get(k, 0) + 1
+        registro["disparadas"] = disparadas
+        registro["ultima"] = datetime.now().isoformat(timespec="seconds")
+        diario[chave_evt] = registro
+        escrever_json(CORRENTES_DIARIO, diario)
+        saidas.append("corrente %s: %s" % (id_g, "; ".join(resultado) or "sem etapas"))
     return saidas
 
 

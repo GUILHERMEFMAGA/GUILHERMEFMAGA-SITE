@@ -20,6 +20,7 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 | Cérebro | `fluxos/regras.json` | as regras que ele sabe obedecer; fora daqui, ele não existe |
 | Coleira | `fluxos/regras.json` → bloco `execucao.permitidas` | a ÚNICA lista de comandos que ele pode executar |
 | Porta | `fluxos/regras.json` → bloco `abrir` | áreas liberadas (`projeto`, `desktop`, `downloads`) + 21 extensões banidas |
+| Correntes | `fluxos/regras.json` → bloco `correntes` | gatilhos da vigília que puxam elos blindados: `copiar_para_projeto` (só entra no projeto), `avisar`, `abrir`, `executar` (na noite, vira fila) |
 | Rascunhos | `fluxos/rascunhos/` | propostas dele esperando minha decisão (`ativa: true` = aprovo) |
 | Fila | `fila/*.txt` | minhas ordens: `executar:`, `abrir:` ou `avisar:` |
 | Museu | `fila/feitas/` + `fila/erros/` | para onde cada ordem vai depois de atendida |
@@ -56,6 +57,37 @@ Depois de rodar, a prova fica em `relatorios\fila-<nome>.txt` e a ordem muda pra
 `fila\feitas\`. Ordem que falha vai pra `fila\erros\` — e o fiscal fica repetindo o
 aviso até eu dar baixa (ler, corrigir, devolver pra fila, ou apagar).
 
+## 🌙 O porteiro (`--vigiar`)
+
+O porteiro compara as pastas vigiadas (bloco `vigilia` do cérebro) com o último
+retrato guardado em `memoria\vigilia.json`. Primeira visita = calibra e fica
+quieto. Depois disso, arquivo novo ou que mudou vira evento — mas só quando
+amadureceu (mais velho que `tolerancia_seg`, pra não gritar com download pela
+metade). Cada evento reage **só** com o vocabulário aprovado: `inventario`,
+`{"anotar": ...}` e `{"anotar_fila": "executar:|abrir:|avisar:..."}`. À noite
+(`tick.bat`) ele anota e enfileira; nada é executado sem a rodada com
+testemunha. Relógio (opcional, uma linha no terminal, sem admin):
+
+```
+schtasks /Create /TN "SuperAgente Tick" /TR "C:\super-agente\tick.bat" /SC MINUTE /MO 15 /F
+```
+
+## ⛓️ Correntes (`bloco correntes` do cérebro)
+
+Quando o porteiro nota um arquivo, cada **gatilho** que bater (olho + extensão)
+roda suas **etapas**, em ordem, na mesma rodada. Vocabulário de elos — nada fora
+disso executa:
+
+- `copiar_para_projeto` → só copia PRA DENTRO do projeto (destino com `..` ou de fora = barrado);
+  a cópia mora em `entrada/`, que o `.gitignore` protege — meus PDFs privados não vão pro GitHub;
+- `avisar` → uma linha no caderno `memoria\vigilia.log`;
+- `abrir` → de DIA abre no app padrão (passando pelos 3 cadeados); À NOITE vira fila;
+- `executar` → de DIA passa pela coleira (leitura pura); À NOITE vira fila.
+
+Cada elo tem limite por arquivo (`max_por_arquivo`, padrão 3) — corrente que
+gritaria toda hora simplesmente dorme. Corrente nenhuma apaga nem move nada do
+mundo real: o porteiro copia, nunca engole.
+
 ## 🛡️ Por que dá pra confiar nele
 
 - **Allowlist**: só executa os comandos de leitura da coleira; símbolos de injeção
@@ -79,6 +111,8 @@ aviso até eu dar baixa (ler, corrigir, devolver pra fila, ou apagar).
 | 4 | auto-melhoria com portão (rascunho → ensaio → aprovação humana) | ✅ |
 | 4.5 | fila com coleira, fiscal e raio-x de diagnóstico | ✅ |
 | 5 | abrir arquivos e pastas com três cadeados (`abrir:`) | ✅ |
+| 5.5 | porteiro de plantão: vigia pastas e reage só pelo vocabulário (`--vigiar`) | ✅ |
+| 5.7 | correntes: gatilho da vigília puxa elos blindados; madrugada vira fila | ✅ |
 | 6 | organizar de verdade (mover/agrupar por regra) e GitHub Actions | 🔜 |
 
 ## 🧠 Frases-guia do projeto
@@ -87,5 +121,7 @@ aviso até eu dar baixa (ler, corrigir, devolver pra fila, ou apagar).
 - "o Git enxerga o disco, não a tela"
 - "mão na massa exige testemunha"
 - "só entra na coleira o que não altera nada"
+- "o porteiro observa e anota; agir sozinho, jamais"
+- "corrente puxa, coleira segura — de madrugada nada abre janela"
 - "o agente abre a porta, mas nunca engole a chave"
 - "o cabeçalho do arquivo é o crachá"

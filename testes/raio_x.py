@@ -5,6 +5,7 @@
 # Saida: [OK] funciona, [DICA] pode melhorar, [AVISO] atencao, [PROBLEMA] quebrou.
 # v2: para de contar o campo legado como olho extra e radiografa o canal abrir:.
 # v3: radiografa o porteiro (--vigiar), o snapshot dele e o tick.bat.
+# v4: radiografa o bloco correntes (gatilhos com etapas no vocabulario blindado).
 # Codigo de saida: 0 = sem problemas, 1 = pelo menos um PROBLEMA (pra portao usar).
 
 import ast
@@ -25,6 +26,7 @@ FERRAMENTAS_DO_CORPO = [
     "fiscal_da_fila", "politica_abrir", "raizes_de_abrir", "dentro_de",
     "validar_abrir", "executar_abrir", "ensaiar", "propor", "promover",
     "politica_vigilia", "snapshot_pasta", "aplicar_reacoes", "vigiar",
+    "corrente_diario", "corrente_gatilhos", "_enfileirar", "corrente_etapa", "correntes_para",
 ]
 
 # comandos que o raio-x reconhece como leitura pura (dicionario de seguranca)
@@ -256,11 +258,11 @@ def checar_loop():
                  % (", ".join(faltando), total),
                  "esse loop.py e de versao ANTIGA ou colado pela metade: feche a aba, cole o bloco inteiro, Ctrl+S, rode o raio-x de novo")
         return
-    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + abrir + porteiro)"
+    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + abrir + porteiro + correntes)"
        % (total, len(funcoes)))
-    if total < 780:
-        aviso("loop.py", "%d linhas e anatomia ok — corpo B10 com braco B11? (a atual tem 818)" % total,
-              "cole o loop.py v4 do bloco B11 inteiro, Ctrl+S, e rode o raio-x de novo")
+    if total < 905:
+        aviso("loop.py", "%d linhas e anatomia ok — corpo B11 sem os bracos do B12? (a atual tem 941)" % total,
+              "cole o loop.py v5 do bloco B12 inteiro, Ctrl+S, e rode o raio-x de novo")
     if extras:
         dica("loop.py", "funcoes fora do meu checklist (suas ou do proprio laco — sem problema): %s"
              % ", ".join(extras[:6]))
@@ -269,7 +271,8 @@ def checar_loop():
 # ---------------------------------------------------------------- .gitignore
 def checar_gitignore():
     caminho = RAIZ / ".gitignore"
-    exigidios = ["fila/", "relatorios/fila-", "relatorios/inventario-", "mundo_falso", "memoria/*.json"]
+    exigidios = ["fila/", "relatorios/fila-", "relatorios/inventario-", "mundo_falso", "memoria/*.json",
+               "entrada/", "relatorios/corrente-"]
     if not caminho.exists():
         problema(".gitignore", "arquivo nao existe — o Git ia ver a fila inteira",
                  "crie .gitignore na raiz com as linhas do bloco combinado")
@@ -471,8 +474,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 15:
-        dica("portao", "%d impressoes — o portao v6 tem 15; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 16:
+        dica("portao", "%d impressoes — o portao v7 tem 16; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- rascunhos
@@ -601,6 +604,72 @@ def checar_vigia(cerebro):
         dica("tick", "ainda sem tick.bat — o duplo-clique que da vida ao porteiro (bloco B11)")
 
 
+# ---------------------------------------------------------------- correntes
+def checar_correntes(cerebro):
+    if not isinstance(cerebro, dict):
+        return
+    cfg = cerebro.get("correntes")
+    if cfg is None:
+        dica("correntes", "sem bloco correntes no cerebro — o porteiro ve, mas ninguem age em corrente")
+        return
+    if not isinstance(cfg, dict):
+        problema("correntes", "bloco correntes nao e objeto { }", "confira as chaves; use o modelo do regras.json v13")
+        return
+    erros = []
+    gatilhos = cfg.get("gatilhos")
+    if not isinstance(gatilhos, list) or not gatilhos:
+        erros.append("sem lista correntes.gatilhos — correntes ligado sem gatilho e cachorro sem coleira")
+        gatilhos = []
+    vistos_ids = []
+    for i, g in enumerate(gatilhos):
+        if not isinstance(g, dict):
+            erros.append("gatilho %d nao e objeto { }" % i)
+            continue
+        id_g = str(g.get("id") or "").strip()
+        if not id_g:
+            erros.append("gatilho %d sem 'id'" % i)
+        elif id_g in vistos_ids:
+            erros.append("id de gatilho repetido: %s" % id_g)
+        else:
+            vistos_ids.append(id_g)
+        se = g.get("se")
+        if not isinstance(se, dict):
+            erros.append("%s: 'se' precisa ser {olho, extensao}" % (id_g or i))
+        else:
+            ext = str(se.get("extensao") or "").strip().lower()
+            if ext and not ext.startswith("."):
+                erros.append("%s: extensao '%s' precisa comecar com ponto (ex.: .pdf)" % (id_g or i, ext))
+        etapas = g.get("etapas")
+        if not isinstance(etapas, list) or not etapas:
+            erros.append("%s: sem 'etapas' [ ] — corrente sem elo nao puxa nada" % (id_g or i))
+            continue
+        for j, etapa in enumerate(etapas):
+            e = etapa if isinstance(etapa, dict) else {"usar": etapa}
+            nome = str(e.get("usar") or "").strip().lower()
+            if nome not in ("copiar_para_projeto", "abrir", "avisar", "executar"):
+                erros.append("%s etapa %d: usar='%s' fora do vocabulario (vale: copiar_para_projeto, abrir, avisar, executar)"
+                             % (id_g or i, j, nome or "?"))
+                continue
+            if nome == "copiar_para_projeto":
+                para = str(e.get("para") or "").strip()
+                if not para or ".." in para or para.startswith("/") or ":" in para:
+                    erros.append("%s etapa %d: 'para' precisa ser pasta DENTRO do projeto (ex.: entrada)" % (id_g or i, j))
+            if nome == "executar" and not str(e.get("comando") or "").strip():
+                erros.append("%s etapa %d: executar sem 'comando'" % (id_g or i, j))
+            if nome == "avisar" and not str(e.get("texto") or "").strip():
+                erros.append("%s etapa %d: avisar sem 'texto'" % (id_g or i, j))
+            mx = e.get("max_por_arquivo", 3)
+            if not (isinstance(mx, int) and not isinstance(mx, bool) and 1 <= mx <= 50):
+                erros.append("%s etapa %d: max_por_arquivo=%r precisa ser 1..50" % (id_g or i, j, mx))
+    if not cfg.get("ligado", False):
+        dica("correntes", "correntes desligadas (ligado: false) — gatilhos nao vao disparar")
+    if erros:
+        problema("correntes", "; ".join(erros[:3]), "conserte so o campo apontado; o modelo esta no regras.json v13")
+    elif cfg.get("ligado") and not erros:
+        total = sum(len(g.get("etapas", [])) for g in gatilhos if isinstance(g, dict))
+        ok("correntes", "%d gatilho(s), %d elo(s) — todos no vocabulario blindado" % (len(gatilhos), total))
+
+
 def main():
     print("=" * 78)
     print("RAIO-X do super-agente — corpo inteiro lido com calma, sem tocar em nada")
@@ -611,6 +680,7 @@ def main():
     print("  loop.py  = o corpo: ver, olhar, decidir, fazer, lembrar, contar, propor")
     print("  fila     = ordens do dia: executar, abrir, avisar (so com voce presente)")
     print("  vigilia  = o porteiro: detecta arquivos novos e reage so com vocabulario aprovado")
+    print("  correntes= fluxos de etapas: gatilho da vigilia puxa elos blindados (copiar, avisar, abrir, executar)")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -647,6 +717,10 @@ def main():
         checar_vigia(cerebro)
     except Exception as erro:
         problema("vigilia", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_correntes(cerebro)
+    except Exception as erro:
+        problema("correntes", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

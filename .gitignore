@@ -4,6 +4,9 @@ __pycache__/
 # ambiente virtual (a "caixinha separada" das bibliotecas)
 .venv/
 venv/
+# capturas das correntes: copia dos SEUS arquivos do mundo — nunca no GitHub
+entrada/
+relatorios/corrente-*.txt
 # memoria de execucao do agente (diario, nao codigo)
 memoria/*.json
 memoria/*.log

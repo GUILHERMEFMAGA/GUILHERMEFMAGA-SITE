@@ -41,6 +41,19 @@
       {"pasta": "desktop", "ao_chegar": ["inventario"]}
     ]
   },
+  "correntes": {
+    "ligado": true,
+    "gatilhos": [
+      {
+        "id": "pdf-no-downloads",
+        "se": {"olho": "downloads", "extensao": ".pdf"},
+        "etapas": [
+          {"usar": "copiar_para_projeto", "para": "entrada"},
+          {"usar": "avisar", "texto": "pdf novo capturado: %arquivo% (copia em entrada/)"}
+        ]
+      }
+    ]
+  },
   "acoes": [
     {
       "id": "criar_arquivo_base",

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v6: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v7: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 
 import importlib.util
@@ -273,8 +273,75 @@ print("  [%s] porteiro  -> calibra, espera a tolerancia, avisa 1 vez, reage so c
 if not (porteiro_ok and vocab_ok):
     falhas.append("porteiro")
 
+# cena nova: correntes — gatilho .pdf roda etapas, PNG ignora, limite dorme, madrugada enfileira
+corr_palco = palco / "correntes"
+casa_c = corr_palco / "casa"
+(casa_c / "Downloads").mkdir(parents=True)
+proj_c = corr_palco / "proj"
+for pasta_c in ("memoria", "fila", "fluxos", "entrada"):
+    (proj_c / pasta_c).mkdir(parents=True)
+regras_c = {"acoes": [], "mundo": {"ligado": False},
+            "vigilia": {"ligado": True, "tolerancia_seg": 0, "max_eventos": 9,
+                        "olhos": [{"pasta": "downloads", "ao_chegar": ["inventario"]}]},
+            "correntes": {"ligado": True, "gatilhos": [
+                {"id": "pdf-captura", "se": {"olho": "downloads", "extensao": ".pdf"},
+                 "etapas": [{"usar": "copiar_para_projeto", "para": "entrada"},
+                            {"usar": "avisar", "texto": "pdf novo capturado: %arquivo%"},
+                            {"usar": "telepatia"}]}]}}
+(proj_c / "fluxos" / "regras.json").write_text(json.dumps(regras_c), encoding="utf-8")
+env_c = os.environ.get("AGENTE_CASA")
+r_c, ce_c, v_c = loop.RAIZ, loop.CEREBRO, loop.VIGILIA
+f_c, d_c = loop.FILA, loop.CORRENTES_DIARIO
+os.environ["AGENTE_CASA"] = str(casa_c)
+try:
+    loop.RAIZ = proj_c
+    loop.CEREBRO = proj_c / "fluxos" / "regras.json"
+    loop.VIGILIA = proj_c / "memoria" / "vigilia.json"
+    loop.CORRENTES_DIARIO = proj_c / "memoria" / "correntes.json"
+    loop.FILA = proj_c / "fila"
+    loop.vigiar()
+    (casa_c / "Downloads" / "trabalho.pdf").write_text("pdfzito", encoding="utf-8")
+    (casa_c / "Downloads" / "foto.png").write_text("png", encoding="utf-8")
+    visao = " | ".join(loop.vigiar())
+    copiou = (proj_c / "entrada" / "trabalho.pdf").exists()
+    ignorou = not (proj_c / "entrada" / "foto.png").exists()
+    anotou = "pdf novo capturado: trabalho.pdf" in (proj_c / "memoria" / "vigilia.log").read_text(encoding="utf-8")
+    recusou = "fora do vocabulario" in visao and "corrente pdf-captura" in visao
+    dormiu = False
+    for rodadazinha in range(4):
+        # tamanho varia de proposito: igual ao mundo real, um arquivo que muda muda de tamanho
+        (casa_c / "Downloads" / "trabalho.pdf").write_text("pdf" + "x" * rodadazinha, encoding="utf-8")
+        if "dormiu" in " | ".join(loop.vigiar()):
+            dormiu = True
+    regras_c["correntes"]["gatilhos"][0]["etapas"] = [{"usar": "abrir"}]
+    (proj_c / "fluxos" / "regras.json").write_text(json.dumps(regras_c), encoding="utf-8")
+    (proj_c / "memoria" / "correntes.json").write_text("{}", encoding="utf-8")
+    verdadeiro_sO = loop.SO_OLHAR
+    loop.SO_OLHAR = True
+    try:
+        (casa_c / "Downloads" / "trabalho.pdf").write_text("noite", encoding="utf-8")
+        noite = " | ".join(loop.vigiar())
+    finally:
+        loop.SO_OLHAR = verdadeiro_sO
+    vigia_arquivos = sorted((proj_c / "fila").glob("vigia-*.txt"))
+    enfileirou = (len(vigia_arquivos) == 1 and "abrir:" in vigia_arquivos[0].read_text(encoding="utf-8")
+                  and "virou fila" in noite)
+    corr_ok = copiou and ignorou and anotou and recusou and dormiu and enfileirou
+finally:
+    loop.RAIZ, loop.CEREBRO, loop.VIGILIA = r_c, ce_c, v_c
+    loop.FILA, loop.CORRENTES_DIARIO = f_c, d_c
+    if env_c is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_c
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] correntes  -> gatilho .pdf roda etapas, PNG ignora, limite dorme, madrugada enfileira"
+      % ("ok  " if corr_ok else "FALHA"))
+if not corr_ok:
+    falhas.append("correntes")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado e porteiro de plantao.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao e correntes no trilho.")
