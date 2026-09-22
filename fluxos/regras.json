@@ -164,5 +164,12 @@
       "criar_arquivo": "LEIA-ME.txt",
       "conteudo": "# NAO APAGUE base.py em config: ele e gerado pelo agente. Veja memoria/historico.json\n"
     }
-  ]
+  ],
+  "aprendizado": {
+    "ligado": true,
+    "janela_dias": 60,
+    "meia_vida_dias": 14,
+    "limite_eventos": 1200,
+    "comentario": "Placar por regra: +1 acerto, +0.5 etapa ok, -1 etapa torta, +2 ideia sua aprovada. O agente so da conselho — nunca muda regra sozinho."
+  }
 }

@@ -27,6 +27,7 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 | Museu | `fila/feitas/` + `fila/erros/` | para onde cada ordem vai depois de atendida |
 | Prova do crime | `relatorios/` | relatórios da fila + inventários dos olhos (desktop, downloads) |
 | Memória | `memoria/` | diário (`historico.json`) e contadores — nunca vai pro GitHub |
+| Experiência | `memoria/aprendizado.json` (B15) | caderno de pesos com decaimento (meia-vida 14 dias): ele **dá conselho**, nunca muda regra sozinho |
 | Portão | `testes/testar_regras.py` | mundo falso onde toda regra nova é testada antes de valer |
 | Raio-X | `testes/raio_x.py` | fotografa o corpo inteiro, lê tudo, não toca em nada |
 | Vigia noturno | `rodar_de_madrugada.bat` | roda agendado em modo observação: olha, anota, não encosta em nada |
@@ -107,6 +108,27 @@ Gatilhos **declarativos** com condição, estilo n8n, dentro do cérebro
 
 As correntes da B12 continuam valendo em paralelo — compatibilidade é lei de
 convivência (nada remove, tudo acrescenta).
+
+## 📊 Aprendizado por experiência (B15 — bloco `aprendizado`)
+
+Reforço sem API e sem GPU: cada resultado vira um evento com peso no caderno
+`memoria/aprendizado.json`.
+
+| Evento | Peso |
+|---|---|
+| regra criou o arquivo esperado (`executar`) | +1 |
+| elo de corrente/fluxo rodou limpo | +0.5 |
+| elo barrado, falho, fora do vocabulário ou pulado | -1 |
+| portão barrou um rascunho dele | -0.5 |
+| **você** aprovou a ideia (`ativa: true`) | +2 |
+
+O placar decai: um evento de há 28 dias vale metade (meia-vida 14 dias,
+`meia_vida_dias` no cérebro). Com evidência suficiente ele imprime conselho —
+*"a experiência pede retrucar ou aposentar essa regra"* / *"regra confiável,
+candidata a ganhar mais mundo"* — e para aí. **Quem aposenta é você.**
+
+Em `--so-olhar` o caderno nem nasce: quem só observa não julga. E em
+`--vigiar --ensaiar` não há registro, porque o passo não executa.
 
 ## 🛡️ Por que dá pra confiar nele
 

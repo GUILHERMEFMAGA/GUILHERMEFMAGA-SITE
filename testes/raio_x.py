@@ -29,6 +29,7 @@ FERRAMENTAS_DO_CORPO = [
     "validar_abrir", "executar_abrir", "ensaiar", "propor", "promover",
     "politica_vigilia", "snapshot_pasta", "aplicar_reacoes", "vigiar",
     "corrente_diario", "corrente_gatilhos", "_enfileirar", "corrente_etapa", "correntes_para",
+    "registrar_experiencia", "pesos_aprendido", "conselhos_aprendido", "_experiencia_elo",
 ]
 
 # comandos que o raio-x reconhece como leitura pura (dicionario de seguranca)
@@ -479,8 +480,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 18:
-        dica("portao", "%d impressoes — o portao v9 tem 18; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 19:
+        dica("portao", "%d impressoes — o portao v10 tem 19; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- saude (B13)
@@ -603,6 +604,53 @@ def checar_fluxos(cerebro):
 
 
 # ---------------------------------------------------------------- rascunhos
+def checar_aprendizado(cerebro):
+    """B15: o caderno de experiencia — so existe pra dar conselho, nunca pra agir sozinho."""
+    cfg = cerebro.get("aprendizado") if isinstance(cerebro, dict) else None
+    if not isinstance(cfg, dict):
+        dica("experiencia", "sem bloco 'aprendizado' no cerebro — o caderno ainda nao nasce; veja o README 5.11")
+        return
+    if not cfg.get("ligado", False):
+        dica("experiencia", "aprendizado desligado (ligado: false) — decisao sua, nao e defeito")
+        return
+    for campo in ("janela_dias", "meia_vida_dias"):
+        v = cfg.get(campo)
+        if v is not None and (not isinstance(v, (int, float)) or isinstance(v, bool) or v <= 0):
+            problema("experiencia", "%s=%r precisa ser numero positivo" % (campo, v),
+                     "exemplo sano: janela_dias 60, meia_vida_dias 14")
+            return
+    teto = cfg.get("limite_eventos", 1200)
+    if not (isinstance(teto, int) and not isinstance(teto, bool) and 50 <= teto <= 100000):
+        problema("experiencia", "limite_eventos=%r precisa ser inteiro entre 50 e 100000" % teto,
+                 "o caderno trava pra nao virar bola de neve no disco")
+        return
+    caminho = RAIZ / "memoria" / "aprendizado.json"
+    if not caminho.exists():
+        dica("experiencia", "caderno ainda vazio — a primeira experiencia entra no proximo tick")
+        return
+    try:
+        dados = ler_json_seguro(caminho)
+    except json.JSONDecodeError as erro:
+        problema("experiencia", "caderno corrompido: %s" % posicao_do_erro(erro, caminho),
+                 "o agente recomeca o placar do zero — pode apagar o arquivo sem medo, as regras nao mudam")
+        return
+    except OSError as erro:
+        aviso("experiencia", "o disco nao deixou ler: %s" % erro)
+        return
+    eventos = dados.get("eventos") if isinstance(dados, dict) else None
+    if not isinstance(eventos, list):
+        problema("experiencia", "aprendizado.json precisa ser {eventos: [ ... ]}",
+                 "se nao bater, apague o arquivo; o caderno e memo de placar, nao de config")
+        return
+    if len(eventos) > teto:
+        problema("experiencia", "%d eventos passou o teto de %d" % (len(eventos), teto),
+                 "o loop corta sozinho na escrita; arquivo cortado a mao tambem resolve")
+        return
+    chaves = {str(ev[1]) for ev in eventos if isinstance(ev, (list, tuple)) and len(ev) >= 2}
+    ok("experiencia", "%d evento(s) em %d chave(s) — conselho sim, mudar regra sozinho nunca"
+       % (len(eventos), len(chaves)))
+
+
 def checar_rascunhos():
     pasta = RAIZ / "fluxos" / "rascunhos"
     if not pasta.exists():
@@ -807,6 +855,7 @@ def main():
     print("  correntes= fluxos de etapas: gatilho da vigilia puxa elos blindados (copiar, avisar, abrir, executar)")
     print("  saude    = B13: pulso do PC a cada tick (ram/disco/nucleos, so leitura); madrugada contada")
     print("  fluxos   = Fase C: gatilhos declarativos com 'se' por passo e --ensaiar (dry-run sem risco)")
+    print("  experiencia= B15: caderno com decaimento — o agente conta o que deu certo e so DA CONSELHO")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -854,6 +903,10 @@ def main():
         checar_fluxos(cerebro)
     except Exception as erro:
         problema("fluxos", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_aprendizado(cerebro)
+    except Exception as erro:
+        problema("experiencia", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

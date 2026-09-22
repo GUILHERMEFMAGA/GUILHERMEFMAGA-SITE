@@ -111,6 +111,7 @@ def executar(regra, pasta):
         conteudo = str(conteudo)
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.write_text(conteudo, encoding="utf-8")
+    registrar_experiencia("acao:%s" % regra.get("id", "?"), "criou", +1.0)
     return "Criei %s/%s seguindo a regra %s" % (pasta, nome, regra.get("id", "?"))
 
 
@@ -870,6 +871,7 @@ def correntes_para(nome_olho, arquivo_path):
                 continue
             rotulo = corrente_etapa(id_g, etapa, arquivo_path, disparadas)
             resultado.append(rotulo)
+            _experiencia_elo(id_g, str(etapa.get("usar") if isinstance(etapa, dict) else etapa).strip().lower() or "?", rotulo)
             agiu = all(p not in rotulo for p in ("dormiu", "barrad", "fora do vocabulario", "falhou", "recusado"))
             if agiu:
                 usar = str(etapa.get("usar") if isinstance(etapa, dict) else etapa).strip().lower()
@@ -971,6 +973,7 @@ def fluxos_para(nome_olho, arquivo_path):
                 continue
             rotulo = corrente_etapa("fluxo:" + id_g, p, arquivo_path, disparadas)
             resultado.append(rotulo)
+            _experiencia_elo("fluxo:" + id_g, nome, rotulo)
             agiu = all(q not in rotulo for q in ("dormiu", "barrad", "fora do vocabulario",
                                                  "falhou", "recusado", "pulado", "ignorado"))
             if agiu:
@@ -984,6 +987,86 @@ def fluxos_para(nome_olho, arquivo_path):
         prefixo = "ensaio fluxo %s" if ENSAIAR else "fluxo %s"
         saidas.append((prefixo + ": %s") % (id_g, "; ".join(resultado) or "sem passos"))
     return saidas
+
+
+# ---------------------------------------------------------------- Aprendizado (B15)
+# Aprendizado por experiencia SEM API e SEM GPU: um caderno de eventos com pesos
+# e decaimento exponencial (meia-vida de 14 dias) — o primo honesto do reforço.
+# O agente nunca muda regra sozinho por causa de placar: ele so da conselho no
+# log. O sim continua sendo do humano (doutrina: agente propoe, teste decide).
+
+def _caminho_aprendizado():
+    return RAIZ / "memoria" / "aprendizado.json"
+
+
+def registrar_experiencia(chave, tipo, peso):
+    """Uma linha no caderno de experiencia. --so-olhar NUNCA julga: so le o mundo."""
+    if SO_OLHAR:
+        return False
+    caminho = _caminho_aprendizado()
+    dados = ler_json(caminho, {})
+    eventos = dados.get("eventos") if isinstance(dados, dict) else None
+    if not isinstance(eventos, list):
+        eventos = []
+    eventos.append([datetime.now().isoformat(timespec="seconds"), str(chave),
+                    str(tipo), float(peso)])
+    cfg = ler_cerebro().get("aprendizado")
+    cfg = cfg if isinstance(cfg, dict) else {}
+    teto = cfg.get("limite_eventos", 1200)
+    if isinstance(eventos, list) and len(eventos) > teto:  # caderno com margem, nada infinito
+        eventos = eventos[-teto:]
+    escrever_json(caminho, {"eventos": eventos})
+    return True
+
+
+def pesos_aprendido(janela_dias=None, meia_vida_dias=None):
+    """Placar por chave: soma de pesos * 0.5^(idade/meia-vida). O tempo apaga
+    lembrancas velhas — experiencia de ontem vale mais que a de marco."""
+    dados = ler_json(_caminho_aprendizado(), {})
+    eventos = dados.get("eventos", []) if isinstance(dados, dict) else []
+    cfg = ler_cerebro().get("aprendizado")
+    cfg = cfg if isinstance(cfg, dict) else {}
+    if janela_dias is None:
+        janela_dias = cfg.get("janela_dias", 60)
+    if meia_vida_dias is None:
+        meia_vida_dias = cfg.get("meia_vida_dias", 14.0)
+    agora = datetime.now()
+    acumulado = {}
+    for ev in eventos:
+        try:
+            quando = datetime.fromisoformat(str(ev[0]))
+            chave, peso = str(ev[1]), float(ev[3])
+        except (ValueError, TypeError, IndexError):
+            continue
+        idade = max(0.0, (agora - quando).total_seconds() / 86400.0)
+        if idade > janela_dias:
+            continue
+        ant = acumulado.get(chave, (0.0, 0))
+        acumulado[chave] = (ant[0] + peso * (0.5 ** (idade / meia_vida_dias)), ant[1] + 1)
+    return sorted(((c, round(s, 2), q) for c, (s, q) in acumulado.items()),
+                  key=lambda item: -item[1])
+
+
+def conselhos_aprendido():
+    """Conselhos nascidos da experiencia — propostas, nunca atos. Alucinacao
+    nao tem vez aqui: so fala quem tem evento de verdade no caderno."""
+    conselhos = []
+    for chave, score, qtd in pesos_aprendido():
+        if score <= -2.0 and qtd >= 2:
+            conselhos.append("%s: score %s em %d eventos — a experiencia pede retrucar ou aposentar essa regra"
+                             % (chave, score, qtd))
+        elif score >= 3.0 and qtd >= 3:
+            conselhos.append("%s: score %s em %d eventos — regra confiavel, candidata a ganhar mais mundo"
+                             % (chave, score, qtd))
+    return conselhos[:5]
+
+
+def _experiencia_elo(gatilho_id, nome_elo, resultado):
+    """Uma etapa deu certa ou torta? O julgo e o texto que o proprio executor
+    fabricou — sem inventar segunda fonte de verdade."""
+    ruins = ("barrada", "barrado", "falhou", "dormiu", "pulado", "recusado", "fora do vocabulario")
+    peso = -1.0 if any(m in resultado for m in ruins) else 0.5
+    registrar_experiencia("%s|elo:%s" % (gatilho_id, nome_elo), "etapa", peso)
 
 
 def ensaiar(proposta):
@@ -1060,6 +1143,7 @@ def propor(cronicos):
         falha = ensaiar(proposta)
         if falha is not None:
             ignoradas.append("%s: %s" % (id_nova, falha))
+            registrar_experiencia("rascunho:%s" % id_nova, "portao-barrou", -0.5)
             escrever_json(destino, {"ativa": False, "proposta": proposta,
                                    "origem": "recriei %s %dx" % (alvo_chave.replace("|", " em "), qtd),
                                    "motivo_da_recusa": falha})
@@ -1096,6 +1180,7 @@ def promover():
         escrever_json(arquivo, {"ativa": True, "proposta": proposta,
                                "origem": dados.get("origem"), "criada_em": dados.get("criada_em"),
                                "promovida_em": datetime.now().isoformat(timespec="seconds")})
+        registrar_experiencia("acao:%s" % proposta["id"], "promovida-pelo-humano", +2.0)
         aprovadas.append(proposta["id"])
     return aprovadas
 
@@ -1172,6 +1257,8 @@ if __name__ == "__main__":
     if cont.get("rodadas"):
         print("   - ele aprendeu: %d de %d rodadas nao tinham trabalho"
               % (cont.get("paradas", 0), cont.get("rodadas", 0)))
+    for linha in conselhos_aprendido():
+        print("   - a experiencia sugere:", linha)
     for linha in ignoradas:
         print("   - O PORTAO BARROU:", linha)
     saidas = list(enterradas_txt)

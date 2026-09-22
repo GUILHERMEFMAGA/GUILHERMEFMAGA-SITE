@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v9: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v10: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 # v8: cena saude (B13) — medir nunca explode, o ponto vira linha, a janela corta e a
 # madrugada conta a fome.
@@ -440,8 +440,59 @@ print("  [%s] fluxos  -> gatilho com condicao, 'se' por passo e --ensaiar nao co
 if not fx_ok:
     falhas.append("fluxos")
 
+# cena nova: aprendizado por experiencia (B15) — caderno com decaimento de
+# meia-vida, conselho so com evidencia no registro e --so-olhar que NUNCA julga
+from datetime import datetime, timedelta
+ap_palco = palco / "aprendizado"
+(ap_palco / "memoria").mkdir(parents=True)
+(ap_palco / "fluxos").mkdir(parents=True)
+(ap_palco / "fluxos" / "regras.json").write_text(
+    json.dumps({"acoes": [], "mundo": {"ligado": False},
+                "aprendizado": {"ligado": True, "janela_dias": 60,
+                                 "meia_vida_dias": 14, "limite_eventos": 1200}}),
+    encoding="utf-8")
+r_ap, ce_ap, so_ap = loop.RAIZ, loop.CEREBRO, loop.SO_OLHAR
+try:
+    loop.RAIZ, loop.CEREBRO = ap_palco, ap_palco / "fluxos" / "regras.json"
+    # 1) placar puro: 4 acertos de hoje pesam 4.0, um atras de 28 dias vale 1.0 (2 meias-vidas)
+    for _ in range(4):
+        loop.registrar_experiencia("acao:boa", "criou", 1.0)
+    caderno = json.loads((ap_palco / "memoria" / "aprendizado.json").read_text(encoding="utf-8"))
+    velho = (datetime.now() - timedelta(days=28)).isoformat(timespec="seconds")
+    caderno["eventos"].append([velho, "acao:velha", "criou", 4.0])
+    (ap_palco / "memoria" / "aprendizado.json").write_text(json.dumps(caderno), encoding="utf-8")
+    placar = dict((c, s) for c, s, q in loop.pesos_aprendido())
+    contam = dict((c, q) for c, s, q in loop.pesos_aprendido())
+    pontuou = abs(placar.get("acao:boa", 0) - 4.0) < 0.05 and contam.get("acao:boa") == 4
+    decaiu = 0.95 <= placar.get("acao:velha", 0) <= 1.05
+    # 2) conselho so fala com evidencia: retrucar o torto, elogiar o confiavel
+    #    (os nomes passam pelo mesmo crivo minúsculo do corrente_etapa)
+    for _ in range(3):
+        loop._experiencia_elo("corrente:ruim", "abrir", "abrir barrado: politica nao deixou")
+    for _ in range(3):
+        loop._experiencia_elo("corrente:otima", "avisar", "anotado em memoria/vigilia.log")
+    conselhos = " ;; ".join(loop.conselhos_aprendido())
+    aconselhou = "aposentar" in conselhos and "corrente:ruim" in conselhos
+    elogiou = any("confiavel" in c and "acao:boa" in c for c in loop.conselhos_aprendido())
+    hook_gravou = any(c == "corrente:otima|elo:avisar" and q == 3 for c, s, q in loop.pesos_aprendido())
+    # 3) --so-olhar nao julga: nem um evento a mais no caderno
+    antes = len(json.loads((ap_palco / "memoria" / "aprendizado.json").read_text(encoding="utf-8"))["eventos"])
+    loop.SO_OLHAR = True
+    mudo = loop.registrar_experiencia("acao:boa", "criou", 1.0) is False
+    loop.SO_OLHAR = False
+    depois = len(json.loads((ap_palco / "memoria" / "aprendizado.json").read_text(encoding="utf-8"))["eventos"])
+    silencia = mudo and antes == depois
+    ap_ok = pontuou and decaiu and aconselhou and elogiou and hook_gravou and silencia
+finally:
+    loop.RAIZ, loop.CEREBRO, loop.SO_OLHAR = r_ap, ce_ap, so_ap
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] aprendizado  -> decaimento de meia-vida, conselho com evidencia e --so-olhar mudo"
+      % ("ok  " if ap_ok else "FALHA"))
+if not ap_ok:
+    falhas.append("aprendizado")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho, saude no pulso e fluxo com condicao.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho, saude no pulso, fluxo com condicao e experiencia com conselho.")
