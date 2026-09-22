@@ -10,6 +10,7 @@ relatorios/corrente-*.txt
 # memoria de execucao do agente (diario, nao codigo)
 memoria/*.json
 memoria/*.log
+memoria/*.txt
 # segredos: NUNCA vao pro GitHub
 .env
 *.env

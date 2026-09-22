@@ -6,6 +6,7 @@
 # v2: para de contar o campo legado como olho extra e radiografa o canal abrir:.
 # v3: radiografa o porteiro (--vigiar), o snapshot dele e o tick.bat.
 # v4: radiografa o bloco correntes (gatilhos com etapas no vocabulario blindado).
+# v5: olhos de saude (B13) no raio-x + linter de .bat (a licao do parentese solto).
 # Codigo de saida: 0 = sem problemas, 1 = pelo menos um PROBLEMA (pra portao usar).
 
 import ast
@@ -18,6 +19,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 
 # anatomia obrigatoria do loop v3 (fila + coleira + fiscal + dois olhos + abrir seguro)
 FERRAMENTAS_DO_CORPO = [
+    "medir_saude", "linha_saude", "bater_ponto_saude", "resumo_da_madrugada",
     "ler_json", "escrever_json", "ler_cerebro", "listar_pastas", "arquivos_de",
     "descobrir_acao", "decidir_acao", "executar", "lembrar", "ler_contadores",
     "registrar_rodada", "contar_fatos", "corpo", "dentro_do_projeto",
@@ -258,11 +260,14 @@ def checar_loop():
                  % (", ".join(faltando), total),
                  "esse loop.py e de versao ANTIGA ou colado pela metade: feche a aba, cole o bloco inteiro, Ctrl+S, rode o raio-x de novo")
         return
-    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + abrir + porteiro + correntes)"
+    ok("loop.py", "%d linhas, %d funcoes, anatomia completa (fila + coleira + fiscal + abrir + porteiro + correntes + saude)"
        % (total, len(funcoes)))
     if total < 905:
         aviso("loop.py", "%d linhas e anatomia ok — corpo B11 sem os bracos do B12? (a atual tem 941)" % total,
               "cole o loop.py v5 do bloco B12 inteiro, Ctrl+S, e rode o raio-x de novo")
+    if "medir_saude" in funcoes and total < 1030:
+        aviso("loop.py", "%d linhas com anatomia de saude ok — falta um pedaco do loop v6? (a atual tem 1069)" % total,
+              "rode o puxar-atualizacao.bat — o loop v6 veio na ponte")
     if extras:
         dica("loop.py", "funcoes fora do meu checklist (suas ou do proprio laco — sem problema): %s"
              % ", ".join(extras[:6]))
@@ -272,7 +277,7 @@ def checar_loop():
 def checar_gitignore():
     caminho = RAIZ / ".gitignore"
     exigidios = ["fila/", "relatorios/fila-", "relatorios/inventario-", "mundo_falso", "memoria/*.json",
-               "entrada/", "relatorios/corrente-"]
+               "memoria/*.txt", "entrada/", "relatorios/corrente-"]
     if not caminho.exists():
         problema(".gitignore", "arquivo nao existe — o Git ia ver a fila inteira",
                  "crie .gitignore na raiz com as linhas do bloco combinado")
@@ -474,8 +479,56 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 16:
-        dica("portao", "%d impressoes — o portao v7 tem 16; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 17:
+        dica("portao", "%d impressoes — o portao v8 tem 17; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+
+
+# ---------------------------------------------------------------- saude (B13)
+def checar_saude():
+    caminho = RAIZ / "memoria" / "saude.txt"
+    if not caminho.exists():
+        dica("saude", "ainda sem batidas — o pulso comeca no proximo tick do porteiro")
+        return
+    try:
+        linhas = [l for l in caminho.read_text(encoding="utf-8").splitlines() if l.strip()]
+    except OSError:
+        aviso("saude", "o diario existe mas o disco nao deixou ler",
+              "feche a aba de saude.txt no editor e rode o raio-x de novo")
+        return
+    if not linhas:
+        dica("saude", "diario criado mas vazio — a primeira batida esta por virar")
+        return
+    fome = sum(1 for l in linhas if "fome=SIM" in l)
+    hora = linhas[-1].split()[0] if linhas[-1].split() else "?"
+    ok("saude", "%d batida(s); ultima as %s; %d com o PC apertado" % (len(linhas), hora, fome))
+
+
+# ---------------------------------------------------------------- linter de .bat (licao do parentese)
+def checar_bats():
+    bats = sorted(RAIZ.glob("*.bat"))
+    if not bats:
+        return
+    suspeitas = []
+    for bat in bats:
+        try:
+            texto = bat.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        dentro = 0
+        for n, linha in enumerate(texto.splitlines(), 1):
+            s = linha.strip()
+            if s.upper().startswith("REM"):
+                continue
+            abre, fecha = s.count("("), s.count(")")
+            if dentro > 0 and (fecha - abre) > 1:
+                suspeitas.append("%s:%d" % (bat.name, n))
+            dentro = max(0, dentro + abre - fecha)
+    if suspeitas:
+        aviso("bats", "parenteses sobrando dentro de bloco if em %s — o cmd fecha o bloco no primeiro \")\" e explode na parse"
+              % ", ".join(suspeitas[:4]),
+              "refaca o .bat com goto no lugar de bloco, como o puxar v3")
+    else:
+        ok("bats", "%d .bat conferidos — nenhum parenteses perdido dentro de bloco if" % len(bats))
 
 
 # ---------------------------------------------------------------- rascunhos
@@ -681,6 +734,7 @@ def main():
     print("  fila     = ordens do dia: executar, abrir, avisar (so com voce presente)")
     print("  vigilia  = o porteiro: detecta arquivos novos e reage so com vocabulario aprovado")
     print("  correntes= fluxos de etapas: gatilho da vigilia puxa elos blindados (copiar, avisar, abrir, executar)")
+    print("  saude    = B13: pulso do PC a cada tick (ram/disco/nucleos, so leitura); madrugada contada")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -695,6 +749,8 @@ def main():
         ("olhos", checar_olhos, ()),
         ("escrita", checar_escrita, ()),
         ("portao", checar_portao, ()),
+        ("saude", checar_saude, ()),
+        ("bats", checar_bats, ()),
         ("rascunhos", checar_rascunhos, ()),
     ]
     for rotulo, checagem, args in checagens:

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v7: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v8: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
+# v8: cena saude (B13) — medir nunca explode, o ponto vira linha, a janela corta e a
+# madrugada conta a fome.
 
 import importlib.util
 import json
@@ -340,8 +342,43 @@ print("  [%s] correntes  -> gatilho .pdf roda etapas, PNG ignora, limite dorme, 
 if not corr_ok:
     falhas.append("correntes")
 
+# cena nova: olhos de saude (B13) — medir e so ler; o ponto vira linha no diario;
+# a janela corta as velhas; o resumo conta a fome da madrugada
+raiz_sa, cerebro_sa = loop.RAIZ, loop.CEREBRO
+sala_sa = palco / "saude"
+(sala_sa / "memoria").mkdir(parents=True)
+try:
+    loop.RAIZ = sala_sa
+    retrato = loop.medir_saude()
+    honesto = (isinstance(retrato.get("ram_pct"), (int, type(None)))
+               and isinstance(retrato.get("disco_gb"), (int, type(None)))
+               and isinstance(retrato.get("nucleos"), int)
+               and isinstance(retrato.get("fome"), list))
+    pulso1, _ = loop.bater_ponto_saude()
+    pulso2, _ = loop.bater_ponto_saude()
+    diario_sa = sala_sa / "memoria" / "saude.txt"
+    duas = diario_sa.exists() and len(diario_sa.read_text(encoding="utf-8").splitlines()) == 2
+    formato = (":" in pulso1.split()[0]) and ("ram=" in pulso1) and ("fome=" in pulso1)
+    diario_sa.write_text("23:15 ram=97% livre=180MB disco=2GB fome=SIM(ram,disco)\n"
+                         "23:30 ram=40% livre=4000MB disco=2GB fome=nao\n", encoding="utf-8")
+    conta_certo = loop.resumo_da_madrugada() == "2 batida(s) na madrugada, 1 com o PC apertado"
+    diario_sa.write_text("\n".join("%02d:0%d ram=10%% livre=1MB disco=9GB fome=nao" % (i % 24, i % 10)
+                                   for i in range(250)), encoding="utf-8")
+    loop.bater_ponto_saude()
+    janela = len(diario_sa.read_text(encoding="utf-8").splitlines()) == loop.SAUDE_JANELA
+    diario_sa.unlink()
+    sem_diario = loop.resumo_da_madrugada() is None
+    saude_ok = honesto and duas and formato and conta_certo and janela and sem_diario
+finally:
+    loop.RAIZ, loop.CEREBRO = raiz_sa, cerebro_sa
+    shutil.rmtree(palco, ignore_errors=True)
+print("  [%s] saude  -> medir so le, ponto vira linha, janela corta velhas, madrugada conta a fome"
+      % ("ok  " if saude_ok else "FALHA"))
+if not saude_ok:
+    falhas.append("saude")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao e correntes no trilho.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho e saude no pulso.")

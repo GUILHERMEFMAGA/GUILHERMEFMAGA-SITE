@@ -9,6 +9,9 @@
 # v5: correntes — quando a vigilia nota um arquivo, o cerebro pode disparar fluxos de etapas
 # (bloco `correntes`). Cada elo usa so ferramentas blindadas: copia so pra dentro do projeto,
 # abrir com os 3 cadeados, e na madrugada abrir/executar viram fila — nunca mao sola.
+# v6: olhos de saude (B13) — a cada tick o PC mede ram/disco/nucleos (so LER, sem verbo
+# novo na coleira), anota o pulso em memoria/saude.txt, e de manha o resumo conta se a
+# madrugada apertou. Silencio = saude; linha com fome = decisao sua de ler de manha.
 
 import json
 import os
@@ -633,6 +636,123 @@ def vigiar(AGORA=None):
     return saidas
 
 
+# ---------------------------------------------------------------- B13: olhos de saude
+# Medir o PC e so ler (ctypes no Windows, /proc no resto, shutil sempre).
+# Nenhum verbo novo, nenhuma coleira nova: o pulso virou linha de arquivo.
+
+RAM_FOME_PCT = 90
+DISCO_FOME_GB = 5
+SAUDE_JANELA = 192  # 192 batidas de 15 min = 48 horas de historia em uma cara so
+
+
+def _caminho_saude():
+    return RAIZ / "memoria" / "saude.txt"  # calculado a cada uso: o portao patcheia RAIZ
+
+
+def _memoria_uso():
+    """(pct_uso, livres_mb) sem pedir licenca: GlobalMemoryStatusEx no Windows, /proc no resto."""
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            class _STATUS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+            st = _STATUS()
+            st.dwLength = ctypes.sizeof(_STATUS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
+            return int(st.dwMemoryLoad), int(st.ullAvailPhys // (1024 * 1024))
+        except Exception:
+            return None, None
+    try:
+        total, livres = 0, 0
+        for l in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if l.startswith("MemTotal:"):
+                total = int(l.split()[1])
+            elif l.startswith("MemAvailable:"):
+                livres = int(l.split()[1])
+        if total > 0:
+            return int(round(100.0 * (total - livres) / total)), int(livres // 1024)
+    except (OSError, ValueError, IndexError):
+        pass
+    return None, None
+
+
+def medir_saude():
+    """Um retrato do PC em tres numeros: memoria, disco, nucleos. So leitura, nunca escreve la fora."""
+    uso, livres_mb = _memoria_uso()
+    disco = None
+    try:
+        du = shutil.disk_usage(str(RAIZ))
+        disco = (int(du.total // (1024 ** 3)), int(du.free // (1024 ** 3)))
+    except OSError:
+        pass
+    fome = []
+    if uso is not None and uso >= RAM_FOME_PCT:
+        fome.append("ram")
+    if disco is not None and disco[1] < DISCO_FOME_GB:
+        fome.append("disco")
+    return {"ram_pct": uso, "ram_livres_mb": livres_mb,
+            "disco_gb": disco[1] if disco else None,
+            "disco_total_gb": disco[0] if disco else None,
+            "nucleos": os.cpu_count() or 0, "fome": fome}
+
+
+def linha_saude(s=None, agora=None):
+    s = s or medir_saude()
+    ts = (agora if agora is not None else datetime.now()).strftime("%H:%M")
+    ram = "?" if s.get("ram_pct") is None else str(s["ram_pct"])
+    livres = "?" if s.get("ram_livres_mb") is None else str(s["ram_livres_mb"])
+    gb = "?" if s.get("disco_gb") is None else str(s["disco_gb"])
+    fome = "nao" if not s.get("fome") else "SIM(%s)" % ",".join(s["fome"])
+    return "%s ram=%s%% livre=%sMB disco=%sGB fome=%s" % (ts, ram, livres, gb, fome)
+
+
+def bater_ponto_saude():
+    """Anota o pulso em memoria/saude.txt com janela deslizante das ultimas batidas."""
+    linha = linha_saude()
+    caminho = _caminho_saude()
+    try:
+        linhas = caminho.read_text(encoding="utf-8").splitlines() if caminho.exists() else []
+    except OSError:
+        linhas = []
+    linhas.append(linha)
+    try:
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        caminho.write_text("\n".join(linhas[-SAUDE_JANELA:]) + "\n", encoding="utf-8")
+    except OSError:
+        return linha, False
+    return linha, "fome=SIM" in linha
+
+
+def resumo_da_madrugada(hora_fim=6):
+    """O que as batidas das 22h as 8h contam: quantas foram, quantas com o PC apertado."""
+    caminho = _caminho_saude()
+    try:
+        texto = caminho.read_text(encoding="utf-8") if caminho.exists() else ""
+    except OSError:
+        return None
+    noturnas = []
+    for l in texto.splitlines():
+        partes = l.split()
+        if not partes or ":" not in partes[0]:
+            continue
+        try:
+            h = int(partes[0].split(":")[0])
+        except ValueError:
+            continue
+        if h >= 22 or h < hora_fim:
+            noturnas.append(l)
+    if not noturnas:
+        return None
+    apertadas = sum(1 for l in noturnas if "fome=SIM" in l)
+    return "%d batida(s) na madrugada, %d com o PC apertado" % (len(noturnas), apertadas)
+
+
 def corrente_diario():
     diario = ler_json(CORRENTES_DIARIO, {})
     return diario if isinstance(diario, dict) else {}
@@ -870,6 +990,12 @@ if __name__ == "__main__":
         print("tick do porteiro em %s" % datetime.now().isoformat(timespec="seconds"))
         for v in (vigiar() or ["nada novo por enquanto"]):
             print(" -", v)
+        pulso, faminto = bater_ponto_saude()
+        print(" - saude:", pulso)
+        if 6 <= datetime.now().hour < 9:
+            madrugada = resumo_da_madrugada()
+            if madrugada:
+                print(" - madrugada:", madrugada)
         raise SystemExit(0)
     pastas = listar_pastas()
     mundo = olhar_mundo()
@@ -906,6 +1032,9 @@ if __name__ == "__main__":
         print("o agente olhou o mundo:", m["linha"])
     for v in vigiou:
         print("o agente vigiou:", v)
+    if VIGIAR:
+        pulso, faminto = bater_ponto_saude()
+        print("o agente mediu a saude:", pulso)
     if fila_resumo:
         print("o agente atendeu a fila:")
         for linha in fila_resumo:

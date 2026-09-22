@@ -21,6 +21,7 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 | Coleira | `fluxos/regras.json` → bloco `execucao.permitidas` | a ÚNICA lista de comandos que ele pode executar |
 | Porta | `fluxos/regras.json` → bloco `abrir` | áreas liberadas (`projeto`, `desktop`, `downloads`) + 21 extensões banidas |
 | Correntes | `fluxos/regras.json` → bloco `correntes` | gatilhos da vigília que puxam elos blindados: `copiar_para_projeto` (só entra no projeto), `avisar`, `abrir`, `executar` (na noite, vira fila) |
+| Saúde | `memoria/saude.txt` (B13) | o pulso do PC a cada tick: RAM, disco e núcleos — só leitura, zero verbo novo na coleira; madrugada contada de manhã |
 | Rascunhos | `fluxos/rascunhos/` | propostas dele esperando minha decisão (`ativa: true` = aprovo) |
 | Fila | `fila/*.txt` | minhas ordens: `executar:`, `abrir:` ou `avisar:` |
 | Museu | `fila/feitas/` + `fila/erros/` | para onde cada ordem vai depois de atendida |
@@ -115,6 +116,7 @@ mundo real: o porteiro copia, nunca engole.
 | 5.5 | porteiro de plantão: vigia pastas e reage só pelo vocabulário (`--vigiar`) | ✅ |
 | 5.7 | correntes: gatilho da vigília puxa elos blindados; madrugada vira fila | ✅ |
 | 5.8 | ponte de entregas com o parceiro (push → puxar → verificar → salvar), sem colar código | ✅ |
+| 5.9 | olhos de saúde: pulso do PC a cada tick + resumo da madrugada (B13) | ✅ |
 | 6 | organizar de verdade (mover/agrupar por regra) e GitHub Actions | 🔜 |
 
 ## 🧠 Frases-guia do projeto
