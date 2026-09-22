@@ -11,6 +11,8 @@ relatorios/corrente-*.txt
 memoria/*.json
 memoria/*.log
 memoria/*.txt
+!memoria/.gitkeep
+*memoria/*.trava  # trava de batida: memo efemera, nunca no GitHub
 # segredos: NUNCA vao pro GitHub
 .env
 *.env

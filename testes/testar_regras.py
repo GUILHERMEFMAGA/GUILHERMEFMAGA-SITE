@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PORTAO DE TESTES v10: roda as regras do cerebro num mundo de mentirinha.
+# PORTAO DE TESTES v11: roda as regras do cerebro num mundo de mentirinha.
 # Codigo novo so entra no cerebro se este portao abrir.
 # v8: cena saude (B13) — medir nunca explode, o ponto vira linha, a janela corta e a
 # madrugada conta a fome.
@@ -491,8 +491,97 @@ print("  [%s] aprendizado  -> decaimento de meia-vida, conselho com evidencia e 
 if not ap_ok:
     falhas.append("aprendizado")
 
+# cena nova: blindagens B16 — fila envenenada nao anda sem dono, trava veta
+# batida gemea, escrita atomica, corrompido != ausente, sombra varrida,
+# deco de cerebro virou contrato cobrado
+bl_palco = palco / "blindagens"
+casa_bl = bl_palco / "casa"
+(casa_bl / "Downloads").mkdir(parents=True)
+proj_bl = bl_palco / "proj"
+for _sub in ("memoria", "fila", "fluxos"):
+    (proj_bl / _sub).mkdir(parents=True)
+regras_bl = {"acoes": [], "mundo": {"ligado": True, "permitido": ["ler", "escrever_fora"],
+                                    "proibido": ["teleporte"]},
+             "execucao": {"ligada": True, "so_com_humano": True, "permitidas": ["python --version"]},
+             "vigilia": {"ligado": True, "tolerancia_seg": 0, "max_eventos": 25,
+                         "olhos": [{"pasta": "downloads", "ao_chegar": []}]}}
+(proj_bl / "fluxos" / "regras.json").write_text(json.dumps(regras_bl), encoding="utf-8")
+env_bl = os.environ.get("AGENTE_CASA")
+r_bl, ce_bl, so_bl, v_bl = loop.RAIZ, loop.CEREBRO, loop.SO_OLHAR, loop.VIGILIA
+os.environ["AGENTE_CASA"] = str(casa_bl)
+try:
+    loop.RAIZ, loop.CEREBRO = proj_bl, proj_bl / "fluxos" / "regras.json"
+    loop.VIGILIA = proj_bl / "memoria" / "vigilia.json"
+    # 1) fila envenenada: --so-olhar nao obedece ordem de executa
+    loop.SO_OLHAR = True
+    (proj_bl / "fila" / "maldade.txt").write_text("executar:python --version\n", encoding="utf-8")
+    fila_parada = loop.tratar_fila() == [] and (proj_bl / "fila" / "maldade.txt").exists()
+    # 2) coleira vale com dono na sala; sem dono, so_com_humano veta
+    loop.SO_OLHAR = False
+    roda_com_dono = loop.executar_comando("python --version")[0] is not None
+    negado = None
+    loop.SO_OLHAR = True
+    negado = loop.executar_comando("python --version")
+    lei_humano = negado[0] is None and "so_com_humano" in negado[1]
+    loop.SO_OLHAR = False
+    # 3) trava so fecha porta pra pid VIVO e fresco; defunto ou velho, assume
+    # vivo garantido: ppid e o dono do processo do teste, nao pode estar morto
+    vivo_pid = os.getppid()
+    tomado, _ = loop.trava_adquirir(pid=vivo_pid, agora=time.time())
+    intruso, motivo = loop.trava_adquirir(pid=os.getpid(), agora=time.time())
+    trava_veta = tomado and not intruso and "recua" in (motivo or "")
+    morto = loop.trava_adquirir(pid=999999, agora=time.time() + 700)
+    trava_velha_cede = morto[0]
+    loop.trava_liberar(pid=999999)
+    loop.trava_liberar()  # por garantia: quem herda a trava dela sai
+    # 4) escrita atomica e leitura honesta: corrompido grita, ausente nao
+    alvo = proj_bl / "memoria" / "alvo.json"
+    loop.escrever_json(alvo, {"x": 1})
+    sem_sobra = alvo.exists() and not (proj_bl / "memoria" / "alvo.json.part").exists()
+    antes_info = len(loop.ler_json_info())
+    alvo.write_text("{truncado", encoding="utf-8")
+    pego = loop.ler_json(alvo, {"padrao": True})
+    grito = pego == {"padrao": True} and len(loop.ler_json_info()) == antes_info + 1
+    sumido = loop.ler_json(proj_bl / "memoria" / "nao-existe.json", {"vazio": True})
+    ausencia_silenciosa = sumido == {"vazio": True} and len(loop.ler_json_info()) == antes_info + 1
+    # 5) podar sombra: calibra, some o arquivo, varre o fantasma do caderno
+    (casa_bl / "Downloads" / "era-um.txt").write_text("tchau", encoding="utf-8")
+    loop.vigiar()
+    loop.vigiar()
+    (casa_bl / "Downloads" / "era-um.txt").unlink()
+    varreu = "1 fantasma(s)" in " | ".join(loop.podar_sombra())
+    depois = json.loads((proj_bl / "memoria" / "vigilia.json").read_text(encoding="utf-8"))
+    sombra_limpa = "era-um.txt" not in depois.get("downloads", {}).get("arquivos", {})
+    varreu = varreu and sombra_limpa
+    # 6) deco virou contrato: permitido/proibido inventados = defeito; coerente = silencio
+    defeito = loop.politica_mundo_ok() or ""
+    cobrou = "escrever_fora" in defeito and "teleporte" in defeito
+    regras_bl["mundo"] = {"ligado": True, "permitido": ["ler", "contar", "escrever_dentro_do_projeto"],
+                          "proibido": ["mover", "apagar", "editar_arquivo_do_mundo"]}
+    (proj_bl / "fluxos" / "regras.json").write_text(json.dumps(regras_bl), encoding="utf-8")
+    coerente = loop.politica_mundo_ok() is None
+    bl_ok = (fila_parada and lei_humano and roda_com_dono
+             and trava_veta and trava_velha_cede and sem_sobra and grito
+             and ausencia_silenciosa and varreu and cobrou and coerente)
+finally:
+    loop.RAIZ, loop.CEREBRO, loop.SO_OLHAR, loop.VIGILIA = r_bl, ce_bl, so_bl, v_bl
+    if env_bl is None:
+        os.environ.pop("AGENTE_CASA", None)
+    else:
+        os.environ["AGENTE_CASA"] = env_bl
+    shutil.rmtree(palco, ignore_errors=True)
+bl_flags = {"fila": fila_parada, "humano": lei_humano, "dono": roda_com_dono,
+            "trava": trava_veta, "velha": trava_velha_cede, "atomica": sem_sobra,
+            "grito": grito, "silencio": ausencia_silenciosa, "sombra": varreu,
+            "cobrou": cobrou, "coerente": coerente}
+print("  [%s] blindagens  -> fila sob chave, trava gemea, atomica, corrompido grita, sombra e deco cobrado%s"
+      % ("ok  " if bl_ok else "FALHA", "" if bl_ok else "  " + ", ".join(
+          "%s=%s" % kv for kv in bl_flags.items() if not kv[1])))
+if not bl_ok:
+    falhas.append("blindagens")
+
 print("  regras no cerebro:", len(loop.ler_cerebro().get("acoes", [])))
 if falhas:
     print("PORTAO FECHADO: %d cena(s) nao bateram: %s" % (len(falhas), ", ".join(falhas)))
     sys.exit(1)
-print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho, saude no pulso, fluxo com condicao e experiencia com conselho.")
+print("PORTAO ABERTO: cerebro valido, olho limpo, coleira firme, fila vigiada, dois olhos, abrir blindado, porteiro de plantao, correntes no trilho, saude no pulso, fluxo com condicao, experiencia com conselho e blindagens fechadas.")

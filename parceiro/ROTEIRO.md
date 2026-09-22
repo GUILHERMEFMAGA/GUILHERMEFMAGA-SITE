@@ -147,3 +147,34 @@ Legenda: ✅ já existe no produto (com prova) · 🔧 feito agora (B15) · 🔜
 8. **Comando de voz** → 🆕 V4: ditado offline do próprio Windows (SAPI via ctypes) — viável SEM nuvem; depois do V1.
 9. **Monitoramento em tempo real de ameaças** → ✅ parcial (saúde+tarefa agendada+fiscal); tempo real de verdade = V1 (ReadDirectoryChangesW); FIM (checksum de arquivos-chave) = 🆕 F4, vende como "auditoria anticorrupção".
 10. **Auto-atualização** → 🚫 PERIGOSO: viola a lei-mãe "só o duplo-clique dele muda o PC dele". Versão honesta já vigente: `puxar` = checar + aplicar COM ele presente. Proposta nova 🆕 P4: "alarme de novidade" (o tick avisa que a ponte tem commit novo; instalar continua sendo ato humano).
+
+### 22/09 — B16 BLINDAGENS entregue (auditoria de ausências virou código)
+
+✅ Feito: so_com_humano com mão • escrita atômica (.part+fsync+replace) • corrompido≠ausente
+(grito via ler_json_info + exit 1) • trava de batida (pid vivo/fresco; vela órfã assume) •
+--podar-sombra • --ajuda + flag desconhecida = exit 2 • mundo.permitido/proibido e
+so_acoes_de_criar cobrados (deco virou contrato).
+
+Lista de ideias da segunda geração (das ausências que a auditoria achou; prioridade
+= impacto de venda ÷ esforço):
+
+1. **F4 checksum-anticorrupção** — lista de arquivos-chave com hash no cérebro;
+   desvio = AVISO no log. É o "monitoramento de ameaças" honesto, zero nuvem. ALTO.
+2. **V3 relatório matutino** — 1 arquivo por manhã: saúde + eventos + conselhos B15.
+   Vende sozinho ("seu agente trabalhou enquanto você dormia"). ALTO.
+3. **C1 matcher semântico** (difflib + TF-IDF/cosseno) — pedido aproximado acha a
+   regra certa; é também o cache semântico (#28) e o grounding (#29). ALTO (próximo).
+4. **C2 ε-greedy sobre o placar B15** — explorar só quando |score|≈0; pergunta menos. MÉDIO.
+5. **Config hot-swap seguro** — cérebro validado por schema PRÓPRIO (o raio já faz
+   metade); gravação do cérebro só via "exportar/importar kit" (onboarding P7). MÉDIO.
+6. **P4 alarme de novidade** — tick checa ponte e avisa EXISTE versão nova; instalar
+   continua ato humano (lei-mãe). BAIXO esforço, ALTO valor de contrato.
+7. **Rodar-de-madrugada ganha --podar-sombra embutido** — 1 palavra no .bat. BAIXO.
+8. **F4-lite inventário assinado** — relatório diário com SHA256 da própria árvore
+   (o cliente anexa ao contrato como prova de estado). BAIXO esforço, OURO pra indústria.
+9. **V4 voz offline (SAPI via ctypes)** — depois do V1; ditado vira tarefa na fila.
+10. **Diagnóstico de si exportável** — `--raio-portatil` escreve laudo único .txt
+    (cliente manda o arquivo, não prints). BAIXO.
+
+Leis que a B16 confirmou: deco no cérebro é bug (raio agora caça chave sem mão no
+corpo: checar_blindagens); teste que depende de PID da rua é flaky (usar ppid).

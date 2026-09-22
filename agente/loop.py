@@ -35,22 +35,83 @@ CORRENTES_DIARIO = RAIZ / "memoria" / "correntes.json"
 PALCO = RAIZ / "testes" / "mundo_falso" / "ensaios"
 IGNORADAS = {"__pycache__", "mundo_falso", "fila", ".git"}
 
-SO_OLHAR = "--so-olhar" in os.sys.argv[1:]
-VIGIAR = "--vigiar" in os.sys.argv[1:]
-ENSAIAR = "--ensaiar" in os.sys.argv[1:]
+SO_OLHAR = False
+VIGIAR = False
+ENSAIAR = False
+PODAR = False
+AJUDA = False
+TRAVA_VELHA = False
+FLAGS_CONHECIDAS = {"--so-olhar", "--vigiar", "--ensaiar", "--podar-sombra", "--ajuda"}
+
+
+def _flags(argv, trava_velha=False):
+    """Bandeiras lidas SEMPRE da lista passada: flag congelada no import ja
+    mordeu teste as costas. Flag desconhecida devolve False (aviso no main)."""
+    global SO_OLHAR, VIGIAR, ENSAIAR, PODAR, AJUDA, TRAVA_VELHA
+    extra = {"--trava-velha"} if trava_velha else set()
+    if set(argv) - (FLAGS_CONHECIDAS | extra):
+        return False
+    SO_OLHAR = "--so-olhar" in argv
+    VIGIAR = "--vigiar" in argv
+    ENSAIAR = "--ensaiar" in argv
+    PODAR = "--podar-sombra" in argv
+    AJUDA = "--ajuda" in argv
+    TRAVA_VELHA = "--trava-velha" in argv
+    return True
+
+
+_flags(os.sys.argv[1:])
+
+
+def ajuda_texto():
+    return ("super-agente — usos:\n"
+            "  python agente\\loop.py                :: uma rodada vigiada por voce\n"
+            "  python agente\\loop.py --so-olhar      :: observa, nao toca em nada (nem julga)\n"
+            "  python agente\\loop.py --vigiar         :: o porteiro bate ponto\n"
+            "  python agente\\loop.py --vigiar --ensaiar :: ensaio: mostra o plano, zero toque\n"
+            "  python agente\\loop.py --podar-sombra  :: varre fantasmas (arquivos que sumiram)\n"
+            "  --trava-velha                          :: (tick) cede a vez se outra batida estiver viva\n"
+            "qualquer outra flag: erro claro em vez de silencio\n")
+
+
+_CORROMPIDOS = []
 
 
 def ler_json(caminho, padrao):
+    """Corrompido NAO e ausente: ausencia e recomeco limpo, corrupcao e um
+    grito gravado em _CORROMPIDOS (visivel por ler_json_info). O arquivo
+    suspeito fica onde esta — apagar ou nao e decisao humana."""
+    origem = Path(caminho)
     try:
-        return json.loads(Path(caminho).read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
+        texto = origem.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return padrao
+    except OSError as erro:
+        _CORROMPIDOS.append("%s: o disco nao deixou ler (%s)" % (origem.name, erro))
+        return padrao
+    try:
+        return json.loads(texto)
+    except json.JSONDecodeError as erro:
+        _CORROMPIDOS.append("%s: existe mas esta corrompido (%s) — usei o padrao e deixei o "
+                            "arquivo la; a decisao de apagar e sua" % (origem.name, erro))
         return padrao
 
 
+def ler_json_info():
+    return list(_CORROMPIDOS)
+
+
 def escrever_json(caminho, dados):
+    """Atomico: .part + fsync + os.replace. Queda de luz no meio da escrita nao
+    deixa mais JSON cortado pra tras — ou vale o antigo inteiro, ou o novo."""
     destino = Path(caminho)
     destino.parent.mkdir(parents=True, exist_ok=True)
-    destino.write_text(json.dumps(dados, indent=2, ensure_ascii=False), encoding="utf-8")
+    provisorio = destino.with_name(destino.name + ".part")
+    with open(provisorio, "w", encoding="utf-8") as f:
+        json.dump(dados, f, indent=2, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(str(provisorio), str(destino))
 
 
 def ler_cerebro():
@@ -336,6 +397,9 @@ def executar_comando(cmd):
     if not comando_permitido(cmd):
         return None, "comando fora da coleira: nao esta em execucao.permitidas (ou tem simbolo proibido)"
     politica = ler_cerebro().get("execucao", {})
+    if isinstance(politica, dict) and politica.get("so_com_humano", False) and SO_OLHAR:
+        return None, ("so_com_humano: com --so-olhar na mesa, comando nenhum roda "
+                      "(corrente ja mandou pra fila da madrugada)")
     try:
         proc = subprocess.run(cmd.split(), shell=False, cwd=str(RAIZ),
                               capture_output=True, text=True,
@@ -388,7 +452,7 @@ def mover_fila(caminho, estado):
 def tratar_fila():
     linhas = []
     if SO_OLHAR:
-        return linhas
+        return linhas  # fila envenenada por terceiros nao anda sem voce na mesa
     FILA.mkdir(parents=True, exist_ok=True)
     for tarefa in sorted(FILA.glob("*.txt")):
         item = ler_tarefa(tarefa)
@@ -494,6 +558,35 @@ def executar_abrir(caminho_texto):
     except OSError as erro:
         return None, "a validacao passou, mas o Windows recusou abrir (%s)" % erro
     return 0, "abri %s com o app padrao do Windows" % resposta
+
+
+PERMITIDO_REAL = {"ler", "contar", "escrever_dentro_do_projeto"}
+PROIBIDO_REAL = {"mover", "apagar", "editar_arquivo_do_mundo"}
+
+
+def politica_mundo_ok():
+    """O cerebro pode declarar o que o corpo faz; o corpo cobra coerencia:
+    'permitido' tem que ser verbo que existe, 'proibido' tem que ser verbo que
+    de fato NINGUEM implementa. Lista inventada = aviso no log."""
+    cfg = ler_cerebro().get("mundo")
+    if not isinstance(cfg, dict):
+        return None
+    defeitos = []
+    permitido = cfg.get("permitido")
+    if permitido is not None:
+        if not isinstance(permitido, list):
+            defeitos.append("'permitido' precisa ser lista")
+        elif set(permitido) - PERMITIDO_REAL:
+            defeitos.append("'permitido' pede verbo que o corpo nao tem: %s"
+                           % ", ".join(sorted(set(permitido) - PERMITIDO_REAL)))
+    proibido = cfg.get("proibido")
+    if proibido is not None:
+        if not isinstance(proibido, list):
+            defeitos.append("'proibido' precisa ser lista")
+        elif set(proibido) - PROIBIDO_REAL:
+            defeitos.append("'proibido' teme verbo que nem existe aqui: %s"
+                           % ", ".join(sorted(set(proibido) - PROIBIDO_REAL)))
+    return "; ".join(defeitos) or None
 
 
 def politica_vigilia():
@@ -652,6 +745,47 @@ def vigiar(AGORA=None):
 RAM_FOME_PCT = 90
 DISCO_FOME_GB = 5
 SAUDE_JANELA = 192  # 192 batidas de 15 min = 48 horas de historia em uma cara so
+
+
+def podar_sombra():
+    """Devolver ao nada os fantasmas: arquivo que sumiu do mundo sai do snapshot
+    e da lista de notificados (senao o limite do fluxo gasta pra sempre num nome
+    que ja nao existe). --so-olhar NUNCA poda: varrer e mexer no caderno."""
+    if SO_OLHAR:
+        return ["--so-olhar nao poda sombra (varrer e mexer no caderno)"]
+    cfg = politica_vigilia()
+    if cfg is None:
+        return ["vigilancia desligada: nada a podar"]
+    estado = ler_json(VIGILIA, {})
+    if not isinstance(estado, dict):
+        return ["caderno da vigilia ileso: nada a podar"]
+    linhas, varridos = [], 0
+    for olho in cfg.get("olhos", []):
+        if not isinstance(olho, dict):
+            continue
+        nome = str(olho.get("pasta") or "").strip().lower()
+        reg = estado.get(nome)
+        if not nome or not isinstance(reg, dict):
+            continue
+        pasta = RAIZ if nome == "projeto" else descobrir_pasta(nome)
+        vivos = snapshot_pasta(pasta) if pasta.exists() else {}
+        arquivos = reg.get("arquivos") if isinstance(reg.get("arquivos"), dict) else {}
+        some = [n for n in arquivos if n not in vivos]
+        if not some:
+            continue
+        for n in some:
+            arquivos.pop(n, None)
+        notificados = [n for n in (reg.get("notificados") or []) if n in arquivos or n in vivos]
+        reg["arquivos"], reg["notificados"] = arquivos, notificados
+        estado[nome] = reg
+        varridos += len(some)
+        linhas.append("%s: %d fantasma(s) varrido(s) da sombra (%s)"
+                      % (nome, len(some), ", ".join(sorted(some)[:5])))
+    if varridos:
+        escrever_json(VIGILIA, estado)
+    if not linhas:
+        linhas.append("nenhuma sombra: o caderno bate com o mundo")
+    return linhas
 
 
 def _caminho_saude():
@@ -989,6 +1123,49 @@ def fluxos_para(nome_olho, arquivo_path):
     return saidas
 
 
+def _caminho_trava():
+    return RAIZ / "memoria" / ".trava"
+
+
+def trava_adquirir(pid=None, agora=None):
+    """Vela de ocupacao na porta do caderno: duas batidas mastigariam o diario.
+    Ocupada por pid VIVO e fresco (<=10 min) -> recusa, com motivo honesto.
+    Vela de pid morto ou velha -> assume e segue."""
+    pid = os.getpid() if pid is None else int(pid)
+    agora = time.time() if agora is None else float(agora)
+    caminho = _caminho_trava()
+    dados = ler_json(caminho, {})
+    if isinstance(dados, dict) and dados.get("pid"):
+        try:
+            outro = int(dados.get("pid"))
+            idade = agora - float(dados.get("quando_epoch", 0))
+        except (TypeError, ValueError):
+            outro, idade = None, 10 ** 9
+        vivo = outro is not None and outro != pid
+        if vivo:
+            try:
+                os.kill(outro, 0)
+            except OSError:
+                vivo = False
+        if vivo and idade <= 600:
+            return False, ("outra batida (pid %s, %ds atras) esta na frente — "
+                           "essa aqui recua limpa" % (outro, int(idade)))
+    escrever_json(caminho, {"pid": pid,
+                            "quando": datetime.now().isoformat(timespec="seconds"),
+                            "quando_epoch": agora})
+    return True, None
+
+
+def trava_liberar(pid=None):
+    pid = os.getpid() if pid is None else int(pid)
+    dados = ler_json(_caminho_trava(), {})
+    if isinstance(dados, dict) and dados.get("pid") == pid:
+        try:
+            _caminho_trava().unlink()
+        except OSError:
+            pass
+
+
 # ---------------------------------------------------------------- Aprendizado (B15)
 # Aprendizado por experiencia SEM API e SEM GPU: um caderno de eventos com pesos
 # e decaimento exponencial (meia-vida de 14 dias) — o primo honesto do reforço.
@@ -1111,6 +1288,10 @@ def propor(cronicos):
     politica = regras.get("auto_promocao", {})
     if not isinstance(politica, dict) or not politica.get("ligada", False):
         return novos, ignoradas, [], enterradas
+    if politica.get("so_acoes_de_criar") is False:
+        enterradas.append("auto-promocao calada: o cerebro marcou so_acoes_de_criar=false "
+                          "e aqui so existe acao de criar — nada a propor")
+        return novos, ignoradas, [], enterradas
     recusas = ler_contadores().get("recusas", {})
     existentes = {r.get("id") for r in regras.get("acoes", []) if isinstance(r, dict)}
     for alvo_chave, qtd in cronicos.items():
@@ -1185,90 +1366,130 @@ def promover():
     return aprovadas
 
 
-if __name__ == "__main__":
-    if VIGIAR and (SO_OLHAR or ENSAIAR):
-        rotulo = "ensaio do porteiro em" if ENSAIAR else "tick do porteiro em"
-        print("%s %s" % (rotulo, datetime.now().isoformat(timespec="seconds")))
-        for v in (vigiar() or ["nada novo por enquanto"]):
-            print(" -", v)
-        if not ENSAIAR:
+def rodar():
+        if VIGIAR and (SO_OLHAR or ENSAIAR):
+            rotulo = "ensaio do porteiro em" if ENSAIAR else "tick do porteiro em"
+            print("%s %s" % (rotulo, datetime.now().isoformat(timespec="seconds")))
+            for v in (vigiar() or ["nada novo por enquanto"]):
+                print(" -", v)
+            if not ENSAIAR:
+                pulso, faminto = bater_ponto_saude()
+                print(" - saude:", pulso)
+                if 6 <= datetime.now().hour < 9:
+                    madrugada = resumo_da_madrugada()
+                    if madrugada:
+                        print(" - madrugada:", madrugada)
+            return 0
+        if PODAR and not VIGIAR:
+            for linha in podar_sombra():
+                print("podar-sombra:", linha)
+            return 0
+        pastas = listar_pastas()
+        mundo = olhar_mundo()
+        vigiou = vigiar() if VIGIAR else []
+        fila_resumo = tratar_fila()
+        presos = fiscal_da_fila()
+        regras = ler_cerebro()
+        acao, alvo = descobrir_acao(pastas, regras)
+        if acao is None:
+            resultado = "Nenhum trabalho: nenhuma regra bateu com o mundo."
+            decisao = "nada_a_fazer"
+        else:
+            resultado = executar(acao, alvo)
+            decisao = "%s -> %s" % (acao.get("id", "?"), alvo)
+        fatos = []
+        if acao is not None:
+            nome = arquivos_de(acao)
+            fatos = ["recriei %s em %s de: %s|%s" % (nome, alvo, alvo, nome)]
+        cont = ler_contadores()
+        cronicos, espalhadas, recusas = contar_fatos(cont)
+        rascunhos, aprovadas, ignoradas, ja_enterradas = propor(cronicos)
+        registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
+                    "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
+                    "mundo": [m["linha"] for m in mundo] if mundo else None,
+                    "vigiou": vigiou if VIGIAR else None,
+                    "fila": fila_resumo, "fila_erros": presos, "fatos": fatos,
+                    "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
+        total = lembrar(registro)
+        cont = registrar_rodada(fatos, ignoradas, acao is not None)
+        cronicos, espalhadas, enterradas_map = contar_fatos(cont)
+        enterradas_txt = ["%s foi barrado %dx: ideia enterrada" % (i, q) for i, q in enterradas_map.items()]
+        print("o agente viu:", pastas)
+        for m in mundo:
+            print("o agente olhou o mundo:", m["linha"])
+        for v in vigiou:
+            print("o agente vigiou:", v)
+        defeito_mundo = politica_mundo_ok()
+        if defeito_mundo:
+            print("   - AVISO de contrato: mundo.permitido/proibido lista verbo que o corpo nao "
+                  "pratica (%s) — conserte o cerebro" % defeito_mundo)
+        if PODAR:
+            for linha in podar_sombra():
+                print("podar-sombra:", linha)
+        if VIGIAR:
             pulso, faminto = bater_ponto_saude()
-            print(" - saude:", pulso)
-            if 6 <= datetime.now().hour < 9:
-                madrugada = resumo_da_madrugada()
-                if madrugada:
-                    print(" - madrugada:", madrugada)
+            print("o agente mediu a saude:", pulso)
+        if fila_resumo:
+            print("o agente atendeu a fila:")
+            for linha in fila_resumo:
+                print("   -", linha)
+        if presos:
+            print("   - o fiscal da fila: ha %d tarefa(s) presa(s) em fila\erros; "
+                  "leia o relatorio, corrija e devolva pra fila (ou apague com a sua mao)" % presos)
+        print("o agente decidiu:", decisao)
+        print("o agente fez:", resultado)
+        if SO_OLHAR:
+            print("o agente em modo observacao: nao se autopromove sem voce aqui")
+        print("o agente contou: %d rodadas, %d cronicos, %d regras espalhadas"
+              % (cont.get("rodadas", 0), len(cronicos), len(espalhadas)))
+        for chave, qtd in cronicos.items():
+            print("   - ele aprendeu: CRONICO: recriei %s %dx ao todo" % (chave.replace("|", " em "), qtd))
+        for rotulo, qtd in espalhadas.items():
+            print("   - ele aprendeu: a regra que cria %s alcancou %d pastas sozinha" % (rotulo, qtd))
+        if cont.get("rodadas"):
+            print("   - ele aprendeu: %d de %d rodadas nao tinham trabalho"
+                  % (cont.get("paradas", 0), cont.get("rodadas", 0)))
+        for linha in conselhos_aprendido():
+            print("   - a experiencia sugere:", linha)
+        for linha in ignoradas:
+            print("   - O PORTAO BARROU:", linha)
+        saidas = list(enterradas_txt)
+        for linha in ja_enterradas:
+            if linha.split(":")[0] not in "".join(enterradas_txt):
+                saidas.append(linha)
+        for linha in saidas:
+            print("   - ele DESISTE de:", linha)
+        for id_novo in rascunhos:
+            print("   - propoe fluxos/rascunhos/%s.json   (ativa: false)" % id_novo)
+        for linha in aprovadas:
+            print("   - CEREBRO GANHOU:", linha)
+        print("o agente lembra:", total, "registros em memoria/historico.json")
+
+
+if __name__ == "__main__":
+    if AJUDA:
+        print(ajuda_texto())
         raise SystemExit(0)
-    pastas = listar_pastas()
-    mundo = olhar_mundo()
-    vigiou = vigiar() if VIGIAR else []
-    fila_resumo = tratar_fila()
-    presos = fiscal_da_fila()
-    regras = ler_cerebro()
-    acao, alvo = descobrir_acao(pastas, regras)
-    if acao is None:
-        resultado = "Nenhum trabalho: nenhuma regra bateu com o mundo."
-        decisao = "nada_a_fazer"
-    else:
-        resultado = executar(acao, alvo)
-        decisao = "%s -> %s" % (acao.get("id", "?"), alvo)
-    fatos = []
-    if acao is not None:
-        nome = arquivos_de(acao)
-        fatos = ["recriei %s em %s de: %s|%s" % (nome, alvo, alvo, nome)]
-    cont = ler_contadores()
-    cronicos, espalhadas, recusas = contar_fatos(cont)
-    rascunhos, aprovadas, ignoradas, ja_enterradas = propor(cronicos)
-    registro = {"quando": datetime.now().isoformat(timespec="seconds"), "viu": len(pastas),
-                "decidiu": decisao.split(" -> ")[0], "alvo": alvo, "fez": resultado,
-                "mundo": [m["linha"] for m in mundo] if mundo else None,
-                "vigiou": vigiou if VIGIAR else None,
-                "fila": fila_resumo, "fila_erros": presos, "fatos": fatos,
-                "rascunhou": rascunhos, "rejeitou_propor": ignoradas, "promoveu": aprovadas}
-    total = lembrar(registro)
-    cont = registrar_rodada(fatos, ignoradas, acao is not None)
-    cronicos, espalhadas, enterradas_map = contar_fatos(cont)
-    enterradas_txt = ["%s foi barrado %dx: ideia enterrada" % (i, q) for i, q in enterradas_map.items()]
-    print("o agente viu:", pastas)
-    for m in mundo:
-        print("o agente olhou o mundo:", m["linha"])
-    for v in vigiou:
-        print("o agente vigiou:", v)
-    if VIGIAR:
-        pulso, faminto = bater_ponto_saude()
-        print("o agente mediu a saude:", pulso)
-    if fila_resumo:
-        print("o agente atendeu a fila:")
-        for linha in fila_resumo:
-            print("   -", linha)
-    if presos:
-        print("   - o fiscal da fila: ha %d tarefa(s) presa(s) em fila\erros; "
-              "leia o relatorio, corrija e devolva pra fila (ou apague com a sua mao)" % presos)
-    print("o agente decidiu:", decisao)
-    print("o agente fez:", resultado)
-    if SO_OLHAR:
-        print("o agente em modo observacao: nao se autopromove sem voce aqui")
-    print("o agente contou: %d rodadas, %d cronicos, %d regras espalhadas"
-          % (cont.get("rodadas", 0), len(cronicos), len(espalhadas)))
-    for chave, qtd in cronicos.items():
-        print("   - ele aprendeu: CRONICO: recriei %s %dx ao todo" % (chave.replace("|", " em "), qtd))
-    for rotulo, qtd in espalhadas.items():
-        print("   - ele aprendeu: a regra que cria %s alcancou %d pastas sozinha" % (rotulo, qtd))
-    if cont.get("rodadas"):
-        print("   - ele aprendeu: %d de %d rodadas nao tinham trabalho"
-              % (cont.get("paradas", 0), cont.get("rodadas", 0)))
-    for linha in conselhos_aprendido():
-        print("   - a experiencia sugere:", linha)
-    for linha in ignoradas:
-        print("   - O PORTAO BARROU:", linha)
-    saidas = list(enterradas_txt)
-    for linha in ja_enterradas:
-        if linha.split(":")[0] not in "".join(enterradas_txt):
-            saidas.append(linha)
-    for linha in saidas:
-        print("   - ele DESISTE de:", linha)
-    for id_novo in rascunhos:
-        print("   - propoe fluxos/rascunhos/%s.json   (ativa: false)" % id_novo)
-    for linha in aprovadas:
-        print("   - CEREBRO GANHOU:", linha)
-    print("o agente lembra:", total, "registros em memoria/historico.json")
+    if not _flags(os.sys.argv[1:], trava_velha=True):
+        desconhecidas = [a for a in os.sys.argv[1:]
+                         if a not in (FLAGS_CONHECIDAS | {"--trava-velha"})]
+        print("flag que eu nao conheco: %s\n%s" % (" ".join(desconhecidas), ajuda_texto()))
+        raise SystemExit(2)
+    travado, codigo = False, 0
+    try:
+        if not SO_OLHAR:
+            travado, motivo = trava_adquirir()
+            if not travado:
+                print("o agente adiou esta batida: %s" % motivo)
+                raise SystemExit(0)
+        codigo = rodar() or 0
+    finally:
+        if travado:
+            trava_liberar()
+        avisos = ler_json_info()
+        if avisos:
+            codigo = codigo or 1
+            print("ATENCAO — caderno corrompido detectado (nada foi apagado por mim):")
+            for a in avisos:
+                print("   -", a)
+    raise SystemExit(codigo)

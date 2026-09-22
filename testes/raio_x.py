@@ -30,6 +30,8 @@ FERRAMENTAS_DO_CORPO = [
     "politica_vigilia", "snapshot_pasta", "aplicar_reacoes", "vigiar",
     "corrente_diario", "corrente_gatilhos", "_enfileirar", "corrente_etapa", "correntes_para",
     "registrar_experiencia", "pesos_aprendido", "conselhos_aprendido", "_experiencia_elo",
+    "_flags", "ajuda_texto", "trava_adquirir", "trava_liberar", "podar_sombra",
+    "politica_mundo_ok", "ler_json_info",
 ]
 
 # comandos que o raio-x reconhece como leitura pura (dicionario de seguranca)
@@ -480,8 +482,8 @@ def checar_portao():
     cenas = sum(1 for no in ast.walk(arvore) if isinstance(no, ast.Call)
                 and isinstance(no.func, ast.Name) and no.func.id == "print")
     ok("portao", "testar_regras.py existe e compila (%d impressoes de relatorio)" % cenas)
-    if cenas < 19:
-        dica("portao", "%d impressoes — o portao v10 tem 19; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
+    if cenas < 21:
+        dica("portao", "%d impressoes — o portao v11 tem 21; se ainda nao colou o testar_regras.py novo, la esta o empurraozinho" % cenas)
 
 
 # ---------------------------------------------------------------- saude (B13)
@@ -649,6 +651,60 @@ def checar_aprendizado(cerebro):
     chaves = {str(ev[1]) for ev in eventos if isinstance(ev, (list, tuple)) and len(ev) >= 2}
     ok("experiencia", "%d evento(s) em %d chave(s) — conselho sim, mudar regra sozinho nunca"
        % (len(eventos), len(chaves)))
+
+
+def checar_blindagens(cerebro):
+    """B16: as leis declaradas no cerebro tem que ter mao no corpo. Deco
+    (chave sem consumo) e o que mais engana auditor de cliente."""
+    try:
+        corpo = (RAIZ / "agente" / "loop.py").read_text(encoding="utf-8")
+    except OSError as erro:
+        aviso("blindagens", "o corpo nao deixou ser lido: %s" % erro)
+        return
+    defeitos = []
+    execucao = cerebro.get("execucao") if isinstance(cerebro.get("execucao"), dict) else {}
+    if execucao.get("so_com_humano") and "so_com_humano" not in corpo.split("def ler_cerebro")[0] + corpo:
+        pass  # sempre presente no corpo lido inteiro
+    if execucao.get("so_com_humano", False) and 'politica.get("so_com_humano"' not in corpo:
+        defeitos.append("cerebro pede so_com_humano mas o corpo nao consulta a chave")
+    for marca in ("os.replace(", "os.fsync(", "def trava_adquirir", "def podar_sombra",
+                  "def _flags", "def ler_json_info"):
+        if marca not in corpo:
+            defeitos.append("corpo sem a blindagem '%s'" % marca.strip("()"))
+    if defeitos:
+        problema("blindagens", "; ".join(defeitos[:3]),
+                 "as leis do cerebro tem que ter mao no corpo; o modelo esta no loop v7")
+        return
+    mundo = cerebro.get("mundo") if isinstance(cerebro.get("mundo"), dict) else {}
+    for chave in ("permitido", "proibido"):
+        lista = mundo.get(chave)
+        if lista is not None and not isinstance(lista, list):
+            problema("blindagens", "mundo.%s precisa ser lista" % chave,
+                     "o corpo cobra coerencia: lista de verbos de verdade, nao texto")
+            return
+    travada = RAIZ / "memoria" / ".trava"
+    sobra = sorted(p.name for p in (RAIZ / "memoria").glob("*.part")) if (RAIZ / "memoria").exists() else []
+    if sobra:
+        aviso("blindagens", "sobrou escritura incompleta: %s (o .replace nao aconteceu; pode apagar)"
+              % ", ".join(sobra[:3]))
+    if travada.exists():
+        try:
+            dados = ler_json_seguro(travada)
+            pid = dados.get("pid") if isinstance(dados, dict) else None
+            vivo = False
+            if pid:
+                try:
+                    os.kill(int(pid), 0)
+                    vivo = True
+                except (OSError, ValueError, TypeError):
+                    vivo = False
+            if vivo:
+                aviso("blindagens", "uma batida esta viva agora (pid %s) — o raio-x nao atrapalha" % pid)
+            else:
+                dica("blindagens", "trava orfa de pid morto no memoria/ — a proxima batida assume sozinha")
+        except Exception:
+            pass
+    ok("blindagens", "leis do cerebro tem mao no corpo (humano, atomica, trava, sombra, flags)")
 
 
 def checar_rascunhos():
@@ -856,6 +912,7 @@ def main():
     print("  saude    = B13: pulso do PC a cada tick (ram/disco/nucleos, so leitura); madrugada contada")
     print("  fluxos   = Fase C: gatilhos declarativos com 'se' por passo e --ensaiar (dry-run sem risco)")
     print("  experiencia= B15: caderno com decaimento — o agente conta o que deu certo e so DA CONSELHO")
+    print("  blindagem= B16: so_com_humano com mao, escrita atomica, trava de batida, flags honestas")
     print("  noturno  = o vigia agendado (olha e anota, NAO toca em nada)")
     print("-" * 78)
     cerebro = None
@@ -907,6 +964,10 @@ def main():
         checar_aprendizado(cerebro)
     except Exception as erro:
         problema("experiencia", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
+    try:
+        checar_blindagens(cerebro)
+    except Exception as erro:
+        problema("blindagens", "a checagem quebrou por dentro: %s" % erro, "manda o print que eu conserto o raio-x")
     print("-" * 78)
     print("PLACAR: %d ok | %d dicas | %d avisos | %d problemas" % (oks, dicas, len(avisos), len(problemas)))
     if problemas:

@@ -39,6 +39,8 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 ```
 python agente\loop.py                    :: atende a fila, olha o mundo, decide, aprende
 python agente\loop.py --vigiar --ensaiar :: dry-run: mostra o plano dos fluxos sem tocar em nada
+python agente\loop.py --podar-sombra       :: varre fantasmas (arquivos que sumiram do mundo)
+python agente\loop.py --ajuda              :: lista de flags (flag errada agora GRITA, nao silencia)
 python testes\raio_x.py                  :: laudo de saúde do corpo inteiro (só lê)
 python testes\testar_regras.py            :: portão — prova o cérebro num mundo de mentira
 .\salvar-tudo.bat                        :: Git: add, commit, ponte + backup, sem digitar nada
@@ -129,6 +131,25 @@ candidata a ganhar mais mundo"* — e para aí. **Quem aposenta é você.**
 
 Em `--so-olhar` o caderno nem nasce: quem só observa não julga. E em
 `--vigiar --ensaiar` não há registro, porque o passo não executa.
+
+## 🔒 Blindagens da B16 — o que virou lei com mão
+
+- **`so_com_humano` não é enfeite**: com `--so-olhar` na mesa, `executar_comando`
+  devolve recusa — a fila envenenada por terceiros não anda sem você presente.
+- **Escrita atômica**: todo JSON passa por `.part` + fsync + troca; queda de luz
+  no meio da gravação não deixa mais caderno cortado pela metade.
+- **Corrompido ≠ ausente**: arquivo ilegível agora GRITA no fim da rodada
+  (`ATENCAO — caderno corrompido`), e o arquivo suspeita fica intacto pra
+  decisão humana. Ausência de verdade continua silenciosa (recomeço limpo).
+- **Trava de batida**: duas execuções simultâneas mastigariam o diário; a
+  segunda cede a vez com motivo honesto (trava de processo morto nunca trava).
+- **`--podar-sombra`**: arquivo que você apagou do mundo sai do caderno do
+  porteiro — limite de fluxo não gasta mais em fantasmas.
+- **Flag errada = erro claro**: `--ensai` (um i a menos) devolve a ajuda com
+  exit 2 em vez de rodar mudo e fazer outra coisa.
+- **Decoração virou contrato**: `mundo.permitido/proibido` é cobrado a cada
+  rodada (`AVISO de contrato` se listar verbo que o corpo não pratica), e
+  `auto_promocao.so_acoes_de_criar=false` agora CALA a auto-promoção de fato.
 
 ## 🛡️ Por que dá pra confiar nele
 
