@@ -53,3 +53,23 @@
 - Fonte conferida via fetch: ponte ainda em 3be2e9c. Nenhum push na ponte,
   nenhuma alteracao de runtime, nenhum acesso ao PC; somente branch desta
   sessao e sua vitrine PR #7. O complemento esta na vitrine, nao no puxar.
+
+## 22/09 — Windows pos-B16: interrupcao repetida no final do portao
+
+- Evidencia nova do dono: loop 1495 linhas/69 funcoes, raio 28 ok | 4 dicas |
+  0 avisos | 0 problemas. As 17 cenas imprimem OK, mas duas tentativas terminam
+  com KeyboardInterrupt na leitura final (testar_regras.py:583). Nao ha
+  PORTAO ABERTO pos-B16 concluido na maquina dele; nao liberar salvar ainda.
+- Correcao da orientacao anterior: nao atribuir ^C ao teclado do dono. Codigo
+  chama os.kill(outro, 0) em loop.py:1147 e raio_x.py:697. A cena de blindagens
+  passa os.getppid() (testar_regras.py:529). No Windows, sinal 0 corresponde a
+  CTRL_C_EVENT; nao e a consulta inofensiva de existencia do POSIX. Pode gerar
+  interrupcao no console; ha caminhos de fallback que terminam processo.
+  Fonte: https://bugs.python.org/issue42962 (explicacao do comportamento Windows).
+- Forte explicacao para repeticao depois da cena de trava; nao reproduzido
+  neste sandbox Linux. Defeito de portabilidade confirmado por leitura;
+  causalidade especifica ainda precisa de validacao Windows apos correcao.
+- Orientacao: nao repetir portao/raio/loop atuais ate substituir a consulta de
+  PID por API Windows somente leitura e testar que nenhum sinal e enviado.
+  Nenhuma correcao publicada na ponte nesta entrega. Proxima prioridade:
+  blindagem Windows antes de B17/F3; vitrine PR #7 nao alimenta o puxar.
