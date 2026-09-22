@@ -1,6 +1,13 @@
 # Estado do projeto (memória viva do agente Arena)
 
-## HOJE: B11 (porteiro) COMPLETO E VALIDADO NA MÁQUINA DELE ✅
+> **Cápsula completa (conversa perdida? leia isto primeiro):** `parceiro/PROMPT-RECUPERACAO.md`
+> — arquitetura, leis, história B1→B16, ciclo da ponte, armadilhas e próximas ações.
+
+## HOJE: B16 (blindagens) PUBLICADA NA PONTE ✅ — máquina dele: perguntar placar do verificar
+
+**Verdade fresca:** ponte tip `1b9b59c`; portão 17/17; raio 25 ok | 0 problemas.
+
+## (história) B11 (porteiro) COMPLETO E VALIDADO NA MÁQUINA DELE ✅
 
 - Demo end-to-end passou ao vivo (print 20/09 ~00:50): calibração silenciosa →
   "ainda em tolerancia" (segurou grito) → ao amadurecer: "chegou teste-do-porteiro.txt"
