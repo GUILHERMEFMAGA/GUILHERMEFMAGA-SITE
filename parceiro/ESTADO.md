@@ -3,9 +3,19 @@
 > **Cápsula completa (conversa perdida? leia isto primeiro):** `parceiro/PROMPT-RECUPERACAO.md`
 > — arquitetura, leis, história B1→B16, ciclo da ponte, armadilhas e próximas ações.
 
-## HOJE: B16 (blindagens) PUBLICADA NA PONTE ✅ — máquina dele: perguntar placar do verificar
+## HOJE: combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
 
-**Verdade fresca:** ponte tip `1b9b59c`; portão 17/17; raio 25 ok | 0 problemas.
+**Verdade fresca (22/09 noite):** seção 0 da cápsula = PROMPT FIXO definitivo
+(recuperação + ritual puxar→verificar→salvar + regras + tom sênior/comercial).
+Nova seção 6.5 grava as regras de convivência CANÔNICAS — incluindo o pedido
+explícito dele: **toda entrega re-espelha o PR #5 no mesmo fôlego do push da
+ponte; chat não cola código**. Resgate honesto: a reescrita da seção 0 quase
+enterrou o bloco de convivência que morava dentro dela — lição escrita na 6.5
+("quem reescreve uma seção confere o que estava dentro dela"). Máquina dele:
+placar do verificar PÓS-B16 ainda não reportado; oferta de limpar PRs órfãos
+1–4 aguardando `limpa`/`deixa`.
+
+## (história) B16 (blindagens) PUBLICADA NA PONTE ✅ — ponte tip à época `1b9b59c`; portão 17/17; raio 25 ok | 0 problemas
 
 ## (história) B11 (porteiro) COMPLETO E VALIDADO NA MÁQUINA DELE ✅
 

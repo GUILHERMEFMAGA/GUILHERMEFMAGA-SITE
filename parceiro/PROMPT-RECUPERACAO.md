@@ -52,6 +52,9 @@ industrial — e entregando o melhor.
 arquivo + o print/output do problema. Ela orienta, não executa — pra executar,
 voltar pro Arena com o prompt acima.)
 
+> Regras de convivência e as três pontas moram na seção 6.5. Se a seção 0
+> divergir de qualquer outra, a seção 0 vence — é a ordem fixa do dono.
+
 ## 1. Quem é o humano e como trabalhar com ele
 - **Guilherme**, iniciante em programação, TDAH, brasileiro (fuso America/Sao_Paulo).
 - Trabalhar assim com ele: passos PEQUENOS, uma ação por rodada, texto escaneável
@@ -196,6 +199,49 @@ python3 testes/raio_x.py          # esperado: 0 problemas
   tarefa da sessão dona, puxando da ponte (que é a única fonte canônica).
 - F5 não reemite GH_TOKEN; se gh gitrear, contornar via git puro (os pushes da
   ponte funcionam pelo credential do clone).
+
+## 6.5 Regras de convivência (CANÔNICAS — a casa delas é AQUI, não na seção 0;
+regra 0 da casa: quem reescreve uma seção confere o que estava dentro dela.
+Aprendido em 22/09: a reescrita da seção 0 quase enterrou este bloco.)
+
+1. **A ponte está viva e é canônica**: `GUILHERMEFMAGA-SITE` @ branch
+   `super-agente` = origem oficial. A SESSÃO que constrói publica na ponte a
+   cada tijolo (após portão + raio verdes).
+2. **A janela canônica do usuário é o PR #5** (combinado 22/09, pedido explícito
+   dele): o espelho `.arena-delivery` (branch da sessão dona) = conteúdo do PR #5
+   = a VITRINE que o Guilherme abre pra ver código. Toda entrega que empurra a
+   ponte RE-ESPELHA o PR #5 no MESMO fôlego (mesa sessão, na sequência imediata;
+   `git archive` do tip da ponte, conferir byte a byte). Chat não cola código do
+   projeto — só números, endereço e ritual (zero-cola). Se a ponte andou e o #5
+   não, o #5 está velho: re-sincronizar antes de qualquer outra coisa.
+3. **O sandbox reseta** (apagou `/home/user/ponte` duas vezes em 22/09, mas o
+   clone do repo da Arena sobreviveu no `.arena-delivery`). Se `ponte` sumir:
+   reconstruir com `git clone -b super-agente https://github.com/GUILHERMEFMAGA/
+   GUILHERMEFMAGA-SITE.git /home/user/ponte` (seção 6.3).
+4. **O repo `super-agente` é privado e dele** — só os .bat DA MÁQUINA dele o
+   atualizam. A IA nunca empurra nele (nem tentaria: 404 de credencial é por
+   desenho, não defeito; e ele EXISTE — não dizer o contrário).
+5. **Toda conversa nova** começa com o PROMPT FIXO (seção 0) e faz os 3 primeiros
+   passos dele antes de opinar: fetch → cápsula → últimos 3 ESTADO.
+6. **AS TRÊS PONTAS (NUNCA confunda)**: ① `GUILHERMEFMAGA-SITE` @ `super-agente`
+   = PONTE entre IAs (eu empurro; ele puxa — nunca é a pasta dele, nunca é backup,
+   é a fita de entrega); ② `C:\super-agente` na máquina dele = o PROJETO VIVO
+   (branch `main` dele; só `puxar-atualizacao.bat` dele a mexe; é onde agente,
+   portão, raio, memória e Tarefa agendada rodam de verdade); ③
+   `GUILHERMEFMAGA/super-agente` no GitHub = o BACKUP (push existe SOMENTE quando
+   ELE roda `salvar-tudo.bat` — nunca da IA, nunca automático; estar atrás da
+   ponte é normal e saudável). Direção da escrita: sandbox → ① → ② → ③. E o
+   espelho da vitrine (PR #5, seção 6.5) é um QUATRO canal só de VISUALIZAÇÃO:
+   ninguém puxa nada dele, é vitrine de revisão — não confundir com ①.
+7. **Espelho só a sessão dona atualiza** (aula do PR velho, 22/09): cada conversa
+   do Arena é presa ao branch `arena/<id>-...` dela; nenhuma sessão consegue
+   empurrar o branch de outra. Sessão nova que quiser vitrine abre PR NOVO; o
+   PR velho é tarefa da sessão dona. NUNCA fundir PR do repo do site sem ordem
+   explícita do dono (o main é o perfil público dele); PRs antigos órfãos (1,2,3,4)
+   ficam abertos até ele mandar limpar (oferta feita 22/09, aguardando `limpa`).
+8. **Lembrete de fechamento de toda entrega** (ordem fixa, sempre): ① duplo clique
+   `puxar-atualizacao.bat` → ② duplo clique `verificar-tudo.bat` (esperado: portão
+   17 cenas, raio 0 problemas) → ③ duplo clique `salvar-tudo.bat` (backup dele).
 
 ## 7. Estado atual (foto — se estiver velho, o VERDADEIRO é `git log` da ponte + ESTADO)
 - Ponte tip: `8907a0e` (recuperação da conversa 22/09 tarde — esta cápsula já com o achado da lei do `--so-olhar`; B16 em `7975863`; reposição das 3 pontas em `2bba1ff`; cápsula original em `88015d5`). Placar sandbox na fonte: **portão 17/17 cenas
