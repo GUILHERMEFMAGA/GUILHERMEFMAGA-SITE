@@ -29,7 +29,8 @@ mudança se autopromove quando eu não estou olhando (modo `--so-olhar`).
 | Portão | `testes/testar_regras.py` | mundo falso onde toda regra nova é testada antes de valer |
 | Raio-X | `testes/raio_x.py` | fotografa o corpo inteiro, lê tudo, não toca em nada |
 | Vigia noturno | `rodar_de_madrugada.bat` | roda agendado em modo observação: olha, anota, não encosta em nada |
-| Botão de salvar | `salvar-tudo.bat` | meu ritual do Git (add → commit → push) num duplo clique |
+| Botão de salvar | `salvar-tudo.bat` | meu ritual do Git (add → commit → ponte → backup) num duplo clique |
+| Botão de sincronizar | `puxar-atualizacao.bat` | baixa da ponte as atualizações do parceiro (ver seção 🌉); o duplo-clique é o único "sim" que deixa código novo entrar no PC |
 
 ## 🚀 Uso diário (os 4 comandos que importam)
 
@@ -113,6 +114,7 @@ mundo real: o porteiro copia, nunca engole.
 | 5 | abrir arquivos e pastas com três cadeados (`abrir:`) | ✅ |
 | 5.5 | porteiro de plantão: vigia pastas e reage só pelo vocabulário (`--vigiar`) | ✅ |
 | 5.7 | correntes: gatilho da vigília puxa elos blindados; madrugada vira fila | ✅ |
+| 5.8 | ponte de entregas com o parceiro (push → puxar → verificar → salvar), sem colar código | ✅ |
 | 6 | organizar de verdade (mover/agrupar por regra) e GitHub Actions | 🔜 |
 
 ## 🧠 Frases-guia do projeto
@@ -125,3 +127,20 @@ mundo real: o porteiro copia, nunca engole.
 - "corrente puxa, coleira segura — de madrugada nada abre janela"
 - "o agente abre a porta, mas nunca engole a chave"
 - "o cabeçalho do arquivo é o crachá"
+- "pull é o meu sim: nada entra no PC sem duplo clique"
+
+## 🌉 Sync com o parceiro (a ponte)
+
+As entregas do parceiro (Arena) chegam pela **ponte**: o repo do site
+(`GUILHERMEFMAGA-SITE`) tem um branch chamado `super-agente` onde ele publica,
+sempre com portão + raio-x verdes antes do push. O repo `super-agente` segue
+sendo meu backup. Nada muda no meu dia a dia sem os três botões:
+
+1. quando o parceiro avisar "tem coisa na ponte": `.\puxar-atualizacao.bat` (traz
+   só o que é fast-forward; se eu mexi sem salvar, ele recusa e nada quebra);
+2. `.\verificar-tudo.bat` (raio-x + portão — o exame de saúde);
+3. `.\salvar-tudo.bat` (empurra para a ponte **e** para o backup).
+
+O que eu ganhei com isso: código novo chega por botão — nunca mais copiar e colar
+trecho no editor. O que eu não abri mão: **duplo-clique é o meu sim**; nenhuma
+entrega entra no PC sem eu rodar o puxar, e nada pula o portão.
