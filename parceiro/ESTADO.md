@@ -30,3 +30,26 @@
   Nenhum dos dois implementado: aguardar aprovacao do dono.
 - Ritual no PC: puxar-atualizacao.bat -> verificar-tudo.bat -> salvar-tudo.bat.
   O PR desta conversa nao altera o que o puxar recebe.
+
+## 22/09/2026 — analise das 75 ideias antes de adicionar
+
+- Pedido: analisar todo o codigo e nao repetir ideias existentes. Feita leitura
+  dos dois programas separados (site e ponte), testes, BATs, configuracoes e JS.
+- Novo parceiro/ROTEIRO.md complementa o roteiro canonico sem alterar o archive:
+  75/75 ideias com destino primario unico; ampliacoes nos tickets existentes;
+  dez grupos novos (nove das ideias + F8 dos achados da auditoria).
+- Inventario reproduzivel: parceiro/analise/auditar_ideias.py e inventario.json;
+  55 arquivos rastreados, 19 Python, 205 funcoes; zero corpos AST identicos.
+  Isso nao prova ausencia de duplicacao semantica, tratada na triagem manual.
+- Quatro falhas reproduzidas somente em diretorio temporario: so-olhar cria
+  arquivo; ensaio escreve inventario; aprendizado desligado grava; promover
+  aceita proposta com apenas id. Nenhuma corrigida ou ativada nesta entrega.
+- Roteiro antigo tem exageros: tick nao roda suite, ponte nao e shadow deploy,
+  propostas/aprovadas nao mede alucinacao, placar nao e probabilidade calibrada.
+  As alegacoes industriais recebidas nao foram certificadas como fatos.
+- Recomendacao reforcada: B17 antes de F3; outros achados agrupados em F8,
+  entregas pequenas, sem autoescrita/execucao de ferramentas e sem comite
+  substituindo autorizacao humana. P5 permanece opcional/desligado.
+- Fonte conferida via fetch: ponte ainda em 3be2e9c. Nenhum push na ponte,
+  nenhuma alteracao de runtime, nenhum acesso ao PC; somente branch desta
+  sessao e sua vitrine PR #7. O complemento esta na vitrine, nao no puxar.

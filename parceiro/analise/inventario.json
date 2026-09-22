@@ -1,0 +1,1138 @@
+{
+  "escopo": "Fontes rastreados do site e archive pos-B16; nao inclui PC do dono.",
+  "inventario": [
+    {
+      "arquivo": ".arena-delivery/.gitattributes",
+      "sha256": "cb4ce290ebf513ca7db3201635d53b621647b77aa9153710cb727577e2907f8b",
+      "linhas": 3
+    },
+    {
+      "arquivo": ".arena-delivery/.gitignore",
+      "sha256": "76b32e523915f137358a6ef6cc5ddcdd4224f8b39a988782aebc8066da273574",
+      "linhas": 28
+    },
+    {
+      "arquivo": ".arena-delivery/README.md",
+      "sha256": "fe4df4dfd9c806c8bceef1ac5b5374c3f29b89c5bc5c0f4623eace0031b83b73",
+      "linhas": 211
+    },
+    {
+      "arquivo": ".arena-delivery/agente/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/agente/loop.py",
+      "sha256": "f4f1b732c9fb0b5d10af4901f5c7449dcd17e26a9f45d9b4f3e900185fa34226",
+      "linhas": 1495,
+      "funcoes": [
+        {
+          "nome": "_flags",
+          "linha": 47
+        },
+        {
+          "nome": "ajuda_texto",
+          "linha": 66
+        },
+        {
+          "nome": "ler_json",
+          "linha": 80
+        },
+        {
+          "nome": "ler_json_info",
+          "linha": 100
+        },
+        {
+          "nome": "escrever_json",
+          "linha": 104
+        },
+        {
+          "nome": "ler_cerebro",
+          "linha": 117
+        },
+        {
+          "nome": "listar_pastas",
+          "linha": 124
+        },
+        {
+          "nome": "arquivos_de",
+          "linha": 136
+        },
+        {
+          "nome": "decidir_acao",
+          "linha": 141
+        },
+        {
+          "nome": "descobrir_acao",
+          "linha": 157
+        },
+        {
+          "nome": "executar",
+          "linha": 165
+        },
+        {
+          "nome": "lembrar",
+          "linha": 179
+        },
+        {
+          "nome": "chave_fato",
+          "linha": 190
+        },
+        {
+          "nome": "zerar_contadores",
+          "linha": 198
+        },
+        {
+          "nome": "acumular",
+          "linha": 202
+        },
+        {
+          "nome": "reconstruir_contadores",
+          "linha": 220
+        },
+        {
+          "nome": "ler_contadores",
+          "linha": 230
+        },
+        {
+          "nome": "registrar_rodada",
+          "linha": 238
+        },
+        {
+          "nome": "contar_fatos",
+          "linha": 245
+        },
+        {
+          "nome": "corpo",
+          "linha": 266
+        },
+        {
+          "nome": "dentro_do_projeto",
+          "linha": 271
+        },
+        {
+          "nome": "descobrir_pasta",
+          "linha": 294
+        },
+        {
+          "nome": "inventariar",
+          "linha": 304
+        },
+        {
+          "nome": "olhar_mundo",
+          "linha": 336
+        },
+        {
+          "nome": "comando_permitido",
+          "linha": 383
+        },
+        {
+          "nome": "executar_comando",
+          "linha": 396
+        },
+        {
+          "nome": "ler_tarefa",
+          "linha": 422
+        },
+        {
+          "nome": "mover_fila",
+          "linha": 438
+        },
+        {
+          "nome": "tratar_fila",
+          "linha": 452
+        },
+        {
+          "nome": "fiscal_da_fila",
+          "linha": 490
+        },
+        {
+          "nome": "politica_abrir",
+          "linha": 498
+        },
+        {
+          "nome": "raizes_de_abrir",
+          "linha": 505
+        },
+        {
+          "nome": "dentro_de",
+          "linha": 519
+        },
+        {
+          "nome": "validar_abrir",
+          "linha": 527
+        },
+        {
+          "nome": "executar_abrir",
+          "linha": 550
+        },
+        {
+          "nome": "politica_mundo_ok",
+          "linha": 567
+        },
+        {
+          "nome": "politica_vigilia",
+          "linha": 592
+        },
+        {
+          "nome": "snapshot_pasta",
+          "linha": 599
+        },
+        {
+          "nome": "aplicar_reacoes",
+          "linha": 617
+        },
+        {
+          "nome": "vigiar",
+          "linha": 670
+        },
+        {
+          "nome": "podar_sombra",
+          "linha": 750
+        },
+        {
+          "nome": "_caminho_saude",
+          "linha": 791
+        },
+        {
+          "nome": "_memoria_uso",
+          "linha": 795
+        },
+        {
+          "nome": "medir_saude",
+          "linha": 828
+        },
+        {
+          "nome": "linha_saude",
+          "linha": 848
+        },
+        {
+          "nome": "bater_ponto_saude",
+          "linha": 858
+        },
+        {
+          "nome": "resumo_da_madrugada",
+          "linha": 875
+        },
+        {
+          "nome": "corrente_diario",
+          "linha": 899
+        },
+        {
+          "nome": "corrente_gatilhos",
+          "linha": 904
+        },
+        {
+          "nome": "_enfileirar",
+          "linha": 912
+        },
+        {
+          "nome": "corrente_etapa",
+          "linha": 923
+        },
+        {
+          "nome": "correntes_para",
+          "linha": 980
+        },
+        {
+          "nome": "_txt_normal",
+          "linha": 1028
+        },
+        {
+          "nome": "_fluxos_config",
+          "linha": 1034
+        },
+        {
+          "nome": "_bate_quando",
+          "linha": 1042
+        },
+        {
+          "nome": "_bate_se",
+          "linha": 1063
+        },
+        {
+          "nome": "fluxos_para",
+          "linha": 1069
+        },
+        {
+          "nome": "_caminho_trava",
+          "linha": 1126
+        },
+        {
+          "nome": "trava_adquirir",
+          "linha": 1130
+        },
+        {
+          "nome": "trava_liberar",
+          "linha": 1159
+        },
+        {
+          "nome": "_caminho_aprendizado",
+          "linha": 1175
+        },
+        {
+          "nome": "registrar_experiencia",
+          "linha": 1179
+        },
+        {
+          "nome": "pesos_aprendido",
+          "linha": 1199
+        },
+        {
+          "nome": "conselhos_aprendido",
+          "linha": 1227
+        },
+        {
+          "nome": "_experiencia_elo",
+          "linha": 1241
+        },
+        {
+          "nome": "ensaiar",
+          "linha": 1249
+        },
+        {
+          "nome": "propor",
+          "linha": 1281
+        },
+        {
+          "nome": "promover",
+          "linha": 1340
+        },
+        {
+          "nome": "rodar",
+          "linha": 1369
+        }
+      ]
+    },
+    {
+      "arquivo": ".arena-delivery/config/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/config/LEIA-ME.txt",
+      "sha256": "1420151f4c61141ea2d24dc60c2a7f8ce4316de5bef554a3ff2918b9434f07b3",
+      "linhas": 1
+    },
+    {
+      "arquivo": ".arena-delivery/config/base.py",
+      "sha256": "86a42b68f6ac3e80f793df8a396ad664545ba6c5a50f747dec7226f4f773f12d",
+      "linhas": 1,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/ferramentas/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/ferramentas/LEIA-ME.txt",
+      "sha256": "1420151f4c61141ea2d24dc60c2a7f8ce4316de5bef554a3ff2918b9434f07b3",
+      "linhas": 1
+    },
+    {
+      "arquivo": ".arena-delivery/ferramentas/base.py",
+      "sha256": "636431fea209168c310a8104c4a65c2b3b64ae175c24f71d4341992d72f07265",
+      "linhas": 1,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/fluxos/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/fluxos/base.py",
+      "sha256": "636431fea209168c310a8104c4a65c2b3b64ae175c24f71d4341992d72f07265",
+      "linhas": 1,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/fluxos/rascunhos/avisar_sobre_config.json",
+      "sha256": "09d272caf77911a512b8d7f115574737bf6ca7aeecbd618a774fa5d23303071f",
+      "linhas": 14
+    },
+    {
+      "arquivo": ".arena-delivery/fluxos/rascunhos/avisar_sobre_testes.json",
+      "sha256": "f3c97fff3cafa9dddfc9c384495662ec69ba14c4cbf22628ef9431c41e0f7a0c",
+      "linhas": 16
+    },
+    {
+      "arquivo": ".arena-delivery/fluxos/regras.json",
+      "sha256": "8285a453ab12ae8fb7f5dfd40bfa0d4516c0f9fd1881164aa59c7647e2bacc7d",
+      "linhas": 175
+    },
+    {
+      "arquivo": ".arena-delivery/memoria/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/parceiro/ESTADO.md",
+      "sha256": "4bbdd187fe8ad933db41f6a39f2c4f908efbab5fcbfae2e1ea92a9cd34eaa0b5",
+      "linhas": 290
+    },
+    {
+      "arquivo": ".arena-delivery/parceiro/PROMPT-RECUPERACAO.md",
+      "sha256": "db4101035c220f7bd296853be793515166fb50fe0b7263143c73e1d6a4bf1eba",
+      "linhas": 333
+    },
+    {
+      "arquivo": ".arena-delivery/parceiro/ROTEIRO.md",
+      "sha256": "1860da43e8849623cedc1284026496a9adf57fe8ebf9149e6bac560432c3fa9e",
+      "linhas": 180
+    },
+    {
+      "arquivo": ".arena-delivery/puxar-atualizacao.bat",
+      "sha256": "ba0e4a7ffdc290ac2b115c971f007fd84f033794c493701ad27c8c3dd3604c6b",
+      "linhas": 36
+    },
+    {
+      "arquivo": ".arena-delivery/relatorios/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/relatorios/LEIA-ME.txt",
+      "sha256": "1420151f4c61141ea2d24dc60c2a7f8ce4316de5bef554a3ff2918b9434f07b3",
+      "linhas": 1
+    },
+    {
+      "arquivo": ".arena-delivery/relatorios/base.py",
+      "sha256": "86a42b68f6ac3e80f793df8a396ad664545ba6c5a50f747dec7226f4f773f12d",
+      "linhas": 1,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/rodar_de_madrugada.bat",
+      "sha256": "8231675f80661f3b79b7f1ac052fcb3efa5679b16276a0d6335aa9384c0950a7",
+      "linhas": 10
+    },
+    {
+      "arquivo": ".arena-delivery/salvar-tudo.bat",
+      "sha256": "dfc4f4436137398e737724f29301c77706c7335559226209ec5a5952bb637f74",
+      "linhas": 65
+    },
+    {
+      "arquivo": ".arena-delivery/testes/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "linhas": 0
+    },
+    {
+      "arquivo": ".arena-delivery/testes/base.py",
+      "sha256": "86a42b68f6ac3e80f793df8a396ad664545ba6c5a50f747dec7226f4f773f12d",
+      "linhas": 1,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/testes/raio_x.py",
+      "sha256": "fb3a919ebf19d1da05e7f191a3f251ed1a5a3af7407e08bcba1d279424282b45",
+      "linhas": 984,
+      "funcoes": [
+        {
+          "nome": "linha",
+          "linha": 54
+        },
+        {
+          "nome": "ok",
+          "linha": 58
+        },
+        {
+          "nome": "dica",
+          "linha": 64
+        },
+        {
+          "nome": "aviso",
+          "linha": 70
+        },
+        {
+          "nome": "problema",
+          "linha": 77
+        },
+        {
+          "nome": "posicao_do_erro",
+          "linha": 83
+        },
+        {
+          "nome": "ler_json_seguro",
+          "linha": 90
+        },
+        {
+          "nome": "checar_python",
+          "linha": 95
+        },
+        {
+          "nome": "checar_cerebro",
+          "linha": 105
+        },
+        {
+          "nome": "checar_coleira",
+          "linha": 208
+        },
+        {
+          "nome": "checar_loop",
+          "linha": 240
+        },
+        {
+          "nome": "checar_gitignore",
+          "linha": 280
+        },
+        {
+          "nome": "checar_memoria",
+          "linha": 298
+        },
+        {
+          "nome": "checar_fila",
+          "linha": 334
+        },
+        {
+          "nome": "checar_noturno",
+          "linha": 378
+        },
+        {
+          "nome": "checar_olhos",
+          "linha": 420
+        },
+        {
+          "nome": "checar_escrita",
+          "linha": 450
+        },
+        {
+          "nome": "checar_portao",
+          "linha": 470
+        },
+        {
+          "nome": "checar_saude",
+          "linha": 490
+        },
+        {
+          "nome": "checar_bats",
+          "linha": 510
+        },
+        {
+          "nome": "checar_duplicacao",
+          "linha": 538
+        },
+        {
+          "nome": "checar_fluxos",
+          "linha": 571
+        },
+        {
+          "nome": "checar_aprendizado",
+          "linha": 609
+        },
+        {
+          "nome": "checar_blindagens",
+          "linha": 656
+        },
+        {
+          "nome": "checar_rascunhos",
+          "linha": 710
+        },
+        {
+          "nome": "checar_abrir",
+          "linha": 735
+        },
+        {
+          "nome": "checar_vigia",
+          "linha": 764
+        },
+        {
+          "nome": "checar_correntes",
+          "linha": 836
+        },
+        {
+          "nome": "main",
+          "linha": 901
+        }
+      ]
+    },
+    {
+      "arquivo": ".arena-delivery/testes/testar_regras.py",
+      "sha256": "6dd23c874c1023dbf3afb68ecf60c0bedc62bca0bf8539634662a741d2108ba5",
+      "linhas": 587,
+      "funcoes": []
+    },
+    {
+      "arquivo": ".arena-delivery/tick.bat",
+      "sha256": "ec27d538ffb5e0fcb3f8acad628d9309d5a56a54bc7c519e7fc6485433c1e8d3",
+      "linhas": 10
+    },
+    {
+      "arquivo": ".arena-delivery/verificar-tudo.bat",
+      "sha256": "f684fb642df5442c1841b46338a75e03120ba1768721720ab92f224f74ff2b9f",
+      "linhas": 26
+    },
+    {
+      "arquivo": "agente-ia/GUIA-DO-INICIADOR.md",
+      "sha256": "cb915f9df798075860ce999328dc26862ae7f8c5651b6ab81c7e470a8b0ff679",
+      "linhas": 395
+    },
+    {
+      "arquivo": "agente-ia/LEIA-ME.md",
+      "sha256": "eaf2ab201bff9f52f77819436a36ea7ec1e071e83e8db499e996062cf584eddc",
+      "linhas": 147
+    },
+    {
+      "arquivo": "agente-ia/agente/__init__.py",
+      "sha256": "8cfa703072fb83a1a2d0d13cea35c6bc1cf7491710f413188d4173b4a18afe21",
+      "linhas": 27,
+      "funcoes": []
+    },
+    {
+      "arquivo": "agente-ia/agente/conhecimento.py",
+      "sha256": "f654854af39f320d351ba4709cf1c74c8445d032ef3cd194039d13e7b998a249",
+      "linhas": 120,
+      "funcoes": [
+        {
+          "nome": "__init__",
+          "linha": 31
+        },
+        {
+          "nome": "carregar",
+          "linha": 38
+        },
+        {
+          "nome": "adicionar",
+          "linha": 44
+        },
+        {
+          "nome": "_calcular_pesos",
+          "linha": 50
+        },
+        {
+          "nome": "_palavras_do_topico",
+          "linha": 65
+        },
+        {
+          "nome": "procurar",
+          "linha": 71
+        },
+        {
+          "nome": "listar_titulos",
+          "linha": 104
+        },
+        {
+          "nome": "total",
+          "linha": 107
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/ferramentas.py",
+      "sha256": "4aa168ed8f3909f9c9eaa46ddd2af42db7ebf172f13fc8541a7c6707aeb351b1",
+      "linhas": 336,
+      "funcoes": [
+        {
+          "nome": "_caminho_seguro",
+          "linha": 26
+        },
+        {
+          "nome": "_calcular_no",
+          "linha": 56
+        },
+        {
+          "nome": "calcular",
+          "linha": 70
+        },
+        {
+          "nome": "data_hora",
+          "linha": 119
+        },
+        {
+          "nome": "salvar_arquivo",
+          "linha": 133
+        },
+        {
+          "nome": "ler_arquivo",
+          "linha": 140
+        },
+        {
+          "nome": "listar_arquivos",
+          "linha": 154
+        },
+        {
+          "nome": "apagar_arquivo",
+          "linha": 165
+        },
+        {
+          "nome": "analisar_texto",
+          "linha": 176
+        },
+        {
+          "nome": "resumir",
+          "linha": 189
+        },
+        {
+          "nome": "info_sistema",
+          "linha": 207
+        },
+        {
+          "nome": "sortear",
+          "linha": 217
+        },
+        {
+          "nome": "ler_pagina",
+          "linha": 236
+        },
+        {
+          "nome": "executar",
+          "linha": 319
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/gerador.py",
+      "sha256": "30b7b69b3ce1e4d6bad2c68915189144ebf34763176daa35ecdbc1116f7d6c0b",
+      "linhas": 155,
+      "funcoes": [
+        {
+          "nome": "montar_gerador",
+          "linha": 119
+        },
+        {
+          "nome": "__init__",
+          "linha": 29
+        },
+        {
+          "nome": "treinar",
+          "linha": 37
+        },
+        {
+          "nome": "_treinar_um",
+          "linha": 41
+        },
+        {
+          "nome": "_treinar_frase",
+          "linha": 49
+        },
+        {
+          "nome": "gerar",
+          "linha": 63
+        },
+        {
+          "nome": "surpreender",
+          "linha": 95
+        },
+        {
+          "nome": "tamanho",
+          "linha": 111
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/memoria.py",
+      "sha256": "305ec8e623b1894374eb0e8ba4e6ec38fe387fc12861f940efd1f1499d8a9096",
+      "linhas": 165,
+      "funcoes": [
+        {
+          "nome": "_limpar_valor",
+          "linha": 154
+        },
+        {
+          "nome": "__init__",
+          "linha": 20
+        },
+        {
+          "nome": "anotar",
+          "linha": 57
+        },
+        {
+          "nome": "ultimas",
+          "linha": 69
+        },
+        {
+          "nome": "lembrar",
+          "linha": 75
+        },
+        {
+          "nome": "recuperar",
+          "linha": 89
+        },
+        {
+          "nome": "todos_os_fatos",
+          "linha": 96
+        },
+        {
+          "nome": "esquecer",
+          "linha": 102
+        },
+        {
+          "nome": "aprender_com_a_frase",
+          "linha": 113
+        },
+        {
+          "nome": "fechar",
+          "linha": 146
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/nucleo.py",
+      "sha256": "d8c9ef2eb8cc06c797a2726428ccd71381a611103628c58dde6f9b95878764b3",
+      "linhas": 675,
+      "funcoes": [
+        {
+          "nome": "__init__",
+          "linha": 43
+        },
+        {
+          "nome": "_caminhos",
+          "linha": 68
+        },
+        {
+          "nome": "_ler_exemplos",
+          "linha": 75
+        },
+        {
+          "nome": "treinar",
+          "linha": 86
+        },
+        {
+          "nome": "_carregar_cerebro",
+          "linha": 141
+        },
+        {
+          "nome": "entender",
+          "linha": 224
+        },
+        {
+          "nome": "responder",
+          "linha": 338
+        },
+        {
+          "nome": "_resposta_de_conversa",
+          "linha": 469
+        },
+        {
+          "nome": "_resposta_nao_sei",
+          "linha": 547
+        },
+        {
+          "nome": "_extrair_expressao",
+          "linha": 581
+        },
+        {
+          "nome": "_extrair_nome_arquivo",
+          "linha": 603
+        },
+        {
+          "nome": "_extrair_arquivo_e_conteudo",
+          "linha": 607
+        },
+        {
+          "nome": "_extrair_nome_fluxo",
+          "linha": 628
+        },
+        {
+          "nome": "estatisticas_como_texto",
+          "linha": 637
+        },
+        {
+          "nome": "_contar_parametros",
+          "linha": 651
+        },
+        {
+          "nome": "definir_nome_usuario",
+          "linha": 660
+        },
+        {
+          "nome": "fechar",
+          "linha": 663
+        },
+        {
+          "nome": "progresso",
+          "linha": 110
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/orquestrador.py",
+      "sha256": "e638beda4064ef93ed955a0eff1c86884bd3b87e32255d3e89257bc69525d5aa",
+      "linhas": 274,
+      "funcoes": [
+        {
+          "nome": "pasta_de_fluxos",
+          "linha": 56
+        },
+        {
+          "nome": "carregar_fluxos",
+          "linha": 62
+        },
+        {
+          "nome": "buscar_fluxo",
+          "linha": 76
+        },
+        {
+          "nome": "_trocar_variaveis",
+          "linha": 86
+        },
+        {
+          "nome": "executar_fluxo",
+          "linha": 102
+        },
+        {
+          "nome": "_carregar_estado",
+          "linha": 159
+        },
+        {
+          "nome": "_salvar_estado",
+          "linha": 170
+        },
+        {
+          "nome": "modo_servico",
+          "linha": 176
+        },
+        {
+          "nome": "_para_timestamp",
+          "linha": 225
+        },
+        {
+          "nome": "_salvar_log",
+          "linha": 234
+        },
+        {
+          "nome": "listar_fluxos",
+          "linha": 240
+        },
+        {
+          "nome": "__init__",
+          "linha": 41
+        },
+        {
+          "nome": "para_json",
+          "linha": 48
+        },
+        {
+          "nome": "substituir",
+          "linha": 91
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/rede_neural.py",
+      "sha256": "720817d42368063056621a0f2bbc3074b80784d3206750c35a3161139e554341",
+      "linhas": 297,
+      "funcoes": [
+        {
+          "nome": "tanh",
+          "linha": 31
+        },
+        {
+          "nome": "tanh_derivada",
+          "linha": 36
+        },
+        {
+          "nome": "softmax",
+          "linha": 41
+        },
+        {
+          "nome": "__init__",
+          "linha": 68
+        },
+        {
+          "nome": "propagar",
+          "linha": 90
+        },
+        {
+          "nome": "prever",
+          "linha": 113
+        },
+        {
+          "nome": "treinar",
+          "linha": 120
+        },
+        {
+          "nome": "avaliar",
+          "linha": 239
+        },
+        {
+          "nome": "salvar",
+          "linha": 255
+        },
+        {
+          "nome": "carregar",
+          "linha": 273
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/texto.py",
+      "sha256": "28225f69c2108a895571f0d23be450d1eed2fa43c5396cea1936f000436d8d13",
+      "linhas": 175,
+      "funcoes": [
+        {
+          "nome": "sem_acento",
+          "linha": 47
+        },
+        {
+          "nome": "tokenizar",
+          "linha": 53
+        },
+        {
+          "nome": "escolher",
+          "linha": 156
+        },
+        {
+          "nome": "barra_de_progresso",
+          "linha": 163
+        },
+        {
+          "nome": "__init__",
+          "linha": 98
+        },
+        {
+          "nome": "aprender",
+          "linha": 104
+        },
+        {
+          "nome": "transformar",
+          "linha": 118
+        },
+        {
+          "nome": "transformar_varias",
+          "linha": 131
+        },
+        {
+          "nome": "salvar",
+          "linha": 135
+        },
+        {
+          "nome": "carregar",
+          "linha": 143
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/agente/web.py",
+      "sha256": "f812f5dbfd353f394fbef4278b9f1734d6c4de48f325734fc8279771da50bfd1",
+      "linhas": 220,
+      "funcoes": [
+        {
+          "nome": "_garantir_agente",
+          "linha": 37
+        },
+        {
+          "nome": "_estado",
+          "linha": 44
+        },
+        {
+          "nome": "_como_quando",
+          "linha": 62
+        },
+        {
+          "nome": "iniciar",
+          "linha": 186
+        },
+        {
+          "nome": "_responder_json",
+          "linha": 75
+        },
+        {
+          "nome": "_responder_html",
+          "linha": 84
+        },
+        {
+          "nome": "_ler_corpo",
+          "linha": 93
+        },
+        {
+          "nome": "do_GET",
+          "linha": 104
+        },
+        {
+          "nome": "do_POST",
+          "linha": 132
+        },
+        {
+          "nome": "log_message",
+          "linha": 182
+        },
+        {
+          "nome": "abrir",
+          "linha": 200
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/dados/conhecimento.json",
+      "sha256": "77ca730d9f0eeec18a29bd8b863d91f97113977fec743613212083596bb4c375",
+      "linhas": 242
+    },
+    {
+      "arquivo": "agente-ia/dados/corpus.txt",
+      "sha256": "aa384e7486ec1d2fe001a4ead68436bb12cf86975c559da747268846a1b22622",
+      "linhas": 39
+    },
+    {
+      "arquivo": "agente-ia/dados/fluxos/bom_dia.json",
+      "sha256": "70ecb26b5ab76c8416526da49c1957080b65e6a56714e436759c7729b41f9f3f",
+      "linhas": 10
+    },
+    {
+      "arquivo": "agente-ia/dados/fluxos/ideias_de_projeto.json",
+      "sha256": "36404549458ae233740a4362b5181050ff7cbaa4e11b66115a9d2a5883fe6534",
+      "linhas": 10
+    },
+    {
+      "arquivo": "agente-ia/dados/fluxos/relatorio_maquina.json",
+      "sha256": "4dfa7c41dea509fd19ac8dcd220063d08bbf604785ae188c9e7509764ce98cea",
+      "linhas": 11
+    },
+    {
+      "arquivo": "agente-ia/dados/fluxos/resumo_de_estudo.json",
+      "sha256": "0fcfa3c7845d5ec06edd3c8f95ff2c491ad820a53c1385574aa1d760955005cf",
+      "linhas": 10
+    },
+    {
+      "arquivo": "agente-ia/dados/saidas/.gitkeep",
+      "sha256": "0dab0fe7190086b9725d993671524ff59773e3fdea58c64458a309337ff85368",
+      "linhas": 1
+    },
+    {
+      "arquivo": "agente-ia/dados/treino.jsonl",
+      "sha256": "84f7dd8b11cc19027755703e32a1e176edf9128867e5cd96468fe9db5172f309",
+      "linhas": 103
+    },
+    {
+      "arquivo": "agente-ia/main.py",
+      "sha256": "73597933cf0470914812fbfe337efa75d6e95845a11404a7e12724164d212447",
+      "linhas": 268,
+      "funcoes": [
+        {
+          "nome": "banner",
+          "linha": 33
+        },
+        {
+          "nome": "ajuda",
+          "linha": 42
+        },
+        {
+          "nome": "modo_chat",
+          "linha": 77
+        },
+        {
+          "nome": "main",
+          "linha": 176
+        }
+      ]
+    },
+    {
+      "arquivo": "agente-ia/web/painel.html",
+      "sha256": "e2457e01e7e894afab7d23f14d5ab01a0cbd20b67a09aaf1f26dc72ece563ba5",
+      "linhas": 251
+    },
+    {
+      "arquivo": "test2.html",
+      "sha256": "cd1e22e32e3a4fcdec2bc7185ac36a20b2452f4b08efc97fc6b33a0cbb7dfa89",
+      "linhas": 26
+    }
+  ],
+  "duplicatas_corpo_ast": [],
+  "sondas_em_diretorio_temporario": {
+    "so_olhar_criou_arquivo": true,
+    "aprendizado_desligado_gravou": true,
+    "ensaio_escreveu_inventario": true,
+    "promoveu_proposta_sem_campos_obrigatorios": true
+  }
+}
