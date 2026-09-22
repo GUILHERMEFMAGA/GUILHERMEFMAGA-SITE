@@ -101,7 +101,7 @@ Legenda: ✅ já existe no produto (com prova) · 🔧 feito agora (B15) · 🔜
 | 32 | GraphRAG | 🔜 V2 | tabela de arestas em SQLite; grafo de "arquivo toca arquivo" |
 
 ### Avaliação
-| 33 | Benchmark diário com suíte própria | ✅✅ | portão (16 cenas) + raio (25 checagens) rodam no tick agendado |
+| 33 | Benchmark diário com suíte própria | ✅✅ | portão (16 cenas, 19 impressões) + raio (20 checagens) rodam no tick agendado |
 | 34 | LLM-as-judge com rubrica | ✅ local | juiz = assertões determinísticas; 🚫 juiz-LLM = API |
 | 35 | Teste de regressão | ✅ | cena antiga quebra = portão fecha = nada é publicado |
 | 36 | Shadow deploy | ✅✅ | a PONTE é o shadow: publica na ponte, só o duplo-clique dele promove |
