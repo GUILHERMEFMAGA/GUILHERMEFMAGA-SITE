@@ -316,6 +316,11 @@ Aprendido em 22/09: a reescrita da seção 0 quase enterrou este bloco.)
     lê a linha INTEIRA como padrão e ela nunca bate — `memoria/.trava` dormiu
     desprotegido por causa disso. Comentário vai na linha de cima; a prova é
     `git check-ignore -v`.
+18. Receita de fila pelo terminal: `echo ordem> arquivo` é sintaxe de CMD — no
+    PowerShell quebra (e o `>` do PowerShell 5.1 ainda salva em UTF-16, que o
+    leitor utf-8 do loop não perdoa). No PowerShell: `Set-Content
+    fila\hoje.txt -Value "executar:..." -Encoding ascii` e conferir com
+    `Get-Content`. A ordem entra no terminal, nunca no editor.
 
 ## 9. Próximos passos (fila do ROTEIRO, ordem recomendada)
 0. **B17 lei-do-só-olhar com mão (ACHADO 22/09) — ✅ ENTREGUE (ordem do dono

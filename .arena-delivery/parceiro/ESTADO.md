@@ -56,6 +56,12 @@
 - Pendências dele: rodar salvar-tudo (o veredito do portão mandou) e recriar o
   hoje.txt no terminal (nunca no editor); verificar de novo, se quiser a foto
   0 problemas.
+- Posso logo depois (print 23/09 17:53): recriou o `fila/hoje.txt` NO TERMINAL —
+  a receita cmd (`echo ...>`) quebrou no PowerShell; o `Set-Content -Encoding
+  ascii` entrou limpo. Ordem dele na fila: `executar:git status` (leitura pura,
+  da coleira). A fila dele ainda carrega as ordens vigias da madrugada
+  (`vigia-*.txt`) esperando rodada com ele presente. Aula do dia virou a
+  armadilha 18 da cápsula.
 
 ## (história) combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
 
