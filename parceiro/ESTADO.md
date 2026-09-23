@@ -38,6 +38,25 @@
 - Pendência dele: puxar → verificar → salvar (a primeira prova do conserto no
   Windows de verdade). Nenhum push no backup (super-agente.git) — nunca houve.
 
+### PROVA na máquina dele (print colado no chat 23/09, relógio do Windows 17:49)
+
+- puxar OK: `3be2e9c..b21f03d`, 6 arquivos, +167/-44 — bateu byte a byte com o esperado.
+- **PORTÃO 17 cenas OK NA MÁQUINA DELE e terminou SOZINHO — sem KeyboardInterrupt.**
+  Primeira passada completa pós-B16 no Windows real: o conserto do `os.kill` está
+  PROVADO lá (a cena da trava usa o pid vivo do cmd e não derrubou mais a janela).
+  Cenas novas rodando nele: "modo observacao -> ... executar sem mao" (B17) e
+  "blindagens -> ... pergunta sem sinal" (processo_vivo). loop: 1531 linhas/70 funções.
+- raio dele: 27 ok | 4 dicas | 0 avisos | **1 problema — fila/hoje.txt vazio**.
+  hoje.txt é arquivo DELE (código nenhum cria; está fora do Git): veio vazio/fora
+  do formato. Conserto = a receita do próprio README (Set-Content) ou apagar.
+  Nada a corrigir no código da ponte por causa disso.
+- Dica "20 impressoes — o portao v11 tem 21": o detalhe cosmético já anotado no
+  ESTADO de 22/09 (off-by-one do contador de prints do raio); correção de 1 linha
+  entra de carona no próximo tijolo (F3), sem ticket novo.
+- Pendências dele: rodar salvar-tudo (o veredito do portão mandou) e recriar o
+  hoje.txt no terminal (nunca no editor); verificar de novo, se quiser a foto
+  0 problemas.
+
 ## (história) combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
 
 **Verdade fresca (22/09 noite):** seção 0 da cápsula = PROMPT FIXO definitivo
