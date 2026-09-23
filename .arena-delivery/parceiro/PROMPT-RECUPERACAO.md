@@ -191,7 +191,8 @@ python3 testes/raio_x.py          # esperado: 0 problemas
 - Testes rodam em Linux puro (sem wine); .bat não rodam aqui — validar por
   inspeção + linter do raio.
 - Se precisar do repo da Arena: branch da sessão = espelho em `.arena-delivery/`
-  (commit a cada entrega; PR #5 aberto apontando pra ele — merge só se ele pedir).
+  (commit a cada entrega; PR da conversa aberto apontando pra ele — nesta
+  conversa, o #8; merge só se ele pedir).
 - Arquivos dele NO sandbox: nada. Conexão direta ao PC dele = NÃO existe.
 - O espelho (`.arena-delivery/` + PR visual) pertence à SESSÃO que o criou (rampa
   própria). Conversa nova NUNCA empurra PR velho — publica na ponte e, se o humano
@@ -207,13 +208,15 @@ Aprendido em 22/09: a reescrita da seção 0 quase enterrou este bloco.)
 1. **A ponte está viva e é canônica**: `GUILHERMEFMAGA-SITE` @ branch
    `super-agente` = origem oficial. A SESSÃO que constrói publica na ponte a
    cada tijolo (após portão + raio verdes).
-2. **A janela canônica do usuário é o PR #5** (combinado 22/09, pedido explícito
-   dele): o espelho `.arena-delivery` (branch da sessão dona) = conteúdo do PR #5
-   = a VITRINE que o Guilherme abre pra ver código. Toda entrega que empurra a
-   ponte RE-ESPELHA o PR #5 no MESMO fôlego (mesa sessão, na sequência imediata;
-   `git archive` do tip da ponte, conferir byte a byte). Chat não cola código do
-   projeto — só números, endereço e ritual (zero-cola). Se a ponte andou e o #5
-   não, o #5 está velho: re-sincronizar antes de qualquer outra coisa.
+2. **VITRINE POR CONVERSA** (ordem do dono 24/09 — supera o combinado do PR #5
+   único): cada conversa abre o PR DELA no SITE, do branch da própria sessão,
+   com TODO o tip da ponte via `git archive` em `.arena-delivery/` (conferir
+   byte a byte). Toda entrega que empurra a ponte RE-ESPELHA esse PR no MESMO
+   fôlego (na sequência imediata). PR = JANELA (só ver código); a PONTE = a
+   esteira que alimenta a máquina (`puxar-atualizacao.bat` NUNCA lê PR). Chat
+   não cola código do projeto — só números, endereço e ritual (zero-cola). Se a
+   ponte andou e o PR não, o PR está velho: re-sincronizar antes de qualquer
+   outra coisa.
 3. **O sandbox reseta** (apagou `/home/user/ponte` duas vezes em 22/09, mas o
    clone do repo da Arena sobreviveu no `.arena-delivery`). Se `ponte` sumir:
    reconstruir com `git clone -b super-agente https://github.com/GUILHERMEFMAGA/
@@ -231,14 +234,18 @@ Aprendido em 22/09: a reescrita da seção 0 quase enterrou este bloco.)
    `GUILHERMEFMAGA/super-agente` no GitHub = o BACKUP (push existe SOMENTE quando
    ELE roda `salvar-tudo.bat` — nunca da IA, nunca automático; estar atrás da
    ponte é normal e saudável). Direção da escrita: sandbox → ① → ② → ③. E o
-   espelho da vitrine (PR #5, seção 6.5) é um QUATRO canal só de VISUALIZAÇÃO:
+   espelho da vitrine (PR da conversa, seção 6.5) é um QUATRO canal só de VISUALIZAÇÃO:
    ninguém puxa nada dele, é vitrine de revisão — não confundir com ①.
-7. **Espelho só a sessão dona atualiza** (aula do PR velho, 22/09): cada conversa
-   do Arena é presa ao branch `arena/<id>-...` dela; nenhuma sessão consegue
-   empurrar o branch de outra. Sessão nova que quiser vitrine abre PR NOVO; o
-   PR velho é tarefa da sessão dona. NUNCA fundir PR do repo do site sem ordem
-   explícita do dono (o main é o perfil público dele); PRs antigos órfãos (1,2,3,4)
-   ficam abertos até ele mandar limpar (oferta feita 22/09, aguardando `limpa`).
+7. **MUSEU e propriedade de sessão** (ordem do dono 24/09; aula do PR velho
+   22/09): os PRs-espelho **#1, #2, #3, #4, #5, #6 e #7 NÃO se apagam** — são o
+   museu das conversas passadas; ninguém fecha, apaga, reabre ou funde PR
+   alheio sem ordem explícita. O **#5 NÃO reabre**: o branch dele
+   (`arena/01a0b1e5`) levou force-push no mesmo segundo do fechamento e o
+   GitHub recusa reabrir PR sem ancestral comum com o main (erro 422, "no
+   history in common"). A vitrine oficial é o PR DA CONVERSA que constrói —
+   nesta conversa (24/09), o **#8**. Cada sessão é presa ao branch
+   `arena/<id>-...` dela e NUNCA funde PR do repo do site sem o dono pedir
+   (o main é o perfil público dele). Sessão nova abre PR NOVO do branch dela.
 8. **Lembrete de fechamento de toda entrega** (ordem fixa, sempre): ① duplo clique
    `puxar-atualizacao.bat` → ② duplo clique `verificar-tudo.bat` (esperado: portão
    17 cenas, raio 0 problemas) → ③ duplo clique `salvar-tudo.bat` (backup dele).
@@ -298,18 +305,30 @@ Aprendido em 22/09: a reescrita da seção 0 quase enterrou este bloco.)
     "última linha PRONTO = sucesso".
 15. Ao editar README/ROTEIRO/ESTADO: português do arquivo deles é sem acento no
     CONTEÚDO técnico (dado que vai pro cmd dele) — manter estilo.
+16. `os.kill(pid, 0)` no Windows NÃO é pergunta de existência: é CTRL_C_EVENT
+    de verdade (GenerateConsoleCtrlEvent) e interrompe o console inteiro — foi
+    ele que derrubava o portão do dono na cena da trava. Perguntar =
+    `processo_vivo()` (POSIX sinal 0; Windows OpenProcess 0x1000 + CloseHandle,
+    acesso negado = vive) ou julgar pela idade da trava. O caminho Windows só
+    é validável por leitura de código (sandbox é Linux); a prova final é o
+    verificar-tudo.bat na máquina dele.
+17. Comentário inline no .gitignore (`padrao  # texto`) não é comentário: o git
+    lê a linha INTEIRA como padrão e ela nunca bate — `memoria/.trava` dormiu
+    desprotegido por causa disso. Comentário vai na linha de cima; a prova é
+    `git check-ignore -v`.
 
 ## 9. Próximos passos (fila do ROTEIRO, ordem recomendada)
-0. **B17 lei-do-só-olhar com mão (ACHADO 22/09, candidato nº1)** — `executar()`
-   (`agente/loop.py` ~linha 165) NÃO consulta `SO_OLHAR`: `--so-olhar` cria
-   arquivo (`memoria/base.py`) apesar da ajuda prometer "observa, nao toca em
-   nada" e da lei 3.2 dizer "não escreve, não executa" (reproduzido 2x; o git vê
-   `?? memoria/base.py`). A cena "modo observacao" do portão só cobre `propor` —
-   por isso 17/17 verde convive com o furo. Tijolo: guarda em `executar()` +
-   cena no portão ("só-olhar não cria arquivo") + ajuda alinhada. **Decisão do
-   Guilherme: 1 = B17 (recomendado) ou 2 = F3 primeiro.**
+0. **B17 lei-do-só-olhar com mão (ACHADO 22/09) — ✅ ENTREGUE (ordem do dono
+   24/09, `b13ee6a`)** — `executar()` consulta `SO_OLHAR`: `--so-olhar` não
+   cria arquivo nenhum ("a regra X espera o seu sim"); a cena do portão provou
+   ("modo observacao -> propor vazio, cerebro imutavel, executar sem mao") e a
+   ajuda ficou honesta. No mesmo tijolo saiu a blindagem Windows
+   (`8333c1e`): `processo_vivo()` no lugar do `os.kill(pid, 0)` que, no
+   Windows, era um Ctrl+C de verdade na cena da trava. **Pendente a prova
+   final na máquina dele: verificar-tudo.bat no Windows.**
 1. **F3 diário-de-evolução** — narrativa que o agente conta do que aprendeu +
-   taxa de alucinação (propostas÷aprovadas). Próximo tijolo natural da ponte.
+   taxa de alucinação (propostas÷aprovadas). Fica POR ÚLTIMO (ordem do dono
+   24/09); a ordem do próximo tijolo é palavra do Guilherme.
 2. **C1 matcher semântico** — difflib + TF-IDF/cosseno stdlib (a "IA de verdade"
    do projeto; cache semântico e grounding de brinde).
 3. F4 checksum anticorrupção; V3 relatório matutino; C2 ε-greedy sobre o placar

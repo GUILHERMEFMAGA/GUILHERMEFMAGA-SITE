@@ -7,10 +7,12 @@
 # mostra o plano sem tocar no mundo nem gastar limites.
 
 import importlib.util
+import inspect
 import json
 import os
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -76,15 +78,24 @@ if guardada.exists():
     guardada.rename(falsa)
 
 verdadeiro = loop.SO_OLHAR
+raiz_verdadeira = loop.RAIZ
+mundo_obs = Path(tempfile.mkdtemp(prefix="cena_observacao_"))
 loop.SO_OLHAR = True
 try:
     travado = loop.propor({"config|base.py": 9}) == ([], [], [], [])
+    loop.RAIZ = mundo_obs
+    recusa = loop.executar({"id": "fantasma-do-olhar", "criar_arquivo": "fantasma-do-olhar.txt",
+                            "conteudo": "nada"}, "memoria")
+    travado = (travado and "--so-olhar" in (recusa or "")
+               and not (mundo_obs / "memoria" / "fantasma-do-olhar.txt").exists())
 except Exception as erro:
     travado = False
     print("     (o modo observacao quebrou: %s)" % erro)
 finally:
+    loop.RAIZ = raiz_verdadeira
     loop.SO_OLHAR = verdadeiro
-print("  [%s] modo observacao  -> propor devolve vazio, cerebro nao muda"
+    shutil.rmtree(mundo_obs, ignore_errors=True)
+print("  [%s] modo observacao  -> propor vazio, cerebro imutavel, executar sem mao"
       % ("ok  " if travado else "FALHA"))
 if not travado:
     falhas.append("modo observacao")
@@ -534,6 +545,16 @@ try:
     trava_velha_cede = morto[0]
     loop.trava_liberar(pid=999999)
     loop.trava_liberar()  # por garantia: quem herda a trava dela sai
+    # 3b) pergunta de existencia SEM sinal: no Windows o sinal 0 e um Ctrl+C de
+    # verdade — a pergunta honesta e processo_vivo (API, so consulta) e a prova
+    # de que o sinal so existe no ramo POSIX fica por leitura do codigo
+    pergunta_viva = loop.processo_vivo(os.getppid()) is True
+    pergunta_morta = all(loop.processo_vivo(x) is False
+                         for x in (None, 0, -1, "fantasma", 999999))
+    fonte = inspect.getsource(loop.processo_vivo)
+    prova_por_leitura = (fonte.count("os.kill") == 1
+                         and fonte.index("os.kill") < fonte.index("import ctypes"))
+    sem_sinal = pergunta_viva and pergunta_morta and prova_por_leitura
     # 4) escrita atomica e leitura honesta: corrompido grita, ausente nao
     alvo = proj_bl / "memoria" / "alvo.json"
     loop.escrever_json(alvo, {"x": 1})
@@ -562,7 +583,8 @@ try:
     coerente = loop.politica_mundo_ok() is None
     bl_ok = (fila_parada and lei_humano and roda_com_dono
              and trava_veta and trava_velha_cede and sem_sobra and grito
-             and ausencia_silenciosa and varreu and cobrou and coerente)
+             and ausencia_silenciosa and varreu and cobrou and coerente
+             and sem_sinal)
 finally:
     loop.RAIZ, loop.CEREBRO, loop.SO_OLHAR, loop.VIGILIA = r_bl, ce_bl, so_bl, v_bl
     if env_bl is None:
@@ -573,8 +595,8 @@ finally:
 bl_flags = {"fila": fila_parada, "humano": lei_humano, "dono": roda_com_dono,
             "trava": trava_veta, "velha": trava_velha_cede, "atomica": sem_sobra,
             "grito": grito, "silencio": ausencia_silenciosa, "sombra": varreu,
-            "cobrou": cobrou, "coerente": coerente}
-print("  [%s] blindagens  -> fila sob chave, trava gemea, atomica, corrompido grita, sombra e deco cobrado%s"
+            "cobrou": cobrou, "coerente": coerente, "sinal": sem_sinal}
+print("  [%s] blindagens  -> fila sob chave, trava gemea, atomica, corrompido grita, sombra, deco cobrado e pergunta sem sinal%s"
       % ("ok  " if bl_ok else "FALHA", "" if bl_ok else "  " + ", ".join(
           "%s=%s" % kv for kv in bl_flags.items() if not kv[1])))
 if not bl_ok:

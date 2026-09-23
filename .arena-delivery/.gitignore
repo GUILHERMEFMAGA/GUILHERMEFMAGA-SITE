@@ -12,7 +12,11 @@ memoria/*.json
 memoria/*.log
 memoria/*.txt
 !memoria/.gitkeep
-*memoria/*.trava  # trava de batida: memo efemera, nunca no GitHub
+# trava de batida: efemera, nunca no GitHub (comentario inline nao vale pro git:
+# ele lia a linha INTEIRA como padrao e a blindagem nunca valia)
+memoria/.trava
+# o que o agente cria em memoria/ fica na maquina (fantasma do --so-olhar nunca sobe)
+memoria/*.py
 # segredos: NUNCA vao pro GitHub
 .env
 *.env
