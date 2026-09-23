@@ -12,6 +12,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -77,15 +78,24 @@ if guardada.exists():
     guardada.rename(falsa)
 
 verdadeiro = loop.SO_OLHAR
+raiz_verdadeira = loop.RAIZ
+mundo_obs = Path(tempfile.mkdtemp(prefix="cena_observacao_"))
 loop.SO_OLHAR = True
 try:
     travado = loop.propor({"config|base.py": 9}) == ([], [], [], [])
+    loop.RAIZ = mundo_obs
+    recusa = loop.executar({"id": "fantasma-do-olhar", "criar_arquivo": "fantasma-do-olhar.txt",
+                            "conteudo": "nada"}, "memoria")
+    travado = (travado and "--so-olhar" in (recusa or "")
+               and not (mundo_obs / "memoria" / "fantasma-do-olhar.txt").exists())
 except Exception as erro:
     travado = False
     print("     (o modo observacao quebrou: %s)" % erro)
 finally:
+    loop.RAIZ = raiz_verdadeira
     loop.SO_OLHAR = verdadeiro
-print("  [%s] modo observacao  -> propor devolve vazio, cerebro nao muda"
+    shutil.rmtree(mundo_obs, ignore_errors=True)
+print("  [%s] modo observacao  -> propor vazio, cerebro imutavel, executar sem mao"
       % ("ok  " if travado else "FALHA"))
 if not travado:
     falhas.append("modo observacao")
