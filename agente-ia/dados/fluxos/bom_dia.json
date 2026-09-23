@@ -1,0 +1,10 @@
+{
+  "nome": "bom_dia",
+  "descricao": "Todo dia às 08:00 escreve um diário com a data e uma mensagem de foco.",
+  "gatilho": { "tipo": "horario", "quando": "08:00" },
+  "passos": [
+    { "acao": "data_hora", "salvar_como": "agora" },
+    { "acao": "sortear", "args": ["Revisar o que aprendi ontem | Criar um fluxo novo | Treinar a rede com 5 exemplos novos | Ler um trecho do codigo | Anotar uma ideia de projeto"], "salvar_como": "meta" },
+    { "acao": "salvar_arquivo", "args": ["diario_do_agente.txt"], "entrada": "=== DIÁRIO DO AGENTE ===\n{{agora}}\n\nMeta de hoje: {{meta}}\n\n(gerado automaticamente pelo fluxo bom_dia)" }
+  ]
+}

@@ -1,0 +1,242 @@
+{
+  "versao": "1.0",
+  "descricao": "Base de conhecimento do agente. Cada tópico = palavras-chave + resposta. Adicione quantos quiser: o agente passa a saber responder na hora (basta salvar o arquivo).",
+  "topicos": [
+    {
+      "titulo": "O que é Inteligência Artificial",
+      "palavras_chave": [
+        "inteligencia artificial",
+        "ia",
+        "o que é ia",
+        "definicao de ia",
+        "machine learning",
+        "aprendizado de maquina",
+        "deep learning"
+      ],
+      "resposta": "Inteligência Artificial é ensinar o computador a tomar decisões a partir de exemplos, em vez de você escrever todas as regras na mão. Quando você escreve regra por regra (if/else), é programação normal. Quando o programa AJUSTA sozinho os números internos olhando exemplos, é aprendizado de máquina (machine learning). Quando existem várias camadas de neurônios fazendo isso, é aprendizado profundo (deep learning). Neste projeto você tem os três: regras (as habilidades), aprendizado (a rede neural) e várias camadas (entrada, escondida, saída).",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é um agente de IA",
+      "palavras_chave": [
+        "agente de ia",
+        "agente",
+        "o que é um agente",
+        "diferenca entre chatbot e agente",
+        "agente autonomo",
+        "super agente"
+      ],
+      "resposta": "Um chatbot só responde texto. Um AGENTE tem quatro coisas: (1) percebe a entrada, (2) decide o que fazer, (3) usa FERRAMENTAS para agir no mundo (calcular, salvar arquivo, acessar sistema), (4) guarda memória do que aconteceu. O ciclo é: entender -> decidir -> agir -> observar -> responder. É exatamente o que o arquivo agente/nucleo.py faz. A diferença entre um agente simples e um 'super agente' é: mais ferramentas, mais memória, mais automações por gatilho e mais capacidade de aprender com o próprio histórico.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como funciona a rede neural deste agente",
+      "palavras_chave": [
+        "rede neural",
+        "neural network",
+        "como funciona a rede",
+        "neuronio",
+        "camada escondida",
+        "pesos",
+        "softmax",
+        "mlp",
+        "perceptron"
+      ],
+      "resposta": "A rede tem 3 camadas. ENTRADA: cada palavra da sua frase vira uma posição com 0.0 ou 1.0 (é o 'saco de palavras'). ESCONDIDA: 24 neurônios calculam soma(peso x entrada) + bias e passam por uma função de ativação chamada tanh; é aqui que o 'raciocínio' acontece. SAÍDA: um neurônio por intenção, e o softmax transforma os valores em probabilidades que somam 1. A resposta é a intenção com a maior probabilidade. Os 'pesos' são os números que o treino ajusta — no nosso caso são cerca de 1.300; no ChatGPT são 175 bilhões.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é backpropagation (retropropagação)",
+      "palavras_chave": [
+        "backpropagation",
+        "retropropagacao",
+        "como a rede aprende",
+        "gradiente",
+        "descida do gradiente",
+        "gradient descent",
+        "treino da rede",
+        "epoca de treino"
+      ],
+      "resposta": "Backpropagation é o método de 'voltar o erro para trás'. Funciona assim: (1) a rede chuta uma resposta; (2) comparamos com a resposta certa e medimos o erro (entropia cruzada); (3) usando cálculo diferencial (regra da cadeia), descobrimos quanto CADA peso contribuiu para o erro; (4) cada peso é ajustado um pouquinho na direção que diminui o erro — isso é a 'descida do gradiente'; (5) repetimos milhares de vezes ('épocas'). No nosso código isso acontece no método treinar() de agente/rede_neural.py. Adicionamos também 'momento' (momento=0.9), que é como dar inércia para o ajuste não ficar tremendo.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é n8n e por que este agente é uma alternativa",
+      "palavras_chave": [
+        "n8n",
+        "automacao",
+        "workflow",
+        "fluxo de trabalho",
+        "zapier",
+        "make",
+        "integromat",
+        "no-code",
+        "low-code"
+      ],
+      "resposta": "n8n é uma ferramenta visual de automação: você arrasta 'nós' e liga um no outro para criar fluxos ('quando acontecer X, faça Y'). É ótimo, mas depende de instalar Node.js/Docker e de uma interface web. Nosso agente/rede_neural.py não substitui 100% do n8n, mas o orquestrador.py faz o principal: fluxos em JSON com gatilho (manual, por horário ou por intervalo), passos encadeados e variáveis com {{nome}}. A vantagem: é código Python que você lê, edita, versiona no GitHub e roda offline, sem Docker, sem nuvem, sem mensalidade. Chamamos carinhosamente de 'mini-n8n em 200 linhas'.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Por que não usar API paga nem Ollama neste agente",
+      "palavras_chave": [
+        "api",
+        "openai",
+        "chatgpt",
+        "ollama",
+        "gpt",
+        "llm",
+        "modelo grande",
+        "sem api",
+        "custo",
+        "token"
+      ],
+      "resposta": "API paga (OpenAI, Gemini, Claude) e modelos locais tipo Ollama usam LLMs de bilhões de parâmetros. Eles são MUITO melhores em conversa livre, mas custam: dinheiro (API) ou memória/GPU (Ollama, algo como 4 GB a 40 GB de RAM). Este projeto foi feito para provar que dá para construir um agente útil e que APRENDE com matemática que você mesmo escreve, em Python puro, rodando em qualquer PC, offline e de graça. O caminho do meio inteligente: use este agente como esqueleto (ferramentas, memória, fluxos) e, se um dia quiser, ligue um LLM só na parte de conversa — o resto continua igual.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como usar o terminal no VS Code",
+      "palavras_chave": [
+        "terminal",
+        "vscode",
+        "vs code",
+        "abrir terminal",
+        "atalho",
+        "ctrl",
+        "prompt",
+        "cmd",
+        "powershell"
+      ],
+      "resposta": "No VS Code: aperte Ctrl + ' (a tecla ao lado do 1, também escrita como crase) ou vá em Menu > Terminal > Novo Terminal. No Windows, o padrão costuma ser o PowerShell; no Linux/Mac, é o bash. Ele abre já na pasta do seu projeto — é para isso que serve a opção 'Abrir pasta' (Ctrl+K Ctrl+O). Comandos essenciais: python --version (confere o Python), cd agente-ia (entra na pasta), python main.py (roda o agente), python main.py treinar (treina a rede), python main.py web (abre no navegador). Se aparecer 'python não é reconhecido', teste python3. Se aparecer erro de porta, mude com --porta 8080.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como usar Git e GitHub neste projeto",
+      "palavras_chave": [
+        "git",
+        "github",
+        "versionamento",
+        "commit",
+        "push",
+        "pull",
+        "repositorio",
+        "clonar",
+        "branch"
+      ],
+      "resposta": "Git guarda o histórico do seu código; GitHub é onde esse histórico fica na nuvem. Roteiro básico: (1) git init (uma vez só, na pasta do projeto); (2) git add . (marca o que mudou); (3) git commit -m \"mensagem do que você fez\"; (4) git remote add origin https://github.com/SEU-USUARIO/SEU-REPO.git (uma vez só); (5) git push -u origin main (envia). No VS Code, o painel 'Source Control' (Ctrl+Shift+G) faz tudo isso com cliques: escreva a mensagem e clique no ✓. Antes de commitar, garanta que o arquivo .gitignore está lá para não subir coisas grandes.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é Python e por que usar neste projeto",
+      "palavras_chave": [
+        "python",
+        "linguagem",
+        "pip",
+        "biblioteca",
+        "instalar python",
+        "python puro",
+        "biblioteca padrao"
+      ],
+      "resposta": "Python é uma linguagem de programação clara, ótima para IA. Neste projeto usamos só a BIBLIOTECA PADRÃO: json, math, random, re, sqlite3, datetime, ast, os, http.server e urllib. Isso significa ZERO instalação de pacotes — nada de pip install, nada de erro de compatibilidade. O pip existe e é útil depois, quando você quiser PyTorch ou pandas, mas o agente funciona sem ele. Regra prática: python arquivo.py executa um arquivo; python main.py executa o programa principal.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como ensinar coisas novas para a rede neural",
+      "palavras_chave": [
+        "ensinar",
+        "adicionar frases",
+        "novo treino",
+        "treino.jsonl",
+        "aumentar a acuracia",
+        "dar exemplos",
+        "melhorar o agente"
+      ],
+      "resposta": "A rede aprende por exemplos. Abra dados/treino.jsonl, cada linha é um exemplo em JSON com 'texto' e 'intencao'. Exemplo: {\"texto\": \"quero uma piada\", \"intencao\": \"humor\"}. Você pode criar uma intenção nova, tipo 'criar_fluxo', com 5 a 10 exemplos variados. Depois rode no terminal: python main.py treinar. Ele recria o vocabulário, treina do zero e mostra a acurácia. Se ficar abaixo de 80%, quase sempre falta exemplo ou existem exemplos iguais com intenções diferentes (isso confunde a rede).",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como criar um fluxo de automação novo",
+      "palavras_chave": [
+        "criar fluxo",
+        "novo fluxo",
+        "fluxos",
+        "json do fluxo",
+        "gatilho",
+        "agendar tarefa",
+        "automatizar tarefa"
+      ],
+      "resposta": "Crie um arquivo .json dentro de dados/fluxos/. Estrutura: {\"nome\": \"meu_fluxo\", \"descricao\": \"...\", \"gatilho\": {\"tipo\": \"manual\"}, \"passos\": [{\"acao\": \"calcular\", \"args\": [\"2+2\"], \"salvar_como\": \"resultado\"}, {\"acao\": \"salvar_arquivo\", \"args\": [\"saida.txt\"], \"entrada\": \"O resultado foi {{resultado}}\"}]}. Os tipos de gatilho são: manual (você manda rodar), horario (todo dia às HH:MM) e intervalo (a cada X segundos). Tudo entre {{ }} é substituído pelo resultado de um passo anterior — igual às expressões do n8n. Para rodar: python main.py fluxo nome_do_fluxo. Para deixar vigiando: python main.py servico.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que são tokens, embeddings e atenção (em linguagem simples)",
+      "palavras_chave": [
+        "token",
+        "tokenizacao",
+        "embedding",
+        "vetor",
+        "atencao",
+        "transformer",
+        "llm por dentro",
+        "como o chatgpt funciona"
+      ],
+      "resposta": "Token é um pedacinho de texto (uma palavra ou parte dela). Embedding é transformar esse pedaço em números que carregam SIGNIFICADO: 'cachorro' e 'cão' ficam com números próximos. A 'atenção' (do Transformer) é o mecanismo que olha todas as palavras da frase e decide quais são importantes para prever a próxima. Neste projeto temos a versão didática de cada peça: o 'saco de palavras' é um embedding simples (0/1); a camada escondida é um parente distante da atenção; e a busca por palavras-chave com IDF é a versão caseira de 'recuperação de informação'.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é prompt e engenharia de prompt",
+      "palavras_chave": [
+        "prompt",
+        "engenharia de prompt",
+        "how to prompt",
+        "instrucao para ia",
+        "prompt bom"
+      ],
+      "resposta": "Prompt é a instrução que você dá para a IA. Um bom prompt tem quatro partes: PAPEL ('você é um professor de Python'), TAREFA ('explique backpropagation'), FORMATO ('em 5 tópicos com exemplo') e CONTEXTO ('para alguém que nunca programou'). Mesmo no nosso agente pequeno isso vale: 'analise: <texto>' funciona melhor que 'faz algo aí'. No VS Code, usar comentários claros antes de pedir algo ao Copilot/Chat é a mesma ideia.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "O que é TDAH e como estudar programação com ele",
+      "palavras_chave": [
+        "tdah",
+        "foco",
+        "consigo focar",
+        "concentracao",
+        "organizacao",
+        "procrastinacao",
+        "hiperfoco",
+        "dificuldade de focar",
+        "dificuldade de concentracao"
+      ],
+      "resposta": "TDAH não é falta de inteligência, é dificuldade de regular atenção e motivação — geralmente com hiperfoco em assuntos que dão prazer, como programar. O que funciona na prática: (1) divida em pedaços de 10-15 minutos com resultado visível ('agora eu crio o arquivo', 'agora eu rodo e vejo funcionar'); (2) sempre saia da sessão com algo FUNCIONANDO, mesmo que pequeno; (3) escreva o próximo passo antes de sair, para não perder o fio; (4) use o próprio agente para lembrar ('salve uma nota lembrete.txt com: amanhã treinar a rede'); (5) aplauso mental quando passar do erro — erro é dado, não derrota. Este guia do projeto foi escrito com passos curtos exatamente por isso.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Segurança: o que o agente pode e não pode fazer",
+      "palavras_chave": [
+        "seguranca",
+        "perigo",
+        "apagar arquivos",
+        "permissao",
+        "sandbox",
+        "caixa de areia",
+        "risco"
+      ],
+      "resposta": "Regras de segurança embutidas no código: (1) o agente só escreve dentro de dados/saidas (veja o 'portão' em ferramentas.py) — não mexe em arquivos do sistema; (2) a calculadora usa ast em vez de eval, então um texto malicioso não executa código; (3) a internet é opcional e só faz leitura simples via urllib; (4) nada de senha ou chave guardada no código. Se um dia você adicionar uma ferramenta que executa comandos no sistema, coloque um limite de pasta e uma lista de comandos permitidos. Agente bom é agente previsível.",
+      "fonte": "material do projeto"
+    },
+    {
+      "titulo": "Como funciona a memória do agente",
+      "palavras_chave": [
+        "memoria",
+        "sqlite",
+        "banco de dados",
+        "lembrar",
+        "esquecer",
+        "memoria.db",
+        "guardar informacao"
+      ],
+      "resposta": "São duas memórias. A CURTA é a conversa de agora: as últimas 12 mensagens, guardadas em uma lista na memória do programa. A LONGA é o arquivo dados/memoria.db (banco SQLite que já vem no Python): ele guarda FATOS no formato chave/valor, tipo nome = Guilherme, cidade = São Paulo. Quando você escreve 'meu nome é X', o módulo memoria.py usa expressões regulares para achar o padrão, extrair o valor e gravar. Na outra vez que o programa abre, os fatos continuam lá. Para apagar tudo: apague o arquivo dados/memoria.db (ou peça para eu esquecer algo).",
+      "fonte": "material do projeto"
+    }
+  ]
+}
