@@ -1123,6 +1123,42 @@ def fluxos_para(nome_olho, arquivo_path):
     return saidas
 
 
+def processo_vivo(pid):
+    """Pergunta se um pid esta vivo, SEM mandar sinal nenhum.
+    No POSIX, sinal 0 e pergunta pura: o sistema responde e nao toca em nada.
+    No Windows, esse mesmo sinal 0 e um Ctrl+C DE VERDADE (cai no console e
+    interrompe a janela inteira) — por isso la a pergunta vai pela API do
+    sistema: OpenProcess so consulta (0x1000, sem direito de terminar nada) e
+    CloseHandle larga a porta na hora. Acesso negado = vive, so nao abre.
+    Na duvida, responde vivo: recusa sem precisao custa menos que batida
+    dupla mastigando o caderno."""
+    if pid is None:
+        return False
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            return False
+        return True
+    try:
+        import ctypes
+        alca = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not alca:
+            return ctypes.GetLastError() == 5  # 5 = acesso negado: o processo existe
+        try:
+            return True
+        finally:
+            ctypes.windll.kernel32.CloseHandle(alca)
+    except Exception:
+        return True
+
+
 def _caminho_trava():
     return RAIZ / "memoria" / ".trava"
 
@@ -1143,10 +1179,7 @@ def trava_adquirir(pid=None, agora=None):
             outro, idade = None, 10 ** 9
         vivo = outro is not None and outro != pid
         if vivo:
-            try:
-                os.kill(outro, 0)
-            except OSError:
-                vivo = False
+            vivo = processo_vivo(outro)
         if vivo and idade <= 600:
             return False, ("outra batida (pid %s, %ds atras) esta na frente — "
                            "essa aqui recua limpa" % (outro, int(idade)))

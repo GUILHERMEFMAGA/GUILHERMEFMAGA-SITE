@@ -7,12 +7,15 @@
 # v3: radiografa o porteiro (--vigiar), o snapshot dele e o tick.bat.
 # v4: radiografa o bloco correntes (gatilhos com etapas no vocabulario blindado).
 # v5: olhos de saude (B13) no raio-x + linter de .bat (a licao do parentese solto).
+# v6: a trava e julgada pela IDADE, sem pergunta com sinal ao sistema — no Windows
+# essa pergunta (sinal 0) e um Ctrl+C de verdade e interrompia o portao do dono.
 # Codigo de saida: 0 = sem problemas, 1 = pelo menos um PROBLEMA (pra portao usar).
 
 import ast
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -691,17 +694,21 @@ def checar_blindagens(cerebro):
         try:
             dados = ler_json_seguro(travada)
             pid = dados.get("pid") if isinstance(dados, dict) else None
-            vivo = False
+            fresca = False
             if pid:
                 try:
-                    os.kill(int(pid), 0)
-                    vivo = True
-                except (OSError, ValueError, TypeError):
-                    vivo = False
-            if vivo:
-                aviso("blindagens", "uma batida esta viva agora (pid %s) — o raio-x nao atrapalha" % pid)
+                    idade = time.time() - float(dados.get("quando_epoch", 0))
+                except (TypeError, ValueError):
+                    idade = None
+                # mesmo teto da trava_adquirir (10 min): fresca pode ser viva ou
+                # morta — o raio-x NAO pergunta ao sistema: no Windows, perguntar
+                # com sinal e um Ctrl+C de verdade na janela do dono
+                fresca = idade is not None and 0 <= idade <= 600
+            if fresca:
+                aviso("blindagens", "trava fresca (pid %s, ha %ds) — viva ou morta, o raio-x nao pergunta ao sistema (sem sinal nenhum)"
+                      % (pid, max(0, int(idade))))
             else:
-                dica("blindagens", "trava orfa de pid morto no memoria/ — a proxima batida assume sozinha")
+                dica("blindagens", "trava velha ou sem idade no memoria/ — a proxima batida assume sozinha")
         except Exception:
             pass
     ok("blindagens", "leis do cerebro tem mao no corpo (humano, atomica, trava, sombra, flags)")
