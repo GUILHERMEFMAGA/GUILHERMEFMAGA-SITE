@@ -62,6 +62,18 @@
   da coleira). A fila dele ainda carrega as ordens vigias da madrugada
   (`vigia-*.txt`) esperando rodada com ele presente. Aula do dia virou a
   armadilha 18 da cápsula.
+- Rodada COM ele presente (print 23/09): fila ESVAZIADA — hoje.txt + as 6
+  vigias da madrugada, **7/7 [FEITA]**, cada uma com relatorio em
+  relatorios/fila-*.txt. O ciclo completo (porteiro anota de noite → humano
+  chega → coleira → execucao → relatorio) rodou de ponta a ponta na maquina
+  real. Depois da fila: nada_a_fazer (mundo resolvido) = silencio = sucesso.
+- Caderno B15 narrando na maquina dele: cronicos de base.py (historia
+  pre-B17; o decaimento apaga com o tempo), 33 de 43 rodadas sem trabalho e o
+  **DESISTE** funcionando: avisar_sobre_testes barrada 4x = ideia enterrada
+  (o freio contra proposta morta). Demo viva do porque o F3 e o tijolo
+  natural: ele narraria exatamente esses fatos.
+- Pendencia: salvar-tudo (backup) ainda sem confirmacao dele; um verificar
+  novo agora deve dar a foto 0 problemas (fila limpa).
 
 ## (história) combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
 
