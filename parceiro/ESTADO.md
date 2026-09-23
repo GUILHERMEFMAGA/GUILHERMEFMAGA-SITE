@@ -3,7 +3,42 @@
 > **Cápsula completa (conversa perdida? leia isto primeiro):** `parceiro/PROMPT-RECUPERACAO.md`
 > — arquitetura, leis, história B1→B16, ciclo da ponte, armadilhas e próximas ações.
 
-## HOJE: combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
+## HOJE (24/09 — ordem do dono executada): Windows blindado + B17 na ponte; #8 é a vitrine desta conversa ✅ — ponte tip `b13ee6a` (cápsula/ESTADO viram no commit seguinte)
+
+- A ordem (5 itens) veio por mensagem. O arquivo `PARA-A-CONVERSA-NOVA.md` que
+  ela citou NÃO existe neste sandbox nem em branch nenhum do SITE — executado
+  pelo texto da mensagem; as provas anexadas do dono (print do verificar)
+  continuam só com ele.
+- Antes de mexer: portão 17/17 + raio 0 problemas reproduzidos em `3be2e9c`.
+- **1) Windows sem Ctrl+C fantasma (`8333c1e`):** `os.kill(pid, 0)` saiu do
+  `trava_adquirir()` (loop) e do raio-x. Novo `processo_vivo()`: POSIX mantém o
+  sinal 0; Windows NUNCA manda sinal — `OpenProcess(0x1000)` (só consulta) +
+  `CloseHandle`; acesso negado = vive; na dúvida, vive. O raio-x julga a trava
+  pela IDADE (teto de 10 min, igual ao loop). Cena nova no portão (blindagens:
+  "pergunta sem sinal" + prova por leitura). ⚠️ Caminho Windows só validável
+  por leitura aqui — a prova final é o verificar-tudo.bat DELE (o
+  KeyboardInterrupt no fim do portão deve sumir).
+- **2) Gitignore honesto (mesmo commit):** comentário inline não vale (o git lia
+  a linha inteira e `memoria/.trava` dormia desprotegido) — padrão sozinho na
+  linha; e `memoria/*.py` para o fantasma `base.py` nunca subir (check-ignore
+  provado: .trava e base.py ignorados; .gitkeep continua rastreado).
+- **3) B17 (`b13ee6a`):** `executar()` consulta `SO_OLHAR` — "observacao nao
+  cria arquivo (a regra X espera o seu sim)". Cena do portão estendida (mundo
+  descorrido via tempfile: regressão não suja o repo nem o fluxo das cenas) +
+  ajuda honesta. Prova E2E em cópia limpa: `--so-olhar` decidia a regra e NÃO
+  criou `memoria/base.py` (antes criava; reproduzido 3x na história).
+- **5) Cápsula 6.5:** item 2 = VITRINE POR CONVERSA (cada conversa abre o PR
+  dela com TODO o tip e re-espelha a cada push; PR = janela, PONTE = esteira);
+  item 7 = MUSEU (#1–#7 não se apagam; #5 não reabre — GitHub 422 "no history
+  in common"; **#8 = vitrine oficial desta conversa**); armadilhas 16–17;
+  seção 9: B17 ✅, F3 por último.
+- Placar depois dos 3 commits: portão 17 cenas OK, exit 0 (2 corridas seguidas
+  pra provar que cena nenhuma suja estado); raio 20 ok | 9 dicas | 1 aviso |
+  0 problemas, exit 0.
+- Pendência dele: puxar → verificar → salvar (a primeira prova do conserto no
+  Windows de verdade). Nenhum push no backup (super-agente.git) — nunca houve.
+
+## (história) combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
 
 **Verdade fresca (22/09 noite):** seção 0 da cápsula = PROMPT FIXO definitivo
 (recuperação + ritual puxar→verificar→salvar + regras + tom sênior/comercial).
