@@ -1,0 +1,175 @@
+{
+  "auto_promocao": {
+    "ligada": true,
+    "so_acoes_de_criar": true,
+    "limite_de_regras": 6
+  },
+  "mundo": {
+    "ligado": true,
+    "relatorio_em": "relatorios/inventario-desktop.txt",
+    "permitido": [
+      "ler",
+      "contar",
+      "escrever_dentro_do_projeto"
+    ],
+    "proibido": [
+      "mover",
+      "apagar",
+      "editar_arquivo_do_mundo"
+    ],
+    "so_quando_mudar": true,
+    "olhos": [
+      {
+        "nome": "desktop",
+        "relatorio_em": "relatorios/inventario-desktop.txt"
+      },
+      {
+        "nome": "downloads",
+        "relatorio_em": "relatorios/inventario-downloads.txt"
+      }
+    ]
+  },
+  "execucao": {
+    "ligada": true,
+    "so_com_humano": true,
+    "timeout": 15,
+    "teto_saida": 4000,
+    "permitidas": [
+      "git status",
+      "git log --oneline -5",
+      "python --version",
+      "pip list"
+    ]
+  },
+  "abrir": {
+    "ligado": true,
+    "raizes": [
+      "projeto",
+      "desktop",
+      "downloads"
+    ],
+    "jamais_abrir": [
+      ".exe",
+      ".bat",
+      ".cmd",
+      ".ps1",
+      ".psm1",
+      ".vbs",
+      ".vbe",
+      ".js",
+      ".jse",
+      ".wsf",
+      ".wsh",
+      ".msi",
+      ".msp",
+      ".scr",
+      ".com",
+      ".pif",
+      ".lnk",
+      ".url",
+      ".reg",
+      ".hta",
+      ".cpl"
+    ]
+  },
+  "vigilia": {
+    "ligado": true,
+    "tolerancia_seg": 30,
+    "max_eventos": 25,
+    "olhos": [
+      {
+        "pasta": "downloads",
+        "ao_chegar": [
+          "inventario",
+          {
+            "anotar": "chegou arquivo novo"
+          },
+          {
+            "anotar_fila": "avisar:o porteiro viu novidade no Downloads — olhe o inventario"
+          }
+        ]
+      },
+      {
+        "pasta": "desktop",
+        "ao_chegar": [
+          "inventario"
+        ]
+      }
+    ]
+  },
+  "correntes": {
+    "ligado": true,
+    "gatilhos": [
+      {
+        "id": "pdf-no-downloads",
+        "se": {
+          "olho": "downloads",
+          "extensao": ".pdf"
+        },
+        "etapas": [
+          {
+            "usar": "copiar_para_projeto",
+            "para": "entrada"
+          },
+          {
+            "usar": "avisar",
+            "texto": "pdf novo capturado: %arquivo% (copia em entrada/)"
+          }
+        ]
+      }
+    ]
+  },
+  "fluxos": {
+    "ligado": true,
+    "gatilhos": [
+      {
+        "id": "txt-notas-na-rede",
+        "quando": {
+          "olho": "desktop",
+          "extensao": ".txt",
+          "nome_contem": "nota"
+        },
+        "passos": [
+          {
+            "usar": "avisar",
+            "texto": "nota encontrada na mesa: %arquivo%"
+          },
+          {
+            "usar": "copiar_para_projeto",
+            "para": "entrada/notas",
+            "se": {
+              "tamanho_min_kb": 1
+            }
+          }
+        ]
+      }
+    ],
+    "ajuda": "gatilhos declarativos: quando{olho,extensao,nome_contem,tamanho_min_kb,tamanho_max_kb}; passos{usar: copiar_para_projeto|abrir|avisar|executar, ..., se{mesmas condicoes}}; veja o plano sem tocar em nada: python agente\\loop.py --vigiar --ensaiar"
+  },
+  "acoes": [
+    {
+      "id": "criar_arquivo_base",
+      "pasta_com_conteudo": [
+        ".gitkeep"
+      ],
+      "criar_arquivo": "base.py",
+      "conteudo": "# EU MUDEI SO O TEXTO DO JSON E O AGENTE OBEDECEU\n"
+    },
+    {
+      "id": "avisar_sobre_config",
+      "pasta_com_conteudo": [
+        ".gitkeep",
+        "base.py"
+      ],
+      "criar_arquivo": "LEIA-ME.txt",
+      "conteudo": "# NAO APAGUE base.py em config: ele e gerado pelo agente. Veja memoria/historico.json\n"
+    }
+  ],
+  "aprendizado": {
+    "ligado": true,
+    "janela_dias": 60,
+    "meia_vida_dias": 14,
+    "limite_eventos": 1200,
+    "comentario": "Placar por regra: +1 acerto, +0.5 etapa ok, -1 etapa torta, +2 ideia sua aprovada. O agente so da conselho — nunca muda regra sozinho."
+  }
+}

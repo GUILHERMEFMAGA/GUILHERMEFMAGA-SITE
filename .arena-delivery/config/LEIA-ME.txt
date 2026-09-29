@@ -1,0 +1,1 @@
+# NAO APAGUE base.py em config: ele e gerado pelo agente. Veja memoria/historico.json
