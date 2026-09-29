@@ -3,106 +3,250 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GIF — visual.md</title>
+  <meta name="description" content="Site do Guilherme F. Maga com animação em destaque." />
+  <title>Guilherme F. Maga</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    html, body { height: 100%; }
+    :root {
+      --laranja: #e2762c;
+      --texto: #b9b1aa;
+      --fraco: #6b645e;
+    }
+
+    html { scroll-behavior: smooth; }
 
     body {
       background-color: #000000;
-      color: #9a9a9a;
+      color: var(--texto);
       font-family: Arial, Helvetica, sans-serif;
       text-align: center;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      padding: 40px 24px 8px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: normal;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ded8d3;
+    }
+
+    header p {
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--fraco);
+      letter-spacing: 0.5px;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+
+    /* ---------- Destaque: a animação ---------- */
+    .destaque {
+      position: relative;
+      margin-top: 36px;
+    }
+
+    .moldura {
+      position: relative;
+      width: 100%;
+      max-width: 800px;      /* largura nativa do GIF: sem borrar */
+      margin: 0 auto;
+      aspect-ratio: 800 / 450;
+      border-radius: 16px;
+      overflow: hidden;
+      background-color: #0a0a0a;
+      /* brilho quente puxado da cor do iPhone */
+      box-shadow:
+        0 0 60px rgba(226, 118, 44, 0.14),
+        0 0 140px rgba(226, 118, 44, 0.06);
+    }
+
+    .moldura img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .moldura img.carregou { opacity: 1; }
+
+    /* Enquanto os 8 MB não chegam, mostra um brilho suave no lugar do vazio */
+    .carregando {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 100vh;
-      padding: 24px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #4a453f;
+      background: radial-gradient(circle at 50% 45%, #1a1208 0%, #000 70%);
+      transition: opacity 0.4s ease;
     }
 
-    .caixa {
-      width: 100%;
-      max-width: 768px;
+    .carregando.some { opacity: 0; }
+
+    .destaque figcaption {
+      margin-top: 18px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--fraco);
     }
 
-    .caixa img {
+    /* ---------- Outras animações ---------- */
+    section {
+      margin-top: 72px;
+      padding-top: 40px;
+      border-top: 1px solid #171717;
+    }
+
+    section h2 {
+      font-size: 13px;
+      font-weight: normal;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7d766f;
+      margin-bottom: 24px;
+    }
+
+    .outra img {
       width: 100%;
+      max-width: 520px;
       height: auto;
-      max-width: 768px;
+      border-radius: 12px;
       display: block;
       margin: 0 auto;
-      border-radius: 12px;
-      background-color: #0b0b0b;
-      box-shadow: 0 0 40px rgba(255, 255, 255, 0.06);
+      box-shadow: 0 0 40px rgba(255, 255, 255, 0.05);
     }
 
-    h1 {
-      font-size: 15px;
-      font-weight: normal;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #5c5c5c;
-      margin-bottom: 16px;
+    section p {
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--fraco);
+      line-height: 1.7;
     }
+
+    footer {
+      padding: 32px 24px 48px;
+      font-size: 12px;
+      color: #4a453f;
+      border-top: 1px solid #141414;
+    }
+
+    footer a { color: #7d766f; text-decoration: none; }
+    footer a:hover { color: var(--laranja); }
 
     .aviso {
       display: none;
-      border: 1px solid #3a2a2a;
-      background-color: #160d0d;
-      color: #c98b8b;
-      border-radius: 8px;
-      padding: 20px;
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .legenda {
-      margin-top: 16px;
+      border: 1px solid #3a2a1a;
+      background-color: #160f08;
+      color: #c9915b;
+      border-radius: 10px;
+      padding: 18px;
       font-size: 13px;
       line-height: 1.6;
+      margin-top: 20px;
     }
 
-    .legenda code {
-      color: #c9c9c9;
-      word-break: break-all;
+    .aviso code { word-break: break-all; color: #e0bb95; }
+
+    @media (max-width: 520px) {
+      header { padding-top: 28px; }
+      section { margin-top: 52px; }
     }
   </style>
 </head>
 <body>
-  <div class="caixa">
-    <h1>GIF do visual.md</h1>
+  <header>
+    <h1>Guilherme F. Maga</h1>
+    <p>Animações e projetos</p>
+  </header>
 
-    <!-- O GIF mora na pasta images/ deste repositório (mesmo arquivo do anexo do GitHub) -->
-    <img
-      id="gif"
-      src="images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif"
-      width="768"
-      height="768"
-      alt="GIF animado do visual.md — cinematic studio 3D"
-    />
+  <main>
+    <!-- Destaque: a animação do iPhone (arquivo local, em loop infinito) -->
+    <figure class="destaque">
+      <div class="moldura" id="moldura">
+        <div class="carregando" id="carregando">Carregando animação…</div>
+        <img
+          id="animacao"
+          src="images/animacao-iphone.gif"
+          width="800"
+          height="450"
+          alt="Animação de um iPhone laranja girando em fundo preto"
+        />
+      </div>
+      <figcaption>
+        800 × 450 · 80 quadros · ciclo de 8 segundos em loop
+      </figcaption>
+    </figure>
 
     <div class="aviso" id="aviso">
-      <strong>Não consegui abrir o GIF.</strong><br />
+      <strong>Não consegui abrir a animação.</strong><br />
       Confira se o arquivo está em<br />
-      <code>images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif</code>
+      <code>images/animacao-iphone.gif</code>
     </div>
 
-    <p class="legenda">
-      Arquivo: <code>images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif</code><br />
-      768 × 768 · 101 quadros
-    </p>
-  </div>
+    <section>
+      <h2>Outra animação</h2>
+      <figure class="outra">
+        <img
+          src="images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif"
+          width="768"
+          height="768"
+          alt="Animação 3D em estúdio cinematográfico"
+          loading="lazy"
+        />
+        <p>768 × 768 · 101 quadros</p>
+      </figure>
+    </section>
+  </main>
+
+  <footer>
+    <a href="https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE">github.com/GUILHERMEFMAGA</a>
+  </footer>
 
   <script>
-    // Se o GIF não estiver na pasta, mostra o aviso em vez de uma imagem quebrada.
     (function () {
-      var gif = document.getElementById('gif');
+      var img = document.getElementById('animacao');
+      var carregando = document.getElementById('carregando');
+      var moldura = document.getElementById('moldura');
       var aviso = document.getElementById('aviso');
-      gif.addEventListener('error', function () {
-        gif.style.display = 'none';
+
+      function pronto() {
+        img.classList.add('carregou');
+        if (carregando) {
+          carregando.classList.add('some');
+          setTimeout(function () { carregando.style.display = 'none'; }, 450);
+        }
+      }
+
+      function falhou() {
+        if (carregando) carregando.style.display = 'none';
+        moldura.style.display = 'none';
         aviso.style.display = 'block';
-      });
+      }
+
+      // O GIF começa com fundo preto, igual ao da página: a troca é suave.
+      if (img.complete && img.naturalWidth > 0) {
+        pronto();
+      } else {
+        img.addEventListener('load', pronto);
+        img.addEventListener('error', falhou);
+      }
     })();
   </script>
 </body>
