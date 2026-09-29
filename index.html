@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GIF — visual.md</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      background-color: #000000;
+      color: #9a9a9a;
+      font-family: Arial, Helvetica, sans-serif;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    .caixa {
+      width: 100%;
+      max-width: 768px;
+    }
+
+    .caixa img {
+      width: 100%;
+      height: auto;
+      max-width: 768px;
+      display: block;
+      margin: 0 auto;
+      border-radius: 12px;
+      background-color: #0b0b0b;
+      box-shadow: 0 0 40px rgba(255, 255, 255, 0.06);
+    }
+
+    h1 {
+      font-size: 15px;
+      font-weight: normal;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #5c5c5c;
+      margin-bottom: 16px;
+    }
+
+    .aviso {
+      display: none;
+      border: 1px solid #3a2a2a;
+      background-color: #160d0d;
+      color: #c98b8b;
+      border-radius: 8px;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .legenda {
+      margin-top: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .legenda code {
+      color: #c9c9c9;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="caixa">
+    <h1>GIF do visual.md</h1>
+
+    <!-- O GIF mora na pasta images/ deste repositório (mesmo arquivo do anexo do GitHub) -->
+    <img
+      id="gif"
+      src="images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif"
+      width="768"
+      height="768"
+      alt="GIF animado do visual.md — cinematic studio 3D"
+    />
+
+    <div class="aviso" id="aviso">
+      <strong>Não consegui abrir o GIF.</strong><br />
+      Confira se o arquivo está em<br />
+      <code>images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif</code>
+    </div>
+
+    <p class="legenda">
+      Arquivo: <code>images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif</code><br />
+      768 × 768 · 101 quadros
+    </p>
+  </div>
+
+  <script>
+    // Se o GIF não estiver na pasta, mostra o aviso em vez de uma imagem quebrada.
+    (function () {
+      var gif = document.getElementById('gif');
+      var aviso = document.getElementById('aviso');
+      gif.addEventListener('error', function () {
+        gif.style.display = 'none';
+        aviso.style.display = 'block';
+      });
+    })();
+  </script>
+</body>
+</html>
