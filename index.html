@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Site do Guilherme F. Maga com animação em destaque." />
+  <meta name="description" content="Site do Guilherme F. Maga." />
   <title>Guilherme F. Maga</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,10 +11,10 @@
     :root {
       --texto: #b9b1aa;
       --fraco: #6b645e;
-      --brilho: 255, 255, 255;
+      --laranja: #e2762c;
     }
 
-    html { scroll-behavior: smooth; }
+    html, body { height: 100%; }
 
     body {
       background-color: #000000;
@@ -23,11 +23,126 @@
       text-align: center;
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
+      overflow: hidden;                 /* enquanto carrega, sem rolagem */
+      transition: overflow 0s;
     }
 
-    header {
-      padding: 40px 24px 8px;
+    body.pronto { overflow: auto; }
+
+    /* ================= TELA DE CARREGAMENTO ================= */
+    #tela-carregando {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #000000;
+      transition: opacity 0.7s ease, visibility 0.7s ease;
     }
+
+    #tela-carregando.saiu {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* a animação preenche a tela (cover), sem distorcer */
+    #tela-carregando img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    #tela-carregando img.carregou { opacity: 1; }
+
+    /* véu escuro por baixo do texto, para ele ficar legível sobre o GIF */
+    .veu {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse at 50% 50%,
+        rgba(0, 0, 0, 0.25) 0%,
+        rgba(0, 0, 0, 0.55) 60%,
+        rgba(0, 0, 0, 0.8) 100%
+      );
+    }
+
+    .texto-carregando {
+      position: relative;
+      z-index: 2;
+      padding: 24px;
+    }
+
+    .marca {
+      font-size: 15px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: #ded8d3;
+    }
+
+    .mensagem {
+      margin-top: 14px;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #8d857e;
+    }
+
+    /* barra fina de progresso */
+    .barra {
+      width: min(220px, 60vw);
+      height: 2px;
+      margin: 22px auto 0;
+      background-color: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .barra span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #8a4a1e, var(--laranja));
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    /* Se o GIF não carregar, a tela não trava o visitante nunca */
+    .pular {
+      position: relative;
+      z-index: 2;
+      margin-top: 26px;
+      display: none;
+      background: none;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #b9b1aa;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: border-color 0.3s ease, color 0.3s ease;
+    }
+
+    .pular:hover { border-color: var(--laranja); color: #e8e2dd; }
+    .pular.mostrar { display: inline-block; }
+
+    /* ================= CONTEÚDO DO SITE ================= */
+    #site {
+      opacity: 0;
+      transition: opacity 0.9s ease;
+    }
+
+    #site.visivel { opacity: 1; }
+
+    header { padding: 40px 24px 8px; }
 
     header h1 {
       font-size: 20px;
@@ -50,50 +165,26 @@
       padding: 0 24px 64px;
     }
 
-    /* ---------- A animação ---------- */
-    figure {
-      margin-top: 36px;
-    }
+    figure { margin-top: 36px; }
 
     .moldura {
       position: relative;
       width: 100%;
-      max-width: 768px;      /* largura nativa do GIF: sem borrar */
+      max-width: 768px;
       margin: 0 auto;
       border-radius: 16px;
       overflow: hidden;
       background-color: #0a0a0a;
       box-shadow:
-        0 0 60px rgba(var(--brilho), 0.10),
-        0 0 140px rgba(var(--brilho), 0.04);
+        0 0 60px rgba(255, 255, 255, 0.10),
+        0 0 140px rgba(255, 255, 255, 0.04);
     }
 
     .moldura img {
       width: 100%;
       height: auto;
       display: block;
-      opacity: 0;
-      transition: opacity 0.5s ease;
     }
-
-    .moldura img.carregou { opacity: 1; }
-
-    /* Enquanto o GIF não chega, mostra um brilho suave no lugar do vazio */
-    .carregando {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: #4a453f;
-      background: radial-gradient(circle at 50% 45%, #141414 0%, #000 70%);
-      transition: opacity 0.4s ease;
-    }
-
-    .carregando.some { opacity: 0; }
 
     figcaption {
       margin-top: 18px;
@@ -112,86 +203,199 @@
     footer a { color: #7d766f; text-decoration: none; }
     footer a:hover { color: #d8d2cc; }
 
-    .aviso {
-      display: none;
-      border: 1px solid #2a2a2a;
-      background-color: #0d0d0d;
-      color: #9a9a9a;
-      border-radius: 10px;
-      padding: 18px;
-      font-size: 13px;
-      line-height: 1.6;
-      margin-top: 20px;
-    }
-
-    .aviso code { word-break: break-all; color: #c9c9c9; }
-
     @media (max-width: 520px) {
       header { padding-top: 28px; }
+    }
+
+    /* Respeita quem prefere menos animação: sem fade, mas o GIF ainda toca uma vez */
+    @media (prefers-reduced-motion: reduce) {
+      #tela-carregando,
+      #tela-carregando img,
+      #site { transition-duration: 0.01s; }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Guilherme F. Maga</h1>
-    <p>Animações e projetos</p>
-  </header>
 
-  <main>
-    <!-- A animação, em loop, direto do arquivo local do repositório -->
-    <figure>
-      <div class="moldura" id="moldura">
-        <div class="carregando" id="carregando">Carregando animação…</div>
-        <img
-          id="animacao"
-          src="images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif"
-          width="768"
-          height="768"
-          alt="Animação 3D cinematográfica em estúdio"
-        />
-      </div>
-      <figcaption>
-        768 × 768 · 101 quadros
-      </figcaption>
-    </figure>
+  <!-- ============ TELA DE CARREGAMENTO ============ -->
+  <div id="tela-carregando" role="status" aria-live="polite">
+    <!-- A animação roda UMA VEZ (arquivo sem a extensão de loop) e fica no último quadro -->
+    <img
+      id="gif-carregando"
+      src="images/animacao-iphone-uma-vez.gif"
+      width="800"
+      height="450"
+      alt=""
+      aria-hidden="true"
+    />
+    <div class="veu"></div>
 
-    <div class="aviso" id="aviso">
-      <strong>Não consegui abrir a animação.</strong><br />
-      Confira se o arquivo está em<br />
-      <code>images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif</code>
+    <div class="texto-carregando">
+      <div class="marca">Guilherme F. Maga</div>
+      <div class="mensagem" id="mensagem">Carregando</div>
+      <div class="barra"><span id="progresso"></span></div>
+      <button class="pular" id="pular" type="button">Pular</button>
     </div>
-  </main>
+  </div>
 
-  <footer>
-    <a href="https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE">github.com/GUILHERMEFMAGA</a>
-  </footer>
+  <!-- ============ SITE ============ -->
+  <div id="site" aria-hidden="true">
+    <header>
+      <h1>Guilherme F. Maga</h1>
+      <p>Animações e projetos</p>
+    </header>
+
+    <main>
+      <figure>
+        <div class="moldura">
+          <img
+            src="images/21232817-6d27-44b0-a6b5-5fc85144cafb.gif"
+            width="768"
+            height="768"
+            alt="Animação 3D cinematográfica em estúdio"
+          />
+        </div>
+        <figcaption>768 × 768 · 101 quadros</figcaption>
+      </figure>
+    </main>
+
+    <footer>
+      <a href="https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE">github.com/GUILHERMEFMAGA</a>
+    </footer>
+  </div>
 
   <script>
     (function () {
-      var img = document.getElementById('animacao');
-      var carregando = document.getElementById('carregando');
-      var moldura = document.getElementById('moldura');
-      var aviso = document.getElementById('aviso');
+      var tela      = document.getElementById('tela-carregando');
+      var gif       = document.getElementById('gif-carregando');
+      var mensagem  = document.getElementById('mensagem');
+      var progresso = document.getElementById('progresso');
+      var pular     = document.getElementById('pular');
+      var site      = document.getElementById('site');
 
-      function pronto() {
-        img.classList.add('carregou');
-        if (carregando) {
-          carregando.classList.add('some');
-          setTimeout(function () { carregando.style.display = 'none'; }, 450);
+      var DURACAO_FALLBACK = 8000;   // ciclo real do GIF: 80 quadros = 8s
+      var FADE = 700;                // precisa bater com o transition do CSS
+      var LIMITE_ESPERA = 20000;     // trava de seguranca: nunca passa disso
+      var jaAbriu = false;
+
+      /* ---------- Abre o site ---------- */
+      function abrir() {
+        if (jaAbriu) return;
+        jaAbriu = true;
+
+        tela.classList.add('saiu');
+        site.classList.add('visivel');
+        site.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('pronto');
+
+        setTimeout(function () { tela.style.display = 'none'; }, FADE + 50);
+      }
+
+      /* ---------- Descobre a duração real do GIF (soma dos quadros) ---------- */
+      function duracaoDoGif(buffer) {
+        var b = new Uint8Array(buffer);
+        if (String.fromCharCode(b[0], b[1], b[2]) !== 'GIF') throw new Error('nao e GIF');
+
+        var pos = 13;
+        if (b[10] & 0x80) pos += 3 * (1 << ((b[10] & 7) + 1));  // tabela de cores global
+
+        var centesimos = 0;
+
+        function pularSubBlocos(p) {
+          while (b[p] !== 0) p += b[p] + 1;
+          return p + 1;
         }
+
+        while (pos < b.length) {
+          var tipo = b[pos];
+
+          if (tipo === 0x3B) break;                    // fim do arquivo
+
+          if (tipo === 0x21) {                         // extensão
+            var rotulo = b[pos + 1];
+            pos += 2;
+            if (rotulo === 0xF9) {                     // controle gráfico: tem o atraso
+              centesimos += b[pos + 2] | (b[pos + 3] << 8);
+            }
+            pos = pularSubBlocos(pos);
+          } else if (tipo === 0x2C) {                  // imagem
+            pos += 1;
+            var flags = b[pos + 8];
+            pos += 9;
+            if (flags & 0x80) pos += 3 * (1 << ((flags & 7) + 1));  // tabela local
+            pos += 1;
+            pos = pularSubBlocos(pos);
+          } else {
+            break;
+          }
+        }
+        return centesimos * 10;   // centésimos -> ms
       }
 
-      function falhou() {
-        if (carregando) carregando.style.display = 'none';
-        moldura.style.display = 'none';
-        aviso.style.display = 'block';
+      /* ---------- Progresso: acompanha o carregamento real do arquivo ---------- */
+      function animarBarra(ms) {
+        var inicio = Date.now();
+        var id = setInterval(function () {
+          var t = Math.min((Date.now() - inicio) / ms, 1);
+          progresso.style.width = (t * 100).toFixed(1) + '%';
+          if (t >= 1 || jaAbriu) clearInterval(id);
+        }, 60);
+        return function () { clearInterval(id); };
       }
 
-      if (img.complete && img.naturalWidth > 0) {
-        pronto();
+      function esperar(ms) {
+        return new Promise(function (r) { setTimeout(r, ms); });
+      }
+
+      /* ---------- Toca a animação uma vez e só então entrega o site ---------- */
+      function tocar() {
+        var pararBarra = animarBarra(DURACAO_FALLBACK);
+
+        // Sem depender do parsing: se em 3s o arquivo não der sinal, mostramos "Pular"
+        var sinal = setTimeout(function () { pular.classList.add('mostrar'); }, 3000);
+
+        fetch(gif.getAttribute('src'))
+          .then(function (r) { return r.arrayBuffer(); })
+          .then(function (buf) {
+            var ms = duracaoDoGif(buf);            // duração exata, lida do arquivo
+            pararBarra();
+            animarBarra(ms);
+            return esperar(ms);                    // o GIF toca exatamente uma vez
+          })
+          .catch(function () {
+            // Se não der para ler o arquivo, usa o ciclo conhecido (8s)
+            pararBarra();
+            animarBarra(DURACAO_FALLBACK);
+            return esperar(DURACAO_FALLBACK);
+          })
+          .then(function () {
+            clearTimeout(sinal);
+            abrir();
+          });
+      }
+
+      /* ---------- Rede de segurança: o GIF quebrou ou demorou demais ---------- */
+      function semGif() {
+        mensagem.textContent = 'Abrindo o site';
+        pular.classList.add('mostrar');
+        setTimeout(abrir, 1200);
+      }
+
+      gif.addEventListener('error', semGif);
+      setTimeout(function () { if (!jaAbriu) { pular.classList.add('mostrar'); } }, 5000);
+      setTimeout(function () { if (!jaAbriu) { abrir(); } }, LIMITE_ESPERA);
+
+      pular.addEventListener('click', abrir);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') abrir();
+      });
+
+      gif.addEventListener('load', function () { gif.classList.add('carregou'); });
+
+      if (document.readyState === 'complete') {
+        tocar();
       } else {
-        img.addEventListener('load', pronto);
-        img.addEventListener('error', falhou);
+        window.addEventListener('load', tocar);
       }
     })();
   </script>
