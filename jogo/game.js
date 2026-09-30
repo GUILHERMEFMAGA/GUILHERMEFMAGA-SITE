@@ -65,6 +65,8 @@
     G.snd.boom(); S.shake = 14;
     for (let k = 0; k < 26; k++) { const a = rand(0, TAU), v = rand(30, 190); G.particle({ x: c.x, y: c.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.5, 1.2), size: rand(9, 20), col: k % 3 === 0 ? 'smoke' : 'fire' }); }
     sparks(c.x, c.y, 18);
+    G.particle({ x: c.x, y: c.y, vx: 0, vy: 0, life: 0.45, size: 10, col: 'ring' });
+    for (let k = 0; k < 8; k++) G.particle({ x: c.x + rand(-14, 14), y: c.y + rand(-14, 14), vx: rand(-25, 25), vy: rand(-40, -10), life: rand(2, 3.2), size: rand(10, 18), col: 'smoke' });
     const P = S.player;
     if (c.driver === 'player' || P.car === c) {
       P.car = null; P.x = c.x + c.fx * 10; P.y = c.y + 50; P.hp -= 45; P.iframes = 1.5; P.vx = rand(-90, 90); P.vy = rand(60, 120);
@@ -92,7 +94,7 @@
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
     // saudação
-    if (S.save.done === 0) G.say('Bem-vindo a Ribeirão Vermelha! Pressione E perto do seu carro vermelho para entrar. Procure um telefone amarelo para pegar missões e a loja de armas (rosa) para se armar. A cidade é perigosa!', 11);
+    if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
     else G.say('Bem-vindo de volta! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 6);
   }
 
@@ -362,7 +364,7 @@
   function updateParticles(dt) {
     for (const p of S.particles) {
       p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.col === 'smoke') { p.size += 10 * dt; p.vx *= 0.98; } else if (p.col === 'fire') { p.size -= 4 * dt; p.vy -= 10 * dt; } else { p.vx *= 0.92; p.vy *= 0.92; }
+      if (p.col === 'smoke') { p.size += 10 * dt; p.vx *= 0.98; } else if (p.col === 'ring') p.size += 330 * dt; else if (p.col === 'fire') { p.size -= 4 * dt; p.vy -= 10 * dt; } else { p.vx *= 0.92; p.vy *= 0.92; }
     }
     S.particles = S.particles.filter(p => p.t < p.max && p.size > 0.5);
   }
@@ -438,7 +440,8 @@
       if (!inV(p)) return;
       const k = 1 - p.t / p.max;
       ctx.save(); ctx.translate(p.x, p.y);
-      if (p.col === 'smoke') { ctx.globalAlpha = 0.55 * k; ctx.fillStyle = '#3a3a3f'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
+      if (p.col === 'smoke') { ctx.globalAlpha = (p.a || 0.55) * k; ctx.fillStyle = p.tint || '#3a3a3f'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
+      else if (p.col === 'ring') { ctx.globalAlpha = k * 0.7; ctx.strokeStyle = '#ffe2b0'; ctx.lineWidth = 2 + 6 * k; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.stroke(); }
       else if (p.col === 'fire') { ctx.globalAlpha = Math.min(1, k * 1.6); ctx.fillStyle = k > 0.6 ? '#ffe15a' : k > 0.3 ? '#ff8a1e' : '#d8321a'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
       else if (p.col === 'blood') { ctx.globalAlpha = Math.min(1, k * 1.8); ctx.fillStyle = '#8c0b10'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
       else if (p.col === 'flash') { ctx.globalAlpha = 0.95; const g = ctx.createRadialGradient(0, 0, 1, 0, 0, p.size * 2.2); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.5, 'rgba(255,170,50,0.7)'); g.addColorStop(1, 'rgba(255,120,0,0)'); ctx.fillStyle = g; ctx.fillRect(-p.size * 2.2, -p.size * 2.2, p.size * 4.4, p.size * 4.4); }
@@ -471,14 +474,23 @@
       const glow = (x, y, r, a) => { const [px, py] = toS(x, y); if (px < -r || px > VW + r || py < -r || py > VH + r) return; const g = dctx.createRadialGradient(px, py, 2, px, py, r); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.beginPath(); dctx.arc(px, py, r, 0, TAU); dctx.fill(); };
       W.lamps.forEach(l => glow(l.x, l.y, 120 * z, 0.75));
       S.particles.forEach(p => { if (p.col === 'flash') glow(p.x, p.y, 100 * z, 0.9); });
+      const cone = (x, y, ang, len, spread, a) => {
+        const [px, py] = toS(x, y), L = len * z; if (px < -L || px > VW + L || py < -L || py > VH + L) return;
+        const g = dctx.createRadialGradient(px, py, 4, px, py, L); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)');
+        dctx.fillStyle = g; dctx.beginPath(); dctx.moveTo(px, py); dctx.arc(px, py, L, ang - spread, ang + spread); dctx.closePath(); dctx.fill();
+      };
+      S.particles.forEach(p => { if (p.col === 'ring') glow(p.x, p.y, 280 * z, 0.9); else if (p.col === 'fire' && p.size > 8) glow(p.x, p.y, p.size * 5 * z, 0.45); });
       S.cars.forEach(c => {
         if (c.dead || !inV(c)) return;
+        if (c.lights !== false) cone(c.x + c.fx * 36, c.y + c.fy * 36, Math.atan2(c.fy, c.fx), 270, 0.34, 0.95);
         glow(c.x + c.fx * 85, c.y + c.fy * 85, 130 * z, 0.9); glow(c.x + c.fx * 40, c.y + c.fy * 40, 70 * z, 0.8); glow(c.x, c.y, 50 * z, 0.5);
       });
       const ref = S.player.car || S.player; glow(ref.x, ref.y, 70 * z, 0.5);
       dctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(darkC, 0, 0);
     }
+    const vg = ctx.createRadialGradient(400, 300, 240, 400, 300, 580); vg.addColorStop(0, 'rgba(0,0,10,0)'); vg.addColorStop(1, 'rgba(0,0,12,0.34)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);   // vinheta (efeito de câmera)
     G.combat.drawScreen(ctx, S);            // tela vermelha ao levar dano
   }
 

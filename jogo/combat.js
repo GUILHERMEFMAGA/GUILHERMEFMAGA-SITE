@@ -205,6 +205,7 @@
   function blast(S, x, y, R, dmg, src) {
     const P = S.player;
     G.snd.boom(); S.shake = Math.max(S.shake, 12);
+    G.particle({ x, y, vx: 0, vy: 0, life: 0.45, size: 10, col: 'ring' });
     for (let k = 0; k < 24; k++) { const a = rand(0, TAU), v = rand(30, 190); G.particle({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.5, 1.1), size: rand(8, 18), col: k % 3 === 0 ? 'smoke' : 'fire' }); }
     for (let k = 0; k < 14; k++) { const a = rand(0, TAU), v = rand(80, 260); G.particle({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.2, 0.5), size: 2.5, col: 'spark' }); }
     scorch(S, x, y, R * 0.6);
@@ -391,6 +392,7 @@
       if (c._sk) {
         S.skids.push({ x1: c._sk[0], y1: c._sk[1], x2: lx, y2: ly, t: 0 }, { x1: c._sk[2], y1: c._sk[3], x2: qx, y2: qy, t: 0 });
       }
+      if (Math.random() < 0.6) for (const [sx, sy] of [[lx, ly], [qx, qy]]) G.particle({ x: sx, y: sy, vx: rand(-14, 14), vy: rand(-14, 14), life: 0.9, size: 3.5, col: 'smoke', tint: '#dcdce4', a: 0.34 });
       c._sk = [lx, ly, qx, qy];
     }
     for (const s of S.skids) s.t += dt;

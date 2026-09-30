@@ -38,9 +38,11 @@
     const glass = wreck ? '#111' : '#1f2a33';
 
     // rodas
-    ctx.fillStyle = '#0d0d0d';
-    [[-1, -L / 2 + 12], [1, -L / 2 + 12], [-1, L / 2 - 26], [1, L / 2 - 26]].forEach(([sx, y]) => {
-      ctx.fillRect(sx * (W / 2) - (sx < 0 ? 3 : 0) - 0, y, 3, 14);
+    [[-1, -L / 2 + 10], [1, -L / 2 + 10], [-1, L / 2 - 26], [1, L / 2 - 26]].forEach(([sx, y]) => {
+      const tx = sx < 0 ? -W / 2 - 2.4 : W / 2 - 2.1;           // pneus aparecem um pouco para fora da lataria
+      ctx.fillStyle = '#0b0b0d'; G.world.rrect(ctx, tx, y, 4.5, 16, 1.6); ctx.fill();
+      ctx.fillStyle = '#26262c'; ctx.fillRect(tx + (sx < 0 ? 0.6 : 2.6), y + 1.5, 1.2, 13); // reflexo na borracha
+      ctx.fillStyle = '#000'; for (let k = 0; k < 4; k++) ctx.fillRect(tx, y + 2 + k * 3.6, 4.5, 0.8);
     });
     // corpo com degradê lateral
     bodyPath(ctx, W, L);
@@ -58,6 +60,19 @@
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(-W / 2 + 6, -L / 2, 7, 20);
       ctx.restore();
     }
+    // brilho e volume da lataria (luz vinda de cima-esquerda)
+    ctx.save(); bodyPath(ctx, W, L); ctx.clip();
+    const lgx = ctx.createLinearGradient(0, -L / 2, 0, L / 2);
+    lgx.addColorStop(0, 'rgba(255,255,255,0.16)'); lgx.addColorStop(0.35, 'rgba(255,255,255,0.02)'); lgx.addColorStop(1, 'rgba(0,0,0,0.24)');
+    ctx.fillStyle = lgx; ctx.fillRect(-W / 2, -L / 2, W, L);
+    const hg = ctx.createRadialGradient(-W * 0.14, -L / 2 + 11, 1, -W * 0.14, -L / 2 + 11, 17);
+    hg.addColorStop(0, 'rgba(255,255,255,0.42)'); hg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hg; ctx.fillRect(-W / 2, -L / 2, W, 32);
+    const tg2 = ctx.createRadialGradient(-W * 0.12, L / 2 - 9, 1, -W * 0.12, L / 2 - 9, 13);
+    tg2.addColorStop(0, 'rgba(255,255,255,0.22)'); tg2.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = tg2; ctx.fillRect(-W / 2, L / 2 - 26, W, 26);
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 3; bodyPath(ctx, W, L); ctx.stroke();
+    ctx.restore();
     // detalhes do capô
     if (!wreck) {
       ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
@@ -66,7 +81,7 @@
     }
     // cabine (vidros)
     const cabT = kind === 'coupe' ? -L / 2 + 19 : -L / 2 + 21, cabB = kind === 'coupe' ? L / 2 - 23 : L / 2 - 19;
-    ctx.fillStyle = glass;
+    if (wreck) ctx.fillStyle = glass; else { const gg = ctx.createLinearGradient(0, cabT, 0, cabB); gg.addColorStop(0, '#46617a'); gg.addColorStop(0.45, '#17252f'); gg.addColorStop(1, '#0c1319'); ctx.fillStyle = gg; }
     ctx.beginPath();
     ctx.moveTo(-W * 0.34, cabT); ctx.lineTo(W * 0.34, cabT); ctx.lineTo(W * 0.42, cabT + 12);
     ctx.lineTo(W * 0.42, cabB - 10); ctx.lineTo(W * 0.32, cabB); ctx.lineTo(-W * 0.32, cabB);
@@ -89,8 +104,16 @@
     if (wreck) { ctx.fillStyle = '#000'; for (let k = 0; k < 7; k++) { ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.arc(-10 + (k * 7) % 22, -28 + k * 9, 4 + k % 3, 0, 7); ctx.fill(); } ctx.globalAlpha = 1; }
     // faróis, lanternas e retrovisores
     if (!wreck) {
+      ctx.fillStyle = '#15151a'; ctx.fillRect(-W / 2 + 12, -L / 2 + 0.5, W - 24, 3.5);            // grade
+      ctx.fillStyle = 'rgba(225,225,235,0.55)'; ctx.fillRect(-W / 2 + 4, -L / 2 + 4.6, W - 8, 1);   // para-choque cromado
+      ctx.fillStyle = '#2a2a2e'; ctx.fillRect(-W / 2 + 2, -L / 2, 10, 5); ctx.fillRect(W / 2 - 12, -L / 2, 10, 5);
       ctx.fillStyle = '#fff7b0'; ctx.fillRect(-W / 2 + 3, -L / 2 + 1, 8, 3); ctx.fillRect(W / 2 - 11, -L / 2 + 1, 8, 3);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(-W / 2 + 4, -L / 2 + 1.4, 3, 1.2); ctx.fillRect(W / 2 - 10, -L / 2 + 1.4, 3, 1.2);
+      ctx.fillStyle = '#3a0a0a'; ctx.fillRect(-W / 2 + 2, L / 2 - 5, 11, 4.5); ctx.fillRect(W / 2 - 13, L / 2 - 5, 11, 4.5);
       ctx.fillStyle = '#d81f1f'; ctx.fillRect(-W / 2 + 3, L / 2 - 4, 9, 3); ctx.fillRect(W / 2 - 12, L / 2 - 4, 9, 3);
+      ctx.fillStyle = '#ff7a6a'; ctx.fillRect(-W / 2 + 3.5, L / 2 - 3.6, 3, 1); ctx.fillRect(W / 2 - 11.5, L / 2 - 3.6, 3, 1);
+      ctx.fillStyle = '#e8e8e0'; ctx.fillRect(-5, L / 2 - 4.2, 10, 2.8); ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5; ctx.strokeRect(-5, L / 2 - 4.2, 10, 2.8);
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; const dy = (cabT + cabB) / 2; ctx.fillRect(-W / 2 + 1.6, dy - 3, 1.6, 4); ctx.fillRect(W / 2 - 3.2, dy - 3, 1.6, 4); // maçanetas
       ctx.fillStyle = shade(base, -0.35); ctx.fillRect(-W / 2 - 3, cabT + 4, 3, 5); ctx.fillRect(W / 2, cabT + 4, 3, 5);
     }
     // contorno
@@ -104,10 +127,18 @@
     return cache[k] || (cache[k] = makeCarSprite(kind, color));
   }
 
+  let shadowCv = null;   // sombra borrada, desenhada uma vez só
+  function shadowSprite() {
+    if (shadowCv) return shadowCv;
+    const c = document.createElement('canvas'); c.width = CAR_W + 50; c.height = CAR_L + 50;
+    const x = c.getContext('2d'); x.shadowColor = 'rgba(0,0,12,0.75)'; x.shadowBlur = 9; x.shadowOffsetX = 2000;
+    x.fillStyle = '#000'; G.world.rrect(x, c.width / 2 - CAR_W / 2 - 2000 + 1, c.height / 2 - CAR_L / 2 + 1, CAR_W - 2, CAR_L - 2, 10); x.fill();
+    return (shadowCv = c);
+  }
   function drawCarShadow(ctx, car) {
+    const sh = shadowSprite();
     ctx.save(); ctx.translate(car.x + 5, car.y + 7); ctx.rotate(car.a);
-    ctx.fillStyle = 'rgba(0,0,10,0.34)';
-    G.world.rrect(ctx, -CAR_W / 2, -CAR_L / 2, CAR_W, CAR_L, 10); ctx.fill();
+    ctx.drawImage(sh, -sh.width / 2, -sh.height / 2);
     ctx.restore();
   }
   function drawCar(ctx, car, time) {
@@ -222,10 +253,13 @@
     ctx.rotate(p.h);
     // pés (animação de caminhada)
     const ph = Math.sin(p.walk) * 4;
-    ctx.fillStyle = '#1b1b22';
-    ctx.beginPath(); ctx.arc(-3.2, -ph - 1, 2.3, 0, 7); ctx.arc(3.2, ph - 1, 2.3, 0, 7); ctx.fill();
+    const l1 = -ph * 0.8 + 0.5, l2 = ph * 0.8 + 0.5;
+    ctx.fillStyle = p.pants || '#2a2a35';
+    ctx.beginPath(); ctx.ellipse(-2.8, l1, 2.3, 4.8, 0, 0, 7); ctx.ellipse(2.8, l2, 2.3, 4.8, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#121216'; ctx.beginPath(); ctx.ellipse(-2.8, l1 - 4.4, 2.1, 1.7, 0, 0, 7); ctx.ellipse(2.8, l2 - 4.4, 2.1, 1.7, 0, 0, 7); ctx.fill();
     // ombros / camisa
-    ctx.fillStyle = p.shirt; ctx.beginPath(); ctx.ellipse(0, 1, 7.5, 4.6, 0, 0, 7); ctx.fill();
+    const tgr = ctx.createLinearGradient(-7.5, 0, 7.5, 0); tgr.addColorStop(0, shade(p.shirt, -0.28)); tgr.addColorStop(0.45, shade(p.shirt, 0.16)); tgr.addColorStop(1, shade(p.shirt, -0.34));
+    ctx.fillStyle = tgr; ctx.beginPath(); ctx.ellipse(0, 1, 7.5, 4.6, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
     if (p.player) { // camisa havaiana laranja e azul
       ctx.fillStyle = '#2aa0d8'; [[-4, 1], [1, 3], [4, 0], [-1, -1]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(a, b, 1.3, 0, 7); ctx.fill(); });
@@ -234,7 +268,7 @@
     // braços
     const wid = p.player ? p.weapon : (p.state === 'fight' ? p.weapon : null);
     const aiming = wid === 'pistol' || wid === 'smg' || wid === 'shotgun';
-    if (!aiming) { ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(-7.6, 1 + ph * 0.5, 2, 0, 7); ctx.arc(7.6, 1 - ph * 0.5, 2, 0, 7); ctx.fill(); }
+    if (!aiming) { ctx.fillStyle = shade(p.shirt, -0.12); ctx.beginPath(); ctx.ellipse(-7.3, 1 + ph * 0.5, 2.1, 3.6, 0, 0, 7); ctx.ellipse(7.3, 1 - ph * 0.5, 2.1, 3.6, 0, 0, 7); ctx.fill(); ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(-7.4, -1.8 + ph * 0.5, 1.7, 0, 7); ctx.arc(7.4, -1.8 - ph * 0.5, 1.7, 0, 7); ctx.fill(); }
     // cabeça
     pedHead(ctx, p);
     if (wid && wid !== 'fist') drawHeld(ctx, p, wid);
@@ -244,7 +278,7 @@
 
   function randomLook() {
     const r = a => a[Math.floor(Math.random() * a.length)];
-    return { shirt: r(SHIRTS), skin: r(SKINS), hair: r(HAIRS) };
+    return { shirt: r(SHIRTS), skin: r(SKINS), hair: r(HAIRS), pants: r(['#2a2f45', '#3a3a3f', '#4a3a2a', '#23232c', '#56688a', '#1c1c20']) };
   }
 
   G.sprites = { CAR_W, CAR_L, carSprite, drawCar, drawPed, randomLook, shade };

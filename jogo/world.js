@@ -180,22 +180,47 @@
 
   // ---------- Desenho ----------
   const tex = {};
-  function makeNoise(base, n, light, dark, size) {
-    const c = document.createElement('canvas'); c.width = c.height = size || 128;
-    const x = c.getContext('2d'); x.fillStyle = base; x.fillRect(0, 0, c.width, c.height);
+  function makeNoise(base, n, light, dark, size, blobs) {
+    const S = size || 128;
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const x = c.getContext('2d'); x.fillStyle = base; x.fillRect(0, 0, S, S);
     const r = mulberry32(base.length * 977 + n);
+    // manchas grandes e suaves (desgaste), repetidas nas bordas para o padrão emendar
+    (blobs || []).forEach(([col, cnt, r0, r1]) => {
+      for (let k = 0; k < cnt; k++) {
+        const bx = r() * S, by = r() * S, rad = r0 + r() * (r1 - r0);
+        x.fillStyle = col;
+        for (const ox of [-S, 0, S]) for (const oy of [-S, 0, S]) { x.beginPath(); x.arc(bx + ox, by + oy, rad, 0, 7); x.fill(); }
+      }
+    });
     for (let k = 0; k < n; k++) {
       x.fillStyle = r() < 0.5 ? light : dark;
-      x.fillRect(Math.floor(r() * c.width), Math.floor(r() * c.height), 1 + (r() < 0.2 ? 1 : 0), 1);
+      x.fillRect(Math.floor(r() * S), Math.floor(r() * S), 1 + (r() < 0.2 ? 1 : 0), 1);
     }
     return c;
   }
   function makeTextures() {
-    tex.asphalt = makeNoise('#6b6090', 2600, 'rgba(255,255,255,0.05)', 'rgba(0,0,0,0.07)');
+    tex.asphalt = makeNoise('#625889', 5200, 'rgba(255,255,255,0.07)', 'rgba(0,0,0,0.10)', 256,
+      [['rgba(0,0,0,0.035)', 46, 8, 28], ['rgba(255,255,255,0.03)', 34, 8, 24], ['rgba(40,20,70,0.04)', 14, 14, 40]]);
     tex.rim = makeNoise('#3b3442', 1200, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
-    tex.grass = makeNoise('#4d9a3a', 2200, 'rgba(190,255,150,0.16)', 'rgba(0,50,0,0.18)');
+    tex.grass = makeNoise('#4a9038', 2600, 'rgba(190,255,150,0.16)', 'rgba(0,50,0,0.2)', 128,
+      [['rgba(20,80,20,0.06)', 18, 6, 18], ['rgba(180,230,110,0.05)', 14, 6, 16]]);
+    { // fios de grama
+      const g = tex.grass.getContext('2d'), r = mulberry32(4242);
+      for (let k = 0; k < 420; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,255,140,0.35)' : 'rgba(10,60,10,0.35)'; g.lineWidth = 1; const gx = r() * 128, gy = r() * 128; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + (r() - 0.5) * 3, gy - 2 - r() * 3); g.stroke(); }
+    }
     tex.water = makeNoise('#21407e', 1500, 'rgba(140,190,255,0.14)', 'rgba(0,0,30,0.2)', 128);
     tex.alley = makeNoise('#59505f', 700, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
+    { // cascalho do telhado (transparente, vai por cima da cor do telhado)
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mulberry32(99);
+      for (let k = 0; k < 1100; k++) { g.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.16)'; g.fillRect(Math.floor(r() * 128), Math.floor(r() * 128), 1 + (r() < 0.3 ? 1 : 0), 1); }
+      tex.gravel = c;
+    }
+    { // lajotas da calçada: sujeira e rachaduras
+      const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mulberry32(7);
+      for (let k = 0; k < 500; k++) { g.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.14)' : 'rgba(90,70,30,0.12)'; g.fillRect(Math.floor(r() * 128), Math.floor(r() * 128), 1 + (r() < 0.3 ? 1 : 0), 1); }
+      tex.paving = c;
+    }
   }
 
   function rrect(ctx, x, y, w, h, r) {
@@ -211,6 +236,17 @@
     ctx.fillStyle = p.dark; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = p.edge; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
     ctx.fillStyle = p.base; ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+    // volume: borda clara em cima/esquerda, escura embaixo/direita (mureta do telhado)
+    ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(x + 2, y + 2, w - 4, 2); ctx.fillRect(x + 2, y + 2, 2, h - 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x + 2, y + h - 4, w - 4, 2); ctx.fillRect(x + w - 4, y + 2, 2, h - 4);
+    // textura de cascalho e luz suave vinda de cima-esquerda
+    ctx.save(); ctx.beginPath(); ctx.rect(x + 6, y + 6, w - 12, h - 12); ctx.clip();
+    ctx.fillStyle = ctx.createPattern(tex.gravel, 'repeat'); ctx.globalAlpha = p.kind === 'tile' ? 0.5 : 1; ctx.fillRect(x + 6, y + 6, w - 12, h - 12); ctx.globalAlpha = 1;
+    const lg = ctx.createLinearGradient(x, y, x + w, y + h); lg.addColorStop(0, 'rgba(255,255,255,0.13)'); lg.addColorStop(1, 'rgba(0,0,30,0.16)');
+    ctx.fillStyle = lg; ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
+    const rs = mulberry32(Math.floor(x * 7 + y * 13)); // manchas de infiltração
+    for (let k = 0; k < 3; k++) { const sx = x + 10 + rs() * (w - 30), sy = y + 10 + rs() * (h - 30); ctx.fillStyle = 'rgba(30,20,10,0.07)'; ctx.fillRect(sx, sy, 3 + rs() * 6, 14 + rs() * 30); }
+    ctx.restore();
     if (p.kind === 'tile') {
       // telhas: listras + cumeeira
       ctx.save(); ctx.beginPath(); ctx.rect(x + 6, y + 6, w - 12, h - 12); ctx.clip();
@@ -239,6 +275,39 @@
     });
   }
 
+  // rachaduras, remendos, manchas de óleo e bueiros (sorteados sempre do mesmo jeito)
+  function drawRoadDetail(ctx, x0, y0, x1, y1) {
+    const cs = 120;
+    for (let gy = Math.floor(y0 / cs) - 1; gy <= Math.floor(y1 / cs) + 1; gy++) for (let gx = Math.floor(x0 / cs) - 1; gx <= Math.floor(x1 / cs) + 1; gx++) {
+      const r = mulberry32(gx * 7349 + gy * 9151 + 13);
+      const px = (gx + r()) * cs, py = (gy + r()) * cs, kind = r(), a1 = r(), a2 = r(), a3 = r();
+      if (tileAt(px, py) !== TILE.ROAD) continue;
+      ctx.save(); ctx.translate(px, py);
+      if (kind < 0.42) { // rachadura
+        ctx.rotate(a1 * 6.28); ctx.beginPath(); ctx.moveTo(0, 0); let cx = 0, cy = 0;
+        const n = 5 + Math.floor(a2 * 5);
+        for (let k = 0; k < n; k++) { cx += 6 + r() * 14; cy += (r() - 0.5) * 14; ctx.lineTo(cx, cy); }
+        ctx.strokeStyle = 'rgba(14,8,28,0.42)'; ctx.lineWidth = 1.3; ctx.stroke();
+        ctx.translate(0.8, 0.8); ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.stroke();
+      } else if (kind < 0.56) { // remendo de asfalto
+        ctx.rotate((a1 - 0.5) * 0.2); const w = 30 + a2 * 40, h = 18 + a3 * 28;
+        ctx.fillStyle = 'rgba(10,6,24,0.17)'; ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1);
+      } else if (kind < 0.70) { // óleo
+        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 16 + a1 * 10);
+        g.addColorStop(0, 'rgba(8,4,18,0.38)'); g.addColorStop(1, 'rgba(8,4,18,0)');
+        ctx.scale(1, 0.7 + a2 * 0.5); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 16 + a1 * 10, 0, 7); ctx.fill();
+      } else if (kind < 0.75) { // bueiro
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(1.5, 2, 10, 0, 7); ctx.fill();
+        ctx.fillStyle = '#4a4458'; ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#2a2633'; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath(); for (let k = -6; k <= 6; k += 3) { ctx.moveTo(k, -7); ctx.lineTo(k, 7); ctx.moveTo(-7, k); ctx.lineTo(7, k); } ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(-3, -3, 4, 0, 7); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawBlockGround(ctx, blk) {
     const { x, y, w, h, kind } = blk;
     if (kind === 'river') {
@@ -261,10 +330,22 @@
     for (let gx = x; gx <= x + w; gx += T) { ctx.moveTo(gx + 0.5, y); ctx.lineTo(gx + 0.5, y + h); }
     for (let gy = y; gy <= y + h; gy += T) { ctx.moveTo(x, gy + 0.5); ctx.lineTo(x + w, gy + 0.5); }
     ctx.stroke();
+    ctx.fillStyle = ctx.createPattern(tex.paving, 'repeat'); ctx.fillRect(x, y, w, h);
+    // sujeira perto do meio-fio e sombra suave dos prédios
+    rrect(ctx, x + 10, y + 10, w - 20, h - 20, 36); ctx.strokeStyle = 'rgba(90,70,30,0.10)'; ctx.lineWidth = 14; ctx.stroke();
     // variação de cor nas lajotas
     const r = mulberry32(blk.bx * 31 + blk.by * 17 + 5);
     for (let k = 0; k < 40; k++) { ctx.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.12)' : 'rgba(120,90,40,0.10)'; ctx.fillRect(x + Math.floor(r() * 12) * T + 1, y + Math.floor(r() * 12) * T + 1, T - 2, T - 2); }
+    // manchas, rachaduras e chicletes
+    for (let k = 0; k < 26; k++) {
+      const sx = x + 12 + r() * (w - 24), sy = y + 12 + r() * (h - 24), t = r();
+      if (t < 0.45) { ctx.fillStyle = 'rgba(70,55,25,0.09)'; ctx.beginPath(); ctx.arc(sx, sy, 3 + r() * 8, 0, 7); ctx.fill(); }
+      else if (t < 0.85) { ctx.strokeStyle = 'rgba(90,70,30,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + (r() - 0.5) * 18, sy + (r() - 0.5) * 18); ctx.lineTo(sx + (r() - 0.5) * 26, sy + (r() - 0.5) * 26); ctx.stroke(); }
+      else { ctx.fillStyle = 'rgba(70,60,60,0.35)'; ctx.beginPath(); ctx.arc(sx, sy, 1.6, 0, 7); ctx.fill(); }
+    }
     ctx.restore();
+    // sarjeta escura na rua, rente ao meio-fio
+    rrect(ctx, x - 6, y - 6, w + 12, h + 12, 48); ctx.strokeStyle = 'rgba(10,5,25,0.22)'; ctx.lineWidth = 5; ctx.stroke();
     // meio-fio branco
     rrect(ctx, x + 2, y + 2, w - 4, h - 4, 42); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.stroke();
     rrect(ctx, x + 6, y + 6, w - 12, h - 12, 38); ctx.strokeStyle = 'rgba(120,100,50,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
@@ -294,13 +375,21 @@
   }
 
   function drawTree(ctx, t) {
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(t.x + 9, t.y + 11, t.r, t.r * 0.92, 0, 0, 7); ctx.fill();
-    const g = ctx.createRadialGradient(t.x - t.r * 0.3, t.y - t.r * 0.3, 2, t.x, t.y, t.r);
-    g.addColorStop(0, '#6fc24b'); g.addColorStop(0.6, '#2f8a2a'); g.addColorStop(1, '#1b5a1d');
+    // sombra suave
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,10,0.5)'; ctx.shadowBlur = 12; ctx.shadowOffsetX = 11; ctx.shadowOffsetY = 13;
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r * 0.9, 0, 7); ctx.fill(); ctx.restore();
+    // copa feita de várias folhagens sobrepostas
+    const r = mulberry32(Math.floor(t.x * 13 + t.y * 7));
+    const greens = ['#1d5c20', '#246b24', '#2f8a2a', '#3a9a31'];
+    for (let k = 0; k < 9; k++) {
+      const a = r() * 6.28, d = r() * t.r * 0.55, rad = t.r * (0.42 + r() * 0.22);
+      ctx.fillStyle = greens[Math.floor(r() * 2)]; ctx.beginPath(); ctx.arc(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, rad, 0, 7); ctx.fill();
+    }
+    const g = ctx.createRadialGradient(t.x - t.r * 0.35, t.y - t.r * 0.35, 2, t.x, t.y, t.r);
+    g.addColorStop(0, 'rgba(150,230,100,0.55)'); g.addColorStop(0.55, 'rgba(60,150,50,0.10)'); g.addColorStop(1, 'rgba(0,30,5,0.45)');
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#123f14'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = 'rgba(200,255,150,0.25)';
-    for (let k = 0; k < 5; k++) { const a = k * 1.3 + t.x; ctx.beginPath(); ctx.arc(t.x + Math.cos(a) * t.r * 0.45, t.y + Math.sin(a) * t.r * 0.45, t.r * 0.2, 0, 7); ctx.fill(); }
+    for (let k = 0; k < 14; k++) { const a = r() * 6.28, d = r() * t.r * 0.8; ctx.fillStyle = r() < 0.6 ? 'rgba(190,255,140,0.22)' : 'rgba(0,40,0,0.22)'; ctx.beginPath(); ctx.arc(t.x + Math.cos(a) * d, t.y + Math.sin(a) * d, 2 + r() * 4, 0, 7); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(10,50,14,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(t.x, t.y, t.r, 0, 7); ctx.stroke();
   }
 
   function drawStatic(ctx, x0, y0, x1, y1) {
@@ -334,6 +423,7 @@
       ctx.beginPath(); ctx.moveTo(Math.max(rx0, x0), yy); ctx.lineTo(Math.min(rx0 + rw, x1), yy); ctx.stroke();
     }
     ctx.restore();
+    drawRoadDetail(ctx, x0, y0, x1, y1);
     // faixas amarelas tracejadas (param antes do cruzamento)
     ctx.fillStyle = '#f2c231';
     for (let i = 0; i <= COLS; i++) {
@@ -373,10 +463,12 @@
     }
     // 7) sombras dos prédios e telhados
     const vis = buildings.filter(b => hit(b.x, b.y, b.w + 14, b.h + 14));
-    vis.forEach(b => {
-      ctx.fillStyle = 'rgba(0,0,0,0.30)';
-      ctx.beginPath(); ctx.moveTo(b.x + 4, b.y + b.h); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x + b.w, b.y + 4);
-      ctx.lineTo(b.x + b.w + 14, b.y + 18); ctx.lineTo(b.x + b.w + 14, b.y + b.h + 14); ctx.lineTo(b.x + 18, b.y + b.h + 14); ctx.closePath(); ctx.fill();
+    vis.forEach(b => { // sombra suave (borrada) projetada para baixo e para a direita
+      ctx.save();
+      ctx.beginPath(); ctx.rect(b.x - 60, b.y - 60, b.w + 160, b.h + 160); ctx.clip();
+      ctx.shadowColor = 'rgba(0,0,12,0.55)'; ctx.shadowBlur = 16; ctx.shadowOffsetX = 16; ctx.shadowOffsetY = 18;
+      ctx.fillStyle = '#000'; ctx.fillRect(b.x + 4, b.y + 4, b.w - 4, b.h - 4);
+      ctx.restore();
     });
     vis.forEach(b => drawRoof(ctx, b));
     // 8) árvores e postes
