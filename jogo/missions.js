@@ -1,6 +1,6 @@
 /* ============================================================
    missions.js — telefones públicos, missões e lugares da cidade
-   (entrega, táxi, roubo de carro, corrida e fuga)
+   (entrega, táxi, roubo de carro, corrida, fuga e acerto de contas)
    ============================================================ */
 (function (G) {
   'use strict';
@@ -15,28 +15,31 @@
     oficina: Object.assign(W.sidePoint(2, 2, 'top', 0.5), { r: 52, name: 'OFICINA' }),
     hospital: Object.assign(W.sidePoint(4, 1, 'bottom', 0.5), { r: 40, name: 'HOSPITAL' }),
     delegacia: Object.assign(W.sidePoint(1, 3, 'right', 0.5), { r: 40, name: 'DELEGACIA' }),
+    armas: Object.assign(W.sidePoint(1, 0, 'bottom', 0.5), { r: 46, name: 'LOJA DE ARMAS' }),
   };
   const PHONES = [
     W.sidePoint(0, 2, 'right', 0.3), W.sidePoint(2, 0, 'bottom', 0.7),
     W.sidePoint(4, 3, 'top', 0.3), W.sidePoint(5, 1, 'left', 0.6),
   ].map(p => Object.assign(p, { r: 40 }));
 
-  // ---------- Definições das 10 missões ----------
+  // ---------- Definições das 12 missões ----------
   const DEFS = [
     { type: 'delivery', name: 'Pacote do Seu Zé', pay: 250, slack: 1.9, brief: 'Seu Zé: Pegue o pacote no ponto marcado e leve até o destino antes que esfrie. Sem pressa... quase!' },
     { type: 'taxi', name: 'Dona Marta', pay: 300, brief: 'Dona Marta precisa ir ao mercado. Busque a passageira e dirija com jeitinho. Batida desconta da gorjeta!' },
     { type: 'steal', name: 'O Fusca Verde', pay: 350, car: { kind: 'sedan', color: '#2f8a3c', label: 'sedã verde' }, brief: 'Um cliente quer um sedã verde. Encontre o carro marcado e leve até o desmanche. Cuidado com a polícia!' },
     { type: 'race', name: 'Racha da Avenida', pay: 500, cps: 5, rivals: 2, brief: 'Racha valendo grana! Vá até a linha de largada, passe pelos cruzamentos marcados e chegue antes dos rivais.' },
+    { type: 'hit', name: 'Cobrança', pay: 450, weapons: ['pistol', 'bat', 'pistol'], give: { pistol: 48 }, brief: 'Uns caras devem dinheiro ao chefe e não querem pagar. Peguei uma pistola para você. Vá até a área marcada e elimine os três. Eles vão atirar de volta!' },
     { type: 'escape', name: 'Deu Ruim', pay: 400, level: 3, brief: 'Fizeram alguma coisa e a polícia quer você! Despiste as viaturas e volte para a garagem!' },
     { type: 'delivery', name: 'Entrega Relâmpago', pay: 450, slack: 1.25, brief: 'Entrega urgente do Seu Zé. Dessa vez o tempo é curto. Pé embaixo!' },
     { type: 'taxi', name: 'Passageiro VIP', pay: 500, vip: true, brief: 'Um figurão quer chegar inteiro. Dirija suave: qualquer batida estraga a corrida.' },
     { type: 'steal', name: 'Táxi Amarelo', pay: 550, car: { kind: 'taxi', color: '#f2c42a', label: 'táxi amarelo' }, wanted: 1, brief: 'Preciso de um táxi amarelo com urgência. Pegue o marcado e entregue no desmanche.' },
+    { type: 'hit', name: 'Guerra de Gangues', pay: 850, weapons: ['smg', 'pistol', 'pistol', 'bat', 'smg'], give: { smg: 120 }, brief: 'A gangue rival tomou o bairro. Deixei uma submetralhadora para você. São cinco armados: use a cobertura, colete e não fique parado!' },
     { type: 'race', name: 'Grande Prêmio', pay: 700, cps: 7, rivals: 3, brief: 'Grande Prêmio da cidade! Sete pontos, três rivais. Só o primeiro leva a bolada.' },
     { type: 'escape', name: 'Fuga Final', pay: 650, level: 4, brief: 'A cidade inteira está atrás de você. Sobreviva à perseguição e chegue à garagem!' },
   ];
   const RANKS = ['Motorista Novato', 'Entregador', 'Piloto de Fuga', 'Mestre do Asfalto', 'Lenda da Rua', 'Rei da Cidade'];
-  const GOAL = 3000;
-  const rankIdx = done => Math.min(5, Math.floor(done / 2) + (done >= 10 ? 0 : 0));
+  const GOAL = 4000;
+  const rankIdx = done => Math.min(5, Math.floor(done / 2));
 
   function randSpot(S, minD, maxD, from) {
     const f = from || S.player;
@@ -46,7 +49,7 @@
     return { x: p.x, y: p.y };
   }
 
-  const M = { POI, PHONES, DEFS, RANKS, GOAL, active: null };
+  const M = { POI, PHONES, DEFS, RANKS, GOAL, TOTAL: DEFS.length, active: null };
 
   M.rank = done => RANKS[rankIdx(done)];
   M.mult = done => 1 + 0.1 * rankIdx(done);
@@ -86,6 +89,21 @@
       m.cp = 0; m.cd = 0; m.rivals = []; m.racing = false; m.placed = 0;
       m.markers = [{ x: W.nodeX(i0), y: W.nodeY(j0), r: 80, label: 'LARGADA' }];
       m.hint = 'Vá até a linha de largada';
+    } else if (def.type === 'hit') {
+      const spot = randSpot(S, 900, 1900, from);
+      S.thugAlert = false; m.thugs = [];
+      def.weapons.forEach((w, k) => {
+        let x = spot.x, y = spot.y;
+        for (let t = 0; t < 30; t++) { const a = rand(0, TAU), d = rand(25, 95), qx = spot.x + Math.cos(a) * d, qy = spot.y + Math.sin(a) * d; if (!W.isSolid(qx, qy) && !W.treeHit(qx, qy, 4) && W.tileAt(qx, qy) !== W.TILE.ROAD) { x = qx; y = qy; break; } }
+        const p = G.ai.makePed(x, y);
+        Object.assign(p, { kind: 'thug', target: true, state: 'guard', weapon: w, armed: true, hp: w === 'bat' ? 70 : 60, shirt: k % 2 ? '#2b2b33' : '#7a1c1c', hair: '#111', cap: null, h: rand(0, TAU) });
+        S.peds.push(p); m.thugs.push(p);
+      });
+      m.spot = spot;
+      m.markers = [{ x: spot.x, y: spot.y, r: 150, label: 'ALVOS' }];
+      m.hint = 'Elimine os ' + m.thugs.length + ' alvos';
+      Object.keys(def.give || {}).forEach(id => { if (!G.combat.arms(S).own[id] || G.combat.ammoOf(S, id) < 20) G.combat.giveWeapon(S, id, def.give[id], true); });
+      G.combat.select(S, def.weapons.includes('smg') ? 'smg' : 'pistol');
     } else if (def.type === 'escape') {
       S.heat = def.level * 20 - 4; m.hint = 'Despiste a polícia! Volte à garagem';
       m.markers = [{ x: POI.garage.x, y: POI.garage.y, r: 70, label: 'GARAGEM' }];
@@ -108,6 +126,7 @@
   M.cleanup = function (S, m) {
     if (m.rivals) m.rivals.forEach(r => { r.car.mode = 'wander'; r.car.nav.mode = 'wander'; r.car.ignoreLights = false; r.car.cruise = rand(170, 230); r.car.hold = 0; });
     if (m.car && m.car.mode !== 'player') m.car.tag = '';
+    if (m.thugs) m.thugs.forEach(p => { if (p.state !== 'dead') { p.dead = true; } else p.target = false; });
   };
   M.complete = function (S, pay, extra) {
     const m = M.active; if (!m) return;
@@ -117,11 +136,11 @@
     M.cleanup(S, m);
     M.active = null;
     G.snd.win(); setTimeout(() => G.snd.cash(), 500);
-    const king = S.save.done >= 10 && S.save.money >= GOAL;
+    const king = S.save.done >= M.TOTAL && S.save.money >= GOAL;
     G.banner(king ? 'REI DA CIDADE!' : 'MISSÃO CUMPRIDA', '+$' + total + (extra ? '  ' + extra : ''));
     let msg = m.def.name + ' concluída! +$' + total + '.';
     if (king && !S.save.king) { S.save.king = true; G.save(); msg = 'VOCÊ É O REI DA CIDADE! Campanha completa. Continue no modo livre!'; }
-    else if (S.save.done >= 10 && S.save.money < GOAL) msg += ' Faltam $' + (GOAL - S.save.money) + ' para ser o Rei da Cidade.';
+    else if (S.save.done >= M.TOTAL && S.save.money < GOAL) msg += ' Faltam $' + (GOAL - S.save.money) + ' para ser o Rei da Cidade.';
     else msg += ' Ligue em outro telefone para a próxima.';
     G.say(msg, 8);
   };
@@ -169,6 +188,11 @@
       } else {
         if (Math.hypot(m.car.x - m.B.x, m.car.y - m.B.y) < 70 && Math.hypot(ref.x - m.B.x, ref.y - m.B.y) < 160) M.complete(S, m.def.pay);
       }
+    } else if (m.type === 'hit') {
+      const left = m.thugs.filter(p => p.state !== 'dead' && !p.dead).length;
+      m.hint = left ? 'Elimine os alvos (faltam ' + left + ')' : 'Alvos eliminados!';
+      if (left !== m.left) { if (m.left != null && left < m.left) G.snd.pick(); m.left = left; }
+      if (left === 0) { m.thugs.forEach(p => { p.target = false; }); M.complete(S, m.def.pay, '(alvos eliminados)'); }
     } else if (m.type === 'race') {
       updateRace(S, m, dt);
     } else if (m.type === 'escape') {
@@ -257,13 +281,14 @@
     // lugares
     Object.keys(POI).forEach(k => {
       const p = POI[k];
-      const col = k === 'oficina' ? '#ff9a3d' : k === 'garage' ? '#6fd0ff' : k === 'hospital' ? '#ff6b6b' : '#7a9bff';
+      const col = k === 'oficina' ? '#ff9a3d' : k === 'garage' ? '#6fd0ff' : k === 'hospital' ? '#ff6b6b' : k === 'armas' ? '#ff4fd8' : '#7a9bff';
       ring(p.x, p.y, p.r, col, '', 'rgba(255,255,255,0.10)');
       ctx.save(); ctx.translate(p.x, p.y);
       ctx.fillStyle = col; ctx.strokeStyle = '#111'; ctx.lineWidth = 3;
       if (k === 'hospital') { ctx.fillStyle = '#fff'; ctx.fillRect(-16, -16, 32, 32); ctx.fillStyle = '#e03030'; ctx.fillRect(-4, -12, 8, 24); ctx.fillRect(-12, -4, 24, 8); ctx.strokeRect(-16, -16, 32, 32); }
       else if (k === 'garage') { ctx.beginPath(); ctx.moveTo(-18, 6); ctx.lineTo(0, -16); ctx.lineTo(18, 6); ctx.lineTo(18, 16); ctx.lineTo(-18, 16); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#223'; ctx.fillRect(-8, 2, 16, 14); }
       else if (k === 'oficina') { ctx.rotate(0.8); ctx.fillRect(-3, -16, 6, 32); ctx.beginPath(); ctx.arc(0, -16, 8, 0, TAU); ctx.fill(); ctx.fillStyle = '#6a3a10'; ctx.beginPath(); ctx.arc(0, -16, 3, 0, TAU); ctx.fill(); }
+      else if (k === 'armas') { ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#111'; ctx.fillRect(-10, -4, 17, 6); ctx.fillRect(-9, 1, 6, 9); ctx.fillStyle = '#ddd'; ctx.fillRect(5, -4, 6, 3); }
       else { ctx.beginPath(); ctx.arc(0, 0, 15, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('★', 0, 7); }
       ctx.restore();
     });

@@ -92,7 +92,7 @@
       if (al > 10 && al < look + len && Math.abs(lat) < latMax) best = Math.min(best, al - len);
     };
     for (const o of S.cars) { if (o === car) continue; if (o.dead && car.stuckT > 5) continue; test(o, G.sprites.CAR_L * 0.55, 34); }
-    for (const p of S.peds) if (p.state !== 'down') test(p, 14, 26);
+    for (const p of S.peds) if (p.state !== 'down' && p.state !== 'dead') test(p, 14, 26);
     if (!S.player.car) test(S.player, 14, 26);
     return best;
   }
@@ -273,11 +273,13 @@
     const pt = randomRoadPoint(tg.x + (tg.vx || 0) * 2, tg.y + (tg.vy || 0) * 2, 700, 1000);
     if (!pt) return;
     const mid = pt.axis === 'v' ? W.roadLeft(pt.idx) + 3 * T : W.roadTop(pt.idx) + 3 * T;
+    const made = [];
     [-1, 1].forEach(s => {
       const cx = pt.axis === 'v' ? mid + s * 48 : pt.along, cy = pt.axis === 'v' ? pt.along : mid + s * 48;
       const c = new G.Car({ x: cx, y: cy, a: pt.a + Math.PI / 2 + s * 0.12, kind: 'police', color: '#ffffff', driver: 'none', mode: 'block', mass: 3 });
-      c.siren = true; c.born = S.time; S.cars.push(c);
+      c.siren = true; c.born = S.time; S.cars.push(c); made.push(c);
     });
+    if (G.combat) G.combat.roadblockCops(S, made);
   }
 
   // ---------- Pedestres ----------
@@ -285,12 +287,13 @@
   function makePed(x, y) {
     const look = G.sprites.randomLook();
     const d = Math.floor(Math.random() * 4);
-    return Object.assign({ x, y, h: DIRS[d] + Math.PI / 2, d, speed: rand(38, 62), state: 'walk', walk: Math.random() * 6, timer: rand(2, 6), downT: 0, vx: 0, vy: 0, fleeT: 0 }, look);
+    const armed = Math.random() < 0.06; // alguns civis andam armados e reagem se forem atacados
+    return Object.assign({ x, y, h: DIRS[d] + Math.PI / 2, d, speed: rand(38, 62), state: 'walk', walk: Math.random() * 6, timer: rand(2, 6), downT: 0, vx: 0, vy: 0, fleeT: 0, kind: 'civ', hp: Math.round(rand(34, 46)), armed, weapon: armed ? 'pistol' : null }, look);
   }
   const pedOk = (x, y) => { const t = W.tileAt(x, y); return W.pedWalkable(t) && !W.treeHit(x, y, 4); };
   function updatePed(p, dt, S) {
-    if (p.state === 'down') { p.downT += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.9; p.vy *= 0.9; if (p.downT > 1.9) p.dead = true; return; }
-    if (p.punchT > 0) p.punchT -= dt;
+    // combate: mortos, caídos, atiradores e guardas são tratados em combat.js
+    if (G.combat && G.combat.updatePed(p, dt, S)) return;
     // susto com carros rápidos
     if (p.state === 'walk') for (const c of S.cars) {
       if (Math.abs(c.x - p.x) > 80 || Math.abs(c.y - p.y) > 80) continue;
@@ -356,6 +359,6 @@
 
   G.ai = {
     lightState, drawLights, initNav, driveTraffic, driveChase, randomRoadPoint, spawnTraffic, spawnPolice, spawnRoadblock,
-    makePed, updatePed, spawnPed, updateHeli, angFor, wrap, clamp, rand, pick, pedOk, CAR_COLORS,
+    makePed, updatePed, spawnPed, updateHeli, lineClear, angFor, wrap, clamp, rand, pick, pedOk, CAR_COLORS,
   };
 })(window.G = window.G || {});

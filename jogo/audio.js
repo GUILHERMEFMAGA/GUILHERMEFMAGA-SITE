@@ -65,6 +65,26 @@
     boom() { noiseBurst(1.3, 500, 1.0); tone(80, 1, 0.8, 'sine', null, null, 25); },
     punch() { noiseBurst(0.08, 1800, 0.5); tone(160, 0.1, 0.4, 'square', null, null, 60); },
     bonk() { tone(300, 0.12, 0.3, 'triangle', null, null, 120); noiseBurst(0.08, 600, 0.3); },
+    // ----- violência (versão 2) -----
+    gun(kind, v) {
+      v = v == null ? 1 : v; if (!ac || muted || v < 0.05) return;
+      if (kind === 'shotgun') { noiseBurst(0.38, 1400, 1.0 * v); tone(120, 0.3, 0.7 * v, 'sine', null, null, 35); }
+      else if (kind === 'smg') { noiseBurst(0.09, 2600, 0.55 * v); tone(260, 0.07, 0.3 * v, 'square', null, null, 90); }
+      else { noiseBurst(0.14, 3200, 0.75 * v); tone(220, 0.12, 0.45 * v, 'square', null, null, 60); noiseBurst(0.3, 700, 0.15 * v); }
+    },
+    scream(v) { // grito curto (oscilador com vibrato rápido)
+      v = v == null ? 1 : v; if (!ac || muted || v < 0.08) return;
+      const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain(), l = ac.createOscillator(), lg = ac.createGain();
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(700 + Math.random() * 300, t); o.frequency.exponentialRampToValueAtTime(380, t + 0.45);
+      l.frequency.value = 22; lg.gain.value = 40; l.connect(lg); lg.connect(o.frequency);
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1300; f.Q.value = 1.2;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22 * v, t + 0.03); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      o.connect(f); f.connect(g); g.connect(sfx); o.start(t); l.start(t); o.stop(t + 0.55); l.stop(t + 0.55);
+    },
+    hurt() { tone(170, 0.14, 0.3, 'sawtooth', null, null, 90); noiseBurst(0.06, 900, 0.25); },
+    thud() { tone(70, 0.16, 0.5, 'sine', null, null, 35); noiseBurst(0.07, 400, 0.35); },
+    swing() { noiseBurst(0.12, 1200, 0.25, 'bandpass'); },
+    empty() { tone(1500, 0.03, 0.15, 'square'); },
     beep() { tone(880, 0.1, 0.25, 'square'); },
     pick() { const t = ac ? ac.currentTime : 0; tone(660, 0.1, 0.25, 'square', t); tone(990, 0.15, 0.25, 'square', t + 0.1); },
     win() { const t = ac ? ac.currentTime : 0;[523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 0.28, 'square', t + i * 0.12)); },

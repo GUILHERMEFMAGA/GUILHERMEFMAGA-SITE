@@ -61,8 +61,10 @@
     const tm = (wx, wy) => [x + w / 2 + (wx - ref.x) / MINI_SCALE, y + h / 2 + (wy - ref.y) / MINI_SCALE];
     const dot = (wx, wy, col, r) => { const [px, py] = tm(wx, wy); if (px < x || px > x + w || py < y || py > y + h) return false; ctx.fillStyle = col; ctx.fillRect(px - r, py - r, r * 2, r * 2); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.strokeRect(px - r, py - r, r * 2, r * 2); return true; };
     G.missions.PHONES.forEach(p => dot(p.x, p.y, G.missions.active ? '#4a88ff' : '#ffe04a', 2.5));
-    const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5);
+    const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     S.cars.forEach(c => { if (c.kind === 'police' && !c.dead && c.mode !== 'wander') dot(c.x, c.y, Math.floor(time * 6) % 2 ? '#ff3030' : '#3a5bff', 2); });
+    S.peds.forEach(p => { if ((p.kind === 'cop' || p.target) && p.state !== 'dead') dot(p.x, p.y, p.kind === 'cop' ? '#5a7bff' : '#ff3030', 1.5); });
+    S.pickups.forEach(k => dot(k.x, k.y, k.type === 'cash' ? '#3fdc4a' : '#ffffff', 1));
     const m = G.missions.active;
     if (m) m.markers.forEach(mk => {
       if (mk.small) return;
@@ -94,6 +96,24 @@
     ctx.restore();
   }
 
+  function drawWeapon(ctx, S, P) {
+    const C = G.combat, w = C.WEAPONS[P.weapon] || C.WEAPONS.fist;
+    const x = 650, y = 98, bw = 140, bh = 44;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(x, y, bw, bh); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.strokeRect(x, y, bw, bh);
+    // ícone simples
+    ctx.save(); ctx.translate(x + 26, y + 22); ctx.fillStyle = '#ddd'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+    if (w.id === 'fist') { ctx.fillStyle = '#e2b48a'; ctx.beginPath(); ctx.arc(0, 0, 10, 0, TAU); ctx.fill(); ctx.stroke(); }
+    else if (w.id === 'bat') { ctx.rotate(-0.6); ctx.fillStyle = '#c8955a'; ctx.fillRect(-16, -3, 32, 6); ctx.fillRect(6, -5, 10, 10); ctx.strokeRect(-16, -3, 32, 6); }
+    else if (w.id === 'pistol') { ctx.fillStyle = '#16181c'; ctx.fillRect(-14, -6, 24, 8); ctx.fillRect(-12, 1, 8, 12); ctx.fillStyle = '#8a8f99'; ctx.fillRect(2, -6, 8, 3); }
+    else if (w.id === 'smg') { ctx.fillStyle = '#16181c'; ctx.fillRect(-16, -6, 32, 8); ctx.fillRect(-4, 1, 6, 13); ctx.fillRect(-14, 1, 6, 8); }
+    else if (w.id === 'shotgun') { ctx.fillStyle = '#6a3f1d'; ctx.fillRect(-18, -2, 12, 6); ctx.fillStyle = '#222'; ctx.fillRect(-8, -4, 28, 4); ctx.fillRect(-8, 0, 24, 3); }
+    else { ctx.fillStyle = '#3f5a2a'; ctx.beginPath(); ctx.arc(0, 2, 9, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#ccc'; ctx.fillRect(-2, -10, 4, 6); }
+    ctx.restore();
+    txt(ctx, w.name.length > 12 ? w.name.slice(0, 5) + '.' : w.name, x + 50, y + 19, 12, '#fff', 'left');
+    if (!w.melee) { const n = C.ammoOf(S, w.id); txt(ctx, 'x' + n, x + 50, y + 37, 16, n > 0 ? '#ffe04a' : '#ff5555', 'left'); }
+    else txt(ctx, 'corpo a corpo', x + 50, y + 37, 11, '#bbb', 'left');
+  }
+
   function draw(ctx, S, time) {
     drawArrow(ctx, S, time);
     const P = S.player;
@@ -106,10 +126,14 @@
     txt(ctx, ms, 790 - mw - 10, 40, 34, '#ffe04a', 'right');
     txt(ctx, '$', 790 - mw - 10 - nw - 8, 40, 34, '#3fdc4a', 'right');
     txt(ctx, G.missions.rank(S.save.done).toUpperCase(), 790, 62, 14, '#ffffff', 'right');
-    if (S.save.done >= 10) txt(ctx, S.save.money >= G.missions.GOAL ? 'META CUMPRIDA' : 'META: $' + money(G.missions.GOAL), 790, 80, 13, '#9ff0ff', 'right');
+    if (S.save.done >= G.missions.TOTAL) txt(ctx, S.save.money >= G.missions.GOAL ? 'META CUMPRIDA' : 'META: $' + money(G.missions.GOAL), 790, 80, 13, '#9ff0ff', 'right');
     // --- corações ---
     const hearts = Math.ceil(P.hp / 20);
     for (let k = 0; k < 5; k++) heart(ctx, 26 + k * 28, 26, 1.25, k < hearts);
+    // colete
+    if (P.armor > 0) { ctx.fillStyle = '#000'; ctx.fillRect(14, 44 + (P.car ? 16 : 0), 136, 10); ctx.fillStyle = '#3a78d8'; ctx.fillRect(16, 46 + (P.car ? 16 : 0), 132 * P.armor / 100, 6); txt(ctx, 'COLETE', 158, 53 + (P.car ? 16 : 0), 10, '#9ec4ff', 'left'); }
+    // arma atual (a pé)
+    if (!P.car) drawWeapon(ctx, S, P);
     // vida do carro
     if (P.car) { ctx.fillStyle = '#000'; ctx.fillRect(14, 44, 136, 12); ctx.fillStyle = P.car.hp > 50 ? '#3fdc4a' : P.car.hp > 25 ? '#ffd21f' : '#ff3030'; ctx.fillRect(16, 46, 132 * P.car.hp / 100, 8); txt(ctx, 'CARRO', 158, 55, 11, '#fff', 'left'); }
     // --- procurado ---

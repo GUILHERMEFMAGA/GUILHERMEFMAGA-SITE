@@ -31,7 +31,6 @@
   // ---------- Partículas ----------
   G.particle = function (p) { if (S.particles.length > 420) S.particles.shift(); p.t = 0; p.max = p.life; S.particles.push(p); };
   function sparks(x, y, n, col) { for (let k = 0; k < n; k++) { const a = rand(0, TAU), v = rand(60, 220); G.particle({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(0.2, 0.5), size: 2.5, col: col || 'spark' }); } }
-  function stars(x, y) { for (let k = 0; k < 5; k++) { const a = rand(0, TAU); G.particle({ x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 20, life: 0.8, size: 7, col: 'star', rot: rand(0, 6) }); } }
 
   // ---------- Procurado ----------
   G.addHeat = function (n) { S.heat = clamp(S.heat + n, 0, 100); };
@@ -75,16 +74,10 @@
       else if (P.car && P.car !== c && d < 100) G.carDamage(P.car, 35);
     }
     S.cars.forEach(o => { if (o !== c && Math.hypot(o.x - c.x, o.y - c.y) < 110) { G.carDamage(o, 40); const a = Math.atan2(o.y - c.y, o.x - c.x); o.vx += Math.cos(a) * 180; o.vy += Math.sin(a) * 180; } });
-    S.peds.forEach(p => { if (p.state !== 'down' && Math.hypot(p.x - c.x, p.y - c.y) < 120) knockPed(p, c.x, c.y, 200); });
+    S.peds.forEach(p => { if (p.state !== 'dead' && Math.hypot(p.x - c.x, p.y - c.y) < 120) G.combat.hurtPed(S, p, 90, c.x, c.y, 220, P.car === c || c.driver === 'player' ? 'player' : 'traffic'); });
+    G.combat.scorch(S, c.x, c.y, 34);
     c.driver = 'none'; c.mode = 'wreck';
   };
-
-  function knockPed(p, fx, fy, force) {
-    if (p.state === 'down' || p.mission) return;
-    p.state = 'down'; p.downT = 0;
-    const a = Math.atan2(p.y - fy, p.x - fx); p.vx = Math.cos(a) * force * 0.45; p.vy = Math.sin(a) * force * 0.45;
-    stars(p.x, p.y - 6); G.snd.bonk();
-  }
 
   // ---------- Criação do mundo ----------
   function newWorld() {
@@ -93,13 +86,14 @@
     const g = M.POI.garage;
     const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
-    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208' });
+    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208' });
+    G.combat.reset(S);
     for (let k = 0; k < 10; k++) AI.spawnTraffic(S);
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
     // saudação
-    if (S.save.done === 0) G.say('Bem-vindo a Ribeirão Vermelha! Pressione E perto do seu carro vermelho para entrar. Depois procure um telefone amarelo para pegar missões.', 10);
-    else G.say('Bem-vindo de volta! Missão ' + (S.save.done + 1) + ' de 10 esperando no telefone.', 6);
+    if (S.save.done === 0) G.say('Bem-vindo a Ribeirão Vermelha! Pressione E perto do seu carro vermelho para entrar. Procure um telefone amarelo para pegar missões e a loja de armas (rosa) para se armar. A cidade é perigosa!', 11);
+    else G.say('Bem-vindo de volta! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 6);
   }
 
   // ---------- Entrar / sair de carros ----------
@@ -186,16 +180,10 @@
       if (okp(P.x, P.y + mvy * dt + Math.sign(mvy) * 6)) P.y += mvy * dt;
       if (dx || dy) { P.h += wrap(Math.atan2(dy, dx) + Math.PI / 2 - P.h) * Math.min(1, 14 * dt); P.walk += sp * dt * 0.2; }
       if (P.punchT > 0) P.punchT -= dt;
-      // soco
-      if (Kp('Space') && P.punchT <= 0) {
-        P.punchT = 0.3; G.snd.punch();
-        const fx = Math.sin(P.h), fy = -Math.cos(P.h);
-        for (const p of S.peds) {
-          if (p.state === 'down' || p.mission) continue;
-          const ddx = p.x - P.x, ddy = p.y - P.y, d = Math.hypot(ddx, ddy);
-          if (d < 34 && (ddx * fx + ddy * fy) > 0) { knockPed(p, P.x, P.y, 160); if (copNear(P.x, P.y, 420)) G.addHeat(10); break; }
-        }
-      }
+      // armas: Espaço ataca/atira • Q troca de arma • 1-6 escolhem a arma
+      if (Kp('KeyQ')) G.combat.cycle(S, 1);
+      G.combat.ORDER.forEach((id, i) => { if (Kp('Digit' + (i + 1))) { if (!G.combat.select(S, id)) G.say('Você não tem essa arma (ou está sem munição).', 2); else G.snd.beep(); } });
+      G.combat.playerUpdate(S, dt, K('Space'), Kp('Space'));
       // o que dá para fazer aqui?
       let action = null;
       const car = nearestCar(P.x, P.y, 62);
@@ -205,6 +193,8 @@
         const gg = M.POI.garage, hh = M.POI.hospital;
         if (!action && Math.hypot(gg.x - P.x, gg.y - P.y) < gg.r + 10) action = { t: 'garage', s: 'E: BUSCAR MEU CARRO VERMELHO' };
         if (!action && Math.hypot(hh.x - P.x, hh.y - P.y) < hh.r + 10) action = { t: 'hospital', s: P.hp < 100 ? 'E: TRATAR FERIMENTOS (GRÁTIS)' : 'HOSPITAL' };
+        const ar = M.POI.armas;
+        if (!action && Math.hypot(ar.x - P.x, ar.y - P.y) < ar.r + 10) action = { t: 'shop', s: 'E: LOJA DE ARMAS' };
       }
       if (action) S.prompt = action.s;
       if (action && Kp('KeyE')) {
@@ -219,7 +209,8 @@
             if (S.save.money >= 50) { S.save.money -= 50; r.x = g.x + 110; r.y = g.y; r.a = Math.PI / 2; r.vx = r.vy = 0; G.say('Guincho trouxe seu carro vermelho ($50).', 4); G.snd.cash(); }
             else G.say('Guincho custa $50.', 3);
           } else G.say('Seu carro vermelho já está aqui perto!', 3);
-        } else if (action.t === 'hospital') { P.hp = 100; G.say('Ferimentos tratados.', 3); }
+        } else if (action.t === 'shop') { S.mode = 'shop'; G.snd.door(); }
+        else if (action.t === 'hospital') { P.hp = 100; G.say('Ferimentos tratados.', 3); }
       }
     }
     if (Kp('KeyR')) { G.snd.nextStation(); S.radioT = 3; }
@@ -243,12 +234,16 @@
   function respawn(where, loss) {
     const P = S.player;
     S.save.money = Math.floor(S.save.money * (1 - loss)); G.save();
-    P.hp = 100; P.car = null; P.x = where.x; P.y = where.y + 4; P.vx = P.vy = 0; P.iframes = 2;
+    P.hp = 100; P.armor = 0; P.car = null; P.x = where.x; P.y = where.y + 4; P.vx = P.vy = 0; P.iframes = 2;
+    const jail = where === M.POI.delegacia;
+    const hadGuns = Object.keys(G.combat.arms(S).own).length > 1;
+    if (jail) G.combat.confiscate(S);
+    S.lastHp = 100;
     S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0;
     S.cars = S.cars.filter(c => !(c.kind === 'police' && (c.mode === 'chase' || c.mode === 'block' || c.mode === 'leave')));
     if (S.redCar && S.redCar.dead) { S.cars = S.cars.filter(c => c !== S.redCar); S.redCar = null; }
     S.mode = 'play';
-    G.say(where === M.POI.hospital ? 'Você acordou no hospital. Perdeu ' + Math.round(loss * 100) + '% do dinheiro.' : 'Solto da delegacia. A fiança custou ' + Math.round(loss * 100) + '% do dinheiro.', 6);
+    G.say(where === M.POI.hospital ? 'Você sobreviveu por pouco e acordou no hospital. Perdeu ' + Math.round(loss * 100) + '% do dinheiro.' : 'Solto da delegacia. A fiança custou ' + Math.round(loss * 100) + '% do dinheiro' + (hadGuns ? ' e suas armas foram confiscadas.' : '.'), 6);
   }
 
   // ---------- Carros (IA, física, colisões) ----------
@@ -277,10 +272,10 @@
       if (c.dead) continue;
       const sp = c.speed;
       for (const p of S.peds) {
-        if (p.state === 'down' || Math.abs(p.x - c.x) > 70 || Math.abs(p.y - c.y) > 70) continue;
+        if (p.state === 'down' || p.state === 'dead' || Math.abs(p.x - c.x) > 70 || Math.abs(p.y - c.y) > 70) continue;
         const h = hitPed(p, c); if (!h) continue;
         if (sp > 55) {
-          knockPed(p, c.x - c.vx * 0.05, c.y - c.vy * 0.05, sp * 0.9 + 60);
+          G.combat.carHit(S, p, c, sp);
           c.vx *= 0.97; c.vy *= 0.97;
           if (c === P.car) { G.addHeat(9); const m = M.active; if (m && m.type === 'taxi' && m.stage === 1) m.comfort -= m.def.vip ? 25 : 12; }
           else if (c.driver === 'ai' && c.kind === 'police') { }
@@ -290,7 +285,7 @@
       if (!P.car && S.mode === 'play') {
         const h = hitPed(P, c);
         if (h) {
-          if (sp > 110 && P.iframes <= 0) { P.hp -= 10 + sp * 0.06; P.iframes = 0.9; P.vx = h.dx / (h.d || 1) * 220; P.vy = h.dy / (h.d || 1) * 220; G.snd.bonk(); S.shake = 5; stars(P.x, P.y - 6); }
+          if (sp > 110 && P.iframes <= 0) { P.hp -= 10 + sp * 0.06; P.iframes = 0.9; P.vx = h.dx / (h.d || 1) * 220; P.vy = h.dy / (h.d || 1) * 220; G.snd.bonk(); S.shake = 5; G.combat.spray(S, P.x, P.y, Math.atan2(h.dy, h.dx), 6, 160); }
           else { const d = h.d || 1; P.x += h.dx / d * (h.r - h.d + 1); P.y += h.dy / d * (h.r - h.d + 1); }
         }
       }
@@ -303,10 +298,11 @@
     const lvlBefore = S.heatLevel;
     S.heatLevel = lvlOf(S.heat);
     const chasers = S.cars.filter(c => c.kind === 'police' && c.mode === 'chase' && !c.dead);
-    S.chasers = chasers.length;
+    const copPeds = S.peds.filter(p => p.kind === 'cop' && p.state !== 'dead');
+    S.chasers = chasers.length + copPeds.length;
     // esfriar
     if (S.heat > 0) {
-      const near = chasers.some(c => Math.hypot(c.x - ref.x, c.y - ref.y) < 520);
+      const near = chasers.some(c => Math.hypot(c.x - ref.x, c.y - ref.y) < 520) || copPeds.some(p => Math.hypot(p.x - ref.x, p.y - ref.y) < 520);
       const heliSees = S.heli && Math.hypot(S.heli.x - ref.x, S.heli.y - ref.y) < 300;
       if (!near) S.heat = Math.max(0, S.heat - dt * (heliSees ? 1.2 : 2.6));
     }
@@ -328,7 +324,9 @@
     // preso?
     if (S.mode === 'play' && S.heatLevel > 0) {
       const close = chasers.filter(c => Math.hypot(c.x - ref.x, c.y - ref.y) < (P.car ? 120 : 90));
-      const ok = P.car ? (P.car.speed < 70 && close.length >= 2) : close.length >= 1;
+      // policiais a pé que querem prender (só quando não estão em tiroteio) também contam
+      const cuff = copPeds.filter(p => p.arresting && Math.hypot(p.x - ref.x, p.y - ref.y) < (P.car ? 55 : 42));
+      const ok = P.car ? (P.car.speed < 70 && close.length + cuff.length >= 2) : (close.length >= 1 || cuff.length >= 1);
       if (ok) S.bustT += dt * (P.car ? 1 : 1.6); else S.bustT = Math.max(0, S.bustT - dt * 1.5);
       if (S.bustT > 3) goBusted();
     } else S.bustT = 0;
@@ -354,9 +352,9 @@
     });
     // pedestres
     S.pedSpawnT -= dt;
-    const alive = S.peds.filter(p => !p.mission).length;
+    const alive = S.peds.filter(p => !p.mission && !p.target && p.state !== 'dead').length;
     if (alive < 34 && S.pedSpawnT <= 0) { S.pedSpawnT = 0.25; AI.spawnPed(S); }
-    S.peds = S.peds.filter(p => !p.dead && (p.mission || Math.hypot(p.x - ref.x, p.y - ref.y) < 1150));
+    S.peds = S.peds.filter(p => !p.dead && (p.mission || p.target || Math.hypot(p.x - ref.x, p.y - ref.y) < 1150));
     for (const p of S.peds) if (p.state === 'wait') { p.walk = 0; } else AI.updatePed(p, dt, S);
   }
 
@@ -364,7 +362,7 @@
   function updateParticles(dt) {
     for (const p of S.particles) {
       p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt;
-      if (p.col === 'smoke') { p.size += 10 * dt; p.vx *= 0.98; } else if (p.col === 'fire') { p.size -= 4 * dt; p.vy -= 10 * dt; } else if (p.col === 'star') p.rot += dt * 8; else { p.vx *= 0.92; p.vy *= 0.92; }
+      if (p.col === 'smoke') { p.size += 10 * dt; p.vx *= 0.98; } else if (p.col === 'fire') { p.size -= 4 * dt; p.vy -= 10 * dt; } else { p.vx *= 0.92; p.vy *= 0.92; }
     }
     S.particles = S.particles.filter(p => p.t < p.max && p.size > 0.5);
   }
@@ -390,9 +388,10 @@
       updateCars(dt);
       managePopulation(dt);
       updatePolice(dt);
+      G.combat.update(S, dt);
       M.update(S, dt);
     } else if (S.mode === 'wasted' || S.mode === 'busted') {
-      S.modeT += dt; updateCars(dt); managePopulation(dt);
+      S.modeT += dt; updateCars(dt); managePopulation(dt); G.combat.update(S, dt);
       if (S.modeT > 3.2) respawn(S.mode === 'wasted' ? M.POI.hospital : M.POI.delegacia, S.mode === 'wasted' ? 0.1 : 0.15);
     }
     updateParticles(dt);
@@ -421,14 +420,19 @@
     ctx.translate(VW / 2 + sx, VH / 2 + sy); ctx.scale(z, z); ctx.translate(-cam.x, -cam.y);
     const vx0 = cam.x - VW / 2 / z - 40, vy0 = cam.y - VH / 2 / z - 40, vx1 = cam.x + VW / 2 / z + 40, vy1 = cam.y + VH / 2 / z + 40;
     W.drawChunks(ctx, vx0, vy0, vx1, vy1);
-    M.drawWorld(ctx, S, S.time);
     const inV = o => o.x > vx0 - 80 && o.x < vx1 + 80 && o.y > vy0 - 80 && o.y < vy1 + 80;
+    G.combat.drawDecals(ctx, S, inV);       // sangue, marcas de pneu e chamuscado
+    M.drawWorld(ctx, S, S.time);
+    G.combat.drawPickups(ctx, S, inV, S.time);
+    const vis = S.peds.filter(inV);
+    vis.forEach(p => { if (p.state === 'dead') SP.drawPed(ctx, p, S.time); }); // corpos ficam embaixo dos carros
     // destroços e estacionados primeiro
     const cars = S.cars.filter(inV).sort((a, b) => (a.dead ? 0 : 1) - (b.dead ? 0 : 1));
     cars.forEach(c => SP.drawCar(ctx, c, S.time));
-    S.peds.filter(inV).forEach(p => SP.drawPed(ctx, p, S.time));
+    vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
     if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
     AI.drawLights(ctx, vx0, vy0, vx1, vy1, S.time);
+    G.combat.drawAir(ctx, S, inV);          // balas e granadas
     // partículas
     S.particles.forEach(p => {
       if (!inV(p)) return;
@@ -436,7 +440,8 @@
       ctx.save(); ctx.translate(p.x, p.y);
       if (p.col === 'smoke') { ctx.globalAlpha = 0.55 * k; ctx.fillStyle = '#3a3a3f'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
       else if (p.col === 'fire') { ctx.globalAlpha = Math.min(1, k * 1.6); ctx.fillStyle = k > 0.6 ? '#ffe15a' : k > 0.3 ? '#ff8a1e' : '#d8321a'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
-      else if (p.col === 'star') { ctx.rotate(p.rot); ctx.globalAlpha = k; ctx.fillStyle = '#ffe04a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 3 : 7, a = i * Math.PI / 5; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      else if (p.col === 'blood') { ctx.globalAlpha = Math.min(1, k * 1.8); ctx.fillStyle = '#8c0b10'; ctx.beginPath(); ctx.arc(0, 0, p.size, 0, TAU); ctx.fill(); }
+      else if (p.col === 'flash') { ctx.globalAlpha = 0.95; const g = ctx.createRadialGradient(0, 0, 1, 0, 0, p.size * 2.2); g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.5, 'rgba(255,170,50,0.7)'); g.addColorStop(1, 'rgba(255,120,0,0)'); ctx.fillStyle = g; ctx.fillRect(-p.size * 2.2, -p.size * 2.2, p.size * 4.4, p.size * 4.4); }
       else { ctx.globalAlpha = k; ctx.fillStyle = '#ffd86a'; ctx.fillRect(-1.5, -1.5, 3, 3); }
       ctx.restore();
     });
@@ -465,6 +470,7 @@
       const toS = (x, y) => [(x - cam.x) * z + VW / 2, (y - cam.y) * z + VH / 2];
       const glow = (x, y, r, a) => { const [px, py] = toS(x, y); if (px < -r || px > VW + r || py < -r || py > VH + r) return; const g = dctx.createRadialGradient(px, py, 2, px, py, r); g.addColorStop(0, 'rgba(0,0,0,' + a + ')'); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.beginPath(); dctx.arc(px, py, r, 0, TAU); dctx.fill(); };
       W.lamps.forEach(l => glow(l.x, l.y, 120 * z, 0.75));
+      S.particles.forEach(p => { if (p.col === 'flash') glow(p.x, p.y, 100 * z, 0.9); });
       S.cars.forEach(c => {
         if (c.dead || !inV(c)) return;
         glow(c.x + c.fx * 85, c.y + c.fy * 85, 130 * z, 0.9); glow(c.x + c.fx * 40, c.y + c.fy * 40, 70 * z, 0.8); glow(c.x, c.y, 50 * z, 0.5);
@@ -473,6 +479,7 @@
       dctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(darkC, 0, 0);
     }
+    G.combat.drawScreen(ctx, S);            // tela vermelha ao levar dano
   }
 
   // ---------- Telas ----------
@@ -483,20 +490,20 @@
     H.txt(ctx, 'RUA VERMELHA', 4, 6, 80, '#000', 'center', '#000');
     H.txt(ctx, 'RUA VERMELHA', 0, 0, 80, '#ff2a2a', 'center', '#200');
     ctx.restore();
-    H.txt(ctx, 'um jogo de mundo aberto em pixel antigo', 400, 172, 20, '#ffe04a', 'center');
+    H.txt(ctx, 'mundo aberto, tiroteio e perseguições • estilo GTA antigo', 400, 172, 20, '#ffe04a', 'center');
     const saved = hasSave() && S.save.done + S.save.money > 0;
-    H.txt(ctx, saved ? 'ENTER: CONTINUAR (Missão ' + Math.min(S.save.done + 1, 10) + ' • $' + S.save.money + ')' : 'ENTER: COMEÇAR', 400, 255, 24, Math.floor(time * 2) % 2 ? '#fff' : '#ffe04a', 'center');
+    H.txt(ctx, saved ? 'ENTER: CONTINUAR (Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' • $' + S.save.money + ')' : 'ENTER: COMEÇAR', 400, 255, 24, Math.floor(time * 2) % 2 ? '#fff' : '#ffe04a', 'center');
     if (saved) H.txt(ctx, 'N: NOVO JOGO (apaga o progresso)', 400, 285, 16, '#ff9a9a', 'center');
     const L = [
-      ['A PÉ', 'WASD / Setas andar  Shift correr  Espaço soco  E entrar no carro / usar'],
+      ['A PÉ', 'WASD / Setas andar  Shift correr  Espaço atacar/atirar  Q ou 1-6 trocam de arma  E usar'],
       ['DE CARRO', 'W/↑ acelera  S/↓ freio e ré  A D ←→ virar  Espaço freio de mão  H buzina  E sair'],
       ['OUTROS', 'R troca a rádio   M som   P pausa'],
-      ['OBJETIVO', 'Atenda os telefones amarelos, faça as 10 missões e vire o REI DA CIDADE!'],
-      ['POLÍCIA', 'Atropelar, bater ou roubar carro na frente da polícia dá PROCURADO. Fuja!'],
+      ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Arme-se na loja rosa!'],
+      ['POLÍCIA', 'Crime na frente da polícia dá PROCURADO. Eles descem e atiram. Fuja ou lute!'],
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(40, 320, 720, 230);
     L.forEach((l, i) => { H.txt(ctx, l[0], 60, 352 + i * 42, 16, '#ffe04a'); H.txt(ctx, l[1], 160, 352 + i * 42, 13, '#fff'); });
-    H.txt(ctx, 'Clique na tela para ativar o teclado • Jogo cartunesco: sem sangue • HTML5 Canvas', 400, 580, 13, '#bbb', 'center');
+    H.txt(ctx, 'Clique na tela para ativar o teclado • ATENÇÃO: violência explícita, sangue e armas (+16) • HTML5 Canvas', 400, 580, 13, '#bbb', 'center');
   }
   function drawOverlay(title, sub, col) {
     const H = G.hud;
@@ -506,7 +513,7 @@
 
   let last = 0, titleCam = 0;
   function startGame(fresh) {
-    if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false }; G.save(); }
+    if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
     G.snd.init(); newWorld(); S.mode = 'play';
   }
   function frame(ts) {
@@ -538,11 +545,13 @@
     }
     if (Kp('KeyP', 'Escape')) { if (S.mode === 'play') S.mode = 'paused'; else if (S.mode === 'paused') S.mode = 'play'; }
     if (S.mode === 'paused' && Kp('Enter')) S.mode = 'play';
-    if (S.mode !== 'paused') update(dt);
+    if (S.mode === 'shop') { for (const k in pressed) if (G.combat.shopKey(S, k)) { S.mode = 'play'; G.snd.door(); break; } }
+    else if (S.mode !== 'paused') update(dt);
     drawWorld();
     G.hud.draw(ctx, S, S.time);
-    if (S.mode === 'wasted') drawOverlay('VOCÊ CAIU', 'Levado ao hospital...', '#ff4a4a');
+    if (S.mode === 'wasted') drawOverlay('VOCÊ MORREU', 'Os médicos te trouxeram de volta...', '#ff4a4a');
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
+    if (S.mode === 'shop') G.combat.drawShop(ctx, S);
     if (S.mode === 'paused') drawOverlay('PAUSADO', 'P ou ENTER para continuar', '#ffe04a');
     for (const k in pressed) delete pressed[k];
   }

@@ -73,15 +73,24 @@ POLÍCIA E PERSEGUIÇÕES
   ou esperar o contador esfriar. Estar "Preso" = perde parte do dinheiro e
   volta ao início (não é game over).
 
-COMBATE E NÍVEL DE VIOLÊNCIA
-- Estilo arcade, cômico e exagerado (tom de "desenho animado"), NÃO realista.
-- SEM sangue, SEM gore: pedestres atropelados "caem", piscam e se levantam
-  ou desaparecem em uma nuvenzinha; carros batem, amassam, soltam fumaça,
-  pegam fogo e explodem em pixel art.
-- Armas (desbloqueáveis): soco, taco, pistola de água/"pistola de sinalização".
-  (Sem armas reais realistas — mantém o jogo livre para todas as idades.)
-- Vida do jogador em corações; dano de batida proporcional à velocidade.
-  Ao morrer: "Você foi levado ao hospital" e perde parte do dinheiro.
+COMBATE E NÍVEL DE VIOLÊNCIA  (REVISADO — versão 2: realista e violenta, +16)
+- Tom mais realista e violento, como o GTA antigo: sangue, corpos, tiroteios.
+- Pedestres atingidos sangram (respingos + manchas no chão) e podem MORRER: o
+  corpo fica no chão numa poça de sangue por um bom tempo. Atropelar mata.
+  Sem desmembramento: o sangue é 2D, visto de cima.
+- Armas: punhos, taco, pistola, submetralhadora, escopeta e granada. Espaço
+  ataca/atira (mira assistida na direção em que o personagem olha), Q ou 1-6
+  trocam de arma. Compradas na LOJA DE ARMAS (ou tiradas de policiais e
+  bandidos mortos, que também deixam dinheiro, colete e kits médicos).
+- Civis fogem de tiros; alguns andam armados e reagem se atacados.
+- Polícia: nível 1-2 desce da viatura e tenta prender; nível 3+ atira (de
+  dentro das viaturas também); nível 4-5 manda equipe tática (SMG/escopeta) e
+  helicóptero que atira. Matar policial = procurado máximo.
+- Carros sofrem dano visível (amassados, furos de bala, fumaça, fogo) e
+  explodem, matando quem estiver perto. Derrapagens deixam marcas de pneu.
+- Missões de tiroteio ("Cobrança" e "Guerra de Gangues") contra bandidos armados.
+- Vida em corações + colete. Ao morrer: vai ao hospital e perde 10% do dinheiro;
+  preso: perde 15% e as ARMAS são confiscadas. Nunca há game over.
 
 INTERAÇÕES
 - Entrar/sair de qualquer carro, buzinar, ligar o rádio (3 estações
@@ -130,16 +139,16 @@ ENTREGA
 | **Dá para sair do carro?** | **Sim.** Tecla **E** entra/sai. Dá para andar a pé e roubar qualquer carro. |
 | **Dá para interagir?** | **Sim:** telefones, garagem, oficina, posto, lojas, NPCs, buzina, rádio. |
 | **Tem perseguição?** | **Sim.** Nível de procurado 0–5, viaturas, bloqueios e helicóptero. |
-| **É violento como o GTA antigo?** | Versão **leve e cartunesca**: sem sangue e sem gore, só batidas, explosões e quedas engraçadas. Classificação livre. |
-| **Como termina?** | Campanha de ~10 missões + modo livre. Morrer/ser preso não dá game over: perde dinheiro e recomeça. |
+| **É violento como o GTA antigo?** | Versão **realista e violenta (+16)**: sangue, tiroteios, corpos no chão, polícia atirando. Sem desmembramento. |
+| **Como termina?** | Campanha de 12 missões + modo livre. Morrer/ser preso não dá game over: perde dinheiro e recomeça. |
 | **Onde roda?** | No navegador (HTML5 Canvas + JavaScript), sem instalar nada. |
 
 ---
 
 ## 3. VERSÕES DO TOM (escolha uma)
 
-1. **Cartunesca (recomendada)** — sem sangue, humor, ideal para publicar no site.
-2. **Clássica** — mais próxima do GTA 1: pedestres atropelados deixam marca no chão,
+1. **Cartunesca** — sem sangue, humor, ideal para todas as idades (era a versão 1 do jogo).
+2. **Clássica / realista (ESCOLHIDA — versão 2)** — mais próxima do GTA 1: pedestres atropelados deixam marca no chão,
    armas de fogo em pixel art (classificação mais alta, cuidado ao publicar).
 3. **Arcade de corrida** — sem pedestres alvo, foco em corridas, fuga e drift.
 
