@@ -4,6 +4,10 @@ Jogo 2D em visão de cima feito com **HTML5 Canvas + JavaScript puro** (sem bibl
 Segue o prompt em [`PROMPT-DO-JOGO.md`](PROMPT-DO-JOGO.md) e a imagem `imagens/gta1-estilo-limpo.png`.
 
 ## Como jogar
+**Jogar online (sem instalar nada):** https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/arena/01a0f45d-guilhermefmaga-site/jogo/rua-vermelha.html
+
+**Ou baixe o arquivo único** `rua-vermelha.html` (aba *Raw* → salvar como) e dê duplo clique.
+
 Abra `index.html` no navegador (duplo clique) ou rode um servidor local:
 
 ```bash
