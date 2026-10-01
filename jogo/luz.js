@@ -14,7 +14,7 @@
 (function (G) {
   'use strict';
   const VW = 800, VH = 600, TAU = Math.PI * 2;
-  const L = G.luz = { nivel: 2 };
+  const L = G.luz = { nivel: 1 };   // 1 = cinema nítido (padrão)
 
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -46,8 +46,8 @@
 
   // ---- cor do ambiente conforme a hora (f = 0..1; 0.55-0.65 entardecer, 0.65-0.92 noite) ----
   const CORES = [
-    [0.00, 255, 226, 190], [0.08, 255, 246, 232], [0.40, 255, 252, 244], [0.52, 255, 226, 180],
-    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 205, 140, 150], [1.00, 255, 226, 190]
+    [0.00, 236, 208, 176], [0.08, 238, 232, 220], [0.40, 238, 236, 228], [0.52, 238, 208, 166],
+    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 190, 130, 140], [1.00, 236, 208, 176]
   ];
   function ambiente(f) {
     for (let i = 1; i < CORES.length; i++) {
@@ -56,7 +56,7 @@
         return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t];
       }
     }
-    return [255, 226, 190];
+    return [236, 208, 176];
   }
 
   // altura da fachada (parede) de um prédio — usada também pelo mundo
@@ -66,12 +66,12 @@
     const add = (x, y, r, col, a, ang, spread) => out.push({ x, y, r, col, a, ang, spread });
     const vx0 = cam.x - VW / 2 / z - 160, vx1 = cam.x + VW / 2 / z + 160, vy0 = cam.y - VH / 2 / z - 160, vy1 = cam.y + VH / 2 / z + 160;
     const vis = (x, y) => x > vx0 && x < vx1 && y > vy0 && y < vy1;
-    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 150, [255, 196, 110], 0.95); });
+    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 140, [255, 196, 110], 0.8); });
     S.cars.forEach(c => {
       if (c.dead || !vis(c.x, c.y)) return;
       const ang = Math.atan2(c.fy, c.fx);
-      add(c.x + c.fx * 34, c.y + c.fy * 34, 270, [255, 240, 195], 0.9, ang, 0.3);       // feixe dos faróis
-      add(c.x + c.fx * 60, c.y + c.fy * 60, 85, [255, 240, 200], 0.7);                    // poça de luz na frente
+      add(c.x + c.fx * 34, c.y + c.fy * 34, 250, [255, 240, 195], 0.78, ang, 0.3);       // feixe dos faróis
+      add(c.x + c.fx * 60, c.y + c.fy * 60, 75, [255, 240, 200], 0.55);                    // poça de luz na frente
       add(c.x - c.fx * 30, c.y - c.fy * 30, c.brakeLight ? 80 : 55, [255, 40, 30], c.brakeLight ? 0.95 : 0.5);                     // lanternas
       if (c.siren) {
         const ph = Math.floor(S.time * 7 + c.x * 0.01) % 2;
@@ -107,7 +107,7 @@
     const f = ((S.dayT % 1) + 1) % 1;
     const amb = ambiente(f);
     const lum = (amb[0] * 0.3 + amb[1] * 0.59 + amb[2] * 0.11) / 255;
-    const noite = clamp(1 - lum * 1.15, 0, 1);            // 0 = dia claro, ~1 = noite fechada
+    const noite = clamp(1.12 - lum * 1.28, 0, 1);            // 0 = dia claro, ~1 = noite fechada
     const t = S.time;
 
     // 1) pixel art: reduz pela metade e amplia sem suavizar
@@ -118,7 +118,7 @@
 
     // 2) neblina volumétrica (duas camadas com velocidades diferentes = profundidade)
     if (!nevPat) nevPat = nx.createPattern(fazNeblina(), 'repeat');
-    const dens = 0.05 + noite * 0.14 + (f > 0.92 || f < 0.06 ? 0.10 : 0);
+    const dens = 0.025 + noite * 0.10 + (f > 0.92 || f < 0.06 ? 0.06 : 0);
     nx.globalCompositeOperation = 'source-over'; nx.clearRect(0, 0, VW, VH);
     const camada = (esc, par, vel, alfa) => {
       nx.save(); nx.globalAlpha = alfa; nx.scale(esc, esc);
@@ -127,7 +127,7 @@
     };
     camada(1.6, 0.35, 9, 1); camada(1.0, 0.6, 18, 0.7);
     nx.globalCompositeOperation = 'source-in'; nx.fillStyle = '#c4cee4'; nx.fillRect(0, 0, VW, VH);
-    ctx.globalAlpha = clamp(dens * 2.2, 0, 0.55); ctx.drawImage(nevC, 0, 0); ctx.globalAlpha = 1;
+    ctx.globalAlpha = clamp(dens * 2, 0, 0.4); ctx.drawImage(nevC, 0, 0); ctx.globalAlpha = 1;
 
     // 3) mapa de luz: começa com a cor do ambiente e soma as luzes
     lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = 'source-over';
@@ -143,7 +143,7 @@
     lx.globalCompositeOperation = 'lighter';
     if (noite > 0.03) {
       luzes.forEach(l => gradLuz(lx, l));
-      lx.fillStyle = 'rgba(255,190,100,0.55)';
+      lx.fillStyle = 'rgba(255,190,100,0.42)';
       janelas.forEach(b => { const fh = W.fachada(b); lx.fillRect(b.x + 4, b.y + b.h - fh + 3, b.w - 8, fh - 6); });
     }
     lx.restore();
@@ -152,11 +152,11 @@
     // 4) brilho das luzes por cima (feixes visíveis na neblina)
     ctx.save(); ctx.setTransform(z, 0, 0, z, VW / 2 - cam.x * z, VH / 2 - cam.y * z);
     ctx.globalCompositeOperation = 'lighter';
-    const forca = 0.04 + noite * 0.15;
+    const forca = 0.02 + noite * 0.09;
     luzes.forEach(l => { const a0 = l.a; l.a = a0 * forca * (l.ang !== undefined ? 0.85 : 0.7); gradLuz(ctx, l); l.a = a0; });
     ctx.restore();
     // raios de sol (só de dia): faixas diagonais bem suaves
-    const sol = clamp(1 - noite * 2.2, 0, 1) * 0.07;
+    const sol = clamp(1 - noite * 2.2, 0, 1) * 0.035;
     if (sol > 0.004) {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       for (let k = 0; k < 4; k++) {
@@ -174,14 +174,14 @@
     b2x.globalCompositeOperation = 'multiply'; b2x.drawImage(bl1, 0, 0); b2x.drawImage(bl1, 0, 0); b2x.drawImage(bl1, 0, 0); b2x.globalCompositeOperation = 'source-over';
     b3x.drawImage(bl2, 0, 0, 100, 75);
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = 0.5; ctx.drawImage(bl2, 0, 0, VW, VH);
-    ctx.globalAlpha = 0.7; ctx.drawImage(bl3, 0, 0, VW, VH);
+    ctx.globalAlpha = 0.16; ctx.drawImage(bl2, 0, 0, VW, VH);
+    ctx.globalAlpha = 0.24; ctx.drawImage(bl3, 0, 0, VW, VH);
     ctx.restore();
 
     // 6) cor de cinema: mais contraste/saturação + sombras azuis e luzes laranja
     cx.globalCompositeOperation = 'source-over'; cx.drawImage(ctx.canvas, 0, 0);
-    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.42; ctx.drawImage(copiaC, 0, 0);
-    ctx.globalAlpha = 0.16;
+    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.3; ctx.drawImage(copiaC, 0, 0);
+    ctx.globalAlpha = 0.09;
     const gr = ctx.createLinearGradient(0, 0, VW, VH); gr.addColorStop(0, '#1fa6c8'); gr.addColorStop(0.5, '#8a6fd0'); gr.addColorStop(1, '#ff9a3c');
     ctx.fillStyle = gr; ctx.fillRect(0, 0, VW, VH);
     ctx.restore();
@@ -193,6 +193,6 @@
     return true;
   };
 
-  const NOMES = ['Clássico', 'Cinema (suave)', 'Cinema pixel art'];
+  const NOMES = ['Clássico', 'Cinema nítido', 'Cinema pixel art'];
   L.alternar = function () { L.nivel = (L.nivel + 2) % 3; return 'Gráficos: ' + NOMES[L.nivel]; };
 })(window.G = window.G || {});

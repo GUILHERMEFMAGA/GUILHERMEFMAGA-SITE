@@ -88,7 +88,7 @@
     const g = M.POI.garage;
     const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
-    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208' });
+    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
     G.combat.reset(S);
     for (let k = 0; k < 10; k++) AI.spawnTraffic(S);
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
