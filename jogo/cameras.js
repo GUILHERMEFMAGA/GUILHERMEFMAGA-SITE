@@ -16,7 +16,7 @@
   const AVENIDAS = ['Av. Independência', 'Av. Presidente Vargas', 'Av. João Fiúza', 'Av. do Rio', 'Av. Francisco Junqueira', 'Av. Nove de Julho', 'Av. Costábile Romano', 'Av. Brasil', 'Av. Saudade', 'Av. da Ponte', 'Av. Novo Horizonte', 'Av. das Obras', 'Av. do Progresso', 'Av. Beira-Rio', 'Av. Vale Verde', 'Av. Aeroporto', 'Av. das Palmeiras', 'Av. Final'];
   const RUAS_H = ['Rua Duque de Caxias', 'Rua General Osório', 'Rua Tibiriçá', 'Rua do Pedágio', 'Rua Amador Bueno', 'Rua Barão do Amazonas', 'Rua São Sebastião'];
   CM.nomeRua = function (x, y) {
-    const i = clamp(Math.round((x / T - W.MG - 3) / W.PITCH), 0, W.COLS), j = clamp(Math.round((y / T - W.MG - 3) / W.PITCH), 0, W.ROWS);
+    const i = clamp(Math.round((x / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.COLS), j = clamp(Math.round((y / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.ROWS);
     return AVENIDAS[i] + ' × ' + RUAS_H[j];
   };
   // texto de localização completo: cidade + rua + quadra
@@ -97,7 +97,7 @@
 
   // ---------- câmeras das ruas (postes) ----------
   // cruzamentos importantes, pedágios, obras grandes, pontes e aeroporto
-  [[1, 1], [4, 3], [6, 2], [8, 5], [2, 5], [5, 0], [10, 2], [11, 4], [12, 1], [15, 2], [15, 4], [16, 5]].forEach(([i, j], k) => {
+  [[1, 1], [4, 3], [6, 2], [8, 5], [2, 5], [5, 0], [2, 7], [5, 7], [18, 2], [19, 5], [25, 3], [26, 6], [32, 2], [33, 5]].forEach(([i, j], k) => {
     const x = W.nodeX(i), y = W.nodeY(j);
     CM.ruas.push({ id: 'rua' + k, cat: 'rua', nome: () => 'RUA · ' + CM.nomeRua(x, y), x, y, px: x + W.ROAD / 2 * T + 18, py: y - W.ROAD / 2 * T - 18, vw: 560 });
   });

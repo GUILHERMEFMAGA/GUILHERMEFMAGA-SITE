@@ -17,6 +17,13 @@
     if (axis === 'v') return t < 5.5 ? 'g' : t < 7 ? 'y' : 'r';
     return t < 8.2 ? 'r' : t < 13.7 ? 'g' : t < 15.2 ? 'y' : 'r';
   }
+  // sinal de pedestre: quem atravessa uma rua de eixo 'v' (carros descendo/subindo) só vai quando o semáforo dela está VERMELHO
+  // (e com tempo de sobra para chegar do outro lado)
+  function pedPodeAtravessar(axisCarros, time) {
+    const t = time % CYCLE;
+    if (axisCarros === 'v') return t >= 7.2 && t < 11.8;                       // v fica vermelho de 7.0 a 16.4
+    const u = (t - 15.4 + CYCLE) % CYCLE; return u < 4.6;                     // h fica vermelho de 15.2 até 8.2 do ciclo seguinte
+  }
   function drawLights(ctx, x0, y0, x1, y1, time) {
     const cols = { g: '#3dff6a', y: '#ffe23d', r: '#ff3d3d' };
     const sv = lightState('v', time), sh = lightState('h', time);
@@ -42,7 +49,7 @@
   const angFor = (axis, dir) => axis === 'v' ? (dir > 0 ? Math.PI : 0) : (dir > 0 ? Math.PI / 2 : -Math.PI / 2);
 
   function initNav(axis, idx, dir, along) {
-    const k = (along / T - MG - ROWS * 0 - 3) / PITCH;
+    const k = (along / T - MG - W.ROAD / 2) / PITCH;
     let n = dir > 0 ? Math.ceil(k - 1e-6) : Math.floor(k + 1e-6);
     const nav = { axis, idx, dir, ni: 0, nj: 0, m: null, mode: 'wander', target: null };
     if (axis === 'v') { nav.ni = idx; nav.nj = clamp(n, 0, ROWS); } else { nav.nj = idx; nav.ni = clamp(n, 0, COLS); }
@@ -140,6 +147,24 @@
       }
       if (block) v = Math.min(v, Math.max(0, toNode - (ROAD_HALF() + 14)) * 1.7);
     }
+    // não entra no cruzamento se a saída está entupida (evita engarrafar a esquina)
+    if (!car.ignoreLights && toNode > 10 && toNode < 150 && (!n.m || n.m.k === 's')) {
+      for (const o of S.cars) {
+        if (o === car || o.dead) continue;
+        const ox = o.x - car.x, oy = o.y - car.y; if (Math.abs(ox) > 420 || Math.abs(oy) > 420) continue;
+        const al = ox * car.fx + oy * car.fy, lat = ox * Math.cos(car.a) + oy * Math.sin(car.a);
+        if (al > toNode + ROAD_HALF() && al < toNode + ROAD_HALF() + 150 && Math.abs(lat) < 34 && o.speed < 22 && o.fx * car.fx + o.fy * car.fy > 0.6) { v = Math.min(v, Math.max(0, toNode - (ROAD_HALF() + 14)) * 1.7); break; }
+      }
+    }
+    // pedestre na faixa à frente (inclusive nas curvas): para
+    if (toNode < ROAD_HALF() + 220 || (n.m && n.m.k !== 's')) for (const p of S.peds) {
+      if (p.state === 'down' || p.state === 'dead') continue;
+      const dx = p.x - car.x, dy = p.y - car.y; if (Math.abs(dx) > 240 || Math.abs(dy) > 240) continue;
+      if (!W.isRoadTile(W.tileAt(p.x, p.y))) continue;   // pedestre em cima da faixa OU da pista: o carro espera
+      const al = dx * car.fx + dy * car.fy, lat = dx * Math.cos(car.a) + dy * Math.sin(car.a);
+      const dd = Math.hypot(dx, dy);
+      if (al > -16 && ((al < 230 && Math.abs(lat) < 70) || dd < 120)) { v = Math.min(v, Math.max(0, dd - 52) * 0.95); break; }
+    }
     // pisca-pisca: avisa antes de virar
     car.blink = (n.m && n.m.k !== 's' && toNode < 280) ? (n.m.k === 'r' ? 1 : -1) : 0;
     // ambulância/polícia de sirene atrás: reduz e deixa passar
@@ -209,7 +234,7 @@
     return true;
   }
   function resnap(car) {
-    const cx = Math.round((car.x / T - MG - 3) / PITCH), cy = Math.round((car.y / T - MG - 3) / PITCH);
+    const cx = Math.round((car.x / T - MG - W.ROAD / 2) / PITCH), cy = Math.round((car.y / T - MG - W.ROAD / 2) / PITCH);
     const i = clamp(cx, 0, COLS), j = clamp(cy, 0, ROWS);
     const dv = Math.abs(car.x - W.nodeX(i)), dh = Math.abs(car.y - W.nodeY(j));
     if (Math.min(dv, dh) > 110) return false;
@@ -224,7 +249,7 @@
     if (car.navDirect || !car.nav) { car.navDirect = false; if (!resnap(car)) return directPursuit(car, dt, S); }
     const n = car.nav;
     if (car.mode === 'chase') {
-      n.mode = 'goto'; n.target = { i: clamp(Math.round((tg.x / T - MG - 3) / PITCH), 0, COLS), j: clamp(Math.round((tg.y / T - MG - 3) / PITCH), 0, ROWS) };
+      n.mode = 'goto'; n.target = { i: clamp(Math.round((tg.x / T - MG - W.ROAD / 2) / PITCH), 0, COLS), j: clamp(Math.round((tg.y / T - MG - W.ROAD / 2) / PITCH), 0, ROWS) };
       car.cruise = 300 * (car.chaseScale || 1);
     } else { n.mode = 'wander'; car.cruise = 250; }
     car.ignoreLights = true;
@@ -239,15 +264,15 @@
       const ang = Math.random() * TAU, d = rand(minD, maxD);
       const px = cx + Math.cos(ang) * d, py = cy + Math.sin(ang) * d;
       if (axis === 'v') {
-        idx = clamp(Math.round((px / T - MG - 3) / PITCH), 0, COLS);
+        idx = clamp(Math.round((px / T - MG - W.ROAD / 2) / PITCH), 0, COLS);
         along = py;
-        const k = clamp(Math.round((along / T - MG - 3) / PITCH), 0, ROWS), nyy = W.nodeY(k);
+        const k = clamp(Math.round((along / T - MG - W.ROAD / 2) / PITCH), 0, ROWS), nyy = W.nodeY(k);
         if (Math.abs(along - nyy) < 300) along = nyy + (along >= nyy ? 1 : -1) * 320;
         along = clamp(along, W.nodeY(0) + 200, W.nodeY(ROWS) - 200);
       } else {
-        idx = clamp(Math.round((py / T - MG - 3) / PITCH), 0, ROWS);
+        idx = clamp(Math.round((py / T - MG - W.ROAD / 2) / PITCH), 0, ROWS);
         along = px;
-        const k = clamp(Math.round((along / T - MG - 3) / PITCH), 0, COLS), nxx = W.nodeX(k);
+        const k = clamp(Math.round((along / T - MG - W.ROAD / 2) / PITCH), 0, COLS), nxx = W.nodeX(k);
         if (Math.abs(along - nxx) < 300) along = nxx + (along >= nxx ? 1 : -1) * 320;
         along = clamp(along, W.nodeX(0) + 200, W.nodeX(COLS) - 200);
       }
@@ -296,7 +321,7 @@
     const P = S.player, tg = P.car || P;
     const pt = randomRoadPoint(tg.x + (tg.vx || 0) * 2, tg.y + (tg.vy || 0) * 2, 700, 1000);
     if (!pt) return;
-    const mid = pt.axis === 'v' ? W.roadLeft(pt.idx) + 3 * T : W.roadTop(pt.idx) + 3 * T;
+    const mid = pt.axis === 'v' ? W.roadLeft(pt.idx) + W.ROAD / 2 * T : W.roadTop(pt.idx) + W.ROAD / 2 * T;
     const made = [];
     [-1, 1].forEach(s => {
       const cx = pt.axis === 'v' ? mid + s * 48 : pt.along, cy = pt.axis === 'v' ? pt.along : mid + s * 48;
@@ -316,6 +341,7 @@
   }
   const pedOk = (x, y) => { const t = W.tileAt(x, y); return W.pedWalkable(t) && !W.treeHit(x, y, 4); };
   function updatePed(p, dt, S) {
+    if (p.script) return;     // pedestre controlado por uma cena (ex.: policial que escolta o preso)
     // combate: mortos, caídos, atiradores e guardas são tratados em combat.js
     if (G.combat && G.combat.updatePed(p, dt, S)) return;
     if (p.talkT > 0 && p.state === 'walk') { p.walk = 0; return; }   // parou para conversar com você
@@ -340,6 +366,32 @@
       if (!W.isSolid(p.x, p.y + vy * dt * 2) && !W.treeHit(p.x, p.y + vy * dt * 2, 3)) p.y += vy * dt;
       p.h += wrap(ang + Math.PI / 2 - p.h) * Math.min(1, 10 * dt); p.walk += sp * dt * 0.22;
       if (p.fleeT <= 0) { p.state = 'walk'; p.d = Math.round(((ang % TAU) + TAU) % TAU / (Math.PI / 2)) % 4; }
+      return;
+    }
+    // semáforo de pedestre: espera na calçada até abrir; carro na faixa também faz esperar
+    if (p.state === 'walk' && !p.alvoMov) {
+      const a0 = DIRS[p.d], px0 = p.x + Math.cos(a0) * 20, py0 = p.y + Math.sin(a0) * 20;
+      const aqui = W.tileAt(p.x, p.y);
+      if (aqui !== W.TILE.CROSS && W.tileAt(px0, py0) === W.TILE.CROSS) {
+        const axisCarros = (p.d === 0 || p.d === 2) ? 'v' : 'h';     // andando em x atravessa a rua dos carros que andam em y
+        let livre = pedPodeAtravessar(axisCarros, S.time);
+        if (livre) for (const c of S.cars) { if (c.dead || c.speed < 30) continue; if (Math.abs(c.x - px0) < 130 && Math.abs(c.y - py0) < 130) { livre = false; break; } }
+        if (!livre) {
+          p.esperaT = (p.esperaT || 0) + dt; p.walk = 0;
+          p.h += wrap(a0 + Math.PI / 2 - p.h) * Math.min(1, 6 * dt);
+          if (p.esperaT > 40) { p.esperaT = 0; p.d = (p.d + 2) % 4; }      // cansou de esperar: volta
+          return;
+        }
+      }
+      p.esperaT = 0;
+    }
+    // empurrado para a pista (por um carro devagar ou explosão)? corre para a calçada mais próxima, em vez de seguir reto no meio da rua
+    if (!W.pedWalkable(W.tileAt(p.x, p.y))) {
+      let melhor = -1, menor = 99;
+      for (let d = 0; d < 4; d++) for (let k = 1; k <= 10; k++) if (pedOk(p.x + Math.cos(DIRS[d]) * k * 16, p.y + Math.sin(DIRS[d]) * k * 16)) { if (k < menor) { menor = k; melhor = d; } break; }
+      if (melhor >= 0) p.d = melhor;
+      p.x += Math.cos(DIRS[p.d]) * p.speed * 1.7 * dt; p.y += Math.sin(DIRS[p.d]) * p.speed * 1.7 * dt; p.walk += p.speed * dt * 0.4;
+      p.h += wrap(DIRS[p.d] + Math.PI / 2 - p.h) * Math.min(1, 10 * dt);
       return;
     }
     // andando
@@ -390,7 +442,7 @@
   }
 
   G.ai = {
-    lightState, drawLights, initNav, driveTraffic, driveChase, randomRoadPoint, spawnTraffic, spawnPolice, spawnRoadblock,
+    pedPodeAtravessar, lightState, drawLights, initNav, driveTraffic, driveChase, randomRoadPoint, spawnTraffic, spawnPolice, spawnRoadblock,
     makePed, updatePed, spawnPed, updateHeli, lineClear, angFor, wrap, clamp, rand, pick, pedOk, CAR_COLORS,
   };
 })(window.G = window.G || {});

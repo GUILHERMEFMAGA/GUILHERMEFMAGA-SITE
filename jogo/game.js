@@ -241,11 +241,11 @@
   }
   function goBusted() {
     S.sentado = null;
-    S.mode = 'busted'; S.modeT = 0;
     if (M.active) M.fail(S, 'você foi preso');
     if (S.player.car) exitCar();
-    G.snd.fail();
+    G.justica.prender(S);      // justica.js: algemas, viatura, delegacia, sentença...
   }
+  G.respawn = (where, loss) => respawn(where, loss);
   function respawn(where, loss) {
     const P = S.player;
     S.save.money = Math.floor(S.save.money * (1 - loss)); G.save();
@@ -268,6 +268,7 @@
       if (c.mode === 'script') { if (G.mercadosScript) G.mercadosScript(c, dt); continue; }   // carros do estacionamento (mercados.js)
       if (c.driver === 'ai') {
         if (c.mode === 'wander' || c.mode === 'race') AI.driveTraffic(c, dt, S);
+        else if (c.mode === 'prisao') G.justica.dirige(c, dt, S);
         else if (c.mode === 'chase' || c.mode === 'leave') AI.driveChase(c, dt, S);
       } else if (c.driver !== 'player') { c.thr = 0; c.steer = 0; c.hb = true; }
       G.updateCar(c, dt);
@@ -290,7 +291,7 @@
       for (const p of S.peds) {
         if (p.state === 'down' || p.state === 'dead' || Math.abs(p.x - c.x) > 70 || Math.abs(p.y - c.y) > 70) continue;
         const h = hitPed(p, c); if (!h) continue;
-        if (sp > 55) {
+        if (sp > (c.driver === 'ai' && c.kind !== 'police' ? 95 : 55)) {   // motorista da cidade devagar só empurra, não atropela
           G.combat.carHit(S, p, c, sp);
           c.vx *= 0.97; c.vy *= 0.97;
           if (c === P.car) { G.addHeat(9); const m = M.active; if (m && m.type === 'taxi' && m.stage === 1) m.comfort -= m.def.vip ? 25 : 12; }
@@ -410,8 +411,11 @@
       G.detalhes.update(S, W, dt);
       G.lugares.atualizar(S, dt);
       updatePolice(dt);
+      G.justica.atualizar(S);
       G.combat.update(S, dt);
       M.update(S, dt);
+    } else if (S.mode === 'preso') {
+      S.modeT += dt; G.justica.rodar(S, dt); updateCars(dt); managePopulation(dt); G.combat.update(S, dt);
     } else if (S.mode === 'wasted' || S.mode === 'busted') {
       S.modeT += dt; updateCars(dt); managePopulation(dt); G.combat.update(S, dt);
       if (S.modeT > 3.2) respawn(S.mode === 'wasted' ? M.POI.hospital : M.POI.delegacia, S.mode === 'wasted' ? 0.1 : 0.15);
@@ -456,7 +460,7 @@
     cars.forEach(c => SP.drawCar(ctx, c, S.time));
     vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
     if (G.fbi) G.fbi.desenhar(ctx, S, inV, S.time);   // agentes do FBI patrulhando
-    if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
+    if (!S.player.car && !S.player.escondido && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
     G.detalhes.draw(ctx, S, inV);            // pombos
     G.lugares.desenhar(ctx, S, inV);         // marcadores dos lugares, balões de fala, seta do guia
     AI.drawLights(ctx, vx0, vy0, vx1, vy1, S.time);
@@ -606,6 +610,7 @@
     }
     if (Kp('KeyP', 'Escape')) { if (S.mode === 'play') S.mode = 'paused'; else if (S.mode === 'paused') S.mode = 'play'; }
     if (S.mode === 'paused' && Kp('Enter')) S.mode = 'play';
+    if (S.mode === 'preso' && (pressed.Space || pressed.Enter)) S.keysPulaViagem = true;
     if (S.mode === 'shop') { for (const k in pressed) if (G.combat.shopKey(S, k)) { S.mode = 'play'; G.snd.door(); break; } }
     else if (S.mode !== 'paused') update(dt);
     drawWorld();
@@ -613,6 +618,7 @@
     if (S.mode === 'play' || S.mode === 'paused') G.lugares.hudMochila(ctx, S);
     if (S.mode === 'wasted') drawOverlay('VOCÊ MORREU', 'Os médicos te trouxeram de volta...', '#ff4a4a');
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
+    if (S.mode === 'preso') G.justica.desenhar(ctx, S);
     if (S.mode === 'shop') G.combat.drawShop(ctx, S);
     if (S.mode === 'paused') drawOverlay('PAUSADO', 'P ou ENTER para continuar', '#ffe04a');
     G.lugares.desenharTrans(ctx, S); G.overlay.desenhar(ctx, S, dt);

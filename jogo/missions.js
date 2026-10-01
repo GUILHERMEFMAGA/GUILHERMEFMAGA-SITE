@@ -10,11 +10,13 @@
   const rand = (a, b) => a + Math.random() * (b - a);
 
   // ---------- Lugares ----------
+  // hospital e delegacia agora são os prédios grandes do mapa (world.js: places do tipo 'hospital' e 'delegacia')
+  const ponto = (tipo, padrao) => { const p = W.places.find(q => q.tipo === tipo); return p ? { x: p.x, y: p.y + 40 } : padrao; };
   const POI = {
     garage: Object.assign(W.sidePoint(0, 0, 'bottom', 0.5), { r: 52, name: 'GARAGEM' }),
     oficina: Object.assign(W.sidePoint(2, 2, 'top', 0.5), { r: 52, name: 'OFICINA' }),
-    hospital: Object.assign(W.sidePoint(4, 1, 'bottom', 0.5), { r: 40, name: 'HOSPITAL' }),
-    delegacia: Object.assign(W.sidePoint(1, 3, 'right', 0.5), { r: 40, name: 'DELEGACIA' }),
+    hospital: Object.assign({}, ponto('hospital', W.sidePoint(4, 1, 'bottom', 0.5)), { r: 44, name: 'HOSPITAL' }),
+    delegacia: Object.assign({}, ponto('delegacia', W.sidePoint(1, 3, 'right', 0.5)), { r: 44, name: 'DELEGACIA' }),
     armas: Object.assign(W.sidePoint(1, 0, 'bottom', 0.5), { r: 46, name: 'LOJA DE ARMAS' }),
   };
   // telefone no meio da calçada, mas nunca em cima da porta de uma casa/loja (senão a tecla E fica confusa)
@@ -58,8 +60,9 @@
 
   function randSpot(S, minD, maxD, from) {
     const f = from || S.player;
-    const c = W.spots.filter(p => { const d = Math.hypot(p.x - f.x, p.y - f.y); return d >= minD && d <= maxD; });
-    const arr = c.length ? c : W.spots;
+    const rib = W.spots.filter(p => p.x < W.roadLeft(9));   // as missões ficam em Ribeirão
+    const c = rib.filter(p => { const d = Math.hypot(p.x - f.x, p.y - f.y); return d >= minD && d <= maxD; });
+    const arr = c.length ? c : rib;
     const p = arr[Math.floor(Math.random() * arr.length)];
     return { x: p.x, y: p.y };
   }
@@ -92,13 +95,13 @@
       m.markers = [{ x: c.x, y: c.y, r: 60, label: def.car.label.toUpperCase(), follow: c }];
       m.hint = 'Encontre o ' + def.car.label;
     } else if (def.type === 'race') {
-      const i0 = 1 + Math.floor(Math.random() * (W.COLS - 1)), j0 = 1 + Math.floor(Math.random() * (W.ROWS - 1));
+      const i0 = 1 + Math.floor(Math.random() * 8), j0 = 1 + Math.floor(Math.random() * (W.ROWS - 1));
       m.start = { i: i0, j: j0 }; m.cps = []; let ci = i0, cj = j0;
       for (let k = 0; k < def.cps; k++) {
         let t = 0, ni, nj;
         do { ni = ci + (Math.floor(Math.random() * 5) - 2); nj = cj + (Math.floor(Math.random() * 3) - 1); t++; }
-        while (t < 30 && (ni < 0 || nj < 0 || ni > W.COLS || nj > W.ROWS || (ni === ci && nj === cj) || Math.abs(ni - ci) + Math.abs(nj - cj) < 2));
-        if (ni < 0 || nj < 0 || ni > W.COLS || nj > W.ROWS) { ni = ci; nj = cj === 0 ? 2 : cj - 2; }
+        while (t < 30 && (ni < 0 || nj < 0 || ni > 9 || nj > W.ROWS || (ni === ci && nj === cj) || Math.abs(ni - ci) + Math.abs(nj - cj) < 2));
+        if (ni < 0 || nj < 0 || ni > 9 || nj > W.ROWS) { ni = ci; nj = cj === 0 ? 2 : cj - 2; }
         m.cps.push({ i: ni, j: nj }); ci = ni; cj = nj;
       }
       m.cp = 0; m.cd = 0; m.rivals = []; m.racing = false; m.placed = 0;

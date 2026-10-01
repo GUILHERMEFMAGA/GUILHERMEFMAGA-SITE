@@ -13,18 +13,21 @@
 
   // ---------- as praças ----------
   const DEFS = [
-    { rio: 9, j: 3, valor: 15, nome: 'PEDÁGIO DO INTERIOR' },
-    { rio: 13, j: 2, valor: 25, nome: 'PEDÁGIO VALE VERDE' },
-    { rio: 13, j: 4, valor: 25, nome: 'PEDÁGIO PONTE NOVA ERA', ponteObra: 'PONTE NOVA ERA' },
-    { rio: 9, j: 1, valor: 15, nome: 'PEDÁGIO PONTE DO PROGRESSO', ponteObra: 'PONTE DO PROGRESSO' }
+    { rio: 9, j: 3, valor: 15, nome: 'PEDÁGIO MATA ESCURA' },
+    { rio: 16, j: 5, valor: 25, nome: 'PEDÁGIO NOVO HORIZONTE' },
+    { rio: 23, j: 4, valor: 30, nome: 'PEDÁGIO VALE VERDE' },
+    { rio: 30, j: 3, valor: 35, nome: 'PEDÁGIO PORTO DO SOL' },
+    { rio: 16, j: 2, valor: 25, nome: 'PEDÁGIO PONTE NOVA ERA', ponteObra: 'PONTE NOVA ERA' },
+    { rio: 9, j: 6, valor: 15, nome: 'PEDÁGIO PONTE DO PROGRESSO', ponteObra: 'PONTE DO PROGRESSO' },
+    { rio: 30, j: 6, valor: 35, nome: 'PEDÁGIO PONTE DO LITORAL', ponteObra: 'PONTE DO LITORAL' }
   ];
   DEFS.forEach(d => {
     const rv = W.blocks.find(b => b.kind === 'river' && b.bx === d.rio), top = W.roadTop(d.j);
-    const pr = Object.assign({}, d, { x0: rv.x, x1: rv.x + rv.w, top, mid: top + 3 * T });
+    const pr = Object.assign({}, d, { x0: rv.x, x1: rv.x + rv.w, top, mid: top + W.ROAD / 2 * T });
     // uma pista para cada sentido: leste entra pela margem esquerda, oeste pela direita
     pr.pistas = [
-      { dir: 1, gx: rv.x + 34, y: top + 4.5 * T, aberta: 0, quebrada: 0, paga: false },
-      { dir: -1, gx: rv.x + rv.w - 34, y: top + 1.5 * T, aberta: 0, quebrada: 0, paga: false }
+      { dir: 1, gx: rv.x + 34, y: W.laneH(d.j, 1), aberta: 0, quebrada: 0, paga: false },
+      { dir: -1, gx: rv.x + rv.w - 34, y: W.laneH(d.j, -1), aberta: 0, quebrada: 0, paga: false }
     ];
     pr.ativa = () => !d.ponteObra || (C.pontes.find(p => p.nome === d.ponteObra) || {}).pronta;
     P.pracas.push(pr);
@@ -39,7 +42,7 @@
     const reg = C.regiaoDe(pl.x, pl.y);
     if (regiaoAnt && reg.id !== regiaoAnt.id && S.mode === 'play') {
       const obras = reg.id !== 'ribeirao';
-      G.banner(reg.nome, obras ? reg.sub + ' — cidade em construção, veja as obras crescerem' : 'de volta para casa', false, 3);
+      G.banner(reg.nome, obras ? reg.sub : 'de volta para casa', false, 3);
     }
     regiaoAnt = reg;
     P.ativas().forEach(pr => pr.pistas.forEach(ps => {

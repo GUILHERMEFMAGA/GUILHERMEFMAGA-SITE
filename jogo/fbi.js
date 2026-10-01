@@ -17,8 +17,10 @@
   const REGIOES = [
     { b0: 0, b1: 2, nome: 'Agente Cruz', id: 'F1', setor: 'Ribeirão Oeste' },
     { b0: 4, b1: 8, nome: 'Agente Lima', id: 'F2', setor: 'Ribeirão Leste' },
-    { b0: 10, b1: 12, nome: 'Agente Rocha', id: 'F3', setor: 'Novo Horizonte' },
-    { b0: 14, b1: 16, nome: 'Agente Duarte', id: 'F4', setor: 'Vale Verde' }
+    { b0: 10, b1: 15, nome: 'Agente Dias', id: 'F5', setor: 'Mata Escura' },
+    { b0: 17, b1: 22, nome: 'Agente Rocha', id: 'F3', setor: 'Novo Horizonte' },
+    { b0: 24, b1: 29, nome: 'Agente Duarte', id: 'F4', setor: 'Vale Verde' },
+    { b0: 31, b1: 33, nome: 'Agente Sá', id: 'F6', setor: 'Porto do Sol' }
   ];
   const caminhavel = (tx, ty) => { if (tx < 0 || ty < 0 || tx >= W.TW || ty >= W.TH) return false; const t = W.tiles[ty * W.TW + tx]; return t === TILE.SIDE || t === TILE.CROSS || t === TILE.GRASS || t === TILE.LOT; };
 

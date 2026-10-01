@@ -45,7 +45,7 @@
     else { const q = r(); tipo = q < 0.42 ? 'casa' : q < 0.68 ? 'comercio' : q < 0.84 ? 'predio' : 'escritorio'; }
     const df = TIPOS[tipo];
     const dur = Math.round(df.dur[0] + r() * (df.dur[1] - df.dur[0]));
-    const interior = l.bx >= 10 && l.bx <= 12;
+    const interior = l.bx >= 17 && l.bx <= 22;
     // quando a obra começa (em segundos do relógio da obra; negativo = já começou antes de você chegar)
     const u = r(), q1 = interior ? 0.30 : 0.14, q2 = interior ? 0.66 : 0.48;
     let inicio = u < q1 ? -dur * (1.05 + r() * 0.8) : u < q2 ? -dur * (0.08 + r() * 0.85) : 20 + r() * (interior ? 700 : 1500);
@@ -76,8 +76,9 @@
 
   // ---------- pontes que estão sendo construídas ----------
   C.pontes = [
-    { rio: 13, j: 4, inicio: -380, dur: 1500, nome: 'PONTE NOVA ERA', fase: -1, pronta: false },
-    { rio: 9, j: 1, inicio: 520, dur: 1500, nome: 'PONTE DO PROGRESSO', fase: -1, pronta: false }
+    { rio: 16, j: 2, inicio: -380, dur: 1500, nome: 'PONTE NOVA ERA', fase: -1, pronta: false },
+    { rio: 9, j: 6, inicio: 520, dur: 1500, nome: 'PONTE DO PROGRESSO', fase: -1, pronta: false },
+    { rio: 30, j: 6, inicio: 900, dur: 1600, nome: 'PONTE DO LITORAL', fase: -1, pronta: false }
   ];
   C.pontes.forEach(pt => {
     const rv = W.blocks.find(b => b.kind === 'river' && b.bx === pt.rio);

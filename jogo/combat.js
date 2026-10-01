@@ -458,6 +458,7 @@
 
   // devolve true quando o pedestre foi tratado aqui
   function updatePed(p, dt, S) {
+    if (p.script) return true;
     if (p.flashT > 0) p.flashT -= dt;
     if (p.state === 'dead') {
       p.corpseT = (p.corpseT || 0) + dt; p.pool = Math.min(1, p.corpseT / 3.5);
