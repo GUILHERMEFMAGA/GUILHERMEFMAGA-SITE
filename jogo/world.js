@@ -221,10 +221,10 @@
 
   // ---------- Lugares da nossa cidade (dá para entrar!) ----------
   const PLACE_DEFS = [
-    { id: 'pinguim', nome: 'PINGUIM', cor: '#1d5fb4' }, { id: 'banco', nome: 'BANCO', cor: '#2a5a9a' }, { id: 'padaria', nome: 'PADARIA', cor: '#c8782a' }, { id: 'pizzaria', nome: 'PIZZARIA', cor: '#b02a2a' },
-    { id: 'farmacia', nome: 'FARMÁCIA', cor: '#d9363e' }, { id: 'barbearia', nome: 'BARBEARIA', cor: '#7b3fa0' },
-    { id: 'shopping', nome: 'SHOPPING', cor: '#e07b1a' }, { id: 'teatro', nome: 'TEATRO PEDRO II', cor: '#8a1f3a' },
-    { id: 'casa', nome: 'MINHA CASA', cor: '#44607a' }, { id: 'academia', nome: 'ACADEMIA', cor: '#b8960c' },
+    { id: 'pinguim', nome: 'PINGUIM CHOPP', cor: '#1d5fb4' }, { id: 'banco', nome: 'BANCO RIBEIRÃO', cor: '#2a5a9a', horario: [10, 16] }, { id: 'padaria', nome: 'PADARIA PÃO QUENTE', cor: '#c8782a', horario: [5, 21] }, { id: 'pizzaria', nome: 'PIZZARIA DONA MARIA', cor: '#b02a2a', horario: [11, 24] },
+    { id: 'farmacia', nome: 'FARMÁCIA DROGA SAÚDE', cor: '#d9363e' }, { id: 'barbearia', nome: 'BARBEARIA', cor: '#7b3fa0' },
+    { id: 'shopping', nome: 'SHOPPING SANTA ÚRSULA', cor: '#e07b1a' }, { id: 'teatro', nome: 'TEATRO PEDRO II', cor: '#8a1f3a' },
+    { id: 'casa', nome: 'SUA CASA', cor: '#44607a' }, { id: 'academia', nome: 'ACADEMIA FORÇA TOTAL', cor: '#b8960c' },
     { id: 'catedral', nome: 'CATEDRAL', cor: '#6a6a78' }
   ];
   (function () {
@@ -252,6 +252,56 @@
       b.place = p; places.push(p);
     });
   })();
+
+  // ---------- Comércios comuns (lanchonete, ótica, ferragem...) ----------
+  // Todo prédio comercial com porta na calçada vira uma loja de verdade: tem letreiro com o nome certo e dá para entrar.
+  const LOJAS_DEF = [
+    { tipo: 'lanchonete', nomes: ['LANCHES DO ZECA', 'BIG LANCHE', 'X-TUDO DA ESQUINA'], cor: '#d9541e', horario: [10, 23] },
+    { tipo: 'sorveteria', nomes: ['SORVETERIA GELATTO', 'PICOLÉ DO BAIRRO'], cor: '#e060a0', horario: [11, 22] },
+    { tipo: 'acougue', nomes: ['AÇOUGUE BOI GORDO', 'CASA DE CARNES SUL'], cor: '#9a2a2a', horario: [7, 19] },
+    { tipo: 'floricultura', nomes: ['FLORICULTURA FLOR DE LIS', 'FLORES DA VOVÓ'], cor: '#3a9a5a', horario: [8, 18] },
+    { tipo: 'petshop', nomes: ['PET SHOP AUAU', 'PET SHOP BICHO FELIZ'], cor: '#2a9ab0', horario: [8, 19] },
+    { tipo: 'livraria', nomes: ['LIVRARIA PÁGINA UM', 'PAPELARIA O LÁPIS'], cor: '#6a4a9a', horario: [9, 19] },
+    { tipo: 'eletronicos', nomes: ['TECNO CELL', 'ELETRO RIBEIRÃO'], cor: '#2a5ad0', horario: [9, 20] },
+    { tipo: 'otica', nomes: ['ÓTICA VISÃO CLARA', 'ÓTICA OLHAR'], cor: '#3a6aa0', horario: [9, 19] },
+    { tipo: 'ferragem', nomes: ['FERRAGEM SÃO JOÃO', 'CASA DO PARAFUSO'], cor: '#8a6a2a', horario: [7, 18] },
+    { tipo: 'loteria', nomes: ['LOTÉRICA SORTE GRANDE', 'LOTÉRICA DA ESQUINA'], cor: '#2a8a4a', horario: [8, 20] },
+    { tipo: 'mercadinho', nomes: ['MERCADINHO BOM PREÇO', 'MERCEARIA DO SEU JOÃO'], cor: '#c8a028', horario: [7, 22] },
+    { tipo: 'roupas', nomes: ['MODA JOVEM', 'BOUTIQUE ELEGANTE'], cor: '#c04a8a', horario: [9, 20] },
+    { tipo: 'bar', nomes: ['BAR DO ZÉ', 'BOTECO DA ESQUINA'], cor: '#a05a1a', horario: [11, 24] },
+    { tipo: 'cafe', nomes: ['CAFÉ DO CENTRO', 'CAFETERIA GRÃO FINO'], cor: '#6a4028', horario: [6, 20] }
+  ];
+  const lojas = [];
+  // "evitar" = pontos (telefones, garagem, hospital...) que não podem ficar em cima de uma porta
+  function gerarLojas(evitar) {
+    if (lojas.length) return;
+    const r = mulberry32(4242), usados = new Set();
+    const portas = places.concat(casas.filter(c => !c.b.place));
+    const cand = [];
+    blocks.forEach(blk => {
+      if (blk.kind !== 'city') return;
+      buildings.forEach(b => {
+        if (b.p.kind !== 'flat' || b.place || b.casa || b.w < 80 || b.h < 60) return;
+        if (b.x < blk.x || b.x > blk.x + blk.w || b.y < blk.y || b.y > blk.y + blk.h) return;
+        const cx = b.x + b.w / 2;
+        if (tiles[Math.floor((b.y + b.h + 10) / T) * TW + Math.floor(cx / T)] !== TILE.SIDE) return;
+        if (tiles[Math.floor((b.y + b.h + 26) / T) * TW + Math.floor(cx / T)] !== TILE.SIDE) return;
+        const px = cx, py = b.y + b.h + 24;
+        if ((evitar || []).some(e => Math.hypot(e.x - px, e.y - py) < 100)) return;
+        if (portas.some(q => Math.hypot(q.x - px, q.y - py) < 100)) return;
+        cand.push({ b, px, py });
+      });
+    });
+    // baralho de tipos embaralhado: cada tipo aparece uma vez antes de repetir
+    let baralho = [];
+    cand.forEach(c => {
+      if (!baralho.length) { baralho = LOJAS_DEF.slice(); for (let i = baralho.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [baralho[i], baralho[j]] = [baralho[j], baralho[i]]; } }
+      const df = baralho.pop();
+      let nome = df.nomes.find(n => !usados.has(n)); if (!nome) nome = df.nomes[0] + ' 2'; usados.add(nome);
+      const pl = { tipo: 'loja', id: 'loja' + lojas.length, loja: df.tipo, nome, cor: df.cor, horario: df.horario, b: c.b, x: c.px, y: c.py, r: 34 };
+      c.b.place = pl; places.push(pl); lojas.push(pl);
+    });
+  }
   const propList = [];
   blocks.forEach(blk => { if (blk.kind !== 'river') blockProps(blk).forEach(p => propList.push(p)); });
 
@@ -337,11 +387,11 @@
     ctx.fillStyle = 'rgba(0,0,20,0.28)'; ctx.fillRect(x, y, w, fh); // parede fica na sombra
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x, y, w, 3);   // sombra do beiral
     ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, y + fh - 2, w, 2); // base clara
-    const rs = mulberry32(Math.floor(b.x * 5 + b.y * 11));
+    const rs = mulberry32(Math.floor(b.x * 5 + b.y * 11)), temPorta = !!(b.place || b.casa);   // só quem dá para entrar tem porta
     const ww = b.p.kind === 'tile' ? 10 : 14, gap = ww + 9;
     for (let xx = x + 8; xx + ww < x + w - 6; xx += gap) {
       const acesa = rs() < 0.45, top = b.place ? 14 : 7, wy = y + top, wh = fh - top - 5;
-      if (Math.abs(xx + ww / 2 - (x + w / 2)) < 24) continue; // deixa espaço para a porta
+      if (temPorta && Math.abs(xx + ww / 2 - (x + w / 2)) < 24) continue; // deixa espaço para a porta
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(xx - 1, wy - 1, ww + 2, wh + 2);
       const gj = ctx.createLinearGradient(xx, wy, xx + ww, wy + wh);
       if (acesa) { gj.addColorStop(0, '#ffe6a0'); gj.addColorStop(1, '#e8a850'); } else { gj.addColorStop(0, '#6f93ad'); gj.addColorStop(1, '#1b2a38'); }
@@ -349,18 +399,20 @@
       ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(xx, wy, 2, wh);   // reflexo
       ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(xx + ww / 2, wy, 1, wh); // divisão do vidro
     }
-    // porta no meio
-    const dw = 16; ctx.fillStyle = '#1c1612'; ctx.fillRect(x + w / 2 - dw / 2 - 1, y + fh - 17, dw + 2, 17);
+    // porta no meio (só nos lugares que dá para entrar)
+    const dw = 16; if (temPorta) { ctx.fillStyle = '#1c1612'; ctx.fillRect(x + w / 2 - dw / 2 - 1, y + fh - 17, dw + 2, 17);
     ctx.fillStyle = '#5a3d28'; ctx.fillRect(x + w / 2 - dw / 2, y + fh - 16, dw, 16);
     ctx.fillStyle = '#c8a24a'; ctx.fillRect(x + w / 2 + 4, y + fh - 9, 2, 2);
+    }
     if (b.place) { // letreiro do lugar (dá para entrar!)
-      const sw = Math.min(w - 16, b.place.tipo === 'lugar' ? 92 : 170), sx = x + w / 2 - sw / 2, sy = y + 2;
+      ctx.font = 'bold 8px Arial, sans-serif'; const tw8 = ctx.measureText(b.place.nome).width, fs = Math.max(5, Math.min(8, 8 * (w - 22) / tw8)); ctx.font = 'bold ' + fs + 'px Arial, sans-serif'; const sw = Math.min(w - 8, Math.max(60, Math.ceil(tw8 * fs / 8) + 14)), sx = x + w / 2 - sw / 2, sy = y + 2;
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(sx + 1.5, sy + 2.5, sw, 10);
       const sg = ctx.createLinearGradient(0, sy, 0, sy + 10); sg.addColorStop(0, shade(b.place.cor, 0.25)); sg.addColorStop(1, shade(b.place.cor, -0.2));
       ctx.fillStyle = sg; ctx.fillRect(sx, sy, sw, 10); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.8; ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 9);
-      ctx.font = 'bold 8px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillText(b.place.nome, x + w / 2 + 0.7, sy + 8); ctx.fillStyle = '#ffffff'; ctx.fillText(b.place.nome, x + w / 2, sy + 7.3); ctx.textAlign = 'left';
+      ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillText(b.place.nome, x + w / 2 + 0.7, sy + 8); ctx.fillStyle = '#ffffff'; ctx.fillText(b.place.nome, x + w / 2, sy + 7.3); ctx.textAlign = 'left';
     }
-    if (b.p.kind !== 'tile' && fh >= 24) { // toldo listrado sobre a porta (cor sorteada)
+    if (!temPorta) { /* parede lisa: sem porta nem toldo */ }
+    else if (b.p.kind !== 'tile' && fh >= 24) { // toldo listrado sobre a porta (cor sorteada)
       const cores = b.place ? [b.place.cor, '#f2ecdc'] : [['#c8302a', '#f2ecdc'], ['#2a6ac8', '#f2ecdc'], ['#2a9a52', '#f2ecdc'], ['#e0a42a', '#f2ecdc'], ['#8a3ac2', '#f2ecdc']][Math.floor(rs() * 5)];
       const aw = 46, ax = x + w / 2 - aw / 2, ay = y + fh - (b.place ? 25 : 26);
       ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(ax + 2, ay + 6, aw, 5);
@@ -851,7 +903,7 @@
   G.world = {
     T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
     roadLeft, roadTop, nodeX, nodeY, laneV, laneH, tileAt, isSolid, treeHit, isRoadTile, pedWalkable,
-    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados,
+    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados, lojas, gerarLojas,
     chunkCount: chunks.length,
   };
 })(window.G = window.G || {});

@@ -194,7 +194,9 @@
       // o que dá para fazer aqui?
       let action = null;
       const car = S.sentado ? null : nearestCar(P.x, P.y, 62);
+      const porta = (!S.sentado && car) ? G.lugares.acao(S, 28) : null;   // carro parado na porta não pode roubar a tecla E de quem está na porta
       if (S.sentado) action = G.lugares.acao(S);
+      else if (porta && porta.t === 'lugar') action = porta;
       else if (car) { action = { t: 'car', car, s: 'E: ENTRAR NO CARRO' + (car.driver === 'ai' ? ' (ROUBAR)' : '') }; }
       else {
         for (const ph of M.PHONES) if (Math.hypot(ph.x - P.x, ph.y - P.y) < 50) action = { t: 'phone', s: M.active ? 'TELEFONE (MISSÃO EM ANDAMENTO)' : 'E: ATENDER TELEFONE', ph };

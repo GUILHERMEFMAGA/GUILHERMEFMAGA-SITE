@@ -122,11 +122,11 @@
 
   L.extrasAcao = []; L.extrasDesenho = []; L.extrasAtualizar = [];   // outros arquivos (casas, mercados...) se penduram aqui
   L.entrar = (S, pl) => entrar(S, pl);
-  L.acao = function (S) {
+  L.acao = function (S, raioMax) {
     if (S.mode !== 'play' || S.trans) return null;
     const P = S.player; if (P.car || P.hp <= 0) return null;
     if (S.sentado) return { t: 'lugar', s: 'E: LEVANTAR (recuperando vida...)', run: () => { S.sentado = null; } };
-    for (const pl of W.places) if (Math.hypot(pl.x - P.x, pl.y - P.y) < pl.r) return { t: 'lugar', s: 'E: ENTRAR — ' + pl.nome, run: () => entrar(S, pl) };
+    for (const pl of W.places) if (Math.hypot(pl.x - P.x, pl.y - P.y) < (raioMax ? Math.min(pl.r, raioMax) : pl.r)) return { t: 'lugar', s: 'E: ENTRAR — ' + pl.nome, run: () => entrar(S, pl) };
     for (const f of L.extrasAcao) { const a = f(S, P); if (a) return a; }
     let bp = null, bd = 26;
     for (const pr of W.propList) {
@@ -205,6 +205,7 @@
     const t = S.time;
     W.places.forEach(pl => {
       if (!inV(pl)) return;
+      if (pl.tipo === 'loja' && Math.hypot(pl.x - S.player.x, pl.y - S.player.y) > 230) return;   // lojas comuns só mostram o marcador quando você chega perto
       const k = 1 + 0.12 * Math.sin(t * 3 + pl.x);
       ctx.save(); ctx.translate(pl.x, pl.y);
       ctx.fillStyle = pl.cor; ctx.globalAlpha = 0.28; ctx.beginPath(); ctx.arc(0, 0, 17 * k, 0, TAU); ctx.fill(); ctx.globalAlpha = 1;
@@ -665,9 +666,11 @@
     linguica: { n: 'Linguiça', hp: 22, cor: '#a8452a' }, espetinho: { n: 'Espetinho', hp: 18, cor: '#c0603a' },
     chocolate: { n: 'Chocolate', hp: 8, cor: '#5a3220' }, bala: { n: 'Balas', hp: 2, cor: '#e84a8a' }, sorvete: { n: 'Sorvete', hp: 10, cor: '#f8c8e0' }, brigadeiro: { n: 'Brigadeiro', hp: 6, cor: '#3a2418' }, pirulito: { n: 'Pirulito', hp: 3, cor: '#e8402a' },
     agua: { n: 'Água', hp: 3, cor: '#8ac8f0' }, guarana: { n: 'Guaraná', hp: 6, cor: '#3a9a3a' }, suco: { n: 'Suco de uva', hp: 7, cor: '#7a3a9a' }, cerveja: { n: 'Cerveja', hp: 8, cor: '#e8b830', bebado: 8 }, energetico: { n: 'Energético', hp: 4, cor: '#2ae0e8', energia: 25 },
+    xburguer: { n: 'X-Burguer', hp: 24, cor: '#c8702a' }, xtudo: { n: 'X-Tudo', hp: 32, cor: '#b85a1a' }, batata: { n: 'Batata frita', hp: 14, cor: '#f0c840' }, hotdog: { n: 'Cachorro-quente', hp: 18, cor: '#d8683a' }, empada: { n: 'Empada', hp: 9, cor: '#e0b060' }, picole: { n: 'Picolé', hp: 7, cor: '#4ab0e8' }, acai: { n: 'Açaí na tigela', hp: 20, cor: '#6a2a8a' }, carne: { n: 'Bife de churrasco', hp: 28, cor: '#a8452a' }, cafe: { n: 'Café', hp: 3, cor: '#4a2a18', energia: 12 }, pingado: { n: 'Pingado com pão', hp: 12, cor: '#8a5a3a' }, fatia: { n: 'Fatia de pizza', hp: 15, cor: '#e8a040' }, brownie: { n: 'Brownie', hp: 12, cor: '#3a2014' },
     pizza: { n: 'Pizza congelada', hp: 30, cor: '#e8a040' }, lasanha: { n: 'Lasanha', hp: 34, cor: '#d8782a' }, marmita: { n: 'Marmita', hp: 40, cor: '#8a6a3a' }
   };
   L.ALIM = ALIM;
+  L.mudaLook = (S, campo) => mudaLook(S, campo, { corte: CORTES.length, cor: CORES_CAB.length, roupa: ROUPAS.length, calca: CALCAS.length, tenis: TENIS.length, acess: ACESS.length }[campo]);
   L.dar = function (S, id, q) { S.save.inv = S.save.inv || {}; S.save.inv[id] = (S.save.inv[id] || 0) + (q || 1); };
   L.totalMochila = S => { let n = 0; const inv = S.save.inv || {}; for (const k in inv) n += inv[k]; return n; };
   L.comer = function (S) {
@@ -829,15 +832,18 @@
       const ex = n.dorme ? 30 : 0, d = Math.hypot(n.x - R.px, n.y - R.py) - 14 - ex; if (d < 34 && d - 12 - ex < bd) { bd = d - 12 - ex; best = { t: 'npc', n, label: n.label || (n.act ? 'FALAR' : 'CONVERSAR') }; }
     }
     R.sel = best;
+    // F ameaça a pessoa mais perto (mesmo que o balcão seja o objeto em foco)
+    let alvoF = null, dF = 1e9;
+    for (const n of R.npcs) { if (n.ameacavel === false) continue; const ex = n.dorme ? 30 : 0, d = Math.hypot(n.x - R.px, n.y - R.py) - 14 - ex; if (d < 40 && d < dF) { dF = d; alvoF = n; } }
     const naPorta = R.py > FY1 - 44 && Math.abs(R.px - PX) < 70;
-    if (best) S.prompt = 'E: ' + best.label + (best.t === 'npc' && best.n.ameacavel !== false && armado(S) ? '    ·    F: AMEAÇAR' : '');
+    if (best) S.prompt = 'E: ' + best.label + (alvoF && armado(S) ? '    ·    F: AMEAÇAR' + (alvoF.nome ? ' ' + alvoF.nome.toUpperCase() : '') : '');
     else if (naPorta) S.prompt = 'E: ' + (R.porta ? R.porta.label : 'SAIR');
     if (Kp('KeyE', 'Enter')) {
       if (best && best.t === 'obj') best.o.act(S, R, best.o);
       else if (best && best.t === 'npc') { if (best.n.act) best.n.act(S, R, best.n); else falaDe(S, R, best.n); }
       else if (naPorta) saidaDaSala(S);
     }
-    if (Kp('KeyF') && best && best.t === 'npc' && best.n.ameacavel !== false) ameacar(S, R, best.n);
+    if (Kp('KeyF') && alvoF) ameacar(S, R, alvoF);
     if (Kp('KeyX')) L.comer(S);
     S.sentado = null; S.bebado = Math.max(0, (S.bebado || 0) - dt); if (S.energia > 0) S.energia -= dt;
   };
@@ -888,7 +894,7 @@
     // título e barra de comando
     ctx.save(); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, VW, 40); ctx.fillStyle = R.cor; ctx.fillRect(0, 40, VW, 3);
     ctx.font = 'bold 20px Arial'; ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText(R.nome, 20, 27);
-    if (R.subtitulo) { ctx.font = '12px Arial'; ctx.fillStyle = '#ccc'; ctx.fillText(R.subtitulo, 20 + ctx.measureText(R.nome).width + 70, 27); }
+    if (R.subtitulo) { const nw = ctx.measureText(R.nome).width; ctx.font = '12px Arial'; ctx.fillStyle = '#ccc'; ctx.fillText(R.subtitulo, 20 + nw + 16, 27); }
     ctx.textAlign = 'right'; ctx.font = 'bold 14px Arial'; ctx.fillStyle = '#9dff9d'; ctx.fillText('$' + S.save.money, VW - 20, 17); ctx.fillStyle = '#ff7a7a'; ctx.fillText('VIDA ' + Math.ceil(S.player.hp), VW - 20, 34);
     if (R.hudTxt) { const tx = R.hudTxt(S, R); if (tx) { ctx.save(); ctx.textAlign = 'center'; ctx.fillStyle = '#8ad8ff'; ctx.font = 'bold 13px Arial'; ctx.fillText(tx, 560, 27); ctx.restore(); } }
     ctx.fillStyle = '#ffe04a'; ctx.fillText(L.horaTxt(S), VW - 110, 17); const nb = L.totalMochila(S); if (nb) { ctx.fillStyle = '#ffb86a'; ctx.fillText('MOCHILA ' + nb + ' (X)', VW - 110, 34); }

@@ -17,12 +17,25 @@
     delegacia: Object.assign(W.sidePoint(1, 3, 'right', 0.5), { r: 40, name: 'DELEGACIA' }),
     armas: Object.assign(W.sidePoint(1, 0, 'bottom', 0.5), { r: 46, name: 'LOJA DE ARMAS' }),
   };
+  // telefone no meio da calçada, mas nunca em cima da porta de uma casa/loja (senão a tecla E fica confusa)
+  const portasDoMapa = () => W.places.concat(W.casas.filter(c => !c.b.place));
+  function tel(bx, by, side, t) {
+    const portas = portasDoMapa();
+    for (const dt of [0, 0.06, -0.06, 0.12, -0.12, 0.18, -0.18, 0.24, -0.24, 0.3, -0.3, 0.36, -0.36, 0.42, -0.42]) {
+      const p = W.sidePoint(bx, by, side, Math.max(0.08, Math.min(0.92, t + dt)));
+      if (!portas.some(q => Math.hypot(q.x - p.x, q.y - p.y) < 72)) return p;
+    }
+    return W.sidePoint(bx, by, side, t);
+  }
   const PHONES = [
-    W.sidePoint(0, 2, 'right', 0.3), W.sidePoint(2, 0, 'bottom', 0.7),
-    W.sidePoint(4, 3, 'top', 0.3), W.sidePoint(5, 1, 'left', 0.6),
+    tel(0, 2, 'right', 0.3), tel(2, 0, 'bottom', 0.7),
+    tel(4, 3, 'top', 0.3), tel(5, 1, 'left', 0.6),
     // telefones dos bairros novos (mapa dobrado)
-    W.sidePoint(7, 0, 'bottom', 0.4), W.sidePoint(8, 2, 'left', 0.5), W.sidePoint(2, 5, 'top', 0.6), W.sidePoint(6, 4, 'right', 0.5), W.sidePoint(4, 5, 'left', 0.4),
+    tel(7, 0, 'bottom', 0.4), tel(8, 2, 'left', 0.5), tel(2, 5, 'top', 0.6), tel(6, 4, 'right', 0.5), tel(4, 5, 'left', 0.4),
   ].map(p => Object.assign(p, { r: 40 }));
+
+  // agora que os telefones e lugares fixos existem, nascem as lojas (longe deles)
+  W.gerarLojas(Object.values(POI).concat(PHONES));
 
   // ---------- Definições das 12 missões ----------
   const DEFS = [

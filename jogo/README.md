@@ -50,7 +50,9 @@ Os lugares abaixo têm **portas para entrar** (círculo colorido no chão, ponto
 |---|---|
 | **Pinguim Chopp** | chopp ($12, cura mas deixa tonto), pastel, jukebox troca a música, sinuca valendo aposta |
 | **Mercadão / Atacadão** | supermercados gigantes — veja a seção própria abaixo |
-| **Banco, Padaria, Pizzaria** | novos lugares nos bairros novos |
+| **Banco Ribeirão** | guichês para **depositar e sacar** (dinheiro no banco não se perde se você morrer ou for preso), fila de clientes e **cofre-forte** (só abre com arma, e chama a polícia). Abre das 10h às 16h |
+| **Padaria Pão Quente** | pão, pão de queijo, coxinha, bolo e café, com forno e mesinhas |
+| **Pizzaria Dona Maria** | fatia, pizza grande, bebidas, forno a lenha e jukebox |
 | **Hotéis** | quatro hotéis, do luxo ao mais feio — veja a seção própria abaixo |
 | **Farmácia** | kit médico ($60), vitaminas ($25), balança |
 | **Barbearia** | muda o corte e a cor do cabelo (mostra o seu visual no cartão) |
@@ -61,6 +63,9 @@ Os lugares abaixo têm **portas para entrar** (círculo colorido no chão, ponto
 | **Catedral** | velas, bancos para rezar e confissão ($100 limpa a ficha na polícia) |
 
 Na rua: **hidrantes** (jorram água), **lixeiras** (às vezes tem dinheiro), **bancos** (sente e recupere vida), **caixas de correio**, **bancas de jornal**, **máquinas de refrigerante** e **pontos de ônibus** (viagem rápida, $5). Os pedestres agora respondem: aperte **E** perto de um deles para conversar — eles dão dicas, falam da cidade e às vezes mostram o caminho até um lugar (seta no jogo e no minimapa). Também cumprimentam e reagem a armas.
+
+## Comércios do bairro
+**Toda porta que você vê na cidade abre**, e o nome do letreiro é o mesmo que aparece lá dentro. Prédios sem porta são só prédios. Os comércios comuns (cada um com atendente, cardápio e algo único) são: **lanchonete, sorveteria, açougue, floricultura, pet shop, livraria, eletrônicos, ótica, ferragem, lotérica, mercadinho, loja de roupas, bar e café**. Ficam espalhados pelos bairros, cada um com seu nome e horário. Alguns exemplos: a **ferragem** vende taco de beisebol, a **ótica** e a **loja de roupas** mudam o seu visual, a **lotérica** tem raspadinha e aposta, a **livraria** vende mapa que marca um lugar para você ir, o **bar** tem sinuca e a **floricultura** tem buquê que cura. Dá para **assaltar** os atendentes com uma arma na mão (**F**), só que isso chama a polícia. O prompt **F: AMEAÇAR** mostra o nome de quem está na sua frente.
 
 ## Mapa dobrado
 A cidade agora tem **9 × 6 quarteirões** (antes eram 6 × 4): bairros novos de **vilas** (casinhas com quintal e becos), dois **supermercados com estacionamento**, quatro **hotéis**, mais parques, mais telefones de missão (9 no total) e muitos lugares novos para explorar. O minimapa mostra suas casas em verde e as casas à venda em vermelho.
@@ -141,6 +146,7 @@ Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes d
 | `mercados.js` | supermercados gigantes, carrinho, caixas e estacionamento com carros chegando e saindo |
 | `hoteis.js` | quatro hotéis: recepção, quartos, restaurante com garçom, piscina, cozinha, hóspedes |
 | `academia.js` | academia com passe, treino em mini-jogo e lanchonete |
+| `comercios.js` | banco, padaria, pizzaria e os 14 tipos de comércio comum (cardápios, atendentes, extras) |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |
