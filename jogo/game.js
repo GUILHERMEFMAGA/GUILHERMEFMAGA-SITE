@@ -83,7 +83,7 @@
 
   // ---------- Criação do mundo ----------
   function newWorld() {
-    S.cars = []; S.peds = []; S.particles = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
+    S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
     const g = M.POI.garage;
     const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
@@ -390,6 +390,7 @@
       updatePlayer(dt);
       updateCars(dt);
       managePopulation(dt);
+      G.detalhes.update(S, W, dt);
       updatePolice(dt);
       G.combat.update(S, dt);
       M.update(S, dt);
@@ -423,6 +424,7 @@
     ctx.translate(VW / 2 + sx, VH / 2 + sy); ctx.scale(z, z); ctx.translate(-cam.x, -cam.y);
     const vx0 = cam.x - VW / 2 / z - 40, vy0 = cam.y - VH / 2 / z - 40, vx1 = cam.x + VW / 2 / z + 40, vy1 = cam.y + VH / 2 / z + 40;
     W.drawChunks(ctx, vx0, vy0, vx1, vy1);
+    W.drawWaterFx(ctx, S.time, vx0, vy0, vx1, vy1);   // brilhos na água
     const inV = o => o.x > vx0 - 80 && o.x < vx1 + 80 && o.y > vy0 - 80 && o.y < vy1 + 80;
     G.combat.drawDecals(ctx, S, inV);       // sangue, marcas de pneu e chamuscado
     M.drawWorld(ctx, S, S.time);
@@ -434,6 +436,7 @@
     cars.forEach(c => SP.drawCar(ctx, c, S.time));
     vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
     if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
+    G.detalhes.draw(ctx, S, inV);            // pombos
     AI.drawLights(ctx, vx0, vy0, vx1, vy1, S.time);
     G.combat.drawAir(ctx, S, inV);          // balas e granadas
     // partículas
@@ -550,7 +553,7 @@
       S.player.x = -9999; S.player.y = -9999; S.player.iframes = 0;
       // o tráfego corre em volta da câmera
       const fake = S.player; fake.x = S.cam.x; fake.y = S.cam.y;
-      updateCars(dt); managePopulation(dt); updateParticles(dt);
+      updateCars(dt); managePopulation(dt); G.detalhes.update(S, W, dt); updateParticles(dt);
       fake.x = -9999; fake.y = -9999;
       drawWorld(); drawTitle(S.time);
       if (Kp('Enter')) startGame(false);

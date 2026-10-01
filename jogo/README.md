@@ -37,7 +37,9 @@ python -m http.server 8080      # depois abra http://localhost:8080
 Geral: **R** troca de rádio (funk, rock, eletrônica) · **M** liga/desliga o som · **P** pausa · **V** troca o visual (Cinema pixel art → Cinema suave → Clássico).
 
 ## Visual cinematográfico
-Pixel art 2.5D com luz dinâmica (`luz.js`): prédios com fachada e janelas, ciclo de dia/noite com cor de ambiente, faróis, postes, sirenes e explosões que iluminam de verdade, neblina em camadas, raios de sol, bloom e cor de cinema. Se ficar pesado no seu computador, aperte **V** para um visual mais leve.
+Pixel art 2.5D com luz dinâmica (`luz.js`): prédios com fachada e janelas, ciclo de dia/noite com cor de ambiente, faróis, postes, sirenes e explosões que iluminam de verdade, neblina em camadas, raios de sol, bloom e cor de cinema. Detalhes extras: hidrantes, lixeiras, bancos, caixas de correio, bancas, vasos e pontos de ônibus nas calçadas; toldos, janelas e canos nas fachadas; painéis solares, exaustores e antenas nos telhados; poças, flores no parque, brilhos na água, fumaça saindo dos bueiros, pombos que voam quando você chega perto e pedestres com boné, chapéu, óculos e mochila.
+
+Se ficar pesado no seu computador, aperte **V** para um visual mais leve.
 
 ## Objetivo
 - Atenda os **telefones amarelos** espalhados pela cidade para receber missões.
@@ -72,6 +74,7 @@ Pixel art 2.5D com luz dinâmica (`luz.js`): prédios com fachada e janelas, cic
 | `ai.js` | tráfego, semáforos, pedestres, polícia, helicóptero |
 | `missions.js` | telefones, lugares e as 12 missões |
 | `luz.js` | iluminação dinâmica, neblina, bloom, pixel art e cor de cinema |
+| `detalhes.js` | pombos e fumaça dos bueiros |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |

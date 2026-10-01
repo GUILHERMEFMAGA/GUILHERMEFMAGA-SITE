@@ -72,7 +72,7 @@
       const ang = Math.atan2(c.fy, c.fx);
       add(c.x + c.fx * 34, c.y + c.fy * 34, 270, [255, 240, 195], 0.9, ang, 0.3);       // feixe dos faróis
       add(c.x + c.fx * 60, c.y + c.fy * 60, 85, [255, 240, 200], 0.7);                    // poça de luz na frente
-      add(c.x - c.fx * 30, c.y - c.fy * 30, 55, [255, 40, 30], 0.55);                     // lanternas
+      add(c.x - c.fx * 30, c.y - c.fy * 30, c.brakeLight ? 80 : 55, [255, 40, 30], c.brakeLight ? 0.95 : 0.5);                     // lanternas
       if (c.siren) {
         const ph = Math.floor(S.time * 7 + c.x * 0.01) % 2;
         add(c.x, c.y, 190, ph ? [255, 40, 40] : [50, 90, 255], 0.95);

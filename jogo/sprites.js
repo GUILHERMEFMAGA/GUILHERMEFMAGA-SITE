@@ -191,6 +191,10 @@
     ctx.fillStyle = p.hair; ctx.beginPath(); ctx.arc(0, 0.2, 3.9, 0.15 * Math.PI, 0.85 * Math.PI); ctx.fill();
     if (p.cap === 'cop') { ctx.fillStyle = '#14224f'; ctx.beginPath(); ctx.arc(0, -0.6, 4.4, 0, 7); ctx.fill(); ctx.fillStyle = '#0a0a10'; ctx.fillRect(-3.2, -5.6, 6.4, 1.8); ctx.fillStyle = '#f2c231'; ctx.fillRect(-0.8, -3.2, 1.6, 1.6); }
     else if (p.cap === 'swat') { ctx.fillStyle = '#1a1c22'; ctx.beginPath(); ctx.arc(0, -0.6, 4.8, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(-2.6, -3.8, 2.4, 1.4); ctx.fillStyle = '#0c0d10'; ctx.fillRect(-3.4, -4.6, 6.8, 2); }
+    else if (p.acc === 'cap') { ctx.fillStyle = p.accCol; ctx.beginPath(); ctx.arc(0, -0.6, 4.3, 0, 7); ctx.fill(); ctx.fillStyle = shade(p.accCol, -0.35); ctx.fillRect(-2.6, -5.6, 5.2, 1.8); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(-2.6, -3, 2, 1.2); }
+    else if (p.acc === 'beanie') { ctx.fillStyle = p.accCol; ctx.beginPath(); ctx.arc(0, -0.6, 4.5, 0, 7); ctx.fill(); ctx.fillStyle = shade(p.accCol, -0.3); ctx.fillRect(-4.2, -3.6, 8.4, 1.4); ctx.fillStyle = shade(p.accCol, 0.3); ctx.beginPath(); ctx.arc(0, -0.6, 1.3, 0, 7); ctx.fill(); }
+    else if (p.acc === 'hat') { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(0.8, 0.2, 6.6, 0, 7); ctx.fill(); ctx.fillStyle = '#d2b074'; ctx.beginPath(); ctx.arc(0, -0.8, 6.4, 0, 7); ctx.fill(); ctx.fillStyle = '#a98450'; ctx.beginPath(); ctx.arc(0, -0.8, 3.6, 0, 7); ctx.fill(); ctx.fillStyle = '#3a2412'; ctx.beginPath(); ctx.arc(0, -0.8, 3.7, 0, 7); ctx.lineWidth = 1; ctx.stroke(); }
+    else if (p.acc === 'shades') { ctx.fillStyle = '#08080c'; ctx.fillRect(-3.6, -3.8, 7.2, 1.7); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-2.6, -3.6, 1.4, 0.7); }
     else if (p.player) { ctx.fillStyle = '#000'; ctx.fillRect(-3, -3.6, 6, 1.6); }
   }
 
@@ -260,6 +264,7 @@
     // ombros / camisa
     const tgr = ctx.createLinearGradient(-7.5, 0, 7.5, 0); tgr.addColorStop(0, shade(p.shirt, -0.28)); tgr.addColorStop(0.45, shade(p.shirt, 0.16)); tgr.addColorStop(1, shade(p.shirt, -0.34));
     ctx.fillStyle = tgr; ctx.beginPath(); ctx.ellipse(0, 1, 7.5, 4.6, 0, 0, 7); ctx.fill();
+    if (p.acc === 'pack') { ctx.fillStyle = p.accCol; ctx.beginPath(); ctx.ellipse(0, 4.4, 4.6, 3.6, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.8; ctx.stroke(); ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(-2.6, 2.6, 2.6, 1); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-4.2, 4.2, 8.4, 0.9); } // mochila
     ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
     if (p.player) { // camisa havaiana laranja e azul
       ctx.fillStyle = '#2aa0d8'; [[-4, 1], [1, 3], [4, 0], [-1, -1]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(a, b, 1.3, 0, 7); ctx.fill(); });
@@ -278,7 +283,7 @@
 
   function randomLook() {
     const r = a => a[Math.floor(Math.random() * a.length)];
-    return { shirt: r(SHIRTS), skin: r(SKINS), hair: r(HAIRS), pants: r(['#2a2f45', '#3a3a3f', '#4a3a2a', '#23232c', '#56688a', '#1c1c20']) };
+    return { shirt: r(SHIRTS), skin: r(SKINS), hair: r(HAIRS), acc: r(['none', 'none', 'none', 'cap', 'beanie', 'hat', 'shades', 'pack', 'pack']), accCol: r(['#d33a3a', '#2a2a30', '#3a7ad3', '#e8e8e8', '#3aa85a', '#e0b32a']), pants: r(['#2a2f45', '#3a3a3f', '#4a3a2a', '#23232c', '#56688a', '#1c1c20']) };
   }
 
   G.sprites = { CAR_W, CAR_L, carSprite, drawCar, drawPed, randomLook, shade };
