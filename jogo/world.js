@@ -231,8 +231,38 @@
     ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
   }
 
+  // altura da parede (fachada) que aparece embaixo do telhado — dá o efeito 2.5D
+  function fachada(b) { return b.p.kind === 'tile' ? Math.min(20, Math.floor(b.h * 0.26)) : Math.min(30, Math.floor(b.h * 0.3)); }
+
+  // parede de frente do prédio: degradê, janelas com reflexo, porta e sombra do beiral
+  function drawFacade(ctx, b, fh) {
+    const { x, w, p } = b, y = b.y + b.h - fh;
+    const g = ctx.createLinearGradient(0, y, 0, y + fh);
+    g.addColorStop(0, p.edge); g.addColorStop(1, p.dark);
+    ctx.fillStyle = g; ctx.fillRect(x, y, w, fh);
+    ctx.fillStyle = 'rgba(0,0,20,0.28)'; ctx.fillRect(x, y, w, fh); // parede fica na sombra
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(x, y, w, 3);   // sombra do beiral
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x, y + fh - 2, w, 2); // base clara
+    const rs = mulberry32(Math.floor(b.x * 5 + b.y * 11));
+    const ww = b.p.kind === 'tile' ? 10 : 14, wh = fh - 12, gap = ww + 9;
+    for (let xx = x + 8; xx + ww < x + w - 6; xx += gap) {
+      const acesa = rs() < 0.45, wy = y + 7;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(xx - 1, wy - 1, ww + 2, wh + 2);
+      const gj = ctx.createLinearGradient(xx, wy, xx + ww, wy + wh);
+      if (acesa) { gj.addColorStop(0, '#ffe6a0'); gj.addColorStop(1, '#e8a850'); } else { gj.addColorStop(0, '#6f93ad'); gj.addColorStop(1, '#1b2a38'); }
+      ctx.fillStyle = gj; ctx.fillRect(xx, wy, ww, wh);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(xx, wy, 2, wh);   // reflexo
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(xx + ww / 2, wy, 1, wh); // divisão do vidro
+    }
+    // porta no meio
+    const dw = 16; ctx.fillStyle = '#1c1612'; ctx.fillRect(x + w / 2 - dw / 2 - 1, y + fh - 17, dw + 2, 17);
+    ctx.fillStyle = '#5a3d28'; ctx.fillRect(x + w / 2 - dw / 2, y + fh - 16, dw, 16);
+    ctx.fillStyle = '#c8a24a'; ctx.fillRect(x + w / 2 + 4, y + fh - 9, 2, 2);
+  }
+
   function drawRoof(ctx, b) {
-    const { x, y, w, h, p } = b;
+    const fh = fachada(b); drawFacade(ctx, b, fh);
+    const { x, y, w, p } = b, h = b.h - fh;
     ctx.fillStyle = p.dark; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = p.edge; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
     ctx.fillStyle = p.base; ctx.fillRect(x + 6, y + 6, w - 12, h - 12);
@@ -534,7 +564,7 @@
   });
 
   G.world = {
-    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps,
+    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps, fachada,
     roadLeft, roadTop, nodeX, nodeY, laneV, laneH, tileAt, isSolid, treeHit, isRoadTile, pedWalkable,
     buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32,
     chunkCount: chunks.length,

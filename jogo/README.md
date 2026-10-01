@@ -34,7 +34,10 @@ python -m http.server 8080      # depois abra http://localhost:8080
 | H | buzina |
 | E | sair do carro (ou consertar e repintar na oficina, $150) |
 
-Geral: **R** troca de rádio (funk, rock, eletrônica) · **M** liga/desliga o som · **P** pausa.
+Geral: **R** troca de rádio (funk, rock, eletrônica) · **M** liga/desliga o som · **P** pausa · **V** troca o visual (Cinema pixel art → Cinema suave → Clássico).
+
+## Visual cinematográfico
+Pixel art 2.5D com luz dinâmica (`luz.js`): prédios com fachada e janelas, ciclo de dia/noite com cor de ambiente, faróis, postes, sirenes e explosões que iluminam de verdade, neblina em camadas, raios de sol, bloom e cor de cinema. Se ficar pesado no seu computador, aperte **V** para um visual mais leve.
 
 ## Objetivo
 - Atenda os **telefones amarelos** espalhados pela cidade para receber missões.
@@ -68,6 +71,7 @@ Geral: **R** troca de rádio (funk, rock, eletrônica) · **M** liga/desliga o s
 | `car.js` | física arcade e colisões |
 | `ai.js` | tráfego, semáforos, pedestres, polícia, helicóptero |
 | `missions.js` | telefones, lugares e as 12 missões |
+| `luz.js` | iluminação dinâmica, neblina, bloom, pixel art e cor de cinema |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |

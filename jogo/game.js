@@ -217,6 +217,7 @@
     }
     if (Kp('KeyR')) { G.snd.nextStation(); S.radioT = 3; }
     if (Kp('KeyM')) G.say(G.snd.mute() ? 'Som desligado' : 'Som ligado', 2);
+    if (Kp('KeyV')) G.say(G.luz.alternar(), 2);
     // morte
     if (P.hp <= 0 && S.mode === 'play') goWasted();
   }
@@ -465,7 +466,7 @@
     }
     ctx.restore();
     // noite
-    const dk = darkness();
+    const dk = G.luz.nivel > 0 ? 0 : darkness();   // com luz.js ligada, a noite vem de lá
     if (dk > 0.02) {
       dctx.globalCompositeOperation = 'source-over'; dctx.clearRect(0, 0, VW, VH);
       dctx.fillStyle = 'rgba(6,8,40,' + (0.62 * dk) + ')'; dctx.fillRect(0, 0, VW, VH);
@@ -489,8 +490,10 @@
       dctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(darkC, 0, 0);
     }
-    const vg = ctx.createRadialGradient(400, 300, 240, 400, 300, 580); vg.addColorStop(0, 'rgba(0,0,10,0)'); vg.addColorStop(1, 'rgba(0,0,12,0.34)');
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);   // vinheta (efeito de câmera)
+    if (G.luz.desenhar(ctx, S, W, cam, z, inV)) { /* visual cinematográfico (luz.js) */ } else {
+      const vg = ctx.createRadialGradient(400, 300, 240, 400, 300, 580); vg.addColorStop(0, 'rgba(0,0,10,0)'); vg.addColorStop(1, 'rgba(0,0,12,0.34)');
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);   // vinheta (efeito de câmera)
+    }
     G.combat.drawScreen(ctx, S);            // tela vermelha ao levar dano
   }
 
@@ -509,7 +512,7 @@
     const L = [
       ['A PÉ', 'WASD / Setas andar  Shift correr  Espaço atacar/atirar  Q ou 1-6 trocam de arma  E usar'],
       ['DE CARRO', 'W/↑ acelera  S/↓ freio e ré  A D ←→ virar  Espaço freio de mão  H buzina  E sair'],
-      ['OUTROS', 'R troca a rádio   M som   P pausa'],
+      ['OUTROS', 'R rádio   M som   P pausa   V gráficos'],
       ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Arme-se na loja rosa!'],
       ['POLÍCIA', 'Crime na frente da polícia dá PROCURADO. Eles descem e atiram. Fuja ou lute!'],
     ];
