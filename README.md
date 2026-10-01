@@ -12,6 +12,10 @@ Ele tem rede neural (feita do zero), memória, ferramentas e automações no est
 
 📘 Documentação técnica: **[agente-ia/LEIA-ME.md](agente-ia/LEIA-ME.md)**
 
+## 🎮 Jogo FPS 3D
+
+**[jogo-fps/](jogo-fps/LEIA-ME.md)**: *Zona de Combate 3D*, um jogo de tiro em primeira pessoa com robôs NPC. Abra `jogo-fps/index.html` no navegador.
+
 ## Rodar em 10 segundos
 
 ```bash

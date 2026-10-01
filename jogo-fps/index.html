@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zona de Combate 3D — FPS</title>
+<link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<div id="game"></div>
+
+<!-- ===== HUD ===== -->
+<div id="hud" class="hidden">
+  <canvas id="minimap" width="168" height="132"></canvas>
+
+  <div id="topbar">
+    <div class="box"><span class="lbl">ONDA</span><span id="h-wave">1</span></div>
+    <div class="box"><span class="lbl">INIMIGOS</span><span id="h-enemies">0</span></div>
+    <div class="box"><span class="lbl">PONTOS</span><span id="h-score">0</span></div>
+  </div>
+
+  <div id="killfeed"></div>
+
+  <div id="crosshair"><i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><b></b></div>
+  <div id="hitmarker"><i></i><i></i><i></i><i></i></div>
+  <div id="dmg-indicators"></div>
+
+  <div id="center-msg"></div>
+  <div id="hint"></div>
+
+  <div id="health">
+    <div class="lbl">VIDA</div>
+    <div class="bar"><div id="h-hpbar"></div></div>
+    <div id="h-hp">100</div>
+  </div>
+
+  <div id="ammo">
+    <div id="h-weapon">PISTOLA</div>
+    <div><span id="h-mag">12</span><span class="sep">/</span><span id="h-reserve">∞</span></div>
+    <div id="h-slots"><span data-i="0">1</span><span data-i="1">2</span><span data-i="2">3</span></div>
+  </div>
+</div>
+
+<div id="vignette"></div>
+<div id="flash"></div>
+
+<!-- ===== MENUS ===== -->
+<div id="menu-start" class="menu">
+  <div class="panel">
+    <h1>ZONA DE<br><span>COMBATE 3D</span></h1>
+    <p class="sub">Sobreviva às ondas de robôs NPC no complexo industrial.</p>
+    <button id="btn-play" class="btn">JOGAR</button>
+    <div class="controls">
+      <div><kbd>W A S D</kbd> mover</div>
+      <div><kbd>Mouse</kbd> mirar</div>
+      <div><kbd>Clique</kbd> atirar</div>
+      <div><kbd>Botão direito</kbd> mira (zoom)</div>
+      <div><kbd>R</kbd> recarregar</div>
+      <div><kbd>1 2 3</kbd> / roda trocar arma</div>
+      <div><kbd>Shift</kbd> correr</div>
+      <div><kbd>Espaço</kbd> pular</div>
+      <div><kbd>Esc</kbd> pausar</div>
+    </div>
+    <label class="sens">Sensibilidade do mouse
+      <input id="sens" type="range" min="0.5" max="4" step="0.1" value="1.6">
+      <span id="sens-v">1.6</span>
+    </label>
+    <p class="tip">Dica: barris vermelhos explodem 💥 &nbsp;|&nbsp; Tiro na cabeça = dano dobrado</p>
+    <p class="best">Recorde: <span id="best">0</span></p>
+  </div>
+</div>
+
+<div id="menu-pause" class="menu hidden">
+  <div class="panel">
+    <h2>PAUSADO</h2>
+    <button id="btn-resume" class="btn">CONTINUAR</button>
+    <button id="btn-restart" class="btn sec">REINICIAR</button>
+  </div>
+</div>
+
+<div id="menu-over" class="menu hidden">
+  <div class="panel">
+    <h2 class="red">VOCÊ FOI ABATIDO</h2>
+    <div id="stats"></div>
+    <button id="btn-again" class="btn">JOGAR DE NOVO</button>
+  </div>
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/jogo.js"></script>
+</body>
+</html>
