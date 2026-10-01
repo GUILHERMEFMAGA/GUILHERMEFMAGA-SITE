@@ -12,6 +12,21 @@ Ele tem rede neural (feita do zero), memória, ferramentas e automações no est
 
 📘 Documentação técnica: **[agente-ia/LEIA-ME.md](agente-ia/LEIA-ME.md)**
 
+## 🏙️ LIFE: Cidade Viva (novo)
+
+Simulador de vida em mundo aberto 3D que roda no navegador, com cidade procedural,
+5.200 NPCs autônomos, economia dinâmica, bancos, empresas, polícia, justiça, clima e
+eventos em cadeia.
+
+```bash
+python3 -m http.server 8080
+# abra http://localhost:8080/jogo/
+```
+
+👉 [`jogo/LEIA-ME.md`](jogo/LEIA-ME.md) · 📐 [`jogo/DOCUMENTO-DE-DESIGN.md`](jogo/DOCUMENTO-DE-DESIGN.md)
+
+---
+
 ## Rodar em 10 segundos
 
 ```bash

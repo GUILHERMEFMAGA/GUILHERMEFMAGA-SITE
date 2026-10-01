@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIFE: Cidade Viva — simulador de vida em mundo aberto</title>
+<link rel="stylesheet" href="estilo.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🏙️</text></svg>">
+</head>
+<body>
+
+<canvas id="cena"></canvas>
+
+<!-- ================= HUD ================= -->
+<div id="hud">
+  <div id="hud-topo">
+    <div class="painel" id="painel-tempo">
+      <div id="relogio">07:24</div>
+      <div id="data" class="muted">—</div>
+      <div id="clima">☀️ Ensolarado</div>
+      <div class="muted">velocidade <b id="velocidade">60×</b></div>
+    </div>
+    <div class="painel" id="painel-cidade">
+      <div id="status-cidade"></div>
+    </div>
+    <div class="painel" id="painel-dinheiro">
+      <div><small>Carteira</small><b id="hud-dinheiro">R$ 0</b></div>
+      <div><small>Conta</small><b id="hud-banco">R$ 0</b></div>
+    </div>
+  </div>
+
+  <div id="hud-esquerda">
+    <canvas id="minimapa" width="170" height="170"></canvas>
+    <div id="necessidades"></div>
+  </div>
+
+  <div id="feed"></div>
+  <div id="prompt"></div>
+  <div id="aviso"></div>
+
+  <div id="hud-ajuda" class="muted">
+    WASD mover • Shift correr • <b>E</b> entrar • <b>F</b> veículo • <b>Tab</b> telefone • <b>M</b> mapa • <b>C</b> câmera • <b>P</b> pausa • arraste o mouse para girar
+  </div>
+</div>
+
+<!-- ================= TELEFONE ================= -->
+<div id="telefone">
+  <div id="telefone-barra">
+    <span>Cidade Viva OS</span>
+    <span>
+      <button id="telefone-home" title="Início">⌂</button>
+      <button id="telefone-fechar" title="Fechar">✕</button>
+    </span>
+  </div>
+  <div id="telefone-tela"></div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="modal">
+  <div id="modal-caixa">
+    <button id="modal-fechar">✕</button>
+    <div id="modal-conteudo"></div>
+  </div>
+</div>
+
+<!-- ================= CARREGAMENTO ================= -->
+<div id="carregando">
+  <div class="carregando-caixa">
+    <h1>LIFE<span>:</span> CIDADE VIVA</h1>
+    <p class="sub">simulador de vida em mundo aberto · sistemas autônomos · economia viva</p>
+    <div id="carregando-barra"><i></i></div>
+    <p id="carregando-status">Iniciando…</p>
+    <ul class="dicas">
+      <li>A cidade funciona mesmo quando você não está olhando: NPCs trabalham, empresas lucram ou quebram, a polícia atende ocorrências.</li>
+      <li>Você pode ser empregado, empresário, investidor, estudante — ou se envolver com o lado errado da lei (e responder por isso).</li>
+      <li>Nada aqui reproduz marcas, mapas, personagens ou procedimentos reais. Tudo é ficcional e sistêmico.</li>
+    </ul>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
