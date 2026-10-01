@@ -12,8 +12,12 @@
   const ROAD = 6;        // largura da rua (tiles) = 2 faixas de 3 tiles
   const BLOCK = 12;      // lado de uma quadra (tiles)
   const PITCH = ROAD + BLOCK;
-  const COLS = 9, ROWS = 6;  // quadras na horizontal / vertical (mapa dobrado: bairros novos a leste e ao sul)
-  const RIVER = 3;       // coluna de quadras ocupada pelo rio
+  const COLS = 17, ROWS = 6;  // quadras na horizontal / vertical (mapa GIGANTE: cidade + interior em obras + cidade vizinha)
+  const RIVER = 3;       // o primeiro rio (o da cidade antiga)
+  const RIVERS = [3, 9, 13];          // colunas de quadras ocupadas por rios
+  // rio -> linhas de rua onde existe ponte ('todas' = uma ponte em cada rua). Os rios novos têm UMA ponte (com pedágio); novas pontes são construídas por cidade.js
+  const PONTES = { 3: 'todas', 9: [3], 13: [2] };
+  const CIDADES = [{ id: 'ribeirao', nome: 'RIBEIRÃO PRETO', sub: 'a cidade', ate: 9 }, { id: 'interior', nome: 'NOVO HORIZONTE', sub: 'interior', ate: 13 }, { id: 'vale', nome: 'VALE VERDE', sub: 'outra cidade', ate: 99 }];
   const MG = 6;          // margem fora das ruas (calçada + prédios)
   const INNER_W = COLS * PITCH + ROAD;
   const INNER_H = ROWS * PITCH + ROAD;
@@ -71,19 +75,22 @@
   const ponds = [];
   const blocks = [];
 
-  function addBuilding(x, y, w, h, forceRoof) {
-    const p = ROOFS[forceRoof != null ? forceRoof : Math.floor(rnd() * ROOFS.length)];
+  // cria o objeto de um prédio (sem colocar no mapa). rg = gerador de números (para não mexer na cidade antiga)
+  function mkBuilding(x, y, w, h, forceRoof, rg) {
+    rg = rg || rnd;
+    const p = ROOFS[forceRoof != null ? forceRoof : Math.floor(rg() * ROOFS.length)];
     const b = { x, y, w, h, p, ridge: w >= h ? 'h' : 'v', det: [] };
     if (p.kind === 'flat') {
-      const n = 1 + Math.floor(rnd() * 3);
+      const n = 1 + Math.floor(rg() * 3);
       for (let k = 0; k < n; k++) {
-        b.det.push({ fx: 0.2 + rnd() * 0.6, fy: 0.2 + rnd() * 0.6, t: ['ac', 'sky', 'tank', 'ac', 'solar', 'vent', 'ant'][Math.floor(rnd() * 7)] });
+        b.det.push({ fx: 0.2 + rg() * 0.6, fy: 0.2 + rg() * 0.6, t: ['ac', 'sky', 'tank', 'ac', 'solar', 'vent', 'ant'][Math.floor(rg() * 7)] });
       }
-    } else if (rnd() < 0.5) {
-      b.det.push({ fx: 0.25 + rnd() * 0.5, fy: 0.3 + rnd() * 0.4, t: 'chim' });
+    } else if (rg() < 0.5) {
+      b.det.push({ fx: 0.25 + rg() * 0.5, fy: 0.3 + rg() * 0.4, t: 'chim' });
     }
-    buildings.push(b);
+    return b;
   }
+  function addBuilding(x, y, w, h, forceRoof) { buildings.push(mkBuilding(x, y, w, h, forceRoof)); }
 
   // divide uma área (em tiles) em prédios
   function partition(tx, ty, tw, th) {
@@ -101,7 +108,17 @@
   setRect(MG - 2, MG - 2, INNER_W + 4, INNER_H + 4, TILE.SIDE);
   setRect(MG, MG, INNER_W, INNER_H, TILE.ROAD);
 
-  const PARKS = [[1, 1], [5, 3], [7, 3]];
+  const PARKS = [[1, 1], [5, 3], [7, 3], [11, 2], [15, 2]];
+  // as quadras novas (interior e cidade vizinha): obras (4 lotes pequenos), obra (1 lote grande), campo, aeroporto
+  const NOVAS = {
+    '10,0': 'obras', '11,0': 'obra', '12,0': 'campo', '10,1': 'obras', '11,1': 'obras', '12,1': 'campo',
+    '10,2': 'obra', '12,2': 'obras', '10,3': 'obras', '11,3': 'obra', '12,3': 'obras',
+    '10,4': 'campo', '11,4': 'obras', '12,4': 'obra', '10,5': 'campo', '11,5': 'campo', '12,5': 'obras',
+    '14,0': 'obra', '15,0': 'obras', '16,0': 'campo', '14,1': 'obras', '15,1': 'obra', '16,1': 'obras',
+    '14,2': 'obras', '16,2': 'obra', '14,3': 'obra', '15,3': 'obras', '16,3': 'campo',
+    '14,4': 'campo', '15,4': 'obras', '16,4': 'aeroporto', '14,5': 'obras', '15,5': 'campo', '16,5': 'obras'
+  };
+  const lotes = [];            // lotes de obra (cidade.js constrói neles)
   const places = [];          // lugares grandes e comércios (dá para entrar)
   const casas = [];           // todas as casas (dá para entrar em todas!)
   const mercados = [];        // supermercados com estacionamento
@@ -131,9 +148,10 @@
   function criarBloco(bx, by) {
     const tx = MG + ROAD + bx * PITCH, ty = MG + ROAD + by * PITCH, key = bx + ',' + by;
     let kind = 'city';
-    if (bx === RIVER) kind = 'river';
+    if (RIVERS.includes(bx)) kind = 'river';
     else if (PARKS.some(p => p[0] === bx && p[1] === by)) kind = 'park';
     else if (ESPECIAIS[key]) kind = ESPECIAIS[key];
+    else if (NOVAS[key]) kind = NOVAS[key];
     else if ((bx >= 6 || by >= 4) && (bx * 5 + by * 3) % 4 !== 0) kind = 'vila';
     const blk = { bx, by, tx, ty, x: tx * T, y: ty * T, w: BLOCK * T, h: BLOCK * T, kind };
     blocks.push(blk);
@@ -171,6 +189,28 @@
       const b = buildings[buildings.length - 1]; b.det = []; b.hotel = def; blk.hotel = def;
       const pl = Object.assign({}, def, { tipo: 'hotel', b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 40 });
       b.place = pl; places.push(pl);
+    } else if (kind === 'obras') {
+      // 4 lotes pequenos para construir (casas, lojas, escritórios...), separados por vielas em cruz
+      [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c], k) => {
+        setRect(tx + 2 + a, ty + 2 + c, 3, 3, TILE.BUILD);
+        lotes.push({ id: 'L' + bx + '_' + by + '_' + k, bx, by, kind, tam: 'p', x: (tx + 2 + a) * T + 5, y: (ty + 2 + c) * T + 5, w: 3 * T - 10, h: 3 * T - 10 });
+      });
+    } else if (kind === 'obra') {
+      // 1 lote grande (hotel, hospital, escola, fábrica, empresa, shopping...)
+      setRect(tx + 2, ty + 2, 8, 8, TILE.BUILD);
+      lotes.push({ id: 'L' + bx + '_' + by + '_0', bx, by, kind, tam: 'g', x: (tx + 2) * T + 5, y: (ty + 2) * T + 5, w: 8 * T - 10, h: 8 * T - 10 });
+    } else if (kind === 'aeroporto') {
+      setRect(tx + 1, ty + 1, 10, 7, TILE.LOT);          // pista e pátio (dá para andar)
+      setRect(tx + 3, ty + 8, 6, 2, TILE.BUILD);         // terminal
+      setRect(tx + 10, ty + 8, 1, 2, TILE.BUILD);        // torre
+      lotes.push({ id: 'L' + bx + '_' + by + '_0', bx, by, kind, tam: 'a', x: (tx + 3) * T + 5, y: (ty + 8) * T + 5, w: 6 * T - 10, h: 2 * T - 10, pista: { x: (tx + 1) * T, y: (ty + 1) * T, w: 10 * T, h: 7 * T }, torre: { x: (tx + 10) * T + 4, y: (ty + 8) * T + 4, w: T - 8, h: 2 * T - 8 } });
+    } else if (kind === 'campo') {
+      // fazenda: calçada em volta, plantação no meio e um celeiro
+      setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
+      setRect(tx + 3, ty + 3, 3, 2, TILE.BUILD);
+      buildings.push(mkBuilding((tx + 3) * T + 4, (ty + 3) * T + 4, 3 * T - 8, 2 * T - 8, 4, mulberry32(bx * 91 + by * 17)));
+      const rr = mulberry32(bx * 53 + by * 29);
+      [[2.6, 9.4], [9.4, 9.4], [9.4, 2.6], [6.5, 9.4]].forEach(([a, b]) => trees.push({ x: (tx + a) * T, y: (ty + b) * T, r: 20 + rr() * 6 }));
     } else {
       setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
       const cx = tx + 6, cy = ty + 6;
@@ -185,10 +225,25 @@
   }
   // primeiro a cidade antiga (sempre igual), depois os bairros novos
   for (let by = 0; by < 4; by++) for (let bx = 0; bx < 6; bx++) criarBloco(bx, by);
-  for (let by = 0; by < ROWS; by++) for (let bx = 0; bx < COLS; bx++) if (!(bx < 6 && by < 4)) criarBloco(bx, by);
+  for (let by = 0; by < ROWS; by++) for (let bx = 0; bx < 9; bx++) if (!(bx < 6 && by < 4)) criarBloco(bx, by);
+  for (let by = 0; by < ROWS; by++) for (let bx = 9; bx < COLS; bx++) criarBloco(bx, by);
+  // árvores enfileiradas nas calçadas das quadras novas (cidade organizada e bonita)
+  blocks.forEach(blk => {
+    if (!['obras', 'obra', 'campo'].includes(blk.kind)) return;
+    const rr = mulberry32(blk.bx * 17 + blk.by * 131 + 7), off = 0.9 * T;
+    [1.4, 4.6, 7.4, 10.6].forEach(a => {
+      trees.push({ x: blk.x + a * T, y: blk.y + off, r: 14 + rr() * 3 });                         // lado de cima
+      if (blk.kind !== 'campo') { trees.push({ x: blk.x + off, y: blk.y + a * T, r: 14 + rr() * 3 }); trees.push({ x: blk.x + blk.w - off, y: blk.y + a * T, r: 14 + rr() * 3 }); }
+    });
+    trees.push({ x: blk.x + 1.2 * T, y: blk.y + blk.h - off, r: 15 }, { x: blk.x + blk.w - 1.2 * T, y: blk.y + blk.h - off, r: 15 });
+  });
   // pontes e faixas de pedestre
-  const rv = blocks.find(b => b.kind === 'river');
-  for (let j = 0; j <= ROWS; j++) setRect(rv.tx, MG + j * PITCH, BLOCK, ROAD, TILE.BRIDGE);
+  const rios = blocks.filter(b => b.kind === 'river');
+  const temPonte = (bx, j) => PONTES[bx] === 'todas' || (Array.isArray(PONTES[bx]) && PONTES[bx].includes(j));
+  rios.forEach(rv => { for (let j = 0; j <= ROWS; j++) setRect(rv.tx, MG + j * PITCH, BLOCK, ROAD, temPonte(rv.bx, j) ? TILE.BRIDGE : TILE.WATER); });
+  // pode um carro ir de um cruzamento ao vizinho na horizontal? (rios sem ponte bloqueiam)
+  // segmento s = quadra entre o cruzamento s e o s+1
+  const cruzaOk = (s, j) => !RIVERS.includes(s) || temPonte(s, j);
   const crossings = [];
   for (let i = 0; i <= COLS; i++) for (let j = 0; j <= ROWS; j++) {
     const x0 = MG + i * PITCH, y0 = MG + j * PITCH;
@@ -354,6 +409,7 @@
       for (let k = 0; k < 420; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,255,140,0.35)' : 'rgba(10,60,10,0.35)'; g.lineWidth = 1; const gx = r() * 128, gy = r() * 128; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + (r() - 0.5) * 3, gy - 2 - r() * 3); g.stroke(); }
     }
     tex.water = makeNoise('#21407e', 1500, 'rgba(140,190,255,0.14)', 'rgba(0,0,30,0.2)', 128);
+    tex.terra = makeNoise('#8c6e49', 1400, 'rgba(210,170,110,0.22)', 'rgba(60,40,20,0.25)', 128, [['rgba(110,80,48,0.35)', 12, 10, 28], ['rgba(170,140,95,0.25)', 8, 8, 20]]);
     tex.alley = makeNoise('#59505f', 700, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
     { // cascalho do telhado (transparente, vai por cima da cor do telhado)
       const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mulberry32(99);
@@ -563,11 +619,13 @@
   // brilhos que se mexem na água do rio e dos lagos (desenhado a cada quadro)
   function drawWaterFx(ctx, t, x0, y0, x1, y1) {
     ctx.save();
-    if (rv) for (let yy = Math.max(rv.y, Math.floor(y0 / 36) * 36); yy < Math.min(rv.y + rv.h, y1); yy += 36) {
-      if (rv.x > x1 || rv.x + rv.w < x0) break;
-      const k = yy / 36, rx = rv.x + 14 + ((k * 53 + t * (9 + (k % 5) * 3)) % (rv.w - 40));
-      ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);
-    }
+    rios.forEach(rv => {
+      if (rv.x > x1 || rv.x + rv.w < x0) return;
+      for (let yy = Math.max(rv.y, Math.floor(y0 / 36) * 36); yy < Math.min(rv.y + rv.h, y1); yy += 36) {
+        const k = yy / 36, rx = rv.x + 14 + ((k * 53 + t * (9 + (k % 5) * 3)) % (rv.w - 40));
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);
+      }
+    });
     ponds.forEach(p => {
       if (p.x < x0 - 80 || p.x > x1 + 80 || p.y < y0 - 80 || p.y > y1 + 80) return;
       for (let k = 0; k < 7; k++) {
@@ -698,6 +756,34 @@
       for (let k = 0; k <= 8; k += 1) { if (k >= 3 && k <= 5) { ctx.moveTo(gx + k * T + 0.5, gy); ctx.lineTo(gx + k * T + 0.5, gy + 8 * T); ctx.moveTo(gx, gy + k * T + 0.5); ctx.lineTo(gx + 8 * T, gy + k * T + 0.5); } }
       ctx.stroke();
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c]) => ctx.fillRect(gx + a * T, gy + c * T, 3 * T, 3 * T));
+    } else if (kind === 'obras' || kind === 'obra') {
+      // terreno de obra: terra batida e vielas (os lotes são desenhados por cidade.js)
+      const gx = x + 2 * T, gy = y + 2 * T;
+      ctx.fillStyle = ctx.createPattern(tex.terra, 'repeat'); ctx.fillRect(gx, gy, 8 * T, 8 * T);
+      if (kind === 'obras') {
+        [[3 * T, 0, 2 * T, 8 * T], [0, 3 * T, 8 * T, 2 * T]].forEach(([a, b, c, d]) => { ctx.fillStyle = '#c9bd8e'; ctx.fillRect(gx + a, gy + b, c, d); ctx.fillStyle = ctx.createPattern(tex.paving, 'repeat'); ctx.fillRect(gx + a, gy + b, c, d); });
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(gx - 4, gy - 4, 8 * T + 8, 4); ctx.fillRect(gx - 4, gy + 8 * T, 8 * T + 8, 4);
+    } else if (kind === 'campo') {
+      // fazenda: faixas de plantação, cerca de madeira e curral
+      const gx = x + 2 * T, gy = y + 2 * T, fr = mulberry32(blk.bx * 71 + blk.by * 19 + 3);
+      ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(gx, gy, 8 * T, 8 * T);
+      const cores = ['#6aa532', '#b9a63a', '#4f8f2a', '#8a6d3a'];
+      for (let k = 0; k < 8; k++) {
+        const cc = cores[Math.floor(fr() * 4)];
+        for (let ly = 0; ly < 8 * T - 4; ly += 7) { if (gy + ly < gy + 5.6 * T && gx + k * T < gx + 6.2 * T && ly < 5.8 * T && k < 6 && ly < 70) continue; ctx.fillStyle = cc; ctx.fillRect(gx + k * T + 2, gy + ly, T - 5, 3); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(gx + k * T + 2, gy + ly + 3, T - 5, 1); }
+      }
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 3; ctx.strokeRect(gx + 2, gy + 2, 8 * T - 4, 8 * T - 4);
+      ctx.strokeStyle = '#a07a4a'; ctx.lineWidth = 1; ctx.strokeRect(gx + 3.5, gy + 3.5, 8 * T - 7, 8 * T - 7);
+      for (let k = 0; k <= 16; k++) { ctx.fillStyle = '#4a321a'; ctx.fillRect(gx + k * T / 2 - 1, gy - 1, 3, 6); ctx.fillRect(gx + k * T / 2 - 1, gy + 8 * T - 5, 3, 6); }
+      for (let k = 0; k < 4; k++) { // vaquinhas
+        const vx = gx + 2 * T + fr() * 5 * T, vy = gy + 5.7 * T + fr() * 2 * T; ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(vx + 3, vy + 4, 11, 6, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#f4f4f0'; ctx.beginPath(); ctx.ellipse(vx, vy, 10, 5.5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.fillRect(vx - 5, vy - 3, 5, 4); ctx.fillRect(vx + 2, vy, 4, 3); ctx.beginPath(); ctx.arc(vx + 11, vy, 3.4, 0, 7); ctx.fill();
+      }
+    } else if (kind === 'aeroporto') {
+      // pista de pouso, pátio e faixas do aeroporto (os aviões e as obras ficam em cidade.js)
+      const pa = { x: x + T, y: y + T, w: 10 * T, h: 7 * T };
+      ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
     } else if (kind === 'mercado') {
       ctx.fillStyle = ctx.createPattern(tex.alley, 'repeat'); ctx.fillRect(x + T, y + T, 10 * T, 5 * T);
       const lt = y + 6 * T;
@@ -819,15 +905,28 @@
     // 5) quadras (chão)
     blocks.forEach(b => { if (hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawBlockGround(ctx, b); });
     blocks.forEach(b => { if (b.kind !== 'river' && hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawProps(ctx, b); });
-    // 6) ponte: proteção e pilares
-    for (let j = 0; j <= ROWS; j++) {
-      const by = roadTop(j), bx = rv.x;
-      if (!hit(bx, by - 20, rv.w, ROAD * T + 40)) continue;
-      ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(bx, by - 14, rv.w, 14); ctx.fillRect(bx, by + ROAD * T, rv.w, 18);
-      ctx.fillStyle = '#9a9aa6'; ctx.fillRect(bx, by - 6, rv.w, 10); ctx.fillRect(bx, by + ROAD * T - 4, rv.w, 10);
-      ctx.fillStyle = '#55555f'; ctx.fillRect(bx, by - 2, rv.w, 4); ctx.fillRect(bx, by + ROAD * T - 2, rv.w, 4);
-      for (let xx = bx + 8; xx < bx + rv.w; xx += 32) { ctx.fillStyle = '#c8c8d2'; ctx.fillRect(xx, by - 6, 5, 10); ctx.fillRect(xx, by + ROAD * T - 4, 5, 10); }
-    }
+    // 6) pontes (e água nas ruas sem ponte): proteção e pilares
+    rios.forEach(rv => {
+      for (let j = 0; j <= ROWS; j++) {
+        const by = roadTop(j), bx = rv.x;
+        if (!hit(bx, by - 20, rv.w, ROAD * T + 40)) continue;
+        if (!temPonte(rv.bx, j)) {
+          ctx.fillStyle = ctx.createPattern(tex.water, 'repeat'); ctx.fillRect(bx, by, rv.w, ROAD * T);
+          ctx.fillStyle = 'rgba(180,220,255,0.10)'; for (let k = 0; k < 14; k++) ctx.fillRect(bx + ((k * 97) % rv.w), by + ((k * 41) % (ROAD * T)), 18, 2);
+          ctx.fillStyle = '#3d4a3b'; ctx.fillRect(bx, by, 10, ROAD * T); ctx.fillRect(bx + rv.w - 10, by, 10, ROAD * T);
+          ctx.fillStyle = '#6f7d6a'; ctx.fillRect(bx + 8, by, 3, ROAD * T); ctx.fillRect(bx + rv.w - 11, by, 3, ROAD * T);
+          continue;
+        }
+        ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(bx, by - 14, rv.w, 14); ctx.fillRect(bx, by + ROAD * T, rv.w, 18);
+        ctx.fillStyle = '#9a9aa6'; ctx.fillRect(bx, by - 6, rv.w, 10); ctx.fillRect(bx, by + ROAD * T - 4, rv.w, 10);
+        ctx.fillStyle = '#55555f'; ctx.fillRect(bx, by - 2, rv.w, 4); ctx.fillRect(bx, by + ROAD * T - 2, rv.w, 4);
+        for (let xx = bx + 8; xx < bx + rv.w; xx += 32) { ctx.fillStyle = '#c8c8d2'; ctx.fillRect(xx, by - 6, 5, 10); ctx.fillRect(xx, by + ROAD * T - 4, 5, 10); }
+        if (PONTES[rv.bx] !== 'todas') { // ponte principal: arcos de ferro, luz azul e faixa de concreto
+          ctx.fillStyle = 'rgba(40,60,110,0.18)'; ctx.fillRect(bx, by, rv.w, ROAD * T);
+          for (let xx = bx + 40; xx < bx + rv.w - 20; xx += 96) { ctx.fillStyle = '#d8dae6'; ctx.fillRect(xx, by - 10, 8, 6); ctx.fillRect(xx, by + ROAD * T + 4, 8, 6); }
+        }
+      }
+    });
     // 7) sombras dos prédios e telhados
     const vis = buildings.filter(b => hit(b.x, b.y, b.w + 14, b.h + 14));
     vis.forEach(b => { // sombra suave (borrada) projetada para baixo e para a direita
@@ -901,9 +1000,9 @@
   });
 
   G.world = {
-    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
+    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, RIVERS, PONTES, CIDADES, lotes, cruzaOk, temPonte, mkBuilding, drawRoof, drawTree, shade, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
     roadLeft, roadTop, nodeX, nodeY, laneV, laneH, tileAt, isSolid, treeHit, isRoadTile, pedWalkable,
-    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados, lojas, gerarLojas,
+    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados, lojas, gerarLojas, LOJAS_DEF,
     chunkCount: chunks.length,
   };
 })(window.G = window.G || {});

@@ -786,6 +786,51 @@
   // manda o NPC passear por uma lista de pontos; fn roda quando chega ao fim
   L.rota = function (n, pts, fn) { n.rota = pts.map(p => ({ x: p.x, y: p.y })); n.alvo = null; n.fimRota = fn || null; };
 
+  // ---------- salas "vigiadas": o sistema de câmeras mostra qualquer sala, mesmo sem você estar nela ----------
+  // cria uma cópia viva da sala (gente andando, hóspedes...) só para as câmeras
+  L.salaVigiada = function (pl, salaId) {
+    const S = G.S, cons = L.construtores[pl.id] || L.construtores['tipo:' + pl.tipo];
+    let lg = pl._lgVigia;
+    if (!lg) {
+      if (cons) lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar };
+      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; }
+      lg.vigia = true; pl._lgVigia = lg;
+    }
+    let R = lg.salas[salaId];
+    if (!R) {
+      if (!lg.criar) return null;
+      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R;
+      R.vigiada = true;
+    }
+    return R;
+  };
+  // faz a sala vigiada andar um pouquinho (só NPCs e rotina; sem o jogador)
+  L.simularSala = function (S, R, dt) {
+    const prev = S.inside; usa(R);
+    R.t = (R.t || 0) + dt;
+    for (const n of R.npcs) { if (n.p.bub) { n.p.bub.t -= dt; if (n.p.bub.t <= 0) n.p.bub = null; } andaNpc(n, dt); if (n.assustado > 0) n.assustado -= dt; }
+    if (R.onUpdate && R.vigiada) { try { R.onUpdate(S, R, dt); } catch (e) { R.onUpdate = null; if (G.olho && G.olho.erro) G.olho.erro(e, 'sala vigiada ' + (R.nome || '')); } }
+    if (prev) usa(prev);
+  };
+  // desenha a sala inteira (sem barras de título), do jeito que a câmera vê
+  L.desenharCena = function (ctx, S, R, mostraJogador) {
+    const prev = S.inside; usa(R);
+    const t = S.time;
+    if (!R.bg) R.bg = fundo(R);
+    ctx.drawImage(R.bg, 0, 0);
+    const lista = [];
+    R.objs.forEach(o => { if (!o.invisivel) lista.push({ k: o.k !== undefined ? o.k : o.y + o.h, f: () => drawObj(ctx, o, t) }); });
+    R.npcs.forEach(n => lista.push({ k: n.k !== undefined ? n.k : n.dorme ? n.y + 60 : n.y + 4, f: () => {
+      if (n.dorme) { gente(ctx, S, n.p, n.x, n.y - 4, 1.9, n.h || 1.57, 0, 'down'); return; }
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(n.x + 3, n.y + 3, 15, 8, 0, 0, TAU); ctx.fill();
+      gente(ctx, S, n.p, n.x, n.y - 8 + (n.sentado ? 5 : 0), 1.9, n.h == null ? Math.PI : n.h, n.corre ? t * 6 : n.walk || 0);
+    } }));
+    if (mostraJogador) lista.push({ k: R.py, f: () => { ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(R.px + 3, R.py + 3, 15, 8, 0, 0, TAU); ctx.fill(); gente(ctx, S, S.player, R.px, R.py - 8 + (R.sentado ? 5 : 0), 1.9, R.ph, R.walk); } });
+    lista.sort((a, b) => a.k - b.k).forEach(i => i.f());
+    if (G.cameras) G.cameras.desenharSala(ctx, S, R);
+    if (prev) usa(prev);
+  };
+
   // ---------- atualização de uma sala ----------
   L.atualizarDentro = function (S, dt, K, Kp) {
     const R = S.inside; if (!R) return;
@@ -794,6 +839,7 @@
     R.t = (R.t || 0) + dt;
     for (const n of R.npcs) { if (n.p.bub) { n.p.bub.t -= dt; if (n.p.bub.t <= 0) n.p.bub = null; } andaNpc(n, dt); if (n.assustado > 0) n.assustado -= dt; }
     if (R.onUpdate) R.onUpdate(S, R, dt);
+    if (G.cameras) G.cameras.atualizarSala(S, R, dt);   // câmeras de segurança veem o que você faz
     const LG = R.lugar;
     if (LG.alarme != null && !LG.alarmeFeito) { LG.alarme -= dt; if (LG.alarme <= 0) { LG.alarmeFeito = true; G.addHeat(LG.alarmeHeat || 40); G.say('Alguém chamou a POLÍCIA! Cuidado quando for sair!', 5); G.snd.beep(); } }
     if (S.trans) return;
@@ -870,6 +916,7 @@
     lista.push({ k: R.py, f: () => { ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(R.px + 3, R.py + 3, 15, 8, 0, 0, TAU); ctx.fill(); gente(ctx, S, S.player, R.px, R.py - 8 + (R.sentado ? 5 : 0), 1.9, R.ph, R.walk); } });
     if (R.carrinho) { const fx = Math.sin(R.ph), fy = -Math.cos(R.ph); lista.push({ k: R.py + (fy > 0 ? 3 : -3), f: () => desenhaCarrinho(ctx, R.px + fx * 30, R.py + fy * 30 - 4, R.ph, R.carrinho) }); }
     lista.sort((a, b) => a.k - b.k).forEach(i => i.f());
+    if (G.cameras) G.cameras.desenharSala(ctx, S, R);   // as câmeras (com a luz vermelha) no teto
     if (R.sel && !S.trans && !R.menu && !R.mini) {
       if (R.sel.t === 'obj') { const o = R.sel.o, z = o.zona || [o.x, o.y - (o.e || 0), o.w, o.h + (o.e || 0)]; ctx.save(); ctx.strokeStyle = 'rgba(255,224,74,' + (0.6 + 0.3 * Math.sin(t * 6)) + ')'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(z[0] - 3, z[1] - 3, z[2] + 6, z[3] + 6); ctx.restore(); }
       else { const n = R.sel.n; ctx.save(); ctx.strokeStyle = 'rgba(255,224,74,' + (0.6 + 0.3 * Math.sin(t * 6)) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(n.x, n.y + 2, 20, 11, 0, 0, TAU); ctx.stroke(); ctx.restore(); }

@@ -139,7 +139,7 @@
   window.addEventListener('keydown', e => { onKey(e, true); G.snd.init(); });
   window.addEventListener('keyup', e => onKey(e, false));
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (S.mode === 'play') S.mode = 'paused'; });
-  const K = (...c) => c.some(x => keys[x]);
+  const K = (...c) => !(G.overlay && G.overlay.atual) && c.some(x => keys[x]);   // com uma tela por cima (câmeras, Olho), o jogo não recebe teclas
   const Kp = (...c) => c.some(x => pressed[x]);
 
   // ---------- Atualização ----------
@@ -398,6 +398,8 @@
 
   function update(dt) {
     S.time += dt; S.dayT += dt / 420;
+    G.cidade.atualizar(S, dt);
+    if (G.extras) G.extras.atualizar(S, dt);
     if (S.msg) { S.msg.t -= dt; if (S.msg.t <= 0) S.msg = null; }
     if (S.ban) { S.ban.t -= dt; if (S.ban.t <= 0) S.ban = null; }
     if (S.radioT > 0) S.radioT -= dt;
@@ -441,6 +443,8 @@
     const vx0 = cam.x - VW / 2 / z - 40, vy0 = cam.y - VH / 2 / z - 40, vx1 = cam.x + VW / 2 / z + 40, vy1 = cam.y + VH / 2 / z + 40;
     W.drawChunks(ctx, vx0, vy0, vx1, vy1);
     W.drawWaterFx(ctx, S.time, vx0, vy0, vx1, vy1);   // brilhos na água
+    G.cidade.desenhar(ctx, S, vx0, vy0, vx1, vy1, S.time);   // obras, prédios novos, pontes e aeroporto
+    if (G.pedagio) G.pedagio.desenhar(ctx, S, vx0, vy0, vx1, vy1, S.time);
     const inV = o => o.x > vx0 - 80 && o.x < vx1 + 80 && o.y > vy0 - 80 && o.y < vy1 + 80;
     G.combat.drawDecals(ctx, S, inV);       // sangue, marcas de pneu e chamuscado
     M.drawWorld(ctx, S, S.time);
@@ -451,6 +455,7 @@
     const cars = S.cars.filter(inV).sort((a, b) => (a.dead ? 0 : 1) - (b.dead ? 0 : 1));
     cars.forEach(c => SP.drawCar(ctx, c, S.time));
     vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
+    if (G.fbi) G.fbi.desenhar(ctx, S, inV, S.time);   // agentes do FBI patrulhando
     if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
     G.detalhes.draw(ctx, S, inV);            // pombos
     G.lugares.desenhar(ctx, S, inV);         // marcadores dos lugares, balões de fala, seta do guia
@@ -469,6 +474,9 @@
       else { ctx.globalAlpha = k; ctx.fillStyle = '#ffd86a'; ctx.fillRect(-1.5, -1.5, 3, 3); }
       ctx.restore();
     });
+    G.cidade.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);   // guindastes e aviões no ar
+    if (G.pedagio) G.pedagio.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);
+    if (G.cameras) G.cameras.desenharRua(ctx, S, vx0, vy0, vx1, vy1, S.time);
     // helicóptero
     const h = S.heli;
     if (h) {
@@ -532,8 +540,8 @@
     const L = [
       ['A PÉ', 'WASD / Setas andar  Shift correr  Espaço atacar/atirar  Q ou 1-6 trocam de arma  E usar'],
       ['DE CARRO', 'W/↑ acelera  S/↓ freio e ré  A D ←→ virar  Espaço freio de mão  H buzina  E sair'],
-      ['OUTROS', 'R rádio   M som   P pausa   V gráficos'],
-      ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Arme-se na loja rosa!'],
+      ['OUTROS', 'R rádio   M som   P pausa   V gráficos   C CENTRAL DE CÂMERAS   F9 relatórios (Olho de Deus)'],
+      ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Atravesse a ponte (pedágio!) e veja as obras.'],
       ['POLÍCIA', 'Crime na frente da polícia dá PROCURADO. Eles descem e atiram. Fuja ou lute!'],
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(40, 320, 720, 230);
@@ -550,6 +558,7 @@
   function startGame(fresh) {
     if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
     G.snd.init(); newWorld(); S.mode = 'play';
+    G.cidade.carregar(S);   // a cidade continua de onde parou
   }
   function frame(ts) {
     requestAnimationFrame(frame);
@@ -578,18 +587,20 @@
       for (const k in pressed) delete pressed[k];
       return;
     }
+    G.overlay.entrada(S, pressed);
     G.lugares.atualizarTrans(S, dt);
     if (S.mode === 'inside') {
       // dentro de um lugar (barbearia, teatro, casa...): outra tela, outro mundo
       if (S.msg) { S.msg.t -= dt; if (S.msg.t <= 0) S.msg = null; }
       if (S.radioT > 0) S.radioT -= dt;
+      G.cidade.atualizar(S, dt); if (G.extras) G.extras.atualizar(S, dt);
       G.lugares.atualizarDentro(S, dt, K, Kp);
       if (Kp('KeyR')) { G.snd.nextStation(); S.radioT = 3; }
       if (Kp('KeyM')) G.say(G.snd.mute() ? 'Som desligado' : 'Som ligado', 2);
       G.snd.update({ inCar: false, car: null, horn: false, sirenVol: 0 });
       if (S.mode === 'inside') G.lugares.desenharDentro(ctx, S);
       else { updateCamera(dt); drawWorld(); G.hud.draw(ctx, S, S.time); G.lugares.hudMochila(ctx, S); }
-      G.lugares.desenharTrans(ctx, S);
+      G.lugares.desenharTrans(ctx, S); G.overlay.desenhar(ctx, S, dt);
       for (const k in pressed) delete pressed[k];
       return;
     }
@@ -604,7 +615,7 @@
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
     if (S.mode === 'shop') G.combat.drawShop(ctx, S);
     if (S.mode === 'paused') drawOverlay('PAUSADO', 'P ou ENTER para continuar', '#ffe04a');
-    G.lugares.desenharTrans(ctx, S);
+    G.lugares.desenharTrans(ctx, S); G.overlay.desenhar(ctx, S, dt);
     for (const k in pressed) delete pressed[k];
   }
 

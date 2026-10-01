@@ -27,8 +27,12 @@
   const ROAD = 6;        // largura da rua (tiles) = 2 faixas de 3 tiles
   const BLOCK = 12;      // lado de uma quadra (tiles)
   const PITCH = ROAD + BLOCK;
-  const COLS = 9, ROWS = 6;  // quadras na horizontal / vertical (mapa dobrado: bairros novos a leste e ao sul)
-  const RIVER = 3;       // coluna de quadras ocupada pelo rio
+  const COLS = 17, ROWS = 6;  // quadras na horizontal / vertical (mapa GIGANTE: cidade + interior em obras + cidade vizinha)
+  const RIVER = 3;       // o primeiro rio (o da cidade antiga)
+  const RIVERS = [3, 9, 13];          // colunas de quadras ocupadas por rios
+  // rio -> linhas de rua onde existe ponte ('todas' = uma ponte em cada rua). Os rios novos têm UMA ponte (com pedágio); novas pontes são construídas por cidade.js
+  const PONTES = { 3: 'todas', 9: [3], 13: [2] };
+  const CIDADES = [{ id: 'ribeirao', nome: 'RIBEIRÃO PRETO', sub: 'a cidade', ate: 9 }, { id: 'interior', nome: 'NOVO HORIZONTE', sub: 'interior', ate: 13 }, { id: 'vale', nome: 'VALE VERDE', sub: 'outra cidade', ate: 99 }];
   const MG = 6;          // margem fora das ruas (calçada + prédios)
   const INNER_W = COLS * PITCH + ROAD;
   const INNER_H = ROWS * PITCH + ROAD;
@@ -86,19 +90,22 @@
   const ponds = [];
   const blocks = [];
 
-  function addBuilding(x, y, w, h, forceRoof) {
-    const p = ROOFS[forceRoof != null ? forceRoof : Math.floor(rnd() * ROOFS.length)];
+  // cria o objeto de um prédio (sem colocar no mapa). rg = gerador de números (para não mexer na cidade antiga)
+  function mkBuilding(x, y, w, h, forceRoof, rg) {
+    rg = rg || rnd;
+    const p = ROOFS[forceRoof != null ? forceRoof : Math.floor(rg() * ROOFS.length)];
     const b = { x, y, w, h, p, ridge: w >= h ? 'h' : 'v', det: [] };
     if (p.kind === 'flat') {
-      const n = 1 + Math.floor(rnd() * 3);
+      const n = 1 + Math.floor(rg() * 3);
       for (let k = 0; k < n; k++) {
-        b.det.push({ fx: 0.2 + rnd() * 0.6, fy: 0.2 + rnd() * 0.6, t: ['ac', 'sky', 'tank', 'ac', 'solar', 'vent', 'ant'][Math.floor(rnd() * 7)] });
+        b.det.push({ fx: 0.2 + rg() * 0.6, fy: 0.2 + rg() * 0.6, t: ['ac', 'sky', 'tank', 'ac', 'solar', 'vent', 'ant'][Math.floor(rg() * 7)] });
       }
-    } else if (rnd() < 0.5) {
-      b.det.push({ fx: 0.25 + rnd() * 0.5, fy: 0.3 + rnd() * 0.4, t: 'chim' });
+    } else if (rg() < 0.5) {
+      b.det.push({ fx: 0.25 + rg() * 0.5, fy: 0.3 + rg() * 0.4, t: 'chim' });
     }
-    buildings.push(b);
+    return b;
   }
+  function addBuilding(x, y, w, h, forceRoof) { buildings.push(mkBuilding(x, y, w, h, forceRoof)); }
 
   // divide uma área (em tiles) em prédios
   function partition(tx, ty, tw, th) {
@@ -116,7 +123,17 @@
   setRect(MG - 2, MG - 2, INNER_W + 4, INNER_H + 4, TILE.SIDE);
   setRect(MG, MG, INNER_W, INNER_H, TILE.ROAD);
 
-  const PARKS = [[1, 1], [5, 3], [7, 3]];
+  const PARKS = [[1, 1], [5, 3], [7, 3], [11, 2], [15, 2]];
+  // as quadras novas (interior e cidade vizinha): obras (4 lotes pequenos), obra (1 lote grande), campo, aeroporto
+  const NOVAS = {
+    '10,0': 'obras', '11,0': 'obra', '12,0': 'campo', '10,1': 'obras', '11,1': 'obras', '12,1': 'campo',
+    '10,2': 'obra', '12,2': 'obras', '10,3': 'obras', '11,3': 'obra', '12,3': 'obras',
+    '10,4': 'campo', '11,4': 'obras', '12,4': 'obra', '10,5': 'campo', '11,5': 'campo', '12,5': 'obras',
+    '14,0': 'obra', '15,0': 'obras', '16,0': 'campo', '14,1': 'obras', '15,1': 'obra', '16,1': 'obras',
+    '14,2': 'obras', '16,2': 'obra', '14,3': 'obra', '15,3': 'obras', '16,3': 'campo',
+    '14,4': 'campo', '15,4': 'obras', '16,4': 'aeroporto', '14,5': 'obras', '15,5': 'campo', '16,5': 'obras'
+  };
+  const lotes = [];            // lotes de obra (cidade.js constrói neles)
   const places = [];          // lugares grandes e comércios (dá para entrar)
   const casas = [];           // todas as casas (dá para entrar em todas!)
   const mercados = [];        // supermercados com estacionamento
@@ -146,9 +163,10 @@
   function criarBloco(bx, by) {
     const tx = MG + ROAD + bx * PITCH, ty = MG + ROAD + by * PITCH, key = bx + ',' + by;
     let kind = 'city';
-    if (bx === RIVER) kind = 'river';
+    if (RIVERS.includes(bx)) kind = 'river';
     else if (PARKS.some(p => p[0] === bx && p[1] === by)) kind = 'park';
     else if (ESPECIAIS[key]) kind = ESPECIAIS[key];
+    else if (NOVAS[key]) kind = NOVAS[key];
     else if ((bx >= 6 || by >= 4) && (bx * 5 + by * 3) % 4 !== 0) kind = 'vila';
     const blk = { bx, by, tx, ty, x: tx * T, y: ty * T, w: BLOCK * T, h: BLOCK * T, kind };
     blocks.push(blk);
@@ -186,6 +204,28 @@
       const b = buildings[buildings.length - 1]; b.det = []; b.hotel = def; blk.hotel = def;
       const pl = Object.assign({}, def, { tipo: 'hotel', b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 40 });
       b.place = pl; places.push(pl);
+    } else if (kind === 'obras') {
+      // 4 lotes pequenos para construir (casas, lojas, escritórios...), separados por vielas em cruz
+      [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c], k) => {
+        setRect(tx + 2 + a, ty + 2 + c, 3, 3, TILE.BUILD);
+        lotes.push({ id: 'L' + bx + '_' + by + '_' + k, bx, by, kind, tam: 'p', x: (tx + 2 + a) * T + 5, y: (ty + 2 + c) * T + 5, w: 3 * T - 10, h: 3 * T - 10 });
+      });
+    } else if (kind === 'obra') {
+      // 1 lote grande (hotel, hospital, escola, fábrica, empresa, shopping...)
+      setRect(tx + 2, ty + 2, 8, 8, TILE.BUILD);
+      lotes.push({ id: 'L' + bx + '_' + by + '_0', bx, by, kind, tam: 'g', x: (tx + 2) * T + 5, y: (ty + 2) * T + 5, w: 8 * T - 10, h: 8 * T - 10 });
+    } else if (kind === 'aeroporto') {
+      setRect(tx + 1, ty + 1, 10, 7, TILE.LOT);          // pista e pátio (dá para andar)
+      setRect(tx + 3, ty + 8, 6, 2, TILE.BUILD);         // terminal
+      setRect(tx + 10, ty + 8, 1, 2, TILE.BUILD);        // torre
+      lotes.push({ id: 'L' + bx + '_' + by + '_0', bx, by, kind, tam: 'a', x: (tx + 3) * T + 5, y: (ty + 8) * T + 5, w: 6 * T - 10, h: 2 * T - 10, pista: { x: (tx + 1) * T, y: (ty + 1) * T, w: 10 * T, h: 7 * T }, torre: { x: (tx + 10) * T + 4, y: (ty + 8) * T + 4, w: T - 8, h: 2 * T - 8 } });
+    } else if (kind === 'campo') {
+      // fazenda: calçada em volta, plantação no meio e um celeiro
+      setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
+      setRect(tx + 3, ty + 3, 3, 2, TILE.BUILD);
+      buildings.push(mkBuilding((tx + 3) * T + 4, (ty + 3) * T + 4, 3 * T - 8, 2 * T - 8, 4, mulberry32(bx * 91 + by * 17)));
+      const rr = mulberry32(bx * 53 + by * 29);
+      [[2.6, 9.4], [9.4, 9.4], [9.4, 2.6], [6.5, 9.4]].forEach(([a, b]) => trees.push({ x: (tx + a) * T, y: (ty + b) * T, r: 20 + rr() * 6 }));
     } else {
       setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
       const cx = tx + 6, cy = ty + 6;
@@ -200,10 +240,25 @@
   }
   // primeiro a cidade antiga (sempre igual), depois os bairros novos
   for (let by = 0; by < 4; by++) for (let bx = 0; bx < 6; bx++) criarBloco(bx, by);
-  for (let by = 0; by < ROWS; by++) for (let bx = 0; bx < COLS; bx++) if (!(bx < 6 && by < 4)) criarBloco(bx, by);
+  for (let by = 0; by < ROWS; by++) for (let bx = 0; bx < 9; bx++) if (!(bx < 6 && by < 4)) criarBloco(bx, by);
+  for (let by = 0; by < ROWS; by++) for (let bx = 9; bx < COLS; bx++) criarBloco(bx, by);
+  // árvores enfileiradas nas calçadas das quadras novas (cidade organizada e bonita)
+  blocks.forEach(blk => {
+    if (!['obras', 'obra', 'campo'].includes(blk.kind)) return;
+    const rr = mulberry32(blk.bx * 17 + blk.by * 131 + 7), off = 0.9 * T;
+    [1.4, 4.6, 7.4, 10.6].forEach(a => {
+      trees.push({ x: blk.x + a * T, y: blk.y + off, r: 14 + rr() * 3 });                         // lado de cima
+      if (blk.kind !== 'campo') { trees.push({ x: blk.x + off, y: blk.y + a * T, r: 14 + rr() * 3 }); trees.push({ x: blk.x + blk.w - off, y: blk.y + a * T, r: 14 + rr() * 3 }); }
+    });
+    trees.push({ x: blk.x + 1.2 * T, y: blk.y + blk.h - off, r: 15 }, { x: blk.x + blk.w - 1.2 * T, y: blk.y + blk.h - off, r: 15 });
+  });
   // pontes e faixas de pedestre
-  const rv = blocks.find(b => b.kind === 'river');
-  for (let j = 0; j <= ROWS; j++) setRect(rv.tx, MG + j * PITCH, BLOCK, ROAD, TILE.BRIDGE);
+  const rios = blocks.filter(b => b.kind === 'river');
+  const temPonte = (bx, j) => PONTES[bx] === 'todas' || (Array.isArray(PONTES[bx]) && PONTES[bx].includes(j));
+  rios.forEach(rv => { for (let j = 0; j <= ROWS; j++) setRect(rv.tx, MG + j * PITCH, BLOCK, ROAD, temPonte(rv.bx, j) ? TILE.BRIDGE : TILE.WATER); });
+  // pode um carro ir de um cruzamento ao vizinho na horizontal? (rios sem ponte bloqueiam)
+  // segmento s = quadra entre o cruzamento s e o s+1
+  const cruzaOk = (s, j) => !RIVERS.includes(s) || temPonte(s, j);
   const crossings = [];
   for (let i = 0; i <= COLS; i++) for (let j = 0; j <= ROWS; j++) {
     const x0 = MG + i * PITCH, y0 = MG + j * PITCH;
@@ -369,6 +424,7 @@
       for (let k = 0; k < 420; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,255,140,0.35)' : 'rgba(10,60,10,0.35)'; g.lineWidth = 1; const gx = r() * 128, gy = r() * 128; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + (r() - 0.5) * 3, gy - 2 - r() * 3); g.stroke(); }
     }
     tex.water = makeNoise('#21407e', 1500, 'rgba(140,190,255,0.14)', 'rgba(0,0,30,0.2)', 128);
+    tex.terra = makeNoise('#8c6e49', 1400, 'rgba(210,170,110,0.22)', 'rgba(60,40,20,0.25)', 128, [['rgba(110,80,48,0.35)', 12, 10, 28], ['rgba(170,140,95,0.25)', 8, 8, 20]]);
     tex.alley = makeNoise('#59505f', 700, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
     { // cascalho do telhado (transparente, vai por cima da cor do telhado)
       const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = mulberry32(99);
@@ -578,11 +634,13 @@
   // brilhos que se mexem na água do rio e dos lagos (desenhado a cada quadro)
   function drawWaterFx(ctx, t, x0, y0, x1, y1) {
     ctx.save();
-    if (rv) for (let yy = Math.max(rv.y, Math.floor(y0 / 36) * 36); yy < Math.min(rv.y + rv.h, y1); yy += 36) {
-      if (rv.x > x1 || rv.x + rv.w < x0) break;
-      const k = yy / 36, rx = rv.x + 14 + ((k * 53 + t * (9 + (k % 5) * 3)) % (rv.w - 40));
-      ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);
-    }
+    rios.forEach(rv => {
+      if (rv.x > x1 || rv.x + rv.w < x0) return;
+      for (let yy = Math.max(rv.y, Math.floor(y0 / 36) * 36); yy < Math.min(rv.y + rv.h, y1); yy += 36) {
+        const k = yy / 36, rx = rv.x + 14 + ((k * 53 + t * (9 + (k % 5) * 3)) % (rv.w - 40));
+        ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);
+      }
+    });
     ponds.forEach(p => {
       if (p.x < x0 - 80 || p.x > x1 + 80 || p.y < y0 - 80 || p.y > y1 + 80) return;
       for (let k = 0; k < 7; k++) {
@@ -713,6 +771,34 @@
       for (let k = 0; k <= 8; k += 1) { if (k >= 3 && k <= 5) { ctx.moveTo(gx + k * T + 0.5, gy); ctx.lineTo(gx + k * T + 0.5, gy + 8 * T); ctx.moveTo(gx, gy + k * T + 0.5); ctx.lineTo(gx + 8 * T, gy + k * T + 0.5); } }
       ctx.stroke();
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c]) => ctx.fillRect(gx + a * T, gy + c * T, 3 * T, 3 * T));
+    } else if (kind === 'obras' || kind === 'obra') {
+      // terreno de obra: terra batida e vielas (os lotes são desenhados por cidade.js)
+      const gx = x + 2 * T, gy = y + 2 * T;
+      ctx.fillStyle = ctx.createPattern(tex.terra, 'repeat'); ctx.fillRect(gx, gy, 8 * T, 8 * T);
+      if (kind === 'obras') {
+        [[3 * T, 0, 2 * T, 8 * T], [0, 3 * T, 8 * T, 2 * T]].forEach(([a, b, c, d]) => { ctx.fillStyle = '#c9bd8e'; ctx.fillRect(gx + a, gy + b, c, d); ctx.fillStyle = ctx.createPattern(tex.paving, 'repeat'); ctx.fillRect(gx + a, gy + b, c, d); });
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(gx - 4, gy - 4, 8 * T + 8, 4); ctx.fillRect(gx - 4, gy + 8 * T, 8 * T + 8, 4);
+    } else if (kind === 'campo') {
+      // fazenda: faixas de plantação, cerca de madeira e curral
+      const gx = x + 2 * T, gy = y + 2 * T, fr = mulberry32(blk.bx * 71 + blk.by * 19 + 3);
+      ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(gx, gy, 8 * T, 8 * T);
+      const cores = ['#6aa532', '#b9a63a', '#4f8f2a', '#8a6d3a'];
+      for (let k = 0; k < 8; k++) {
+        const cc = cores[Math.floor(fr() * 4)];
+        for (let ly = 0; ly < 8 * T - 4; ly += 7) { if (gy + ly < gy + 5.6 * T && gx + k * T < gx + 6.2 * T && ly < 5.8 * T && k < 6 && ly < 70) continue; ctx.fillStyle = cc; ctx.fillRect(gx + k * T + 2, gy + ly, T - 5, 3); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(gx + k * T + 2, gy + ly + 3, T - 5, 1); }
+      }
+      ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 3; ctx.strokeRect(gx + 2, gy + 2, 8 * T - 4, 8 * T - 4);
+      ctx.strokeStyle = '#a07a4a'; ctx.lineWidth = 1; ctx.strokeRect(gx + 3.5, gy + 3.5, 8 * T - 7, 8 * T - 7);
+      for (let k = 0; k <= 16; k++) { ctx.fillStyle = '#4a321a'; ctx.fillRect(gx + k * T / 2 - 1, gy - 1, 3, 6); ctx.fillRect(gx + k * T / 2 - 1, gy + 8 * T - 5, 3, 6); }
+      for (let k = 0; k < 4; k++) { // vaquinhas
+        const vx = gx + 2 * T + fr() * 5 * T, vy = gy + 5.7 * T + fr() * 2 * T; ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(vx + 3, vy + 4, 11, 6, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = '#f4f4f0'; ctx.beginPath(); ctx.ellipse(vx, vy, 10, 5.5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#2a2a2a'; ctx.fillRect(vx - 5, vy - 3, 5, 4); ctx.fillRect(vx + 2, vy, 4, 3); ctx.beginPath(); ctx.arc(vx + 11, vy, 3.4, 0, 7); ctx.fill();
+      }
+    } else if (kind === 'aeroporto') {
+      // pista de pouso, pátio e faixas do aeroporto (os aviões e as obras ficam em cidade.js)
+      const pa = { x: x + T, y: y + T, w: 10 * T, h: 7 * T };
+      ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
     } else if (kind === 'mercado') {
       ctx.fillStyle = ctx.createPattern(tex.alley, 'repeat'); ctx.fillRect(x + T, y + T, 10 * T, 5 * T);
       const lt = y + 6 * T;
@@ -834,15 +920,28 @@
     // 5) quadras (chão)
     blocks.forEach(b => { if (hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawBlockGround(ctx, b); });
     blocks.forEach(b => { if (b.kind !== 'river' && hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawProps(ctx, b); });
-    // 6) ponte: proteção e pilares
-    for (let j = 0; j <= ROWS; j++) {
-      const by = roadTop(j), bx = rv.x;
-      if (!hit(bx, by - 20, rv.w, ROAD * T + 40)) continue;
-      ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(bx, by - 14, rv.w, 14); ctx.fillRect(bx, by + ROAD * T, rv.w, 18);
-      ctx.fillStyle = '#9a9aa6'; ctx.fillRect(bx, by - 6, rv.w, 10); ctx.fillRect(bx, by + ROAD * T - 4, rv.w, 10);
-      ctx.fillStyle = '#55555f'; ctx.fillRect(bx, by - 2, rv.w, 4); ctx.fillRect(bx, by + ROAD * T - 2, rv.w, 4);
-      for (let xx = bx + 8; xx < bx + rv.w; xx += 32) { ctx.fillStyle = '#c8c8d2'; ctx.fillRect(xx, by - 6, 5, 10); ctx.fillRect(xx, by + ROAD * T - 4, 5, 10); }
-    }
+    // 6) pontes (e água nas ruas sem ponte): proteção e pilares
+    rios.forEach(rv => {
+      for (let j = 0; j <= ROWS; j++) {
+        const by = roadTop(j), bx = rv.x;
+        if (!hit(bx, by - 20, rv.w, ROAD * T + 40)) continue;
+        if (!temPonte(rv.bx, j)) {
+          ctx.fillStyle = ctx.createPattern(tex.water, 'repeat'); ctx.fillRect(bx, by, rv.w, ROAD * T);
+          ctx.fillStyle = 'rgba(180,220,255,0.10)'; for (let k = 0; k < 14; k++) ctx.fillRect(bx + ((k * 97) % rv.w), by + ((k * 41) % (ROAD * T)), 18, 2);
+          ctx.fillStyle = '#3d4a3b'; ctx.fillRect(bx, by, 10, ROAD * T); ctx.fillRect(bx + rv.w - 10, by, 10, ROAD * T);
+          ctx.fillStyle = '#6f7d6a'; ctx.fillRect(bx + 8, by, 3, ROAD * T); ctx.fillRect(bx + rv.w - 11, by, 3, ROAD * T);
+          continue;
+        }
+        ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(bx, by - 14, rv.w, 14); ctx.fillRect(bx, by + ROAD * T, rv.w, 18);
+        ctx.fillStyle = '#9a9aa6'; ctx.fillRect(bx, by - 6, rv.w, 10); ctx.fillRect(bx, by + ROAD * T - 4, rv.w, 10);
+        ctx.fillStyle = '#55555f'; ctx.fillRect(bx, by - 2, rv.w, 4); ctx.fillRect(bx, by + ROAD * T - 2, rv.w, 4);
+        for (let xx = bx + 8; xx < bx + rv.w; xx += 32) { ctx.fillStyle = '#c8c8d2'; ctx.fillRect(xx, by - 6, 5, 10); ctx.fillRect(xx, by + ROAD * T - 4, 5, 10); }
+        if (PONTES[rv.bx] !== 'todas') { // ponte principal: arcos de ferro, luz azul e faixa de concreto
+          ctx.fillStyle = 'rgba(40,60,110,0.18)'; ctx.fillRect(bx, by, rv.w, ROAD * T);
+          for (let xx = bx + 40; xx < bx + rv.w - 20; xx += 96) { ctx.fillStyle = '#d8dae6'; ctx.fillRect(xx, by - 10, 8, 6); ctx.fillRect(xx, by + ROAD * T + 4, 8, 6); }
+        }
+      }
+    });
     // 7) sombras dos prédios e telhados
     const vis = buildings.filter(b => hit(b.x, b.y, b.w + 14, b.h + 14));
     vis.forEach(b => { // sombra suave (borrada) projetada para baixo e para a direita
@@ -916,9 +1015,9 @@
   });
 
   G.world = {
-    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
+    T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, RIVERS, PONTES, CIDADES, lotes, cruzaOk, temPonte, mkBuilding, drawRoof, drawTree, shade, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
     roadLeft, roadTop, nodeX, nodeY, laneV, laneH, tileAt, isSolid, treeHit, isRoadTile, pedWalkable,
-    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados, lojas, gerarLojas,
+    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados, lojas, gerarLojas, LOJAS_DEF,
     chunkCount: chunks.length,
   };
 })(window.G = window.G || {});
@@ -1687,14 +1786,16 @@
     return nav;
   }
 
+  // rios sem ponte nessa rua: o carro não pode seguir naquele sentido (só as pontes ligam as margens)
+  const okH = (i, j, hd) => W.cruzaOk(hd > 0 ? i : i - 1, j);
   function chooseManeuver(car) {
     const n = car.nav, i = n.ni, j = n.nj, d = n.dir, opts = [];
     if (n.axis === 'v') {
       if (d > 0 ? j < ROWS : j > 0) opts.push({ k: 's', ni: i, nj: j + d });
       const rh = d > 0 ? -1 : 1;
-      [[rh, 'r'], [-rh, 'l']].forEach(([hd, k]) => { if (hd > 0 ? i < COLS : i > 0) opts.push({ k, axis: 'h', dir: hd, ni: i + hd, nj: j, trig: W.laneH(j, hd) }); });
+      [[rh, 'r'], [-rh, 'l']].forEach(([hd, k]) => { if ((hd > 0 ? i < COLS : i > 0) && okH(i, j, hd)) opts.push({ k, axis: 'h', dir: hd, ni: i + hd, nj: j, trig: W.laneH(j, hd) }); });
     } else {
-      if (d > 0 ? i < COLS : i > 0) opts.push({ k: 's', ni: i + d, nj: j });
+      if ((d > 0 ? i < COLS : i > 0) && okH(i, j, d)) opts.push({ k: 's', ni: i + d, nj: j });
       const rv = d > 0 ? 1 : -1;
       [[rv, 'r'], [-rv, 'l']].forEach(([vd, k]) => { if (vd > 0 ? j < ROWS : j > 0) opts.push({ k, axis: 'v', dir: vd, ni: i, nj: j + vd, trig: W.laneV(i, vd) }); });
     }
@@ -1709,6 +1810,7 @@
       for (const o of opts) { r -= wt[o.k]; if (r <= 0) { m = o; break; } }
       if (!m) m = opts[0];
     }
+    if (!m) m = { k: 's', ni: n.ni, nj: n.nj };   // sem opção: o carro fica parado até alguém resolver (o Olho de Deus vê isso)
     m = Object.assign({}, m);
     if (m.k === 's') m.trig = nodeCoord(n);
     return m;
@@ -4311,6 +4413,51 @@
   // manda o NPC passear por uma lista de pontos; fn roda quando chega ao fim
   L.rota = function (n, pts, fn) { n.rota = pts.map(p => ({ x: p.x, y: p.y })); n.alvo = null; n.fimRota = fn || null; };
 
+  // ---------- salas "vigiadas": o sistema de câmeras mostra qualquer sala, mesmo sem você estar nela ----------
+  // cria uma cópia viva da sala (gente andando, hóspedes...) só para as câmeras
+  L.salaVigiada = function (pl, salaId) {
+    const S = G.S, cons = L.construtores[pl.id] || L.construtores['tipo:' + pl.tipo];
+    let lg = pl._lgVigia;
+    if (!lg) {
+      if (cons) lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar };
+      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; }
+      lg.vigia = true; pl._lgVigia = lg;
+    }
+    let R = lg.salas[salaId];
+    if (!R) {
+      if (!lg.criar) return null;
+      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R;
+      R.vigiada = true;
+    }
+    return R;
+  };
+  // faz a sala vigiada andar um pouquinho (só NPCs e rotina; sem o jogador)
+  L.simularSala = function (S, R, dt) {
+    const prev = S.inside; usa(R);
+    R.t = (R.t || 0) + dt;
+    for (const n of R.npcs) { if (n.p.bub) { n.p.bub.t -= dt; if (n.p.bub.t <= 0) n.p.bub = null; } andaNpc(n, dt); if (n.assustado > 0) n.assustado -= dt; }
+    if (R.onUpdate && R.vigiada) { try { R.onUpdate(S, R, dt); } catch (e) { R.onUpdate = null; if (G.olho && G.olho.erro) G.olho.erro(e, 'sala vigiada ' + (R.nome || '')); } }
+    if (prev) usa(prev);
+  };
+  // desenha a sala inteira (sem barras de título), do jeito que a câmera vê
+  L.desenharCena = function (ctx, S, R, mostraJogador) {
+    const prev = S.inside; usa(R);
+    const t = S.time;
+    if (!R.bg) R.bg = fundo(R);
+    ctx.drawImage(R.bg, 0, 0);
+    const lista = [];
+    R.objs.forEach(o => { if (!o.invisivel) lista.push({ k: o.k !== undefined ? o.k : o.y + o.h, f: () => drawObj(ctx, o, t) }); });
+    R.npcs.forEach(n => lista.push({ k: n.k !== undefined ? n.k : n.dorme ? n.y + 60 : n.y + 4, f: () => {
+      if (n.dorme) { gente(ctx, S, n.p, n.x, n.y - 4, 1.9, n.h || 1.57, 0, 'down'); return; }
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(n.x + 3, n.y + 3, 15, 8, 0, 0, TAU); ctx.fill();
+      gente(ctx, S, n.p, n.x, n.y - 8 + (n.sentado ? 5 : 0), 1.9, n.h == null ? Math.PI : n.h, n.corre ? t * 6 : n.walk || 0);
+    } }));
+    if (mostraJogador) lista.push({ k: R.py, f: () => { ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(R.px + 3, R.py + 3, 15, 8, 0, 0, TAU); ctx.fill(); gente(ctx, S, S.player, R.px, R.py - 8 + (R.sentado ? 5 : 0), 1.9, R.ph, R.walk); } });
+    lista.sort((a, b) => a.k - b.k).forEach(i => i.f());
+    if (G.cameras) G.cameras.desenharSala(ctx, S, R);
+    if (prev) usa(prev);
+  };
+
   // ---------- atualização de uma sala ----------
   L.atualizarDentro = function (S, dt, K, Kp) {
     const R = S.inside; if (!R) return;
@@ -4319,6 +4466,7 @@
     R.t = (R.t || 0) + dt;
     for (const n of R.npcs) { if (n.p.bub) { n.p.bub.t -= dt; if (n.p.bub.t <= 0) n.p.bub = null; } andaNpc(n, dt); if (n.assustado > 0) n.assustado -= dt; }
     if (R.onUpdate) R.onUpdate(S, R, dt);
+    if (G.cameras) G.cameras.atualizarSala(S, R, dt);   // câmeras de segurança veem o que você faz
     const LG = R.lugar;
     if (LG.alarme != null && !LG.alarmeFeito) { LG.alarme -= dt; if (LG.alarme <= 0) { LG.alarmeFeito = true; G.addHeat(LG.alarmeHeat || 40); G.say('Alguém chamou a POLÍCIA! Cuidado quando for sair!', 5); G.snd.beep(); } }
     if (S.trans) return;
@@ -4395,6 +4543,7 @@
     lista.push({ k: R.py, f: () => { ctx.fillStyle = 'rgba(0,0,0,0.32)'; ctx.beginPath(); ctx.ellipse(R.px + 3, R.py + 3, 15, 8, 0, 0, TAU); ctx.fill(); gente(ctx, S, S.player, R.px, R.py - 8 + (R.sentado ? 5 : 0), 1.9, R.ph, R.walk); } });
     if (R.carrinho) { const fx = Math.sin(R.ph), fy = -Math.cos(R.ph); lista.push({ k: R.py + (fy > 0 ? 3 : -3), f: () => desenhaCarrinho(ctx, R.px + fx * 30, R.py + fy * 30 - 4, R.ph, R.carrinho) }); }
     lista.sort((a, b) => a.k - b.k).forEach(i => i.f());
+    if (G.cameras) G.cameras.desenharSala(ctx, S, R);   // as câmeras (com a luz vermelha) no teto
     if (R.sel && !S.trans && !R.menu && !R.mini) {
       if (R.sel.t === 'obj') { const o = R.sel.o, z = o.zona || [o.x, o.y - (o.e || 0), o.w, o.h + (o.e || 0)]; ctx.save(); ctx.strokeStyle = 'rgba(255,224,74,' + (0.6 + 0.3 * Math.sin(t * 6)) + ')'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(z[0] - 3, z[1] - 3, z[2] + 6, z[3] + 6); ctx.restore(); }
       else { const n = R.sel.n; ctx.save(); ctx.strokeStyle = 'rgba(255,224,74,' + (0.6 + 0.3 * Math.sin(t * 6)) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(n.x, n.y + 2, 20, 11, 0, 0, TAU); ctx.stroke(); ctx.restore(); }
@@ -5993,6 +6142,1409 @@
 </script>
 <script>
 /* ============================================================
+   overlay.js — telas por cima do jogo (Central de Câmeras, painel do Olho de Deus...)
+   Qualquer arquivo pode registrar uma tela e um atalho de teclado.
+   O game.js chama G.overlay.quadro() uma vez por quadro.
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const O = G.overlay = {
+    atual: null,          // a tela aberta agora (ou null)
+    atalhos: {},          // 'KeyC' -> função(S) que abre uma tela
+    teclas: null          // o game.js coloca aqui o objeto das teclas apertadas neste quadro
+  };
+  O.abrir = function (tela) { if (O.atual && O.atual.fecha) O.atual.fecha(); O.atual = tela; if (tela && tela.abre) tela.abre(G.S); };
+  O.fechar = function () { const t = O.atual; O.atual = null; if (t && t.fecha) t.fecha(); };
+  // o jogo fica bloqueado (sem teclas) enquanto uma tela está aberta
+  O.bloqueado = () => !!O.atual;
+  // pode abrir telas agora? (não no título, nem no meio de uma transição, nem com menu aberto)
+  O.podeAbrir = function (S) {
+    if (!S || S.trans) return false;
+    if (S.mode === 'play') return true;
+    if (S.mode === 'inside') { const R = S.inside; return !!R && !R.menu && !R.mini && !R.sentado; }
+    return false;
+  };
+  // chamado pelo game.js no começo de cada quadro (depois do título)
+  O.entrada = function (S, pressed) {
+    if (O.atual) {
+      for (const k in pressed) { if (O.atual.tecla) O.atual.tecla(k, S); if (!O.atual) break; }
+      for (const k in pressed) delete pressed[k];   // o jogo não vê essas teclas
+      return;
+    }
+    for (const k in pressed) {
+      if (O.atalhos[k] && O.podeAbrir(S)) { O.atalhos[k](S); delete pressed[k]; }
+    }
+  };
+  // chamado pelo game.js no fim do quadro, desenha por cima de tudo
+  O.desenhar = function (ctx, S, dt) {
+    if (O.atual && O.atual.desenha) O.atual.desenha(ctx, S, dt);
+    else if (O.hudFns) for (const f of O.hudFns) f(ctx, S);
+  };
+  // lista de rotinas que rodam todo quadro (jogando ou dentro de lugares): pedágio, câmeras, Olho, FBI...
+  G.extras = {
+    lista: [],
+    add(f) { this.lista.push(f); },
+    atualizar(S, dt) { for (const f of this.lista) { try { f(S, dt); } catch (e) { if (G.olho && G.olho.erro) G.olho.erro(e, 'extras'); else throw e; } } }
+  };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
+   cidade.js — a cidade que CRESCE sozinha
+   Os operários constroem de verdade, etapa por etapa:
+     terraplanagem → fundação → estrutura → fechamento → acabamento → pronto
+   Tudo depende só do "relógio da obra" (G.cidade.t), que é salvo no jogo:
+   por isso a cidade continua crescendo mesmo quando você fecha e abre o jogo.
+   Construímos casas, lojas, prédios, hotéis, hospital, escola, fábrica, empresas,
+   shopping, um AEROPORTO e até PONTES novas. Prédios prontos viram lugares de verdade.
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const W = G.world, T = W.T, TAU = Math.PI * 2;
+  const C = G.cidade = { t: 0, vel: 1, lotes: W.lotes, pontes: [], eventos: [] };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rg = W.mulberry32;
+  const FASES = ['TERRAPLANAGEM', 'FUNDAÇÃO', 'ESTRUTURA', 'FECHAMENTO', 'ACABAMENTO', 'PRONTO'];
+  const FRAC = [0.12, 0.14, 0.32, 0.22, 0.20];                 // quanto da obra cada etapa ocupa
+  const FRAC_AERO = [0.20, 0.30, 0.20, 0.15, 0.15];            // aeroporto: terraplanagem, pista, terminal, fechamento, acabamento
+
+  // ---------- o que se constrói ----------
+  const EMPRESAS = ['TECNOVALE', 'AGROFORTE', 'HORIZONTE', 'NOVA ERA', 'SOL NASCENTE', 'MEGA UNIÃO', 'BRASIL SUL', 'ALFA', 'PRIMAVERA', 'CENTRAL'];
+  const TIPOS = {
+    casa: { tam: 'p', and: 1, dur: [230, 320], nome: () => 'CASA NOVA', cor: '#9dff9d' },
+    comercio: { tam: 'p', and: 1, dur: [270, 360], nome: null, cor: '#e0a02a' },
+    predio: { tam: 'p', and: 3, dur: [380, 470], nome: r => 'EDIFÍCIO ' + EMPRESAS[Math.floor(r() * 10)], cor: '#7a8aa0' },
+    escritorio: { tam: 'p', and: 2, dur: [330, 420], nome: r => 'ESCRITÓRIO ' + EMPRESAS[Math.floor(r() * 10)], cor: '#4a7ab0' },
+    hotel: { tam: 'g', and: 5, dur: [640, 780], nome: r => 'HOTEL ' + ['PORTO NOVO', 'VALE VERDE', 'HORIZONTE', 'PALACE', 'DAS PALMEIRAS'][Math.floor(r() * 5)], cor: '#c05a8a' },
+    hospital: { tam: 'g', and: 4, dur: [720, 860], nome: () => 'HOSPITAL SÃO LUCAS', cor: '#d9363e', extra: 'cruz' },
+    escola: { tam: 'g', and: 2, dur: [520, 620], nome: () => 'ESCOLA MUNICIPAL', cor: '#e0b020', extra: 'escola' },
+    fabrica: { tam: 'g', and: 2, dur: [600, 720], nome: r => 'FÁBRICA ' + EMPRESAS[Math.floor(r() * 10)], cor: '#7a6a5a', extra: 'fabrica' },
+    empresa: { tam: 'g', and: 6, dur: [660, 780], nome: r => 'EMPRESA ' + EMPRESAS[Math.floor(r() * 10)], cor: '#2a8ab0', extra: 'heliponto' },
+    shopping: { tam: 'g', and: 3, dur: [740, 860], nome: () => 'SHOPPING VALE VERDE', cor: '#d07a1a', extra: 'shopping' },
+    aeroporto: { tam: 'a', and: 2, dur: [1000, 1000], nome: () => 'AEROPORTO VALE VERDE', cor: '#2a6ab8', extra: 'aero' }
+  };
+  const ROOF_P = { casa: [3, 4, 5, 6], comercio: [0, 2, 7, 1], predio: [1, 7, 1, 2], escritorio: [1, 7], hotel: [2, 1], hospital: [1], escola: [2], fabrica: [7, 0], empresa: [1], shopping: [2, 1], aeroporto: [1] };
+
+  // ---------- cria os projetos de cada lote (sempre iguais: sementes fixas) ----------
+  const ordemG = ['hotel', 'hospital', 'empresa', 'escola', 'shopping', 'fabrica', 'hotel', 'empresa'];
+  let nG = 0, nLoja = 0, nHotel = 0, nCasa = 0;
+  W.lotes.forEach((l, idx) => {
+    const r = rg(9100 + idx * 131);
+    let tipo;
+    if (l.tam === 'a') tipo = 'aeroporto';
+    else if (l.tam === 'g') tipo = ordemG[nG++ % ordemG.length];
+    else { const q = r(); tipo = q < 0.42 ? 'casa' : q < 0.68 ? 'comercio' : q < 0.84 ? 'predio' : 'escritorio'; }
+    const df = TIPOS[tipo];
+    const dur = Math.round(df.dur[0] + r() * (df.dur[1] - df.dur[0]));
+    const interior = l.bx >= 10 && l.bx <= 12;
+    // quando a obra começa (em segundos do relógio da obra; negativo = já começou antes de você chegar)
+    const u = r(), q1 = interior ? 0.30 : 0.14, q2 = interior ? 0.66 : 0.48;
+    let inicio = u < q1 ? -dur * (1.05 + r() * 0.8) : u < q2 ? -dur * (0.08 + r() * 0.85) : 20 + r() * (interior ? 700 : 1500);
+    if (tipo === 'aeroporto') inicio = -0.32 * dur;
+    const nome = df.nome ? df.nome(r) : null;
+    const p = { tipo, dur, inicio, nome, cor: df.cor, and: df.and, roof: ROOF_P[tipo][Math.floor(r() * ROOF_P[tipo].length)], seed: 9100 + idx * 131 };
+    l.proj = p; l.fase = -2; l.ativo = false; l.cx = l.x + l.w / 2; l.cy = l.y + l.h / 2;
+    // objeto do prédio pronto (para o telhado e a fachada de verdade)
+    l.b = W.mkBuilding(l.x, l.y, l.w, l.h, p.roof, rg(p.seed + 7));
+    if (tipo === 'casa') {
+      const area = Math.round(l.w * l.h / (T * T));
+      const c = { id: 'cn' + (nCasa++), tipo: 'casa', nome: 'CASA', b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 30, seed: p.seed, area, venda: true, preco: Math.round((1200 + area * 26) / 100) * 100, nova: true };
+      l.b.casa = c; l.casa = c; p.nome = 'CASA NOVA ' + (nCasa);
+    } else if (tipo === 'comercio') {
+      const LJ = W.LOJAS_DEF, df2 = LJ[(nLoja++ * 5 + idx) % LJ.length];
+      const nm = df2.nomes[nLoja % df2.nomes.length] + ' (NOVO)';
+      const pl = { tipo: 'loja', id: 'lojaN' + idx, loja: df2.tipo, nome: nm, cor: df2.cor, horario: df2.horario, b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 34 };
+      l.b.place = pl; l.place = pl; p.nome = nm;
+    } else if (tipo === 'hotel') {
+      const nivel = ['medio', 'luxo', 'simples'][nHotel++ % 3];
+      const pl = { tipo: 'hotel', id: 'hotelN' + idx, nome: p.nome, cor: '#c05a8a', nivel, estrelas: nivel === 'luxo' ? 5 : nivel === 'medio' ? 3 : 2, b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 40 };
+      l.b.place = pl; l.b.hotel = pl; l.place = pl;
+    } else if (tipo === 'aeroporto') {
+      const pl = { tipo: 'loja', id: 'aeroporto', loja: 'cafe', nome: p.nome, cor: '#2a6ab8', horario: [0, 24], b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 40 };
+      l.b.place = pl; l.place = pl;
+    }
+  });
+
+  // ---------- pontes que estão sendo construídas ----------
+  C.pontes = [
+    { rio: 13, j: 4, inicio: -380, dur: 1500, nome: 'PONTE NOVA ERA', fase: -1, pronta: false },
+    { rio: 9, j: 1, inicio: 520, dur: 1500, nome: 'PONTE DO PROGRESSO', fase: -1, pronta: false }
+  ];
+  C.pontes.forEach(pt => {
+    const rv = W.blocks.find(b => b.kind === 'river' && b.bx === pt.rio);
+    pt.x = rv.x; pt.w = rv.w; pt.y = W.roadTop(pt.j); pt.h = W.ROAD * T;
+  });
+
+  // ---------- estado de um lote no tempo t ----------
+  // devolve { f: fase (-1 = terreno esperando, 0..4 obra, 5 pronto), p: progresso da fase (0..1), geral }
+  function estadoDe(l, t) {
+    const p = l.proj, dt = t - p.inicio;
+    if (dt < 0) return { f: -1, p: 0, g: 0 };
+    if (dt >= p.dur) return { f: 5, p: 1, g: 1 };
+    const fr = p.tipo === 'aeroporto' ? FRAC_AERO : FRAC;
+    let a = 0;
+    for (let k = 0; k < 5; k++) { const d = fr[k] * p.dur; if (dt < a + d) return { f: k, p: (dt - a) / d, g: dt / p.dur }; a += d; }
+    return { f: 5, p: 1, g: 1 };
+  }
+  C.estadoDe = l => estadoDe(l, C.t);
+  C.faseNome = e => e.f < 0 ? 'EM BREVE' : FASES[e.f];
+
+  // ---------- prédio pronto: desenho guardado numa imagem ----------
+  function fin(l) {
+    if (l.img) return l.img;
+    const pad = 44, b = l.b, c = document.createElement('canvas');
+    c.width = Math.ceil(b.w + pad * 2); c.height = Math.ceil(b.h + pad * 2);
+    const x = c.getContext('2d'); x.translate(pad - b.x, pad - b.y);
+    x.save(); x.beginPath(); x.rect(b.x - 60, b.y - 60, b.w + 160, b.h + 160); x.clip();
+    x.shadowColor = 'rgba(0,0,12,0.55)'; x.shadowBlur = 16; x.shadowOffsetX = 16; x.shadowOffsetY = 18; x.fillStyle = '#000'; x.fillRect(b.x + 4, b.y + 4, b.w - 4, b.h - 4); x.restore();
+    W.drawRoof(x, b);
+    roofExtra(x, l);
+    l.img = c; l.imgPad = pad; return c;
+  }
+  function roofExtra(x, l) {
+    const b = l.b, p = l.proj, fh = W.fachada(b), rx = b.x + 8, ry = b.y + 8, rw = b.w - 16, rh = b.h - fh - 16, cx = b.x + b.w / 2, cy = b.y + (b.h - fh) / 2;
+    const df = TIPOS[p.tipo], ex = df.extra;
+    if (ex === 'cruz') { x.fillStyle = '#fff'; x.fillRect(cx - 20, cy - 20, 40, 40); x.fillStyle = '#d9242a'; x.fillRect(cx - 7, cy - 17, 14, 34); x.fillRect(cx - 17, cy - 7, 34, 14); }
+    else if (ex === 'heliponto') { x.fillStyle = '#34383f'; x.beginPath(); x.arc(cx, cy, 34, 0, TAU); x.fill(); x.strokeStyle = '#ffe04a'; x.lineWidth = 3; x.stroke(); x.fillStyle = '#ffe04a'; x.font = 'bold 34px Arial'; x.textAlign = 'center'; x.fillText('H', cx, cy + 12); }
+    else if (ex === 'fabrica') { for (let k = 0; k < 3; k++) { const px = rx + 22 + k * 52, py = ry + 22; x.fillStyle = '#3a3a40'; x.beginPath(); x.arc(px, py, 14, 0, TAU); x.fill(); x.fillStyle = '#5a5a62'; x.beginPath(); x.arc(px, py, 9, 0, TAU); x.fill(); x.fillStyle = '#0a0a0e'; x.beginPath(); x.arc(px, py, 5, 0, TAU); x.fill(); } x.strokeStyle = 'rgba(0,0,0,0.25)'; x.lineWidth = 2; for (let k = 0; k < 5; k++) { x.beginPath(); x.moveTo(rx + 6, ry + 60 + k * 16); x.lineTo(rx + rw - 6, ry + 60 + k * 16); x.stroke(); } }
+    else if (ex === 'escola') { x.fillStyle = '#4a9a3a'; x.fillRect(rx + 12, ry + rh - 70, rw - 24, 58); x.strokeStyle = '#fff'; x.lineWidth = 2; x.strokeRect(rx + 16, ry + rh - 66, rw - 32, 50); x.beginPath(); x.arc(rx + rw / 2, ry + rh - 41, 9, 0, TAU); x.stroke(); x.fillStyle = '#d9242a'; x.fillRect(rx + 14, ry + 12, 3, 24); x.fillStyle = '#ffe04a'; x.fillRect(rx + 17, ry + 12, 14, 9); }
+    else if (ex === 'shopping') { x.fillStyle = 'rgba(120,200,255,0.45)'; x.fillRect(rx + rw / 2 - 40, ry + 10, 80, 50); x.strokeStyle = 'rgba(255,255,255,0.7)'; x.lineWidth = 2; x.strokeRect(rx + rw / 2 - 40, ry + 10, 80, 50); for (let k = 0; k < 5; k++) { x.fillStyle = '#3a3a44'; x.fillRect(rx + 8 + k * 20, ry + rh - 24, 14, 14); } }
+    if (!b.place && !b.casa || ex) { // letreiro no telhado (onde não há porta de verdade)
+      const nm = p.nome || ''; x.font = 'bold 11px Arial'; const tw = Math.min(rw - 6, x.measureText(nm).width + 14);
+      x.fillStyle = 'rgba(10,10,20,0.62)'; x.fillRect(cx - tw / 2, b.y + b.h - fh - 24, tw, 15); x.fillStyle = '#fff'; x.textAlign = 'center';
+      let fs = 11; while (fs > 5 && x.measureText(nm).width > tw - 6) { fs--; x.font = 'bold ' + fs + 'px Arial'; } x.fillText(nm, cx, b.y + b.h - fh - 13);
+    }
+  }
+
+  // ---------- peças desenhadas (máquinas e operários) ----------
+  function operario(ctx, x, y, ang, t, i) {
+    const bob = Math.sin(t * 7 + i * 2) * 1.2;
+    ctx.save(); ctx.translate(x, y); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(2, 3, 6, 4, 0, 0, TAU); ctx.fill();
+    ctx.rotate(ang);
+    ctx.fillStyle = '#f0782a'; ctx.beginPath(); ctx.ellipse(0, 0, 4, 6.2, 0, 0, TAU); ctx.fill();            // colete laranja
+    ctx.fillStyle = '#f2e24a'; ctx.fillRect(-4, -1, 8, 1.4);                                                 // faixa refletiva
+    ctx.fillStyle = '#e0b090'; ctx.beginPath(); ctx.arc(bob * 0.3, -1, 3, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#f2d21a'; ctx.beginPath(); ctx.arc(bob * 0.3, -1.4, 3.2, Math.PI, TAU); ctx.fill();      // capacete amarelo
+    ctx.strokeStyle = '#e0b090'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(-3.5, 0); ctx.lineTo(-5 - bob, -5 + Math.sin(t * 9 + i) * 2); ctx.moveTo(3.5, 0); ctx.lineTo(5 + bob, -5 - Math.sin(t * 9 + i) * 2); ctx.stroke();
+    ctx.restore();
+  }
+  function escavadeira(ctx, x, y, ang, t) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-9, -13, 22, 30);
+    ctx.fillStyle = '#26262a'; ctx.fillRect(-11, -14, 5, 28); ctx.fillRect(6, -14, 5, 28);
+    ctx.fillStyle = '#e8b81a'; ctx.fillRect(-8, -9, 16, 20); ctx.fillStyle = '#111'; ctx.fillRect(-8, 5, 16, 2);
+    ctx.fillStyle = '#9ad0ee'; ctx.fillRect(-5, -7, 10, 7);
+    const sw = Math.sin(t * 1.6) * 0.5;                                                                     // braço mexendo
+    ctx.save(); ctx.translate(0, -9); ctx.rotate(sw);
+    ctx.strokeStyle = '#d0a010'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -20); ctx.stroke();
+    ctx.rotate(Math.sin(t * 2.4) * 0.5); ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(0, -34); ctx.stroke();
+    ctx.fillStyle = '#6a6a72'; ctx.fillRect(-5, -39, 10, 7);
+    ctx.restore(); ctx.restore();
+  }
+  function betoneira(ctx, x, y, ang, t) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-10, -22, 24, 48);
+    ctx.fillStyle = '#e8e8ea'; ctx.fillRect(-9, -24, 18, 11); ctx.fillStyle = '#9ad0ee'; ctx.fillRect(-7, -23, 14, 4);
+    ctx.fillStyle = '#d8d8dc'; ctx.beginPath(); ctx.ellipse(0, 6, 10, 20, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#f08a1e'; ctx.lineWidth = 3; for (let k = 0; k < 5; k++) { const yy = -10 + ((k * 8 + t * 14) % 40); ctx.beginPath(); ctx.moveTo(-9, yy); ctx.lineTo(9, yy + 3); ctx.stroke(); }
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, 6, 10, 20, 0, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+  function cerca(ctx, r, t) {
+    ctx.save(); ctx.lineWidth = 3; ctx.strokeStyle = '#f08a1e'; ctx.strokeRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+    ctx.strokeStyle = '#fff'; ctx.setLineDash([9, 9]); ctx.strokeRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2); ctx.setLineDash([]);
+    ctx.fillStyle = '#d6561a'; [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([a, b]) => ctx.fillRect(a - 3, b - 3, 6, 6));
+    ctx.restore();
+  }
+  function placa(ctx, l, e) {
+    const w = 94, h = 22, x = l.cx - w / 2, y = l.y + l.h - 4;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 3, y + 4, w, h);
+    ctx.fillStyle = '#4a321a'; ctx.fillRect(x + 8, y + h, 3, 6); ctx.fillRect(x + w - 11, y + h, 3, 6);
+    ctx.fillStyle = e.f < 0 ? '#c9a21a' : '#1f7a3a'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; let nm = (e.f < 0 ? 'EM BREVE: ' : '') + (l.proj.nome || ''), fs = 7; ctx.font = 'bold 7px Arial'; while (fs > 4 && ctx.measureText(nm).width > w - 6) { fs -= 0.5; ctx.font = 'bold ' + fs + 'px Arial'; }
+    ctx.fillText(nm, x + w / 2, y + 8.5);
+    ctx.font = 'bold 6px Arial'; ctx.fillStyle = '#ffe9a0'; ctx.fillText(e.f < 0 ? 'AGUARDANDO LICENÇA' : FASES[e.f] + ' ' + Math.round(e.p * 100) + '%', x + w / 2, y + 14.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 6, y + 16.5, w - 12, 3); ctx.fillStyle = '#7dff8a'; ctx.fillRect(x + 6, y + 16.5, (w - 12) * e.g, 3);
+    ctx.textAlign = 'left';
+  }
+  function andaime(ctx, r, alt, a) {
+    // andaime amarelo/cinza na frente do prédio
+    ctx.save(); ctx.globalAlpha = a;
+    const h = Math.max(6, alt * 26), y = r.y + r.h - h;
+    ctx.strokeStyle = '#8a8d94'; ctx.lineWidth = 1.5; ctx.strokeRect(r.x - 2, y, r.w + 4, h);
+    ctx.strokeStyle = '#e0b020'; ctx.lineWidth = 1;
+    ctx.beginPath(); for (let xx = r.x; xx < r.x + r.w - 4; xx += 14) { ctx.moveTo(xx, y); ctx.lineTo(xx + 14, y + h); ctx.moveTo(xx + 14, y); ctx.lineTo(xx, y + h); } ctx.stroke();
+    ctx.fillStyle = 'rgba(40,40,50,0.35)'; ctx.fillRect(r.x - 2, y + h, r.w + 4, 4);
+    ctx.restore();
+  }
+
+  // ---------- desenho de cada fase ----------
+  function pilha(ctx, x, y, r, cor) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 3, r, r * 0.8, 0, 0, TAU); ctx.fill(); ctx.fillStyle = cor; ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.8, 0, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.beginPath(); ctx.ellipse(x - r * 0.25, y - r * 0.25, r * 0.5, r * 0.35, 0, 0, TAU); ctx.fill(); }
+  function trabalhadores(ctx, l, n, t, area) {
+    for (let i = 0; i < n; i++) {
+      const a = 0.35 + (i * 0.173) % 0.4, ph = i * 2.1 + l.proj.seed;
+      const px = area.x + area.w * (0.5 + 0.42 * Math.sin(t * a * 0.6 + ph)), py = area.y + area.h * (0.5 + 0.42 * Math.cos(t * a * 0.5 + ph * 1.3));
+      const vx = Math.cos(t * a * 0.6 + ph) * a * 0.6, vy = -Math.sin(t * a * 0.5 + ph * 1.3) * a * 0.5;
+      operario(ctx, px, py, Math.atan2(vy * area.h, vx * area.w) + Math.PI / 2, t, i);
+    }
+  }
+  function desenhaObra(ctx, l, e, t, ctxAlto) {
+    const r = { x: l.x, y: l.y, w: l.w, h: l.h }, ins = { x: r.x + 8, y: r.y + 8, w: r.w - 16, h: r.h - 16 };
+    const grande = l.tam === 'g', nOp = grande ? 5 : 2;
+    if (e.f === -1) { cerca(ctx, r); placa(ctx, l, e); pilha(ctx, r.x + 20, r.y + 20, 8, '#7a5f3d'); return; }
+    if (e.f === 0) {          // terraplanagem: terra mexida, escavadeira, montes
+      ctx.fillStyle = 'rgba(70,45,22,0.35)'; for (let k = 0; k < 9; k++) ctx.fillRect(r.x + 6 + ((k * 37) % (r.w - 30)), r.y + 6 + ((k * 53) % (r.h - 20)), 22, 3);
+      pilha(ctx, r.x + r.w - 20, r.y + 22, 8 + 14 * e.p * (grande ? 1.4 : 0.9), '#7a5f3d'); pilha(ctx, r.x + 22, r.y + r.h - 28, 6 + 10 * e.p, '#6a5233');
+      const ex = ins.x + ins.w * (0.5 + 0.3 * Math.sin(t * 0.25 + l.proj.seed)), ey = ins.y + ins.h * (0.5 + 0.25 * Math.cos(t * 0.31 + l.proj.seed));
+      escavadeira(ctx, ex, ey, Math.sin(t * 0.25 + l.proj.seed) * 0.8, t);
+      trabalhadores(ctx, l, nOp, t, ins); cerca(ctx, r); placa(ctx, l, e); return;
+    }
+    if (e.f === 1) {          // fundação: valas escuras e concreto enchendo
+      const fx = ins.x + 6, fy = ins.y + 6, fw = ins.w - 12, fh = ins.h - 12;
+      ctx.fillStyle = '#3a2c1c'; ctx.fillRect(fx, fy, fw, fh);
+      ctx.fillStyle = '#8e9096'; ctx.fillRect(fx + 3, fy + 3, fw - 6, (fh - 6) * e.p);
+      ctx.strokeStyle = '#4a4c52'; ctx.lineWidth = 1; ctx.beginPath(); for (let xx = fx + 8; xx < fx + fw - 4; xx += 10) { ctx.moveTo(xx, fy + 3); ctx.lineTo(xx, fy + fh - 3); } ctx.stroke();
+      ctx.strokeStyle = '#b05a2a'; ctx.beginPath(); for (let yy = fy + 8; yy < fy + fh - 4; yy += 14) { ctx.moveTo(fx + 3, yy); ctx.lineTo(fx + fw - 3, yy); } ctx.stroke();
+      betoneira(ctx, r.x + r.w - 20, r.y + r.h - 40, Math.PI * 0.5 + 0.2, t); trabalhadores(ctx, l, nOp, t, ins); cerca(ctx, r); placa(ctx, l, e); return;
+    }
+    if (e.f === 2 || e.f === 3 || e.f === 4) {
+      const fh = W.fachada(l.b), corpo = { x: l.b.x, y: l.b.y, w: l.b.w, h: l.b.h };
+      // estrutura de concreto (sempre por baixo)
+      const estr = e.f === 2 ? e.p : 1;
+      ctx.fillStyle = 'rgba(0,0,12,0.35)'; ctx.fillRect(corpo.x + 6, corpo.y + 8, corpo.w, corpo.h);
+      ctx.fillStyle = '#9a9ca2'; ctx.fillRect(corpo.x, corpo.y, corpo.w, corpo.h);
+      const andares = Math.max(1, Math.floor(estr * l.proj.and + 0.001));
+      for (let k = 1; k <= andares; k++) { ctx.fillStyle = k === andares && e.f === 2 ? '#bcbec4' : '#a8aab0'; ctx.fillRect(corpo.x - k * 1.2, corpo.y - k * 2.2, corpo.w, corpo.h); ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.strokeRect(corpo.x - k * 1.2 + 0.5, corpo.y - k * 2.2 + 0.5, corpo.w - 1, corpo.h - 1); }
+      const nx = Math.max(2, Math.round(corpo.w / 36)), ny = Math.max(2, Math.round(corpo.h / 36));
+      for (let a = 0; a <= nx; a++) for (let b = 0; b <= ny; b++) { const px = corpo.x + 6 + (corpo.w - 18) * a / nx, py = corpo.y + 6 + (corpo.h - 18) * b / ny - andares * 2.2; ctx.fillStyle = '#5a5c62'; ctx.fillRect(px, py, 7, 7); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(px, py, 7, 1.5); }
+      ctx.strokeStyle = '#6d6f76'; ctx.lineWidth = 2.5; ctx.beginPath(); for (let a = 0; a <= nx; a++) { const px = corpo.x + 9.5 + (corpo.w - 18) * a / nx; ctx.moveTo(px, corpo.y + 9 - andares * 2.2); ctx.lineTo(px, corpo.y + corpo.h - 9 - andares * 2.2); } for (let b = 0; b <= ny; b++) { const py = corpo.y + 9.5 + (corpo.h - 18) * b / ny - andares * 2.2; ctx.moveTo(corpo.x + 9, py); ctx.lineTo(corpo.x + corpo.w - 9, py); } ctx.stroke();
+      if (e.f === 2) { ctx.strokeStyle = '#b05a2a'; ctx.lineWidth = 1; for (let k = 0; k < 8; k++) { const px = corpo.x + 12 + (k * 23) % (corpo.w - 24), py = corpo.y + 12 + (k * 31) % (corpo.h - 24) - andares * 2.2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 7); ctx.stroke(); } }
+      if (e.f >= 3) { // paredes e telhado de verdade aparecendo
+        const a = e.f === 3 ? clamp((e.p - 0.15) / 0.8, 0, 1) : 1;
+        ctx.globalAlpha = a; ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad); ctx.globalAlpha = 1;
+      }
+      if (e.f <= 3) andaime(ctx, { x: corpo.x, y: corpo.y + corpo.h - fh - 4, w: corpo.w, h: fh + 4 }, e.f === 2 ? 0.3 + e.p * 0.7 : 1, 1);
+      else andaime(ctx, { x: corpo.x, y: corpo.y + corpo.h - fh - 4, w: corpo.w, h: fh + 4 }, 1, 1 - e.p);
+      if (e.f === 4) { ctx.fillStyle = 'rgba(255,255,255,' + (0.1 + 0.1 * Math.sin(t * 3)) + ')'; ctx.fillRect(corpo.x + 4, corpo.y + 4, corpo.w - 8, corpo.h - fh - 8); }
+      trabalhadores(ctx, l, e.f === 4 ? 3 : nOp, t, { x: r.x - 14, y: r.y + r.h - 14, w: r.w + 28, h: 24 });
+      if (e.f <= 3) cerca(ctx, { x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 }); placa(ctx, l, e);
+      if (e.f === 2 && grande) betoneira(ctx, r.x + r.w - 14, r.y + r.h + 20, 0, t);
+    }
+  }
+
+  // guindaste (camada de cima): braço girando sobre a obra
+  function guindaste(ctx, l, t) {
+    const mx = l.x + (l.tam === 'g' ? 28 : 12), my = l.y + (l.tam === 'g' ? 28 : 12), len = Math.min(l.w, l.h) * 0.95 + 20, a = t * 0.18 + l.proj.seed;
+    const draw = (ox, oy, sombra) => {
+      ctx.save(); ctx.translate(mx + ox, my + oy); ctx.rotate(a);
+      if (sombra) { ctx.strokeStyle = 'rgba(0,0,10,0.28)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(len, 0); ctx.stroke(); ctx.fillStyle = 'rgba(0,0,10,0.28)'; ctx.fillRect(-34, -6, 16, 12); ctx.restore(); return; }
+      ctx.strokeStyle = '#e8b81a'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-26, 0); ctx.lineTo(len, 0); ctx.stroke();
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.beginPath(); for (let k = -24; k < len - 8; k += 10) { ctx.moveTo(k, -2.5); ctx.lineTo(k + 5, 2.5); ctx.lineTo(k + 10, -2.5); } ctx.stroke();
+      ctx.fillStyle = '#6a6a72'; ctx.fillRect(-34, -6, 16, 12);                                  // contrapeso
+      ctx.fillStyle = '#e8b81a'; ctx.fillRect(-6, -7, 14, 14); ctx.fillStyle = '#9ad0ee'; ctx.fillRect(-3, -5, 8, 5);     // cabine
+      const hx = len * (0.55 + 0.25 * Math.sin(t * 0.4 + l.proj.seed));                         // carrinho e carga
+      ctx.fillStyle = '#222'; ctx.fillRect(hx - 3, -4, 6, 8);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, 6 + Math.sin(t * 0.8) * 2); ctx.stroke();
+      ctx.fillStyle = '#b05a2a'; ctx.fillRect(hx - 6, 6 + Math.sin(t * 0.8) * 2, 12, 5);
+      ctx.restore();
+    };
+    draw(10, 14, true); draw(0, 0, false);
+    ctx.fillStyle = '#444'; ctx.beginPath(); ctx.arc(mx, my, 5, 0, TAU); ctx.fill();
+  }
+
+  // ---------- aeroporto ----------
+  function pistaAero(l) { const pa = l.pista; return { x: pa.x + 10, y: pa.y + 2 * T, w: pa.w - 20, h: 72 }; }
+  function aviao(ctx, x, y, ang, esc, cor, alt) {
+    ctx.save();
+    ctx.translate(x + alt * 0.5, y + alt * 0.9); ctx.rotate(ang); ctx.scale(esc, esc); ctx.fillStyle = 'rgba(0,0,10,' + (0.32 - alt * 0.002) + ')'; // sombra no chão
+    ctx.beginPath(); ctx.ellipse(0, 0, 5, 24, 0, 0, TAU); ctx.fill(); ctx.fillRect(-26, -3, 52, 7); ctx.restore();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.scale(esc, esc);
+    ctx.fillStyle = '#f4f4f6'; ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 24, 0, 0, TAU); ctx.fill();                  // fuselagem
+    ctx.fillStyle = '#e4e6ec'; ctx.beginPath(); ctx.moveTo(-3, -4); ctx.lineTo(-28, 4); ctx.lineTo(-28, 9); ctx.lineTo(-3, 5); ctx.fill(); ctx.beginPath(); ctx.moveTo(3, -4); ctx.lineTo(28, 4); ctx.lineTo(28, 9); ctx.lineTo(3, 5); ctx.fill();   // asas
+    ctx.fillStyle = cor; ctx.fillRect(-7, 18, 14, 3); ctx.beginPath(); ctx.moveTo(-1, 18); ctx.lineTo(-9, 24); ctx.lineTo(9, 24); ctx.lineTo(1, 18); ctx.fill();   // cauda
+    ctx.fillStyle = '#2a6ab8'; ctx.beginPath(); ctx.ellipse(0, -13, 3, 4, 0, 0, TAU); ctx.fill();                      // cabine
+    ctx.strokeStyle = 'rgba(30,30,40,0.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -24, 1, 0, TAU); ctx.stroke();
+    const ha = (performance.now ? performance.now() : 0) * 0.05; ctx.strokeStyle = 'rgba(20,20,25,0.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-9 * Math.cos(ha), -24 + 3 * Math.sin(ha)); ctx.lineTo(9 * Math.cos(ha), -24 - 3 * Math.sin(ha)); ctx.stroke();
+    ctx.restore();
+  }
+  // voos como função do tempo: ciclo de 44s por avião
+  function voo(l, t) {
+    const rw = pistaAero(l), out = [], CIC = 44;
+    for (let k = 0; k < 2; k++) {
+      const ph = ((t + k * 22) % CIC) / CIC * CIC;   // 0..44
+      const idx = Math.floor((t + k * 22) / CIC);
+      const cor = ['#d9363e', '#2a8a4a', '#e0a02a', '#6a3fa0'][(idx + k) % 4];
+      if (ph < 9) { const u = ph / 9; out.push({ k, x: rw.x + 30 + (rw.w + 120) * u * u, y: rw.y + rw.h * 0.5, ang: Math.PI / 2, esc: 1 + 0.55 * clamp(u * 1.3 - 0.3, 0, 1), alt: clamp(u * 1.4 - 0.4, 0, 1) * 90, cor, voando: u > 0.55 }); }
+      else if (ph >= 22 && ph < 31) { const u = (ph - 22) / 9; out.push({ k, x: rw.x + rw.w + 100 - (rw.w + 100) * (1 - (1 - u) * (1 - u)), y: rw.y + rw.h * 0.5, ang: -Math.PI / 2, esc: 1 + 0.55 * clamp(1 - u * 1.4, 0, 1), alt: clamp(1 - u * 1.5, 0, 1) * 90, cor, voando: u < 0.3 }); }
+      else out.push({ k, parado: true, x: rw.x + rw.w * (0.22 + 0.12 * k) , y: rw.y + 120 + k * 18, ang: k ? 0.3 : -0.4, esc: 1, alt: 0, cor });
+    }
+    return out;
+  }
+  function desenhaAero(ctx, l, e, t) {
+    const pa = l.pista, rw = pistaAero(l), r = { x: pa.x, y: pa.y, w: pa.w, h: pa.h };
+    if (e.f === -1) { cerca(ctx, { x: pa.x, y: pa.y, w: pa.w, h: pa.h + 2 * T }); placa(ctx, l, e); return; }
+    ctx.fillStyle = ctx.fillStyle = '#8c6e49'; ctx.fillRect(pa.x, pa.y, pa.w, pa.h);
+    ctx.fillStyle = 'rgba(70,45,22,0.35)'; for (let k = 0; k < 24; k++) ctx.fillRect(pa.x + 10 + ((k * 61) % (pa.w - 40)), pa.y + 8 + ((k * 43) % (pa.h - 20)), 30, 3);
+    if (e.f === 0) { const ex = pa.x + pa.w * (0.5 + 0.4 * Math.sin(t * 0.2)); escavadeira(ctx, ex, pa.y + 70 + 40 * Math.sin(t * 0.4), Math.sin(t * 0.2) * 1.2, t); escavadeira(ctx, pa.x + pa.w * (0.5 - 0.35 * Math.cos(t * 0.17)), pa.y + 150, 2 + Math.cos(t * 0.17), t + 2); trabalhadores(ctx, l, 5, t, { x: pa.x + 10, y: pa.y + 10, w: pa.w - 20, h: pa.h - 20 }); }
+    if (e.f >= 1) {
+      const prog = e.f === 1 ? e.p : 1, wpx = rw.w * prog;
+      ctx.fillStyle = '#2f2f36'; ctx.fillRect(rw.x, rw.y, wpx, rw.h); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(rw.x, rw.y, wpx, 4);
+      ctx.fillStyle = '#f4f4f0'; for (let xx = rw.x + 70; xx < rw.x + wpx - 30; xx += 36) ctx.fillRect(xx, rw.y + rw.h / 2 - 1.5, 20, 3);
+      if (wpx > 60) { for (let k = 0; k < 6; k++) { ctx.fillRect(rw.x + 8, rw.y + 8 + k * 10, 24, 3); } }
+      if (prog > 0.95) { for (let k = 0; k < 6; k++) ctx.fillRect(rw.x + rw.w - 32, rw.y + 8 + k * 10, 24, 3); ctx.save(); ctx.translate(rw.x + 48, rw.y + 38); ctx.rotate(-Math.PI / 2); ctx.font = 'bold 14px Arial'; ctx.fillText('09', -9, 5); ctx.restore(); ctx.save(); ctx.translate(rw.x + rw.w - 48, rw.y + 38); ctx.rotate(Math.PI / 2); ctx.fillText('27', -9, 5); ctx.restore(); }
+      if (e.f === 1) { betoneira(ctx, rw.x + wpx, rw.y + rw.h + 24, Math.PI / 2, t); escavadeira(ctx, rw.x + wpx - 30, rw.y - 26, Math.PI / 2, t); }
+      // pátio e taxiway aparecem no fim da fase 1
+      const ap = e.f === 1 ? clamp((e.p - 0.55) / 0.45, 0, 1) : 1;
+      if (ap > 0) { ctx.fillStyle = '#3a3a42'; ctx.fillRect(pa.x + 2.2 * T, rw.y + rw.h, 2 * T, (pa.y + pa.h - rw.y - rw.h) * ap); ctx.fillRect(pa.x + 1.0 * T, rw.y + rw.h + 70, 6 * T, 100 * ap); ctx.fillStyle = '#ffd84a'; ctx.fillRect(pa.x + 3.2 * T - 1.5, rw.y + rw.h, 3, (pa.y + pa.h - rw.y - rw.h) * ap); }
+    }
+    // terminal e torre
+    const tr = l.torre, term = { x: l.x, y: l.y, w: l.w, h: l.h };
+    if (e.f <= 4 && e.f >= 2) {
+      const el = { f: e.f - 2 + 2, p: e.p, g: e.g };
+      desenhaObra(ctx, l, { f: e.f === 2 ? 2 : e.f, p: e.p, g: e.g }, t);
+      ctx.fillStyle = '#9a9ca2'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h);
+    } else if (e.f <= 1) { cerca(ctx, { x: l.x - 6, y: l.y - 6, w: l.w + 12, h: l.h + 12 }); pilha(ctx, l.x + 20, l.y + 16, 9, '#7a5f3d'); placa(ctx, l, e); }
+    if (e.f >= 3) { ctx.fillStyle = '#c8c8d0'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h); ctx.fillStyle = '#7ec8ee'; ctx.fillRect(tr.x - 4, tr.y - 6, tr.w + 8, 14); ctx.strokeStyle = '#fff'; ctx.strokeRect(tr.x - 3.5, tr.y - 5.5, tr.w + 7, 13); }
+    if (e.f === 5) {
+      ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad);
+      ctx.fillStyle = '#c8c8d0'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h); ctx.fillStyle = '#7ec8ee'; ctx.fillRect(tr.x - 4, tr.y - 6, tr.w + 8, 14); ctx.strokeStyle = '#fff'; ctx.strokeRect(tr.x - 3.5, tr.y - 5.5, tr.w + 7, 13);
+      voo(l, t).forEach(v => { if (!v.voando) aviao(ctx, v.x, v.y, v.ang, v.esc, v.cor, v.alt); });
+      // cones e luzes da pista
+      for (let xx = rw.x + 10; xx < rw.x + rw.w; xx += 60) { const on = Math.floor(t * 2 + xx / 60) % 2; ctx.fillStyle = on ? '#ffe9a0' : '#8a7a40'; ctx.fillRect(xx, rw.y - 6, 3, 3); ctx.fillRect(xx, rw.y + rw.h + 3, 3, 3); }
+      // biruta
+      ctx.fillStyle = '#d9242a'; ctx.save(); ctx.translate(pa.x + pa.w - 14, pa.y + 14); ctx.rotate(Math.sin(t * 0.7) * 0.5); ctx.fillRect(0, -2, 22, 5); ctx.restore(); ctx.fillStyle = '#444'; ctx.fillRect(pa.x + pa.w - 16, pa.y + 12, 4, 4);
+    }
+  }
+  function altoAero(ctx, l, e, t) {
+    if (e.f !== 5) return;
+    voo(l, t).forEach(v => { if (v.voando) aviao(ctx, v.x, v.y, v.ang, v.esc, v.cor, v.alt); });
+  }
+
+  // ---------- pontes em construção ----------
+  function desenhaPonte(ctx, pt, t) {
+    if (pt.fase < 0) return;
+    const ph = pt.pronta ? 1 : pt.p, x0 = pt.x, y0 = pt.y, w = pt.w, h = pt.h;
+    // pilares na água
+    for (let k = 1; k < 4; k++) { const px = x0 + w * k / 4; ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(px - 8, y0 - 2, 16, h + 8); ctx.fillStyle = '#8a8c92'; ctx.fillRect(px - 8, y0 - 6, 16, h + 8); ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.5; ctx.strokeRect(px - 8.5, y0 - 5.5, 17, h + 7); ctx.globalAlpha = 1; }
+    const lado = w / 2 * ph;
+    const faixa = (xa, xb) => {
+      if (xb - xa <= 1) return;
+      ctx.fillStyle = 'rgba(0,0,20,0.35)'; ctx.fillRect(xa, y0 - 14, xb - xa, 14); ctx.fillRect(xa, y0 + h, xb - xa, 18);
+      ctx.fillStyle = pt.pronta ? '#4a4a55' : '#9a9aa2'; ctx.fillRect(xa, y0, xb - xa, h);
+      ctx.fillStyle = '#9a9aa6'; ctx.fillRect(xa, y0 - 6, xb - xa, 10); ctx.fillRect(xa, y0 + h - 4, xb - xa, 10);
+      ctx.fillStyle = '#55555f'; ctx.fillRect(xa, y0 - 2, xb - xa, 4); ctx.fillRect(xa, y0 + h - 2, xb - xa, 4);
+      for (let xx = xa + 8; xx < xb; xx += 32) { ctx.fillStyle = '#c8c8d2'; ctx.fillRect(xx, y0 - 6, 5, 10); ctx.fillRect(xx, y0 + h - 4, 5, 10); }
+    };
+    if (pt.pronta) { // ponte pronta: asfalto escuro, faixas amarelas e guarda-corpo (igual às outras)
+      ctx.fillStyle = '#3a3646'; ctx.fillRect(x0, y0, w, h); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x0, y0, w, h);
+      faixa(x0, x0 + w); ctx.fillStyle = '#f2c231'; for (let xx = x0 + 20; xx < x0 + w - 30; xx += 96) ctx.fillRect(xx, y0 + h / 2 - 3, 56, 6);
+      return;
+    }
+    // em obras: duas metades crescendo das margens (o asfalto vem depois do concreto)
+    ctx.fillStyle = '#6a6a72'; ctx.fillRect(x0, y0, lado, h); ctx.fillRect(x0 + w - lado, y0, lado, h);
+    ctx.fillStyle = '#3a3646'; const asf = lado * clamp((ph - 0.6) / 0.4, 0, 1); ctx.fillRect(x0, y0, asf, h); ctx.fillRect(x0 + w - asf, y0, asf, h);
+    faixa(x0, x0 + lado); faixa(x0 + w - lado, x0 + w);
+    // pontas com cones, treliça e guindaste flutuante (balsa)
+    [[x0 + lado, 1], [x0 + w - lado, -1]].forEach(([ex, d], i) => {
+      ctx.fillStyle = '#d6561a'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(ex + d * 8, y0 + 12 + k * ((h - 24) / 3), 4, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(ex + d * 8 - 2, y0 + 11 + k * ((h - 24) / 3), 4, 2); ctx.fillStyle = '#d6561a'; }
+      ctx.save(); ctx.translate(ex + d * 30, y0 + h + 30 + i * 8); ctx.fillStyle = '#7a5a2a'; ctx.fillRect(-26, -10, 52, 20); ctx.fillStyle = '#e8b81a'; ctx.fillRect(-8, -7, 14, 14); ctx.strokeStyle = '#e8b81a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(d * 28 * Math.cos(t * 0.3), -26 - 6 * Math.sin(t * 0.3)); ctx.stroke(); ctx.restore();
+      operario(ctx, ex - d * (6 + 10 * Math.sin(t + i)), y0 + h * 0.5 + 12 * Math.cos(t * 0.8 + i), Math.PI / 2 * d, t, i); operario(ctx, ex - d * 22, y0 + h * 0.3 + 6 * Math.sin(t * 0.5), -Math.PI / 2 * d, t, i + 4);
+    });
+    // placa
+    const px = x0 + w / 2 - 50, py = y0 - 40; ctx.fillStyle = '#1f7a3a'; ctx.fillRect(px, py, 100, 22); ctx.strokeStyle = '#fff'; ctx.strokeRect(px + 0.5, py + 0.5, 99, 21); ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center'; ctx.fillText(pt.nome, px + 50, py + 9); ctx.font = 'bold 7px Arial'; ctx.fillStyle = '#ffe9a0'; ctx.fillText('OBRA DA PONTE ' + Math.round(ph * 100) + '%', px + 50, py + 18); ctx.textAlign = 'left';
+  }
+
+  // ---------- chamadas do jogo ----------
+  const vis = (o, v) => o.x + (o.w || 0) > v.x0 - 60 && o.x < v.x1 + 60 && o.y + (o.h || 0) > v.y0 - 60 && o.y < v.y1 + 90;
+  C.desenhar = function (ctx, S, x0, y0, x1, y1, t) {
+    const v = { x0, y0, x1, y1 };
+    C.pontes.forEach(pt => { if (vis(pt, v)) desenhaPonte(ctx, pt, t); });
+    W.lotes.forEach(l => {
+      const box = l.tam === 'a' ? { x: l.pista.x, y: l.pista.y, w: l.pista.w, h: l.pista.h + 2 * T } : l;
+      if (!vis(box, v)) return;
+      const e = l.est || estadoDe(l, C.t);
+      if (l.tam === 'a') { desenhaAero(ctx, l, e, t); return; }
+      if (e.f === 5) { ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad); return; }
+      desenhaObra(ctx, l, e, t);
+    });
+  };
+  C.desenharAlto = function (ctx, S, x0, y0, x1, y1, t) {
+    const v = { x0, y0, x1, y1 };
+    W.lotes.forEach(l => {
+      const box = l.tam === 'a' ? { x: l.pista.x, y: l.pista.y, w: l.pista.w, h: l.pista.h + 2 * T } : l;
+      if (!vis(box, v)) return;
+      const e = l.est || estadoDe(l, C.t);
+      if (l.tam === 'a') { altoAero(ctx, l, e, t); if (e.f >= 2 && e.f <= 3) guindaste(ctx, l, t); return; }
+      if (e.f === 2 || e.f === 3) guindaste(ctx, l, t);
+    });
+  };
+
+  // ---------- atualização: avança o relógio da obra e ativa o que ficou pronto ----------
+  let acc = 0, salvaT = 0;
+  C.atualizar = function (S, dt) {
+    C.t += dt * C.vel; S.save.cidadeT = C.t;
+    acc += dt; if (acc < 0.5) return; acc = 0;
+    W.lotes.forEach(l => {
+      const e = estadoDe(l, C.t), ant = l.fase; l.est = e; l.fase = e.f;
+      if (ant !== -2 && e.f !== ant) C.evento('fase', l, e);
+      if (e.f === 5 && !l.ativo) ativar(S, l);
+    });
+    C.pontes.forEach(pt => {
+      const dt2 = C.t - pt.inicio; pt.p = clamp(dt2 / pt.dur, 0, 1); const ant = pt.fase;
+      pt.fase = dt2 < 0 ? -1 : pt.p >= 1 ? 5 : 2;
+      if (pt.fase === 5 && !pt.pronta) concluirPonte(S, pt); else if (ant === -1 && pt.fase === 2) C.evento('pontecomeca', pt);
+    });
+    salvaT += 0.5; if (salvaT > 30) { salvaT = 0; if (G.save) G.save(); }
+  };
+  function ativar(S, l) {
+    l.ativo = true;
+    if (!l.b.janelaOk) { l.b.janelaOk = true; W.buildings.push(l.b); }
+    const pl = l.place;
+    if (l.casa) { W.casas.push(l.casa); }
+    else if (pl) { W.places.push(pl); if (pl.tipo === 'loja') W.lojas.push(pl); }
+    if (l.proj.tipo === 'aeroporto') { const tr = l.torre; }
+    if (C.carregado) C.evento('pronto', l, l.est);
+  }
+  function concluirPonte(S, pt) {
+    pt.pronta = true;
+    const tx = Math.round(pt.x / T), ty = Math.round(pt.y / T), bw = Math.round(pt.w / T), bh = W.ROAD;
+    for (let y = ty; y < ty + bh; y++) for (let x = tx; x < tx + bw; x++) W.tiles[y * W.TW + x] = W.TILE.BRIDGE;
+    if (!Array.isArray(W.PONTES[pt.rio])) W.PONTES[pt.rio] = [W.PONTES[pt.rio]];
+    W.PONTES[pt.rio].push(pt.j);
+    if (C.carregado) C.evento('ponte', pt);
+  }
+  C.evento = function (tipo, o, e) {
+    const reg = C.regiaoDe(o.cx != null ? o.cx : o.x + o.w / 2, o.cy != null ? o.cy : o.y + o.h / 2);
+    const ev = { tipo, t: C.t, reg: reg.nome };
+    if (tipo === 'fase') { ev.msg = (o.proj.nome || o.proj.tipo) + ' — ' + C.faseNome(e); ev.lote = o.id; }
+    else if (tipo === 'pronto') { ev.msg = 'OBRA CONCLUÍDA: ' + (o.proj.nome || o.proj.tipo) + ' (' + reg.nome + ')'; ev.lote = o.id; if (G.say && !(G.S && G.S.inside)) G.say('Nova obra concluída: ' + o.proj.nome + ' em ' + reg.nome + '!', 5); }
+    else if (tipo === 'ponte') { ev.msg = 'PONTE INAUGURADA: ' + o.nome; if (G.say) G.say('A ' + o.nome + ' foi inaugurada! Agora tem mais um caminho entre as margens (com pedágio).', 6); }
+    else if (tipo === 'pontecomeca') { ev.msg = 'COMEÇOU A OBRA: ' + o.nome; }
+    C.eventos.push(ev); if (C.eventos.length > 120) C.eventos.shift();
+    if (G.olho && G.olho.obra) G.olho.obra(ev);
+  };
+  C.regiaoDe = function (x, y) {
+    const bx = Math.floor((x / T - W.MG - W.ROAD) / W.PITCH + 0.02);
+    return W.CIDADES.find(c => bx < c.ate) || W.CIDADES[0];
+  };
+  // acelera o tempo da obra (modo observador / testes)
+  C.acelerar = function (seg) { C.t += seg; };
+  C.resumo = function () {
+    const r = { prontas: 0, emObra: 0, aguardando: 0, porTipo: {} };
+    W.lotes.forEach(l => { const e = l.est || estadoDe(l, C.t); if (e.f === 5) r.prontas++; else if (e.f >= 0) r.emObra++; else r.aguardando++; r.porTipo[l.proj.tipo] = (r.porTipo[l.proj.tipo] || 0) + 1; });
+    return r;
+  };
+  // chamado quando o jogo carrega o save
+  C.carregar = function (S) {
+    C.t = S.save.cidadeT || 0;
+    W.lotes.forEach(l => { const e = estadoDe(l, C.t); l.est = e; l.fase = e.f; if (e.f === 5 && !l.ativo) ativar(S, l); });
+    C.pontes.forEach(pt => { const d = C.t - pt.inicio; pt.p = clamp(d / pt.dur, 0, 1); pt.fase = d < 0 ? -1 : pt.p >= 1 ? 5 : 2; if (pt.fase === 5 && !pt.pronta) concluirPonte(S, pt); });
+    C.carregado = true;
+  };
+  C.zerar = function () { C.t = 0; };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
+   pedagio.js — praças de pedágio nas pontes para o interior e para a outra cidade
+   • Carro do jogador: ao chegar na cancela o pedágio é cobrado sozinho. Sem dinheiro, a cancela não abre.
+   • Passou a cancela fechada em alta velocidade? Quebra a cancela e a polícia fica sabendo (evasão!).
+   • Carros e pedestres da cidade passam de graça (a prefeitura paga).
+   • Também avisa quando você entra em outra cidade.
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const W = G.world, T = W.T, TAU = Math.PI * 2, C = G.cidade;
+  const P = G.pedagio = { pracas: [], cobrado: 0, passagens: 0 };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- as praças ----------
+  const DEFS = [
+    { rio: 9, j: 3, valor: 15, nome: 'PEDÁGIO DO INTERIOR' },
+    { rio: 13, j: 2, valor: 25, nome: 'PEDÁGIO VALE VERDE' },
+    { rio: 13, j: 4, valor: 25, nome: 'PEDÁGIO PONTE NOVA ERA', ponteObra: 'PONTE NOVA ERA' },
+    { rio: 9, j: 1, valor: 15, nome: 'PEDÁGIO PONTE DO PROGRESSO', ponteObra: 'PONTE DO PROGRESSO' }
+  ];
+  DEFS.forEach(d => {
+    const rv = W.blocks.find(b => b.kind === 'river' && b.bx === d.rio), top = W.roadTop(d.j);
+    const pr = Object.assign({}, d, { x0: rv.x, x1: rv.x + rv.w, top, mid: top + 3 * T });
+    // uma pista para cada sentido: leste entra pela margem esquerda, oeste pela direita
+    pr.pistas = [
+      { dir: 1, gx: rv.x + 34, y: top + 4.5 * T, aberta: 0, quebrada: 0, paga: false },
+      { dir: -1, gx: rv.x + rv.w - 34, y: top + 1.5 * T, aberta: 0, quebrada: 0, paga: false }
+    ];
+    pr.ativa = () => !d.ponteObra || (C.pontes.find(p => p.nome === d.ponteObra) || {}).pronta;
+    P.pracas.push(pr);
+  });
+  P.ativas = () => P.pracas.filter(p => p.ativa());
+
+  // ---------- regra do pedágio ----------
+  let regiaoAnt = null;
+  function atualizar(S, dt) {
+    const pl = S.player, car = pl.car;
+    // aviso de cidade nova
+    const reg = C.regiaoDe(pl.x, pl.y);
+    if (regiaoAnt && reg.id !== regiaoAnt.id && S.mode === 'play') {
+      const obras = reg.id !== 'ribeirao';
+      G.banner(reg.nome, obras ? reg.sub + ' — cidade em construção, veja as obras crescerem' : 'de volta para casa', false, 3);
+    }
+    regiaoAnt = reg;
+    P.ativas().forEach(pr => pr.pistas.forEach(ps => {
+      if (ps.aberta > 0) ps.aberta -= dt; if (ps.quebrada > 0) ps.quebrada -= dt;
+      // carros da cidade: a cancela abre sozinha na frente deles
+      for (const c of S.cars) {
+        if (c === car || c.dead) continue;
+        const rel = (c.x - ps.gx) * ps.dir;
+        if (Math.abs(c.y - ps.y) < 60 && rel > -240 && rel < 30) { ps.aberta = Math.max(ps.aberta, 1.4); break; }
+      }
+      if (!car) { ps.paga = false; return; }
+      const rel = (car.x - ps.gx) * ps.dir, naPista = Math.abs(car.y - ps.y) < 58, dentro = naPista && rel > -150 && rel < 150;
+      if (!dentro) { if (!naPista || rel < -320 || rel > 220) ps.paga = false; return; }
+      const sentido = (car.vx * ps.dir) > -30 || car.speed < 25;   // vindo na direção da cancela (ou parado)
+      if (rel < 6 && rel > -150 && !ps.paga && ps.aberta <= 0 && ps.quebrada <= 0 && sentido) {
+        if (S.save.money >= pr.valor) {
+          S.save.money -= pr.valor; ps.paga = true; ps.aberta = 7; P.cobrado += pr.valor; P.passagens++;
+          G.say(pr.nome + ': cobrado $' + pr.valor + '. Boa viagem!', 3.5); G.snd.beep(); G.save();
+          if (G.cameras && G.cameras.registra) G.cameras.registra('PEDÁGIO', pr.nome + ' — carro do jogador pagou $' + pr.valor, 'info', { x: car.x, y: car.y });
+        } else if (rel > -80) {
+          if (!ps.avisou || S.time - ps.avisou > 4) { ps.avisou = S.time; G.say('PEDÁGIO $' + pr.valor + ' — você não tem dinheiro. Dê ré!', 3.5); }
+        }
+      }
+      // cancela fechada: bloqueia (ou quebra, se estiver rápido demais)
+      if (ps.aberta <= 0 && ps.quebrada <= 0 && rel > -38 && rel < 16 && sentido) {
+        if (car.speed > 150) {
+          ps.quebrada = 28; G.addHeat(18); G.say('VOCÊ ARROMBOU A CANCELA DO PEDÁGIO! A câmera filmou tudo.', 4);
+          if (G.cameras && G.cameras.registra) G.cameras.registra('CRIME', pr.nome + ' — evasão: carro do jogador quebrou a cancela', 'crime', { x: car.x, y: car.y });
+          S.shake = Math.max(S.shake || 0, 6); G.snd.crash && G.snd.crash(0.6);
+        } else {
+          car.x = ps.gx - ps.dir * 38; car.vx *= -0.2; car.vy *= -0.2;
+        }
+      }
+    }));
+  }
+  G.extras.add(atualizar);
+
+  // ---------- desenho ----------
+  const vis = (pr, v) => pr.x1 > v.x0 - 100 && pr.x0 < v.x1 + 100 && pr.top + 200 > v.y0 && pr.top - 50 < v.y1;
+  P.desenhar = function (ctx, S, x0, y0, x1, y1, t) {
+    const v = { x0, y0, x1, y1 };
+    P.ativas().forEach(pr => {
+      if (!vis(pr, v)) return;
+      pr.pistas.forEach(ps => {
+        // ilha com a guarita no meio da pista dupla
+        const ix = ps.gx, iy = pr.mid;
+        ctx.fillStyle = 'rgba(0,0,12,0.4)'; ctx.fillRect(ix - 18, iy - 28 + 7, 40, 60);
+        ctx.fillStyle = '#9a9aa6'; ctx.fillRect(ix - 18, iy - 28, 36, 56); ctx.fillStyle = '#c8c8d2'; ctx.fillRect(ix - 18, iy - 28, 36, 3);
+        ctx.fillStyle = '#e0b020'; for (let k = 0; k < 6; k++) ctx.fillRect(ix - 18 + k * 6, iy - 28, 3, 56 * 0 + 3);
+        // guarita (telhado) com cobrador
+        ctx.fillStyle = '#e8e8ec'; ctx.fillRect(ix - 13, iy - 22, 26, 44); ctx.fillStyle = '#c0c0c8'; ctx.fillRect(ix - 11, iy - 20, 22, 40);
+        ctx.fillStyle = '#2a6ab8'; ctx.fillRect(ix - 13, iy - 22, 26, 5);
+        ctx.fillStyle = '#9ad0ee'; ctx.fillRect(ps.dir > 0 ? ix + 6 : ix - 11, iy - 10, 5, 20);
+        // faixas de aviso na pista
+        ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let k = 0; k < 5; k++) ctx.fillRect(ps.gx - ps.dir * (46 + k * 12) - 3, ps.y - 40, 6, 80 * 0 + 3 + 0);
+        ctx.fillStyle = 'rgba(255,224,74,0.9)'; ctx.fillRect(ps.gx - 2, ps.y - 46, 4, 92);
+        // semáforo da cabine
+        const livre = ps.aberta > 0 || ps.quebrada > 0;
+        ctx.fillStyle = '#111'; ctx.fillRect(ix - 5, ps.y < iy ? iy - 36 : iy + 30, 10, 6);
+        ctx.fillStyle = livre ? '#3dff6a' : '#ff3d3d'; ctx.beginPath(); ctx.arc(ix, ps.y < iy ? iy - 33 : iy + 33, 2.4, 0, TAU); ctx.fill();
+      });
+    });
+  };
+  // a cancela e o pórtico ficam por cima dos carros
+  P.desenharAlto = function (ctx, S, x0, y0, x1, y1, t) {
+    const v = { x0, y0, x1, y1 };
+    P.ativas().forEach(pr => {
+      if (!vis(pr, v)) return;
+      pr.pistas.forEach(ps => {
+        const px = ps.gx, py0 = pr.mid + (ps.y > pr.mid ? 14 : -14), len = 78, sgn = ps.y > pr.mid ? 1 : -1;
+        const alvo = ps.quebrada > 0 ? 1.1 : ps.aberta > 0 ? 0 : 1;               // 1 = fechada
+        ps.ang = (ps.ang == null ? 1 : ps.ang) + (alvo - (ps.ang == null ? 1 : ps.ang)) * 0.15;
+        const a = ps.ang;
+        ctx.save(); ctx.translate(px, py0);
+        // braço gira de "atravessado na pista" (a=1) até "deitado ao longo da pista" (a=0)
+        const rot = (1 - a) * (Math.PI / 2) * ps.dir * -sgn + (ps.quebrada > 0 ? 0.5 : 0);
+        ctx.rotate(rot);
+        ctx.fillStyle = 'rgba(0,0,10,0.3)'; ctx.fillRect(3, sgn > 0 ? 3 : -len + 3, 5, len);
+        if (ps.quebrada > 0) { ctx.fillStyle = '#e8e8ea'; ctx.fillRect(-2.5, sgn > 0 ? 0 : -len / 2, 5, len / 2); ctx.fillStyle = '#d9242a'; ctx.fillRect(-2.5, sgn > 0 ? 8 : -len / 2 + 8, 5, 8); }
+        else for (let k = 0; k < 8; k++) { ctx.fillStyle = k % 2 ? '#e8e8ea' : '#d9242a'; ctx.fillRect(-2.5, sgn > 0 ? k * len / 8 : -(k + 1) * len / 8, 5, len / 8 + 0.4); }
+        ctx.restore();
+        ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px, py0, 5, 0, TAU); ctx.fill();
+      });
+      // pórtico com placa (uma linha por cima da pista)
+      const gx0 = pr.pistas[0].gx, gx1 = pr.pistas[1].gx;
+      [[gx0, pr.pistas[0]], [gx1, pr.pistas[1]]].forEach(([gx, ps]) => {
+        ctx.fillStyle = 'rgba(0,0,10,0.25)'; ctx.fillRect(gx - 5, pr.top + 6 + 8, 10, 6 * T - 12);
+        ctx.fillStyle = '#3a3a44'; ctx.fillRect(gx - 5, pr.top + 6, 10, 6 * T - 12);
+        const px = gx - 38, py = pr.top - 16 + (ps.dir > 0 ? 6 * T + 20 : 0);
+        ctx.fillStyle = '#1b5fb0'; ctx.fillRect(px, ps.dir > 0 ? pr.top + 6 * T + 6 : pr.top - 30, 76, 24); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, (ps.dir > 0 ? pr.top + 6 * T + 6 : pr.top - 30) + 0.5, 75, 23);
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center'; ctx.fillText('PEDÁGIO', gx, (ps.dir > 0 ? pr.top + 6 * T + 6 : pr.top - 30) + 9);
+        ctx.font = 'bold 11px Arial'; ctx.fillStyle = ps.aberta > 0 ? '#7dff8a' : '#ffe04a'; ctx.fillText('R$ ' + pr.valor, gx, (ps.dir > 0 ? pr.top + 6 * T + 6 : pr.top - 30) + 20); ctx.textAlign = 'left';
+      });
+    });
+  };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
+   cameras.js — câmeras de segurança de VERDADE
+   • Dentro de TODOS os estabelecimentos (mercados, hotéis, banco, lojas, shopping...) existem câmeras no teto,
+     girando e com uma luz vermelha. Só as CASAS não têm.
+   • Nas ruas há câmeras em postes: cruzamentos, pedágios, obras, pontes e aeroporto.
+   • Se você aparecer armado (ou assaltar) na frente de uma câmera, fica GRAVADO e a polícia é chamada.
+   • Aperte C (ou use o celular) para abrir a CENTRAL DE CÂMERAS e assistir tudo ao vivo.
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const W = G.world, T = W.T, TAU = Math.PI * 2, L = G.lugares, C = G.cidade, SP = G.sprites;
+  const CM = G.cameras = { gravacoes: [], ruas: [], aberta: false };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // ---------- nomes das ruas (para os relatórios dizerem ONDE as coisas acontecem) ----------
+  const AVENIDAS = ['Av. Independência', 'Av. Presidente Vargas', 'Av. João Fiúza', 'Av. do Rio', 'Av. Francisco Junqueira', 'Av. Nove de Julho', 'Av. Costábile Romano', 'Av. Brasil', 'Av. Saudade', 'Av. da Ponte', 'Av. Novo Horizonte', 'Av. das Obras', 'Av. do Progresso', 'Av. Beira-Rio', 'Av. Vale Verde', 'Av. Aeroporto', 'Av. das Palmeiras', 'Av. Final'];
+  const RUAS_H = ['Rua Duque de Caxias', 'Rua General Osório', 'Rua Tibiriçá', 'Rua do Pedágio', 'Rua Amador Bueno', 'Rua Barão do Amazonas', 'Rua São Sebastião'];
+  CM.nomeRua = function (x, y) {
+    const i = clamp(Math.round((x / T - W.MG - 3) / W.PITCH), 0, W.COLS), j = clamp(Math.round((y / T - W.MG - 3) / W.PITCH), 0, W.ROWS);
+    return AVENIDAS[i] + ' × ' + RUAS_H[j];
+  };
+  // texto de localização completo: cidade + rua + quadra
+  CM.onde = function (x, y) {
+    const r = C.regiaoDe(x, y), bx = Math.floor((x / T - W.MG - W.ROAD) / W.PITCH), by = Math.floor((y / T - W.MG - W.ROAD) / W.PITCH);
+    return r.nome + ' · ' + CM.nomeRua(x, y) + ' · quadra ' + bx + ',' + by;
+  };
+
+  // ---------- gravações ----------
+  CM.registra = function (tipo, msg, sev, pos) {
+    const S = G.S, r = { id: CM.gravacoes.length + 1, tipo, msg, sev: sev || 'info', hora: L.horaTxt(S), t: S.time, pos: pos || null, onde: pos ? CM.onde(pos.x, pos.y) : '' };
+    CM.gravacoes.push(r); if (CM.gravacoes.length > 200) CM.gravacoes.shift();
+    if (G.olho && G.olho.camera) G.olho.camera(r);
+    return r;
+  };
+
+  // ---------- câmeras dentro das salas ----------
+  function camsDe(R) {
+    if (R._cams !== undefined) return R._cams;
+    const pl = R.lugar && R.lugar.place;
+    if (!pl || pl.tipo === 'casa' || pl.id === 'casa' || /^q\d/.test(R.id || '') || R.semCamera) return (R._cams = []);
+    const n = clamp(Math.round((R.x1 - R.x0) / 380), 1, 4), cams = [];
+    for (let k = 0; k < n; k++) cams.push({ id: pl.id + ':' + (R.id || 'entrada') + ':' + k, nome: pl.nome + ' · CAM ' + (k + 1), x: R.x0 + (R.x1 - R.x0) * (k + 0.5) / n, y: R.y0 - 16, base: Math.PI / 2, amp: 0.75, per: 7 + k * 1.3, fase: k * 1.7, alcance: (R.y1 - R.y0) * 1.25, fov: 0.55, quebrada: false, ve: false });
+    return (R._cams = cams);
+  }
+  CM.camsDe = camsDe;
+  const angDe = (c, t) => c.base + c.amp * Math.sin(t * TAU / c.per + c.fase);
+  function enxerga(c, px, py, t) {
+    const dx = px - c.x, dy = py - c.y, d = Math.hypot(dx, dy); if (d > c.alcance) return false;
+    let df = Math.atan2(dy, dx) - angDe(c, t); df = Math.atan2(Math.sin(df), Math.cos(df));
+    return Math.abs(df) < c.fov;
+  }
+  // desenha as câmeras de uma sala (no teto/parede de trás), com a luz vermelha piscando
+  CM.desenharSala = function (ctx, S, R) {
+    const cams = camsDe(R); if (!cams.length) return;
+    const t = S.time;
+    cams.forEach(c => {
+      const a = angDe(c, t);
+      if (!c.quebrada) { // cone de visão no chão (bem suave)
+        const g = ctx.createRadialGradient(c.x, c.y, 10, c.x, c.y, c.alcance);
+        g.addColorStop(0, c.ve ? 'rgba(255,60,60,0.20)' : 'rgba(210,235,255,0.13)'); g.addColorStop(1, 'rgba(210,235,255,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(c.x, c.y + 4); ctx.arc(c.x, c.y + 4, c.alcance, a - c.fov, a + c.fov); ctx.closePath(); ctx.fill();
+      }
+      ctx.save(); ctx.translate(c.x, c.y);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-9, 6, 20, 5);                    // sombra na parede
+      ctx.fillStyle = '#d0d2d8'; ctx.fillRect(-10, -3, 20, 5);                           // suporte
+      ctx.rotate(a - Math.PI / 2);
+      ctx.fillStyle = '#2a2c33'; W.rrect(ctx, -7, 0, 14, 17, 4); ctx.fill(); ctx.strokeStyle = '#6a6d78'; ctx.lineWidth = 1; ctx.stroke();    // corpo
+      ctx.fillStyle = '#0a0c12'; ctx.beginPath(); ctx.arc(0, 15, 4.2, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(120,180,255,0.7)'; ctx.beginPath(); ctx.arc(-1, 14, 1.4, 0, TAU); ctx.fill();   // lente
+      const pisca = c.quebrada ? false : (Math.floor(t * 2 + c.fase) % 2 === 0 || c.ve);
+      ctx.fillStyle = pisca ? '#ff2a2a' : '#5a0a0a'; ctx.beginPath(); ctx.arc(4.5, 3, 2.1, 0, TAU); ctx.fill();                          // LED vermelho
+      if (pisca) { ctx.fillStyle = 'rgba(255,40,40,0.35)'; ctx.beginPath(); ctx.arc(4.5, 3, 6, 0, TAU); ctx.fill(); }
+      ctx.restore();
+    });
+  };
+  const armado = S => { const w = S.player.weapon; return w === 'pistol' || w === 'smg' || w === 'shotgun'; };
+  // as câmeras reparam em armas e em crimes dentro do estabelecimento
+  CM.atualizarSala = function (S, R, dt) {
+    const cams = camsDe(R); if (!cams.length) return;
+    const LG = R.lugar, pl = LG.place;
+    let visto = false;
+    cams.forEach(c => { c.ve = !c.quebrada && enxerga(c, R.px, R.py, S.time); if (c.ve) visto = true; });
+    R.camVisto = visto;
+    if (visto && armado(S) && !R.sentado) {
+      R.camArmado = (R.camArmado || 0) + dt;
+      if (R.camArmado > 3 && !R.camF1) {
+        R.camF1 = true; CM.registra('CRIME', pl.nome + ' — pessoa armada filmada pela câmera', 'crime', { x: pl.x, y: pl.y });
+        G.say('A câmera de segurança viu sua arma! Alguém vai chamar a polícia...', 4);
+        if (LG.alarme == null && !LG.alarmeFeito) LG.alarme = 8;
+      }
+    } else R.camArmado = Math.max(0, (R.camArmado || 0) - dt);
+    if (LG.alarme != null && visto && !R.camF2) {
+      R.camF2 = true; CM.registra('CRIME', pl.nome + ' — assalto/ameaça GRAVADO (rosto do suspeito)', 'crime', { x: pl.x, y: pl.y });
+      G.addHeat(8); G.say('GRAVADO! As câmeras filmaram o seu rosto.', 3.5);
+    }
+  };
+  CM.contaSala = R => camsDe(R).length;
+
+  // ---------- câmeras das ruas (postes) ----------
+  // cruzamentos importantes, pedágios, obras grandes, pontes e aeroporto
+  [[1, 1], [4, 3], [6, 2], [8, 5], [2, 5], [5, 0], [10, 2], [11, 4], [12, 1], [15, 2], [15, 4], [16, 5]].forEach(([i, j], k) => {
+    const x = W.nodeX(i), y = W.nodeY(j);
+    CM.ruas.push({ id: 'rua' + k, cat: 'rua', nome: () => 'RUA · ' + CM.nomeRua(x, y), x, y, px: x + W.ROAD / 2 * T + 18, py: y - W.ROAD / 2 * T - 18, vw: 560 });
+  });
+  G.pedagio.pracas.forEach(pr => CM.ruas.push({ id: 'ped' + pr.rio + '_' + pr.j, cat: 'rua', nome: () => pr.nome + (pr.ativa() ? '' : ' (OBRA)'), x: (pr.x0 + pr.x1) / 2, y: pr.mid, px: pr.x0 + 14, py: pr.top - 14, vw: 640 }));
+  W.lotes.forEach(l => {
+    if (l.tam === 'p') return;
+    const a = l.tam === 'a';
+    CM.ruas.push({ id: 'obra' + l.id, cat: 'obra', lote: l, nome: () => 'OBRA · ' + l.proj.nome + ' · ' + C.faseNome(l.est || C.estadoDe(l)), x: a ? l.pista.x + l.pista.w / 2 : l.cx, y: a ? l.pista.y + l.pista.h / 2 + 30 : l.cy, px: l.x - 10, py: l.y + l.h + 8, vw: a ? 520 : 420 });
+  });
+  C.pontes.forEach(pt => CM.ruas.push({ id: 'ponte' + pt.nome, cat: 'obra', nome: () => 'OBRA · ' + pt.nome + (pt.pronta ? ' (INAUGURADA)' : ' ' + Math.round(pt.p * 100) + '%'), x: pt.x + pt.w / 2, y: pt.y + pt.h / 2, px: pt.x + 6, py: pt.y - 16, vw: 520 }));
+  // poste com câmera (desenhado no mundo)
+  CM.desenharRua = function (ctx, S, x0, y0, x1, y1, t) {
+    CM.ruas.forEach(c => {
+      if (c.px < x0 - 30 || c.px > x1 + 30 || c.py < y0 - 30 || c.py > y1 + 30) return;
+      const a = Math.atan2(c.y - c.py, c.x - c.px) + Math.sin(t * 0.5 + c.px) * 0.35;
+      ctx.fillStyle = 'rgba(0,0,10,0.3)'; ctx.beginPath(); ctx.arc(c.px + 5, c.py + 6, 5, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#55586a'; ctx.beginPath(); ctx.arc(c.px, c.py, 4, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(c.px, c.py); ctx.rotate(a); ctx.fillStyle = '#2a2c33'; ctx.fillRect(0, -3.5, 13, 7); ctx.fillStyle = '#0a0c12'; ctx.fillRect(11, -2.5, 3, 5);
+      ctx.restore();
+      const on = Math.floor(t * 2 + c.px) % 2 === 0; ctx.fillStyle = on ? '#ff2a2a' : '#5a0a0a'; ctx.beginPath(); ctx.arc(c.px + Math.cos(a) * 4, c.py + Math.sin(a) * 4 - 3, 1.8, 0, TAU); ctx.fill();
+      if (on) { ctx.fillStyle = 'rgba(255,40,40,0.3)'; ctx.beginPath(); ctx.arc(c.px + Math.cos(a) * 4, c.py + Math.sin(a) * 4 - 3, 5, 0, TAU); ctx.fill(); }
+    });
+    // câmera da rua flagra fuga da polícia (só registro)
+    if (S.heatLevel > 0 && S.mode === 'play') {
+      const ref = S.player.car || S.player;
+      for (const c of CM.ruas) { if (Math.hypot(ref.x - c.x, ref.y - c.y) < 230 && (!c.flag || S.time - c.flag > 40)) { c.flag = S.time; CM.registra('CRIME', c.nome() + ' — suspeito em fuga filmado (nível de procurado ' + S.heatLevel + ')', 'crime', { x: ref.x, y: ref.y }); break; } }
+    }
+  };
+
+  // ---------- catálogo de tudo o que dá para assistir ----------
+  const SALAS_HOTEL = [['entrada', 'RECEPÇÃO'], ['restaurante', 'RESTAURANTE'], ['corredor', 'CORREDOR'], ['piscina', 'PISCINA'], ['cozinha', 'COZINHA']];
+  let catCache = null, catN = -1;
+  CM.catalogo = function () {
+    if (catCache && catN === W.places.length) return catCache;
+    const lista = [];
+    W.places.forEach(pl => {
+      if (pl.tipo === 'casa' || pl.id === 'casa') return;
+      const salas = pl.tipo === 'hotel' ? SALAS_HOTEL : pl.tipo === 'mercado' ? [['entrada', 'CORREDORES']] : [['entrada', 'SALÃO']];
+      salas.forEach(([sid, nm]) => lista.push({ id: pl.id + ':' + sid, cat: 'predio', pl, sala: sid, nome: () => pl.nome + ' · ' + nm, reg: C.regiaoDe(pl.x, pl.y).nome }));
+    });
+    CM.ruas.forEach(c => lista.push(Object.assign(c, { reg: C.regiaoDe(c.x, c.y).nome })));
+    catCache = lista; catN = W.places.length; return lista;
+  };
+
+  // ---------- desenho dos sinais ----------
+  const cvs = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  function salaReal(S, f) { const R = S.inside; return R && R.lugar && R.lugar.place === f.pl && (R.id || 'entrada') === f.sala ? R : null; }
+  function efeitoCamera(x, w, h, f, S, t, ruim) {
+    x.fillStyle = 'rgba(10,40,25,0.16)'; x.fillRect(0, 0, w, h);
+    x.fillStyle = 'rgba(0,0,0,0.13)'; for (let yy = 0; yy < h; yy += 3) x.fillRect(0, yy, w, 1);
+    const v = x.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.9); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.5)'); x.fillStyle = v; x.fillRect(0, 0, w, h);
+    const r = ((Math.floor(t * 12) * 9301 + 49297) % 233280) / 233280; if (r < 0.1) { x.fillStyle = 'rgba(255,255,255,0.10)'; x.fillRect(0, (r * 10) * h, w, 3); }
+  }
+  // um sinal de sala (interna) ou de rua (externa), desenhado dentro de um canvas w×h
+  function renderaFeed(S, f, w, h, dt) {
+    if (!f.cv || f.cv.width !== w || f.cv.height !== h) f.cv = cvs(w, h);
+    const x = f.cv.getContext('2d'), t = S.time;
+    x.save(); x.fillStyle = '#05080a'; x.fillRect(0, 0, w, h);
+    try {
+      if (f.cat === 'predio') {
+        let R = salaReal(S, f), real = !!R;
+        if (!R) { if (f.erro) throw f.erro; R = f.R = f.R || L.salaVigiada(f.pl, f.sala); if (!R) throw new Error('sala não existe'); L.simularSala(S, R, dt); }
+        const sc = Math.min(w / R.W, h / R.H);
+        x.translate((w - R.W * sc) / 2, (h - R.H * sc) / 2); x.scale(sc, sc);
+        x.beginPath(); x.rect(0, 0, R.W, R.H); x.clip();
+        L.desenharCena(x, S, R, real);
+        f.camsN = camsDe(R).length;
+      } else {
+        const z = w / f.vw, vw = f.vw, vh = h / z, cx = f.x, cy = f.y;
+        const vx0 = cx - vw / 2, vy0 = cy - vh / 2, vx1 = cx + vw / 2, vy1 = cy + vh / 2;
+        x.translate(w / 2, h / 2); x.scale(z, z); x.translate(-cx, -cy);
+        W.drawChunks(x, vx0, vy0, vx1, vy1); W.drawWaterFx(x, t, vx0, vy0, vx1, vy1);
+        C.desenhar(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenhar(x, S, vx0, vy0, vx1, vy1, t);
+        const inV = o => o.x > vx0 - 60 && o.x < vx1 + 60 && o.y > vy0 - 60 && o.y < vy1 + 60;
+        S.cars.filter(inV).forEach(c => SP.drawCar(x, c, t)); S.peds.filter(inV).forEach(p => SP.drawPed(x, p, t));
+        if (!S.player.car && S.mode !== 'inside' && inV(S.player)) SP.drawPed(x, S.player, t);
+        if (G.fbi && G.fbi.desenhar) G.fbi.desenhar(x, S, inV, t);
+        C.desenharAlto(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenharAlto(x, S, vx0, vy0, vx1, vy1, t);
+        CM.desenharRua(x, S, vx0, vy0, vx1, vy1, t);
+        const fr = ((S.dayT % 1) + 1) % 1, dk = fr < 0.55 ? 0 : fr < 0.65 ? (fr - 0.55) / 0.1 : fr < 0.92 ? 1 : 1 - (fr - 0.92) / 0.08;
+        if (dk > 0.02) { x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = 'rgba(5,8,40,' + 0.55 * dk + ')'; x.fillRect(0, 0, w, h); }
+      }
+    } catch (e) {
+      x.setTransform(1, 0, 0, 1, 0, 0); f.erro = e; x.fillStyle = '#111'; x.fillRect(0, 0, w, h); x.fillStyle = '#ff6a6a'; x.font = 'bold 14px Arial'; x.textAlign = 'center'; x.fillText('SEM SINAL', w / 2, h / 2); x.font = '10px Arial'; x.fillText(String(e.message || e).slice(0, 50), w / 2, h / 2 + 16);
+      if (G.olho && G.olho.erro && !f.reportou) { f.reportou = true; G.olho.erro(e, 'câmera ' + (typeof f.nome === 'function' ? f.nome() : f.nome)); }
+    }
+    x.restore(); x.save(); efeitoCamera(x, w, h, f, S, t); x.restore();
+  }
+
+  // ---------- a Central de Câmeras (tela por cima do jogo) ----------
+  const FILTROS = [['TODAS', null], ['PRÉDIOS', 'predio'], ['RUAS', 'rua'], ['OBRAS', 'obra']];
+  const tela = {
+    sel: 0, filtro: 0, cheio: false, tl: false, quadro: 0,
+    abre(S) { CM.aberta = true; this.quadro = 0; },
+    fecha() { CM.aberta = false; if (this.tl) { C.vel = 1; this.tl = false; } this.cheio = false; },
+    lista() { const cat = FILTROS[this.filtro][1]; return CM.catalogo().filter(f => !cat || f.cat === cat); },
+    tecla(k, S) {
+      const L2 = this.lista(), n = L2.length;
+      if (k === 'Escape' || k === 'KeyC') { if (this.cheio && k === 'Escape') this.cheio = false; else G.overlay.fechar(); return; }
+      if (k === 'Enter' || k === 'Space') this.cheio = !this.cheio;
+      else if (k === 'ArrowRight' || k === 'KeyD') this.sel = (this.sel + 1) % n;
+      else if (k === 'ArrowLeft' || k === 'KeyA') this.sel = (this.sel + n - 1) % n;
+      else if (k === 'ArrowDown' || k === 'KeyS') this.sel = (this.sel + 3) % n;
+      else if (k === 'ArrowUp' || k === 'KeyW') this.sel = (this.sel + n - 3) % n;
+      else if (k === 'PageDown') this.sel = (this.sel + 6) % n;
+      else if (k === 'PageUp') this.sel = (this.sel + n - 6) % n;
+      else if (k === 'Tab' || k === 'KeyF') { this.filtro = (this.filtro + 1) % FILTROS.length; this.sel = 0; }
+      else if (k === 'KeyT') { this.tl = !this.tl; C.vel = this.tl ? 30 : 1; G.say(this.tl ? 'TIMELAPSE DAS OBRAS ligado (x30)' : 'Tempo normal', 2); }
+    },
+    desenha(ctx, S, dt) {
+      const L2 = this.lista(), n = L2.length; if (this.sel >= n) this.sel = 0;
+      this.quadro++;
+      ctx.save(); ctx.fillStyle = '#04070a'; ctx.fillRect(0, 0, 800, 600);
+      // cabeçalho
+      ctx.fillStyle = '#0c1a14'; ctx.fillRect(0, 0, 800, 44); ctx.fillStyle = '#1f6a44'; ctx.fillRect(0, 44, 800, 2);
+      ctx.fillStyle = '#7dffb0'; ctx.font = 'bold 16px Arial'; ctx.textAlign = 'left'; ctx.fillText('CENTRAL DE CÂMERAS', 14, 28);
+      ctx.font = 'bold 11px Arial'; FILTROS.forEach(([nm], i) => { const x = 292 + i * 80; ctx.fillStyle = i === this.filtro ? '#1f6a44' : '#13241c'; ctx.fillRect(x, 12, 74, 22); ctx.fillStyle = i === this.filtro ? '#fff' : '#7ab08e'; ctx.textAlign = 'center'; ctx.fillText(nm, x + 37, 27); });
+      ctx.textAlign = 'right'; ctx.fillStyle = '#9dff9d'; ctx.font = 'bold 12px Arial'; ctx.fillText(L.horaTxt(S) + (this.tl ? '  ·  TIMELAPSE x30' : '') + '  ·  ' + n + ' câmeras', 784, 17);
+      ctx.fillStyle = Math.floor(performance.now() / 500) % 2 ? '#ff3a3a' : '#7a1a1a'; ctx.fillText('● REC', 784, 36);
+      if (!n) { ctx.restore(); return; }
+      if (this.cheio) {
+        const f = L2[this.sel]; renderaFeed(S, f, 760, 470, dt); ctx.drawImage(f.cv, 20, 56);
+        ctx.strokeStyle = '#2fb070'; ctx.lineWidth = 2; ctx.strokeRect(20, 56, 760, 470);
+        this.rotulo(ctx, f, 20, 56, 760, 470, S, true);
+        ctx.fillStyle = '#9ac8ae'; ctx.font = '12px Arial'; ctx.textAlign = 'left'; ctx.fillText(f.reg + (f.camsN ? '  ·  ' + f.camsN + ' câmera(s) nesta sala' : ''), 20, 546);
+        this.ticker(ctx, S, 560); ctx.fillStyle = '#7ab08e'; ctx.fillText('ENTER voltar à grade · ← → trocar câmera · T timelapse · ESC/C sair', 20, 592);
+        ctx.restore(); return;
+      }
+      const page = Math.floor(this.sel / 6), CW = 250, CH = 178;
+      for (let k = 0; k < 6; k++) {
+        const i = page * 6 + k; if (i >= n) break;
+        const f = L2[i], cx = 15 + (k % 3) * 262, cy = 56 + Math.floor(k / 3) * 214;
+        if (!f.cv || this.quadro % 2 === k % 2 || f.cv.width !== CW) renderaFeed(S, f, CW, CH, dt * 2);
+        ctx.drawImage(f.cv, cx, cy);
+        ctx.strokeStyle = i === this.sel ? '#ffe04a' : '#1f4a36'; ctx.lineWidth = i === this.sel ? 3 : 1; ctx.strokeRect(cx, cy, CW, CH);
+        this.rotulo(ctx, f, cx, cy, CW, CH, S, false);
+      }
+      ctx.fillStyle = '#7ab08e'; ctx.font = '11px Arial'; ctx.textAlign = 'left'; ctx.fillText('página ' + (page + 1) + '/' + Math.ceil(n / 6) + '  ·  ←→↑↓ escolher · ENTER tela cheia · TAB filtro · T timelapse das obras · ESC sair', 15, 494 + 20);
+      this.ticker(ctx, S, 540);
+      ctx.restore();
+    },
+    rotulo(ctx, f, x, y, w, h, S, grande) {
+      const nm = typeof f.nome === 'function' ? f.nome() : f.nome;
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(x, y, w, grande ? 24 : 17);
+      ctx.fillStyle = '#d8ffe8'; ctx.font = 'bold ' + (grande ? 13 : 9) + 'px Arial'; ctx.textAlign = 'left'; let t = nm; while (ctx.measureText(t).width > w - 60 && t.length > 8) t = t.slice(0, -2); ctx.fillText(t, x + 5, y + (grande ? 16 : 12));
+      const seg = Math.floor(S.time % 60); ctx.textAlign = 'right'; ctx.fillStyle = '#9dff9d'; ctx.font = (grande ? 'bold 11px' : '9px') + ' Arial'; ctx.fillText(L.horaTxt(S) + ':' + String(seg).padStart(2, '0'), x + w - 5, y + h - 5);
+      ctx.fillStyle = Math.floor(performance.now() / 500) % 2 ? '#ff3a3a' : '#7a1a1a'; ctx.beginPath(); ctx.arc(x + w - 10, y + (grande ? 12 : 8.5), grande ? 4 : 3, 0, TAU); ctx.fill();
+      if (f.erro) { ctx.fillStyle = '#ff6a6a'; ctx.textAlign = 'left'; ctx.fillText('FALHA', x + 5, y + h - 5); }
+    },
+    ticker(ctx, S, y) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, y - 14, 800, 50);
+      ctx.font = 'bold 11px Arial'; ctx.textAlign = 'left';
+      const g = CM.gravacoes.slice(-3).reverse();
+      if (!g.length) { ctx.fillStyle = '#7ab08e'; ctx.fillText('Nenhum incidente gravado ainda.', 15, y); return; }
+      g.forEach((r, i) => { ctx.fillStyle = r.sev === 'crime' ? '#ff7a7a' : '#9ac8ae'; ctx.fillText('[' + r.hora + '] ' + r.tipo + ' · ' + r.msg, 15, y + i * 15); });
+    }
+  };
+  CM.tela = tela; CM.renderaFeed = renderaFeed;
+  G.overlay.atalhos['KeyC'] = () => G.overlay.abrir(tela);
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
+   olho.js — O OLHO DE DEUS
+   Um sistema INVISÍVEL: o jogador nunca o vê dentro do jogo. Ele observa tudo, o tempo todo,
+   e só resolve problemas:
+     • carros travados, fora do mapa, dentro de parede, empilhados ou com números quebrados;
+     • pedestres e jogador presos em paredes; dinheiro/vida quebrados; telas inconsistentes;
+     • salas com objetos inalcançáveis, NPCs presos, erros de JavaScript, queda de desempenho.
+   Cada coisa achada vira um RELATÓRIO no "super cache" (guardado no navegador) com todos os detalhes
+   (posição, rua, tipo do carro, estado, o que foi feito para consertar).
+   F9 abre o painel para VOCÊ ler os relatórios. No console: G.olho.relatorio()  /  G.olho.exportar()
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const W = G.world, T = W.T, TAU = Math.PI * 2;
+  const KEY = 'ruaVermelha.olho';
+  const O = G.olho = { cache: [], seq: 0, porChave: {}, stats: { varreduras: 0, achados: 0, consertos: 0, fps: 60, dtMed: 0.016 }, novos: 0, ligado: true, reduzido: false };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fin = v => typeof v === 'number' && isFinite(v);
+
+  // ---------- cache persistente ----------
+  function carrega() { try { const j = JSON.parse(localStorage.getItem(KEY)); if (j && Array.isArray(j.cache)) { O.cache = j.cache; O.seq = j.seq || O.cache.length; O.cache.forEach(r => { O.porChave[r.chave] = r; }); } } catch (e) { } }
+  let sujo = false, salvaT = 0;
+  function salva() {
+    if (!sujo) return; sujo = false;
+    try { localStorage.setItem(KEY, JSON.stringify({ seq: O.seq, cache: O.cache.slice(-120) })); } catch (e) { try { localStorage.setItem(KEY, JSON.stringify({ seq: O.seq, cache: O.cache.slice(-30) })); } catch (e2) { } }
+  }
+  carrega();
+
+  // descreve um objeto sem pegar nada pesado (só números, textos e um nível de objetos pequenos)
+  function snap(e) {
+    const o = {};
+    if (!e) return o;
+    let n = 0;
+    for (const k in e) {
+      const v = e[k]; if (n > 60) break;
+      if (typeof v === 'number') { o[k] = fin(v) ? Math.round(v * 100) / 100 : String(v); n++; }
+      else if (typeof v === 'string' || typeof v === 'boolean') { o[k] = v; n++; }
+      else if (v && typeof v === 'object' && !Array.isArray(v) && (k === 'nav' || k === 'look' || k === 'threat') && n < 50) { o[k] = {}; for (const q in v) { const w = v[q]; if (typeof w === 'number' || typeof w === 'string' || typeof w === 'boolean') o[k][q] = typeof w === 'number' && fin(w) ? Math.round(w * 100) / 100 : w; } }
+    }
+    return o;
+  }
+  function lugarDe(e) {
+    if (!e || !fin(e.x) || !fin(e.y)) return { tile: null, onde: 'posição inválida' };
+    const tx = Math.floor(e.x / T), ty = Math.floor(e.y / T), nomes = ['RUA', 'CALÇADA', 'PRÉDIO', 'GRAMA', 'ÁGUA', 'PONTE', 'FAIXA', 'ESTACIONAMENTO'];
+    const tp = W.tileAt(e.x, e.y);
+    return { tile: { tx, ty, tipo: nomes[tp] || tp }, onde: G.cameras ? G.cameras.onde(e.x, e.y) : tx + ',' + ty };
+  }
+  O.snap = snap; O.lugarDe = lugarDe;
+
+  // registra um achado. r = { tipo, sev(1..3), fonte, msg, ent (entidade), detalhe, chave, corrigido, acao }
+  O.registrar = function (r) {
+    const S = G.S, chave = r.chave || (r.tipo + ':' + r.msg);
+    let rec = O.porChave[chave];
+    const agora = Date.now();
+    if (rec && agora - rec.ult < 60000 && !r.forcar) {          // o mesmo problema de novo: só soma
+      rec.n++; rec.ult = agora; if (r.corrigido) { rec.corrigido = true; rec.acao = r.acao || rec.acao; O.stats.consertos++; }
+      if (r.fonte && rec.fontes.indexOf(r.fonte) < 0) rec.fontes.push(r.fonte);
+      sujo = true; return rec;
+    }
+    const loc = r.ent ? lugarDe(r.ent) : { tile: null, onde: r.onde || '' };
+    rec = {
+      id: ++O.seq, chave, tipo: r.tipo, sev: r.sev || 1, fonte: r.fonte || 'OLHO', fontes: [r.fonte || 'OLHO'], msg: r.msg,
+      hora: G.lugares ? G.lugares.horaTxt(S) : '', tempo: Math.round(S.time), real: new Date().toISOString(), n: 1, ult: agora,
+      onde: r.onde || loc.onde, tile: loc.tile, ent: r.ent ? snap(r.ent) : null, detalhe: r.detalhe || null,
+      mundo: { modo: S.mode, dentro: S.inside && S.inside.lugar ? S.inside.lugar.id + ':' + (S.inside.id || '') : null, carros: S.cars.length, pedestres: S.peds.length, procurado: S.heatLevel, dinheiro: S.save && S.save.money, fps: Math.round(O.stats.fps) },
+      corrigido: r.corrigido === undefined && (r.sev || 1) <= 1 ? null : !!r.corrigido, acao: r.acao || ''
+    };
+    if (G.fbi && r.ent && r.ent.uid == null) { /* sem id: tudo bem */ }
+    O.cache.push(rec); O.porChave[chave] = rec; O.stats.achados++; if (r.corrigido) O.stats.consertos++;
+    if (O.cache.length > 300) { const x = O.cache.shift(); if (O.porChave[x.chave] === x) delete O.porChave[x.chave]; }
+    O.novos++; sujo = true;
+    if (rec.sev >= 3 && window.console) console.warn('[OLHO] ' + rec.tipo + ': ' + rec.msg);
+    return rec;
+  };
+  // eventos de outros sistemas viram registro (sem alarde)
+  O.obra = ev => O.registrar({ tipo: 'obra', sev: 1, fonte: 'CIDADE', msg: ev.msg, onde: ev.reg, chave: 'obra:' + ev.msg, detalhe: ev });
+  O.camera = r => O.registrar({ tipo: 'camera', sev: r.sev === 'crime' ? 2 : 1, fonte: 'CÂMERAS', msg: r.msg, onde: r.onde, chave: 'cam:' + r.id, detalhe: { gravacao: r.id, hora: r.hora }, forcar: true });
+  O.erro = function (e, onde) {
+    const msg = String(e && e.message || e).slice(0, 160);
+    return O.registrar({ tipo: 'erro-js', sev: 3, fonte: 'OLHO', msg: onde + ': ' + msg, onde: onde, chave: 'js:' + onde + ':' + msg, detalhe: { pilha: String(e && e.stack || '').split('\n').slice(0, 6) } });
+  };
+  window.addEventListener('error', ev => { try { O.erro(ev.error || ev.message, 'erro do navegador'); } catch (e) { } });
+  window.addEventListener('unhandledrejection', ev => { try { O.erro(ev.reason, 'promessa'); } catch (e) { } });
+
+  // ---------- achar um lugar bom perto de (x,y) ----------
+  function maisPerto(x, y, ok, raio) {
+    const tx0 = clamp(Math.floor(x / T), 1, W.TW - 2), ty0 = clamp(Math.floor(y / T), 1, W.TH - 2);
+    for (let r = 0; r <= (raio || 24); r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+      const tx = tx0 + dx, ty = ty0 + dy; if (tx < 1 || ty < 1 || tx >= W.TW - 1 || ty >= W.TH - 1) continue;
+      if (ok(W.tiles[ty * W.TW + tx])) return { x: (tx + 0.5) * T, y: (ty + 0.5) * T };
+    }
+    return null;
+  }
+  O.maisPerto = maisPerto;
+  const ehVia = t => t === W.TILE.ROAD || t === W.TILE.CROSS || t === W.TILE.BRIDGE;
+  const ehCalcada = t => W.pedWalkable(t) && t !== W.TILE.LOT;
+
+  // ---------- diagnósticos (só olham, não mexem) ----------
+  let uidN = 0; const uid = e => (e.uid == null ? (e.uid = ++uidN) : e.uid);
+  O.diagnosticaCarro = function (c, S) {
+    const out = [], p = S.player, ehJog = p.car === c;
+    if (!fin(c.x) || !fin(c.y) || !fin(c.vx) || !fin(c.vy) || !fin(c.a)) { out.push({ tipo: 'carro-nan', sev: 3, msg: 'carro #' + uid(c) + ' (' + c.kind + ') com número inválido (NaN)', fix: () => removeCarro(S, c, 'carro-nan') }); return out; }
+    if (c.x < 0 || c.y < 0 || c.x > W.W || c.y > W.H) out.push({ tipo: 'carro-fora', sev: 3, msg: 'carro #' + uid(c) + ' fora do mapa', fix: () => ehJog ? tpJogCarro(S, c) : removeCarro(S, c, 'fora do mapa') });
+    else if (W.isSolid(c.x, c.y)) {
+      c._sol = (c._sol || 0) + 1;
+      if (c._sol >= 2) out.push({ tipo: 'carro-parede', sev: 3, msg: 'carro #' + uid(c) + ' (' + c.kind + ') dentro de ' + lugarDe(c).tile.tipo, fix: () => { const q = maisPerto(c.x, c.y, ehVia, 20); if (q && (ehJog || c.owned)) { c.x = q.x; c.y = q.y; c.vx = c.vy = 0; c._sol = 0; return 'reposicionado na rua mais próxima'; } removeCarro(S, c, 'dentro de parede'); return 'removido'; } });
+    } else c._sol = 0;
+    if (Math.hypot(c.vx, c.vy) > 1000) out.push({ tipo: 'carro-velocidade', sev: 2, msg: 'carro #' + uid(c) + ' com velocidade absurda (' + Math.round(Math.hypot(c.vx, c.vy)) + ')', fix: () => { c.vx *= 0.1; c.vy *= 0.1; return 'velocidade zerada'; } });
+    // travado: carro da cidade que não sai do lugar
+    if (c.driver === 'ai' && !c.dead && !c.hb && (c.mode === 'wander' || c.mode === 'goto' || c.mode === 'chase')) {
+      const m = c._m || (c._m = { x: c.x, y: c.y, t: S.time });
+      if (Math.hypot(c.x - m.x, c.y - m.y) > 10) { m.x = c.x; m.y = c.y; m.t = S.time; }
+      else if (S.time - m.t > 16) out.push({ tipo: 'carro-travado', sev: 2, msg: 'carro #' + uid(c) + ' (' + c.kind + ') TRAVADO há ' + Math.round(S.time - m.t) + 's', fix: () => { removeCarro(S, c, 'travado'); return 'removido (o trânsito repõe outro)'; } });
+    }
+    return out;
+  };
+  O.diagnosticaPed = function (p, S) {
+    const out = [];
+    if (!fin(p.x) || !fin(p.y)) { out.push({ tipo: 'ped-nan', sev: 3, msg: 'pedestre #' + uid(p) + ' com posição inválida', fix: () => { S.peds.splice(S.peds.indexOf(p), 1); return 'removido'; } }); return out; }
+    if (p.x < 0 || p.y < 0 || p.x > W.W || p.y > W.H || W.isSolid(p.x, p.y)) out.push({ tipo: 'ped-parede', sev: 2, msg: 'pedestre #' + uid(p) + ' preso em ' + lugarDe(p).tile.tipo, fix: () => { const q = maisPerto(p.x, p.y, ehCalcada, 20); if (q) { p.x = q.x; p.y = q.y; return 'movido para a calçada'; } S.peds.splice(S.peds.indexOf(p), 1); return 'removido'; } });
+    return out;
+  };
+  function removeCarro(S, c, porque) { const i = S.cars.indexOf(c); if (i >= 0) S.cars.splice(i, 1); if (S.redCar === c) { /* o carro do jogador nunca some: volta para a rua */ tpJogCarro(S, c); S.cars.push(c); } }
+  function tpJogCarro(S, c) { const q = maisPerto(isFinite(c.x) ? c.x : W.nodeX(2), isFinite(c.y) ? c.y : W.nodeY(2), ehVia, 40) || { x: W.nodeX(2), y: W.nodeY(2) }; c.x = q.x; c.y = q.y; c.vx = c.vy = 0; if (!fin(c.a)) c.a = 0; if (S.player.car === c) { S.player.x = q.x; S.player.y = q.y; } }
+
+  // aplica os consertos e registra tudo (fonte pode ser o OLHO ou um agente que viu primeiro)
+  O.trata = function (d, ent, fonte, soReporta) {
+    let acao = '';
+    if (!soReporta && d.fix) { try { acao = d.fix() || 'consertado'; } catch (e) { acao = 'falhou ao consertar: ' + e.message; } }
+    return O.registrar({ tipo: d.tipo, sev: d.sev, fonte: fonte || 'OLHO', msg: d.msg, ent, chave: d.tipo + ':' + (ent && ent.uid != null ? ent.uid : d.msg), corrigido: !soReporta && !!d.fix, acao: soReporta ? '' : acao, detalhe: d.detalhe });
+  };
+
+  // ---------- varredura principal (1 vez por segundo) ----------
+  let ultimo = { x: 0, y: 0, ok: false }, tTrans = 0, tSol = 0, acumulo = 0, lentoT = 0, relogio = 0;
+  function varrer(S, dt) {
+    O.stats.varreduras++;
+    // carros
+    for (const c of S.cars.slice()) for (const d of O.diagnosticaCarro(c, S)) O.trata(d, c);
+    if (S.cars.length > 90) { const P = S.player, ord = S.cars.slice().sort((a, b) => Math.hypot(b.x - P.x, b.y - P.y) - Math.hypot(a.x - P.x, a.y - P.y)); for (let k = 0; k < S.cars.length - 90; k++) if (!ord[k].owned && ord[k] !== P.car) { const i = S.cars.indexOf(ord[k]); if (i >= 0) S.cars.splice(i, 1); } O.registrar({ tipo: 'excesso-carros', sev: 1, msg: 'mais de 90 carros no mapa: os mais distantes foram removidos', corrigido: true, acao: 'limpeza' }); }
+    // pedestres
+    for (const p of S.peds.slice()) for (const d of O.diagnosticaPed(p, S)) O.trata(d, p);
+    if (S.peds.length > 160) { S.peds.length = 160; O.registrar({ tipo: 'excesso-peds', sev: 1, msg: 'mais de 160 pedestres: cortei o excesso', corrigido: true, acao: 'limpeza' }); }
+    // jogador
+    const P = S.player;
+    if (!fin(P.x) || !fin(P.y)) { P.x = ultimo.ok ? ultimo.x : W.nodeX(2); P.y = ultimo.ok ? ultimo.y : W.nodeY(2); P.vx = P.vy = 0; O.registrar({ tipo: 'jogador-nan', sev: 3, msg: 'posição do jogador inválida', corrigido: true, acao: 'voltou para a última posição boa' }); }
+    else if (S.mode === 'play' && !P.car && W.isSolid(P.x, P.y)) { tSol++; if (tSol >= 2) { const q = maisPerto(P.x, P.y, ehCalcada, 20); if (q) { P.x = q.x; P.y = q.y; } tSol = 0; O.registrar({ tipo: 'jogador-parede', sev: 2, msg: 'jogador ficou preso dentro de ' + lugarDe(P).tile.tipo, ent: P, corrigido: true, acao: 'movido para a calçada mais próxima' }); } }
+    else { tSol = 0; if (S.mode === 'play') { ultimo = { x: P.x, y: P.y, ok: true }; } }
+    if (!fin(P.hp)) { P.hp = 100; O.registrar({ tipo: 'vida-nan', sev: 2, msg: 'vida do jogador inválida', corrigido: true, acao: 'vida = 100' }); }
+    if (S.save) {
+      if (!fin(S.save.money) || S.save.money < 0) { const v = S.save.money; S.save.money = 0; O.registrar({ tipo: 'dinheiro', sev: 3, msg: 'dinheiro inválido (' + v + ')', corrigido: true, acao: 'dinheiro = 0' }); }
+      const inv = S.save.inv; if (inv) for (const k in inv) if (!fin(inv[k]) || inv[k] < 0) { delete inv[k]; O.registrar({ tipo: 'mochila', sev: 2, msg: 'item inválido na mochila: ' + k, corrigido: true, acao: 'item removido' }); }
+    }
+    // telas inconsistentes
+    if (S.mode === 'inside' && !S.inside) { S.mode = 'play'; O.registrar({ tipo: 'tela', sev: 3, msg: 'modo "dentro" sem sala', corrigido: true, acao: 'voltou para a rua' }); }
+    if (S.mode === 'play' && S.inside) { S.inside = null; O.registrar({ tipo: 'tela', sev: 2, msg: 'sala ainda aberta com o jogo na rua', corrigido: true, acao: 'sala fechada' }); }
+    if (S.trans) { tTrans += 1; if (tTrans > 8) { S.trans = null; tTrans = 0; O.registrar({ tipo: 'tela', sev: 3, msg: 'transição de tela travada', corrigido: true, acao: 'transição cancelada' }); } } else tTrans = 0;
+    // sala atual
+    const R = S.inside;
+    if (R) {
+      if (!fin(R.px) || !fin(R.py) || R.px < R.x0 - 20 || R.px > R.x1 + 20 || R.py < R.y0 - 20 || R.py > R.y1 + 60) { O.registrar({ tipo: 'sala-jogador', sev: 3, msg: 'jogador fora da sala ' + (R.nome || ''), corrigido: true, acao: 'voltou para a porta' }); R.px = R.portaX; R.py = R.y1 - 40; }
+      for (const n of R.npcs.slice()) if (!fin(n.x) || !fin(n.y)) { R.npcs.splice(R.npcs.indexOf(n), 1); O.registrar({ tipo: 'sala-npc', sev: 2, msg: 'NPC com posição inválida em ' + (R.nome || ''), corrigido: true, acao: 'NPC removido' }); }
+    }
+    // desempenho
+    if (O.stats.dtMed > 0.045) { lentoT += 1; if (lentoT > 8 && !O.reduzido) { O.reduzido = true; O.registrar({ tipo: 'desempenho', sev: 2, msg: 'jogo lento (' + Math.round(1 / O.stats.dtMed) + ' fps): reduzi trânsito e gente', corrigido: true, acao: 'menos carros/peds', detalhe: { carros: S.cars.length, peds: S.peds.length, particulas: S.particles.length } }); if (S.particles.length > 150) S.particles.length = 150; } }
+    else { lentoT = Math.max(0, lentoT - 1); if (O.stats.dtMed < 0.03) O.reduzido = false; }
+    // relógio das obras
+    G.cidade.lotes.forEach(l => { if (l.est && (!fin(l.est.p) || l.est.p < 0 || l.est.p > 1.0001)) O.registrar({ tipo: 'obra-estado', sev: 2, msg: 'obra ' + l.id + ' com progresso inválido', detalhe: l.est }); });
+  }
+  O.estadoMundo = function () { const S = G.S; return { carros: S.cars.length, pedestres: S.peds.length, particulas: S.particles.length, fps: Math.round(O.stats.fps), obras: G.cidade.resumo(), modo: S.mode, cacheTamanho: O.cache.length }; };
+
+  G.extras.add((S, dt) => {
+    if (!O.ligado) return;
+    O.stats.dtMed += (dt - O.stats.dtMed) * 0.05; O.stats.fps = 1 / Math.max(0.001, O.stats.dtMed);
+    acumulo += dt; salvaT += dt;
+    if (acumulo >= 1) { acumulo = 0; try { varrer(S, dt); } catch (e) { O.erro(e, 'varredura do Olho'); } }
+    if (salvaT > 10) { salvaT = 0; salva(); }
+  });
+  window.addEventListener('beforeunload', () => { sujo = true; salva(); });
+
+  // ---------- relatórios para o desenvolvedor ----------
+  O.relatorio = function () {
+    const por = {}; O.cache.forEach(r => { const k = r.tipo + (r.corrigido ? ' (corrigido)' : r.corrigido === null ? ' (info)' : ' (aberto)'); por[k] = (por[k] || 0) + r.n; });
+    return { resumo: por, total: O.cache.length, ultimos: O.cache.slice(-15).map(r => '[' + r.hora + '] ' + r.fonte + ' · ' + r.tipo + ' · ' + r.msg + (r.corrigido ? '  ✔ ' + r.acao : '')), mundo: O.estadoMundo() };
+  };
+  O.exportar = function () { return JSON.stringify({ gerado: new Date().toISOString(), mundo: O.estadoMundo(), relatorios: O.cache, gravacoes: G.cameras ? G.cameras.gravacoes : [], obras: G.cidade.eventos }, null, 1); };
+  O.baixar = function () {
+    try { const b = new Blob([O.exportar()], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'olho-de-deus-relatorio.json'; a.click(); G.say('Relatório salvo: olho-de-deus-relatorio.json', 3); } catch (e) { G.say('Não deu para baixar aqui. Use G.olho.exportar() no console.', 4); }
+  };
+
+  // ---------- o painel (F9) ----------
+  const ABAS = ['RELATÓRIOS', 'SAÚDE', 'OBRAS', 'GRAVAÇÕES'];
+  const tela = {
+    aba: 0, sel: 0, det: false, filtro: 0,
+    abre() { O.novos = 0; this.sel = 0; this.det = false; },
+    lista() {
+      if (this.aba === 0) { const l = O.cache.slice().reverse(); return this.filtro === 0 ? l : this.filtro === 1 ? l.filter(r => r.sev >= 2) : l.filter(r => r.corrigido === false && r.sev >= 2); }
+      if (this.aba === 2) return G.cidade.eventos.slice().reverse();
+      if (this.aba === 3) return G.cameras ? G.cameras.gravacoes.slice().reverse() : [];
+      return [];
+    },
+    tecla(k) {
+      const l = this.lista(), n = l.length;
+      if (k === 'F9' || k === 'Escape') { if (this.det && k === 'Escape') this.det = false; else G.overlay.fechar(); return; }
+      if (k === 'Tab') { this.aba = (this.aba + 1) % ABAS.length; this.sel = 0; this.det = false; }
+      else if (k === 'ArrowDown' || k === 'KeyS') this.sel = Math.min(n - 1, this.sel + 1);
+      else if (k === 'ArrowUp' || k === 'KeyW') this.sel = Math.max(0, this.sel - 1);
+      else if (k === 'PageDown') this.sel = Math.min(n - 1, this.sel + 8);
+      else if (k === 'PageUp') this.sel = Math.max(0, this.sel - 8);
+      else if (k === 'Enter') this.det = !this.det;
+      else if (k === 'KeyF') { this.filtro = (this.filtro + 1) % 3; this.sel = 0; }
+      else if (k === 'KeyD') O.baixar();
+      else if (k === 'KeyX') { O.cache.length = 0; O.porChave = {}; sujo = true; salva(); this.sel = 0; }
+    },
+    desenha(ctx, S) {
+      ctx.save(); ctx.fillStyle = 'rgba(4,6,14,0.96)'; ctx.fillRect(0, 0, 800, 600);
+      ctx.fillStyle = '#10142a'; ctx.fillRect(0, 0, 800, 44); ctx.fillStyle = '#5a6aff'; ctx.fillRect(0, 44, 800, 2);
+      ctx.font = 'bold 19px Arial'; ctx.fillStyle = '#b8c4ff'; ctx.textAlign = 'left'; ctx.fillText('OLHO DE DEUS', 14, 29);
+      ctx.font = 'bold 11px Arial'; ABAS.forEach((nm, i) => { const x = 230 + i * 128; ctx.fillStyle = i === this.aba ? '#3a48c8' : '#181c3a'; ctx.fillRect(x, 12, 122, 22); ctx.fillStyle = i === this.aba ? '#fff' : '#8a96d8'; ctx.textAlign = 'center'; ctx.fillText(nm, x + 61, 27); });
+      ctx.textAlign = 'left';
+      if (this.aba === 1) this.saude(ctx, S); else this.relatorios(ctx, S);
+      ctx.fillStyle = '#7a86c8'; ctx.font = '11px Arial'; ctx.fillText('TAB abas · ↑↓ escolher · ENTER detalhes · F filtro · D baixar JSON · X limpar · F9/ESC fechar', 14, 590);
+      ctx.restore();
+    },
+    relatorios(ctx, S) {
+      const l = this.lista(), n = l.length; ctx.font = 'bold 11px Arial';
+      const ab = O.stats;
+      ctx.fillStyle = '#9aa6e8'; ctx.fillText(n + ' registros' + (this.aba === 0 ? '  ·  filtro: ' + ['todos', 'importantes', 'abertos'][this.filtro] : '') + '  ·  achados: ' + ab.achados + '  ·  consertos: ' + ab.consertos + '  ·  varreduras: ' + ab.varreduras, 14, 64);
+      if (this.det && l[this.sel]) { this.detalhe(ctx, l[this.sel]); return; }
+      const lin = 24, top = 76, vis = 21, ini = clamp(this.sel - 10, 0, Math.max(0, n - vis));
+      for (let k = 0; k < vis && ini + k < n; k++) {
+        const r = l[ini + k], y = top + k * lin, sel = ini + k === this.sel;
+        ctx.fillStyle = sel ? '#202a6a' : (k % 2 ? '#0a0e20' : '#0d1228'); ctx.fillRect(10, y, 780, lin - 2);
+        const cor = r.sev >= 3 ? '#ff6a6a' : r.sev === 2 ? '#ffc86a' : '#7ad8ff'; ctx.fillStyle = cor; ctx.fillRect(10, y, 4, lin - 2);
+        ctx.fillStyle = '#8a96d8'; ctx.font = '10px Arial'; ctx.fillText((r.hora || '') + '  ' + (r.fonte || r.reg || ''), 20, y + 15);
+        ctx.fillStyle = '#e8ecff'; ctx.font = 'bold 11px Arial'; let tx = (r.tipo || '') + ' · ' + (r.msg || ''); while (ctx.measureText(tx).width > 560 && tx.length > 10) tx = tx.slice(0, -2); ctx.fillText(tx, 150, y + 15);
+        if (r.corrigido != null && this.aba === 0) { ctx.fillStyle = r.corrigido ? '#7dff9a' : r.corrigido === null ? '#7ad8ff' : '#ff9a7a'; ctx.textAlign = 'right'; ctx.fillText((r.n > 1 ? 'x' + r.n + '  ' : '') + (r.corrigido ? 'CONSERTADO' : r.corrigido === null ? 'INFO' : 'ABERTO'), 782, y + 15); ctx.textAlign = 'left'; }
+      }
+      if (!n) { ctx.fillStyle = '#7a86c8'; ctx.font = 'bold 13px Arial'; ctx.fillText('Nada por aqui ainda. Jogue um pouco: o Olho e os agentes do FBI estão trabalhando.', 20, 110); }
+    },
+    detalhe(ctx, r) {
+      ctx.fillStyle = '#0d1230'; ctx.fillRect(10, 76, 780, 500); ctx.strokeStyle = '#3a48c8'; ctx.strokeRect(10.5, 76.5, 779, 499);
+      const txt = JSON.stringify(r, null, 1).split('\n'); ctx.font = '11px Consolas, monospace'; ctx.fillStyle = '#c8d2ff';
+      txt.slice(0, 38).forEach((s, i) => { let t = s; while (ctx.measureText(t).width > 760 && t.length > 8) t = t.slice(0, -2); ctx.fillText(t, 18, 94 + i * 12.6); });
+    },
+    saude(ctx, S) {
+      const st = O.estadoMundo(), r = G.cidade.resumo(), linhas = [
+        ['Quadros por segundo', st.fps], ['Carros no mapa', st.carros], ['Pedestres', st.pedestres], ['Partículas', st.particulas], ['Modo do jogo', st.modo],
+        ['Obras prontas', r.prontas], ['Obras em andamento', r.emObra], ['Terrenos aguardando', r.aguardando], ['Relógio da obra (s)', Math.round(G.cidade.t)],
+        ['Pedágios cobrados', '$' + (G.pedagio ? G.pedagio.cobrado : 0) + ' (' + (G.pedagio ? G.pedagio.passagens : 0) + ' passagens)'],
+        ['Gravações das câmeras', G.cameras ? G.cameras.gravacoes.length : 0], ['Agentes do FBI', G.fbi ? G.fbi.agentes.length + ' em campo · ' + G.fbi.stats.lugares + ' lugares auditados · ' + G.fbi.stats.ruas + ' varreduras de rua' : '—'],
+        ['Registros no cache', O.cache.length], ['Varreduras do Olho', O.stats.varreduras], ['Problemas achados / consertados', O.stats.achados + ' / ' + O.stats.consertos]
+      ];
+      ctx.font = 'bold 14px Arial'; linhas.forEach(([a, b], i) => { const y = 84 + i * 28; ctx.fillStyle = i % 2 ? '#0a0e20' : '#0d1228'; ctx.fillRect(10, y, 780, 26); ctx.fillStyle = '#9aa6e8'; ctx.textAlign = 'left'; ctx.fillText(a, 22, y + 18); ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.fillText(String(b), 780, y + 18); });
+      ctx.textAlign = 'left';
+    }
+  };
+  O.tela = tela;
+  G.overlay.atalhos['F9'] = () => G.overlay.abrir(tela);
+  // contador discreto no canto (só o jogo sabe que ele existe)
+  G.overlay.hudFns = G.overlay.hudFns || [];
+  G.overlay.hudFns.push((ctx, S) => {
+    if (S.mode !== 'play') return;
+    const abertos = O.cache.filter(r => r.corrigido === false && r.sev >= 2).length;
+    ctx.save(); ctx.globalAlpha = 0.45; ctx.font = 'bold 9px Arial'; ctx.fillStyle = abertos ? '#ffb86a' : '#8aa0ff'; ctx.textAlign = 'right'; ctx.fillText('F9 · OLHO ' + O.cache.length + (abertos ? ' · ' + abertos + '!' : ''), 790, 596); ctx.restore();
+  });
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
+   fbi.js — os AGENTES DO FBI (robôs com cara de gente)
+   Quatro agentes de terno e óculos escuros patrulham o mapa inteiro, cada um na sua região:
+   andam pelas calçadas, ENTRAM em todos os estabelecimentos (auditoria completa da sala) e
+   olham carros, pedestres, obras e pedágios. Tudo o que acham vai para o "super cache" do Olho de Deus
+   (aperte F9 para ler), com detalhes: quem viu, onde (cidade, rua, quadra), qual carro, estado, posição.
+   Os agentes não atrapalham o trânsito: são fantasmas para os carros (e nunca somem do mapa).
+   ============================================================ */
+(function (G) {
+  'use strict';
+  const W = G.world, T = W.T, TAU = Math.PI * 2, L = G.lugares, C = G.cidade, O = G.olho, SP = G.sprites, TILE = W.TILE;
+  const F = G.fbi = { agentes: [], stats: { lugares: 0, ruas: 0, salas: 0, problemas: 0, caminhos: 0 } };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // ---------- onde cada agente trabalha (colunas de quadras) ----------
+  const REGIOES = [
+    { b0: 0, b1: 2, nome: 'Agente Cruz', id: 'F1', setor: 'Ribeirão Oeste' },
+    { b0: 4, b1: 8, nome: 'Agente Lima', id: 'F2', setor: 'Ribeirão Leste' },
+    { b0: 10, b1: 12, nome: 'Agente Rocha', id: 'F3', setor: 'Novo Horizonte' },
+    { b0: 14, b1: 16, nome: 'Agente Duarte', id: 'F4', setor: 'Vale Verde' }
+  ];
+  const caminhavel = (tx, ty) => { if (tx < 0 || ty < 0 || tx >= W.TW || ty >= W.TH) return false; const t = W.tiles[ty * W.TW + tx]; return t === TILE.SIDE || t === TILE.CROSS || t === TILE.GRASS || t === TILE.LOT; };
+
+  // ---------- caminho (A* nas casas do mapa) ----------
+  const NT = W.TW * W.TH, gS = new Float32Array(NT), vindo = new Int32Array(NT), fechado = new Uint8Array(NT);
+  function caminho(ax, ay, bx, by, lim) {
+    const sx = Math.floor(ax / T), sy = Math.floor(ay / T), tx = Math.floor(bx / T), ty = Math.floor(by / T);
+    if (!caminhavel(tx, ty)) return null;
+    gS.fill(1e9); fechado.fill(0); vindo.fill(-1);
+    const heap = [], push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { let l = 2 * i + 1, r = l + 1, m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top[1]; };
+    const s = sy * W.TW + sx, goal = ty * W.TW + tx; gS[s] = 0; push(s, 0);
+    let n = 0;
+    while (heap.length && n < 120000) {
+      const k = pop(); if (fechado[k]) continue; fechado[k] = 1; n++;
+      if (k === goal) break;
+      const x = k % W.TW, y = (k / W.TW) | 0;
+      for (let d = 0; d < 4; d++) {
+        const nx = x + (d === 0 ? 1 : d === 1 ? -1 : 0), ny = y + (d === 2 ? 1 : d === 3 ? -1 : 0);
+        if (nx < lim.x0 || nx > lim.x1 || !caminhavel(nx, ny)) continue;
+        const nk = ny * W.TW + nx, g = gS[k] + 1; if (g < gS[nk]) { gS[nk] = g; vindo[nk] = k; push(nk, g + Math.abs(nx - tx) + Math.abs(ny - ty)); }
+      }
+    }
+    if (vindo[goal] < 0 && goal !== s) return null;
+    const pts = []; let k = goal; while (k !== s && k >= 0) { pts.push({ x: (k % W.TW + 0.5) * T, y: ((k / W.TW | 0) + 0.5) * T }); k = vindo[k]; }
+    pts.reverse(); F.stats.caminhos++;
+    // simplifica: só guarda as curvas
+    const out = []; for (let i = 0; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], c = pts[i + 1]; if (!a || !c || (b.x - a.x) !== (c.x - b.x) || (b.y - a.y) !== (c.y - b.y)) out.push(b); }
+    return out;
+  }
+  F.caminho = caminho;
+
+  // ---------- criação dos agentes ----------
+  const OLHOS = ['#f0c8a0', '#c89870', '#8a5a3a', '#e0b890'];
+  function novoAgente(rg, k) {
+    const x0 = (W.MG + rg.b0 * W.PITCH) - 1, x1 = (W.MG + (rg.b1 + 1) * W.PITCH + W.ROAD) + 1;
+    const ag = {
+      nome: rg.nome, id: rg.id, setor: rg.setor, lim: { x0, x1 }, estado: 'parado', t: 1 + k, rota: [], alvo: null, visitas: {}, scan: 0, aviso: -99, escondido: false,
+      ped: { x: 0, y: 0, h: 0, d: 0, state: 'walk', walk: 0, hp: 100, vx: 0, vy: 0, kind: 'fbi', speed: 95, timer: 0, downT: 0, fleeT: 0, armed: false, weapon: 'fist', look: { shirt: '#ffffff', skin: OLHOS[k % 4], hair: '#15110e', fem: false, hairStyle: 'curto', dress: false, pat: 'liso', sleeve: 'longa', shoe: '#0c0c10', acc: 'shades', accCol: '#101014', pants: '#101016' } }
+    };
+    // começa numa calçada da região
+    const sp = W.spots.filter(p => p.x / T >= x0 + 2 && p.x / T <= x1 - 2 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T)));
+    const p0 = sp.length ? sp[Math.floor(sp.length * 0.4)] : { x: W.nodeX(rg.b0 + 1), y: W.nodeY(1) };
+    ag.ped.x = ag.x = p0.x; ag.ped.y = ag.y = p0.y;
+    return ag;
+  }
+  REGIOES.forEach((r, k) => F.agentes.push(novoAgente(r, k)));
+
+  // ---------- o que cada agente visita ----------
+  function alvosDe(ag) {
+    const lista = [], dentro = x => x / T >= ag.lim.x0 && x / T <= ag.lim.x1;
+    W.places.forEach(pl => { if (pl.tipo !== 'casa' && pl.id !== 'casa' && dentro(pl.x)) lista.push({ tipo: 'lugar', id: 'p:' + pl.id, x: pl.x, y: pl.y + 4, pl }); });
+    G.cidade.lotes.forEach(l => { if (dentro(l.cx) && l.tam !== 'p') lista.push({ tipo: 'obra', id: 'o:' + l.id, x: l.tam === 'a' ? l.x + l.w / 2 : l.cx, y: l.y + l.h + 26, lote: l }); });
+    // pontos de calçada: vigilância de rua em todos os cantos da região
+    W.spots.forEach((p, i) => { if (dentro(p.x) && i % 3 === 0 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T))) lista.push({ tipo: 'rua', id: 's:' + i, x: p.x, y: p.y }); });
+    return lista;
+  }
+  function escolheAlvo(ag) {
+    const lista = alvosDe(ag); if (!lista.length) return null;
+    let best = null, bs = 1e18;
+    lista.forEach(a => { const v = ag.visitas[a.id] || 0, d = Math.hypot(a.x - ag.x, a.y - ag.y), s = v * 2200 + d + (a.tipo === 'lugar' ? -300 : a.tipo === 'obra' ? -150 : 0) + Math.random() * 80; if (s < bs) { bs = s; best = a; } });
+    return best;
+  }
+
+  // ---------- auditoria completa de um estabelecimento ----------
+  const palavras = s => String(s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^A-Z0-9]+/).filter(w => w.length > 3);
+  function auditaSala(ag, pl, sid, R) {
+    const probs = [], fonte = 'FBI ' + ag.nome, ms0 = Date.now();
+    const rep = (tipo, sev, msg, det) => { probs.push(tipo); F.stats.problemas++; O.registrar({ tipo, sev, fonte, msg: pl.nome + ' (' + sid + '): ' + msg, onde: G.cameras.onde(pl.x, pl.y), chave: tipo + ':' + pl.id + ':' + sid + ':' + (det && det.o || ''), detalhe: Object.assign({ lugar: pl.id, sala: sid, agente: ag.id }, det) }); };
+    if (!isFinite(R.W) || !isFinite(R.H) || R.W <= 0 || R.H <= 0) { rep('sala-tamanho', 3, 'tamanho inválido', { W: R.W, H: R.H }); return { probs }; }
+    // nome do letreiro x nome da sala
+    const pa = palavras(pl.nome), ra = palavras(R.nome);
+    if (R.nome && pa.length && !pa.some(w => ra.includes(w)) && !(R.subtitulo && palavras(R.subtitulo).some(w => pa.includes(w)))) rep('nome-nao-confere', 2, 'o letreiro diz "' + pl.nome + '" mas a sala se chama "' + R.nome + '"', { letreiro: pl.nome, sala: R.nome });
+    if (pl.horario && (!Array.isArray(pl.horario) || pl.horario.length !== 2 || pl.horario.some(h => !isFinite(h) || h < 0 || h > 24))) rep('horario-invalido', 2, 'horário de funcionamento inválido', { horario: pl.horario });
+    // porta de rua alcançável?
+    if (sid === 'entrada') {
+      const tx = Math.floor(pl.x / T), ty = Math.floor(pl.y / T);
+      if (!caminhavel(tx, ty)) rep('porta-bloqueada', 3, 'a porta da rua está sobre um tile que não dá para pisar', { tx, ty, tile: W.tiles[ty * W.TW + tx] });
+      else if (!caminhavel(tx, ty + 1) && !caminhavel(tx - 1, ty) && !caminhavel(tx + 1, ty)) rep('porta-ilhada', 2, 'a porta fica isolada (sem calçada em volta)', { tx, ty });
+    }
+    // objetos com números inválidos e alcançabilidade (grade de 16px)
+    let interativos = 0, alcancados = 0;
+    R.objs.forEach(o => { if (!isFinite(o.x + o.y + o.w + o.h)) rep('objeto-nan', 3, 'objeto "' + o.t + '" com coordenadas inválidas', { o: o.t }); });
+    const livre = (x, y) => {
+      if (x < R.x0 + 14 || x > R.x1 - 14 || y < R.y0 + 14) return false; if (y > R.y1 - 6 && Math.abs(x - R.portaX) > 30) return false;
+      for (const o of R.objs) if (o.solid && x > o.x - 10 && x < o.x + o.w + 10 && y > o.y - (o.e || 0) * 0.35 - 8 && y < o.y + o.h + 8) return false; return true;
+    };
+    const gw = Math.ceil((R.x1 - R.x0) / 16) + 2, gh = Math.ceil((R.y1 - R.y0 + 60) / 16) + 2, vis = new Uint8Array(gw * gh);
+    const cx = k => R.x0 + 8 + (k % gw) * 16, cy = k => R.y0 + 8 + ((k / gw) | 0) * 16;
+    const sx0 = clamp(Math.round((R.portaX - R.x0 - 8) / 16), 0, gw - 1), sy0 = clamp(Math.round((R.y1 - 40 - R.y0 - 8) / 16), 0, gh - 1);
+    if (!livre(R.portaX, R.y1 - 40)) rep('entrada-bloqueada', 3, 'o ponto de entrada da sala está bloqueado por um objeto', { x: R.portaX, y: R.y1 - 40 });
+    else {
+      const fila = [sy0 * gw + sx0]; vis[fila[0]] = 1;
+      for (let i = 0; i < fila.length; i++) { const k = fila[i], x = k % gw, y = (k / gw) | 0; [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) return; const nk = ny * gw + nx; if (!vis[nk] && livre(cx(nk), cy(nk))) { vis[nk] = 1; fila.push(nk); } }); }
+      const alcanca = (zx, zy, zw, zh, r) => { for (let k = 0; k < vis.length; k++) if (vis[k]) { const px = cx(k), py = cy(k), dx = Math.max(zx - px, 0, px - (zx + zw)), dy = Math.max(zy - py, 0, py - (zy + zh)); if (dx * dx + dy * dy < r * r) return true; } return false; };
+      R.objs.forEach(o => {
+        if (!(o.act || o.menu || o.t === 'cofre') || o.t === 'porta' || o.invisivel) return;   // portas ficam na parede: o jogo as usa de perto interativos++;
+        const z = o.zona || [o.x, o.y - (o.e || 0), o.w, o.h + (o.e || 0)];
+        if (alcanca(z[0], z[1], z[2], z[3], o.r || 34)) alcancados++; else rep('objeto-inalcancavel', 2, 'objeto "' + o.t + '" não dá para alcançar', { o: o.t + '@' + Math.round(o.x) + ',' + Math.round(o.y), x: Math.round(o.x), y: Math.round(o.y) });
+      });
+    }
+    R.npcs.forEach(n => {
+      if (!isFinite(n.x + n.y)) { rep('npc-nan', 3, 'NPC com posição inválida', { o: n.nome || 'npc' }); return; }
+      if (n.x < R.x0 - 4 || n.x > R.x1 + 4 || n.y > R.y1 + 30) rep('npc-fora', 2, 'NPC fora da sala (' + (n.nome || 'sem nome') + ')', { o: n.nome || 'npc', x: Math.round(n.x), y: Math.round(n.y) });
+      else if (!n.semColisao && R.objs.some(o => o.solid && !o.invisivel && o.t !== 'barreira' && n.x > o.x + 4 && n.x < o.x + o.w - 4 && n.y > o.y + 4 && n.y < o.y + o.h - 4 && o.t !== 'tapete' && !o.sentavel)) { /* gente atrás do balcão é normal */ }
+    });
+    const cams = G.cameras.camsDe(R).length;
+    if (pl.tipo !== 'casa' && !cams && !/^q\d/.test(sid)) rep('sem-camera', 2, 'sala sem câmera de segurança', { o: 'cam' });
+    return { probs, info: { sala: sid, dim: Math.round(R.W) + 'x' + Math.round(R.H), objetos: R.objs.length, interativos, alcancaveis: alcancados, npcs: R.npcs.length, cameras: cams, ms: Date.now() - ms0 } };
+  }
+  F.auditar = function (ag, pl) {
+    const salas = G.cameras.catalogo().filter(f => f.pl === pl), infos = []; let probs = 0;
+    salas.forEach(f => {
+      let R; try { R = L.salaVigiada(pl, f.sala); } catch (e) { probs++; F.stats.problemas++; O.registrar({ tipo: 'sala-erro', sev: 3, fonte: 'FBI ' + ag.nome, msg: pl.nome + ': a sala "' + f.sala + '" quebra ao abrir (' + String(e.message).slice(0, 80) + ')', onde: G.cameras.onde(pl.x, pl.y), chave: 'sala-erro:' + pl.id + ':' + f.sala, detalhe: { lugar: pl.id, sala: f.sala, pilha: String(e.stack || '').split('\n').slice(0, 5) } }); return; }
+      if (!R) return;
+      try { const r = auditaSala(ag, pl, f.sala, R); probs += r.probs.length; if (r.info) infos.push(r.info); F.stats.salas++; }
+      catch (e) { probs++; O.erro(e, 'auditoria ' + pl.id); }
+    });
+    F.stats.lugares++;
+    O.registrar({ tipo: 'auditoria', sev: probs ? 2 : 1, fonte: 'FBI ' + ag.nome, msg: ag.nome + ' entrou e auditou ' + pl.nome + ': ' + infos.length + ' sala(s), ' + infos.reduce((a, b) => a + b.cameras, 0) + ' câmera(s), ' + probs + ' problema(s)', onde: G.cameras.onde(pl.x, pl.y), chave: 'auditoria:' + pl.id, detalhe: { agente: ag.id, setor: ag.setor, salas: infos, aberto: pl.horario ? pl.horario.join('-') + 'h' : 'sempre' }, forcar: false });
+    return probs;
+  };
+
+  // armado na frente de um agente (vigiado o tempo todo, não só quando ele anda)
+  function vigiaArma(ag, S) {
+    const P = S.player, ref = P.car || P;
+    if (S.mode === 'play' && !P.car && (P.weapon === 'pistol' || P.weapon === 'smg' || P.weapon === 'shotgun') && Math.hypot(P.x - ag.x, P.y - ag.y) < 170 && S.time - ag.aviso > 25) {
+      ag.aviso = S.time; G.say(ag.nome.toUpperCase() + ' (FBI): "Largue essa arma agora!"', 3.5); G.addHeat(14);
+      G.cameras.registra('CRIME', ag.nome + ' viu o jogador armado na rua', 'crime', { x: P.x, y: P.y });
+    }
+  }
+
+  // ---------- olhar a rua (carros, gente, obras, pedágios) ----------
+  function olharRua(ag, S) {
+    F.stats.ruas++; const fonte = 'FBI ' + ag.nome; let vistos = 0;
+    S.cars.forEach(c => { if (!isFinite(c.x) || !isFinite(c.y) || Math.hypot(c.x - ag.x, c.y - ag.y) > 420) { if (isFinite(c.x) && isFinite(c.y)) return; } vistos++; O.diagnosticaCarro(c, S).forEach(d => O.trata(d, c, fonte, true)); });
+    S.peds.forEach(p => { if (isFinite(p.x) && Math.hypot(p.x - ag.x, p.y - ag.y) > 380) return; O.diagnosticaPed(p, S).forEach(d => O.trata(d, p, fonte, true)); });
+    G.pedagio.pracas.forEach(pr => { if (Math.abs((pr.x0 + pr.x1) / 2 - ag.x) < 900 && Math.abs(pr.mid - ag.y) < 700) pr.pistas.forEach(ps => { if (ps.ang != null && !isFinite(ps.ang)) O.registrar({ tipo: 'pedagio-cancela', sev: 3, fonte, msg: pr.nome + ': cancela com ângulo inválido', onde: G.cameras.onde(pr.x0, pr.mid) }); }); });
+    // quebrada? só informa
+    G.pedagio.pracas.forEach(pr => pr.pistas.forEach(ps => { if (ps.quebrada > 0 && Math.abs(ps.gx - ag.x) < 400 && Math.abs(pr.mid - ag.y) < 400) O.registrar({ tipo: 'pedagio-quebrado', sev: 2, fonte, msg: pr.nome + ': cancela quebrada à vista (manutenção chamada)', onde: G.cameras.onde(ps.gx, pr.mid), chave: 'pq:' + pr.nome }); }));
+    return vistos;
+  }
+
+  // ---------- movimento e rotina ----------
+  function atualizaAgente(ag, S, dt) {
+    const p = ag.ped;
+    if (ag.escondido) { ag.t -= dt; if (ag.t <= 0) { ag.escondido = false; ag.estado = 'parado'; ag.t = 0.4; p.x = ag.x; p.y = ag.y; } return; }
+    if (ag.estado === 'parado') {
+      ag.t -= dt; if (ag.t > 0) return;
+      const a = escolheAlvo(ag); if (!a) { ag.t = 3; return; }
+      ag.alvo = a; ag.visitas[a.id] = (ag.visitas[a.id] || 0) + 1;
+      const rota = caminho(ag.x, ag.y, a.x, a.y, ag.lim);
+      if (!rota || !rota.length) { ag.visitas[a.id] += 2; ag.t = 0.3; ag.falhas = (ag.falhas || 0) + 1; if (ag.falhas === 3) O.registrar({ tipo: 'agente-preso', sev: 2, fonte: 'FBI ' + ag.nome, msg: ag.nome + ' não achou caminho até ' + (a.pl ? a.pl.nome : a.id), chave: 'ap:' + ag.id + ':' + a.id, detalhe: { de: [Math.round(ag.x), Math.round(ag.y)], para: [Math.round(a.x), Math.round(a.y)] } }); return; }
+      ag.falhas = 0; ag.rota = rota; ag.estado = 'andando'; return;
+    }
+    if (ag.estado === 'andando') {
+      const q = ag.rota[0];
+      if (!q) { chegou(ag, S); return; }
+      const dx = q.x - ag.x, dy = q.y - ag.y, d = Math.hypot(dx, dy), v = 96 * dt;
+      if (d <= v) { ag.x = q.x; ag.y = q.y; ag.rota.shift(); }
+      else { ag.x += dx / d * v; ag.y += dy / d * v; p.walk += v * 0.22; const h = Math.atan2(dy, dx) + Math.PI / 2; p.h += Math.atan2(Math.sin(h - p.h), Math.cos(h - p.h)) * Math.min(1, 10 * dt); }
+      p.x = ag.x; p.y = ag.y;
+      ag.scan -= dt; if (ag.scan <= 0) { ag.scan = 1.3; olharRua(ag, S); }
+      return;
+    }
+    if (ag.estado === 'olhando') {
+      ag.t -= dt; p.walk = 0;
+      if (ag.t <= 0) { ag.estado = 'parado'; ag.t = 0.3; }
+    }
+  }
+  function chegou(ag, S) {
+    const a = ag.alvo;
+    if (a && a.tipo === 'lugar') {
+      ag.estado = 'dentro'; ag.escondido = true; ag.t = 6 + Math.random() * 4;
+      try { F.auditar(ag, a.pl); } catch (e) { O.erro(e, 'FBI auditar ' + a.pl.id); }
+      return;
+    }
+    if (a && a.tipo === 'obra') {
+      const l = a.lote, e = l.est || C.estadoDe(l);
+      O.registrar({ tipo: 'inspecao-obra', sev: 1, fonte: 'FBI ' + ag.nome, msg: ag.nome + ' inspecionou a obra ' + (l.proj.nome || l.proj.tipo) + ' — ' + C.faseNome(e) + ' ' + Math.round(e.p * 100) + '%', onde: G.cameras.onde(l.cx, l.cy), chave: 'insp:' + l.id, detalhe: { lote: l.id, tipo: l.proj.tipo, fase: e.f, progresso: Math.round(e.p * 100), geral: Math.round(e.g * 100), terminaEm: Math.max(0, Math.round(l.proj.inicio + l.proj.dur - C.t)) + 's' } });
+    }
+    ag.estado = 'olhando'; ag.t = 2 + Math.random() * 2;
+  }
+  G.extras.add((S, dt) => { for (const ag of F.agentes) { try { atualizaAgente(ag, S, dt); if (!ag.escondido) vigiaArma(ag, S); } catch (e) { ag.estado = 'parado'; ag.t = 5; ag.escondido = false; O.erro(e, 'agente ' + ag.nome); } } });
+
+  // ---------- desenho: agentes na rua ----------
+  F.desenhar = function (ctx, S, inV, t) {
+    F.agentes.forEach(ag => {
+      if (ag.escondido || !inV(ag)) return;
+      if (!ag.ped.shirt) Object.assign(ag.ped, ag.ped.look);   // o sprite lê as cores direto do pedestre
+      SP.drawPed(ctx, ag.ped, t);
+      const near = Math.hypot(S.player.x - ag.x, S.player.y - ag.y) < 260;
+      ctx.save(); ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center';
+      const nm = near ? 'FBI · ' + ag.nome.replace('Agente ', '').toUpperCase() : 'FBI', w = ctx.measureText(nm).width + 8;
+      ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(ag.x - w / 2, ag.y - 24, w, 10); ctx.fillStyle = '#ffe04a'; ctx.fillText(nm, ag.x, ag.y - 16.5); ctx.restore();
+    });
+  };
+  F.dentroDe = pl => F.agentes.find(a => a.escondido && a.alvo && a.alvo.pl === pl) || null;
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* ============================================================
    game.js — laço principal, jogador, polícia, colisões, câmera e telas
    ============================================================ */
 (function (G) {
@@ -6133,7 +7685,7 @@
   window.addEventListener('keydown', e => { onKey(e, true); G.snd.init(); });
   window.addEventListener('keyup', e => onKey(e, false));
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (S.mode === 'play') S.mode = 'paused'; });
-  const K = (...c) => c.some(x => keys[x]);
+  const K = (...c) => !(G.overlay && G.overlay.atual) && c.some(x => keys[x]);   // com uma tela por cima (câmeras, Olho), o jogo não recebe teclas
   const Kp = (...c) => c.some(x => pressed[x]);
 
   // ---------- Atualização ----------
@@ -6392,6 +7944,8 @@
 
   function update(dt) {
     S.time += dt; S.dayT += dt / 420;
+    G.cidade.atualizar(S, dt);
+    if (G.extras) G.extras.atualizar(S, dt);
     if (S.msg) { S.msg.t -= dt; if (S.msg.t <= 0) S.msg = null; }
     if (S.ban) { S.ban.t -= dt; if (S.ban.t <= 0) S.ban = null; }
     if (S.radioT > 0) S.radioT -= dt;
@@ -6435,6 +7989,8 @@
     const vx0 = cam.x - VW / 2 / z - 40, vy0 = cam.y - VH / 2 / z - 40, vx1 = cam.x + VW / 2 / z + 40, vy1 = cam.y + VH / 2 / z + 40;
     W.drawChunks(ctx, vx0, vy0, vx1, vy1);
     W.drawWaterFx(ctx, S.time, vx0, vy0, vx1, vy1);   // brilhos na água
+    G.cidade.desenhar(ctx, S, vx0, vy0, vx1, vy1, S.time);   // obras, prédios novos, pontes e aeroporto
+    if (G.pedagio) G.pedagio.desenhar(ctx, S, vx0, vy0, vx1, vy1, S.time);
     const inV = o => o.x > vx0 - 80 && o.x < vx1 + 80 && o.y > vy0 - 80 && o.y < vy1 + 80;
     G.combat.drawDecals(ctx, S, inV);       // sangue, marcas de pneu e chamuscado
     M.drawWorld(ctx, S, S.time);
@@ -6445,6 +8001,7 @@
     const cars = S.cars.filter(inV).sort((a, b) => (a.dead ? 0 : 1) - (b.dead ? 0 : 1));
     cars.forEach(c => SP.drawCar(ctx, c, S.time));
     vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
+    if (G.fbi) G.fbi.desenhar(ctx, S, inV, S.time);   // agentes do FBI patrulhando
     if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
     G.detalhes.draw(ctx, S, inV);            // pombos
     G.lugares.desenhar(ctx, S, inV);         // marcadores dos lugares, balões de fala, seta do guia
@@ -6463,6 +8020,9 @@
       else { ctx.globalAlpha = k; ctx.fillStyle = '#ffd86a'; ctx.fillRect(-1.5, -1.5, 3, 3); }
       ctx.restore();
     });
+    G.cidade.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);   // guindastes e aviões no ar
+    if (G.pedagio) G.pedagio.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);
+    if (G.cameras) G.cameras.desenharRua(ctx, S, vx0, vy0, vx1, vy1, S.time);
     // helicóptero
     const h = S.heli;
     if (h) {
@@ -6526,8 +8086,8 @@
     const L = [
       ['A PÉ', 'WASD / Setas andar  Shift correr  Espaço atacar/atirar  Q ou 1-6 trocam de arma  E usar'],
       ['DE CARRO', 'W/↑ acelera  S/↓ freio e ré  A D ←→ virar  Espaço freio de mão  H buzina  E sair'],
-      ['OUTROS', 'R rádio   M som   P pausa   V gráficos'],
-      ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Arme-se na loja rosa!'],
+      ['OUTROS', 'R rádio   M som   P pausa   V gráficos   C CENTRAL DE CÂMERAS   F9 relatórios (Olho de Deus)'],
+      ['OBJETIVO', 'Faça as 12 missões nos telefones amarelos e vire o REI DA CIDADE. Atravesse a ponte (pedágio!) e veja as obras.'],
       ['POLÍCIA', 'Crime na frente da polícia dá PROCURADO. Eles descem e atiram. Fuja ou lute!'],
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(40, 320, 720, 230);
@@ -6544,6 +8104,7 @@
   function startGame(fresh) {
     if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
     G.snd.init(); newWorld(); S.mode = 'play';
+    G.cidade.carregar(S);   // a cidade continua de onde parou
   }
   function frame(ts) {
     requestAnimationFrame(frame);
@@ -6572,18 +8133,20 @@
       for (const k in pressed) delete pressed[k];
       return;
     }
+    G.overlay.entrada(S, pressed);
     G.lugares.atualizarTrans(S, dt);
     if (S.mode === 'inside') {
       // dentro de um lugar (barbearia, teatro, casa...): outra tela, outro mundo
       if (S.msg) { S.msg.t -= dt; if (S.msg.t <= 0) S.msg = null; }
       if (S.radioT > 0) S.radioT -= dt;
+      G.cidade.atualizar(S, dt); if (G.extras) G.extras.atualizar(S, dt);
       G.lugares.atualizarDentro(S, dt, K, Kp);
       if (Kp('KeyR')) { G.snd.nextStation(); S.radioT = 3; }
       if (Kp('KeyM')) G.say(G.snd.mute() ? 'Som desligado' : 'Som ligado', 2);
       G.snd.update({ inCar: false, car: null, horn: false, sirenVol: 0 });
       if (S.mode === 'inside') G.lugares.desenharDentro(ctx, S);
       else { updateCamera(dt); drawWorld(); G.hud.draw(ctx, S, S.time); G.lugares.hudMochila(ctx, S); }
-      G.lugares.desenharTrans(ctx, S);
+      G.lugares.desenharTrans(ctx, S); G.overlay.desenhar(ctx, S, dt);
       for (const k in pressed) delete pressed[k];
       return;
     }
@@ -6598,7 +8161,7 @@
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
     if (S.mode === 'shop') G.combat.drawShop(ctx, S);
     if (S.mode === 'paused') drawOverlay('PAUSADO', 'P ou ENTER para continuar', '#ffe04a');
-    G.lugares.desenharTrans(ctx, S);
+    G.lugares.desenharTrans(ctx, S); G.overlay.desenhar(ctx, S, dt);
     for (const k in pressed) delete pressed[k];
   }
 

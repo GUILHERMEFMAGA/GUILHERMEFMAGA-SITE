@@ -26,6 +26,8 @@ python -m http.server 8080      # depois abra http://localhost:8080
 | Q · 1 a 6 | trocar de arma (punhos, taco, pistola, SMG, escopeta, granada) |
 | F | (dentro de casas e lugares, com arma na mão) **ameaçar** um morador ou atendente e levar o dinheiro dele |
 | X | comer algo da mochila (cura; energético faz você correr mais) |
+| C | **Central de Câmeras**: setas escolhem, Enter tela cheia, TAB filtro (prédios/ruas/obras), T mostra o timelapse das obras, Esc sai |
+| F9 | **Olho de Deus**: relatórios, saúde do jogo, obras e gravações (TAB abas, Enter detalhes, F filtro, **D baixa o JSON** com tudo, X limpa) |
 | E | entrar em carro (qualquer um!), atender telefone, pegar o carro na garagem, **comprar na loja de armas** (prédio rosa, perto da garagem), **entrar nos lugares**, usar objetos da rua e conversar com pedestres |
 
 | De carro | |
@@ -150,3 +152,16 @@ Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes d
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |
+
+
+## Mapa gigante, pedágio e cidade em obras
+- O mapa tem 17×6 quadras (10368 × 4032 px). **Ribeirão** fica a oeste; atravessando a **ponte com pedágio** você chega a **Novo Horizonte** e, mais adiante, a **Vale Verde**. Pedágio: $15 / $25. Sem pagar, a cancela fecha; forçar passagem rende procurado.
+- Essas cidades estão **em construção de verdade** (`cidade.js`): terrenos viram canteiros (tapume, grua, andaimes, operários), depois prédios prontos com interior, funcionando: comércios, hotéis, hospital, escola, shopping, fábrica, empresas, escritórios e casas. O **aeroporto** (pista, terminal e avião) cresce na última quadra. NPCs constroem **novas pontes** para outras margens, e tudo continua evoluindo com o tempo (a Central de Câmeras mostra o timelapse).
+- Ruas com árvores enfileiradas nas quadras novas.
+
+## Câmeras (`cameras.js`)
+73 câmeras: corredores e salas dos mercados, hotéis, banco, loja e demais lugares (exceto casas), mais câmeras de rua, pedágios e obras. Dentro das lojas a câmera mostra a cena de verdade, com os atendentes e clientes.
+
+## Olho de Deus e agentes do FBI (`olho.js`, `fbi.js`)
+- O **Olho de Deus** é invisível no jogo (só um "F9" pequeno no canto). A cada segundo observa carros, pedestres, jogador, salas, dinheiro, obras e erros de JavaScript. **Conserta sozinho** o que dá (carro NaN, carro na parede, carro travado, pedestre preso...) e guarda um **super cache** com hora, local, entidade e snapshot de cada caso (salvo em `localStorage`).
+- Quatro **agentes do FBI** (Cruz, Lima, Rocha e Duarte), de terno e óculos, andam pelas calçadas do mapa inteiro, **entram em cada estabelecimento** (hotéis, mercados, bancos...), conferem nomes, tamanho, objetos inalcançáveis, NPCs e câmeras, inspecionam as obras e **reportam os erros** ao Olho. Se você passar armado perto de um agente, ele grita e você ganha procurado.

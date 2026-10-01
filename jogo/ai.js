@@ -49,14 +49,16 @@
     return nav;
   }
 
+  // rios sem ponte nessa rua: o carro não pode seguir naquele sentido (só as pontes ligam as margens)
+  const okH = (i, j, hd) => W.cruzaOk(hd > 0 ? i : i - 1, j);
   function chooseManeuver(car) {
     const n = car.nav, i = n.ni, j = n.nj, d = n.dir, opts = [];
     if (n.axis === 'v') {
       if (d > 0 ? j < ROWS : j > 0) opts.push({ k: 's', ni: i, nj: j + d });
       const rh = d > 0 ? -1 : 1;
-      [[rh, 'r'], [-rh, 'l']].forEach(([hd, k]) => { if (hd > 0 ? i < COLS : i > 0) opts.push({ k, axis: 'h', dir: hd, ni: i + hd, nj: j, trig: W.laneH(j, hd) }); });
+      [[rh, 'r'], [-rh, 'l']].forEach(([hd, k]) => { if ((hd > 0 ? i < COLS : i > 0) && okH(i, j, hd)) opts.push({ k, axis: 'h', dir: hd, ni: i + hd, nj: j, trig: W.laneH(j, hd) }); });
     } else {
-      if (d > 0 ? i < COLS : i > 0) opts.push({ k: 's', ni: i + d, nj: j });
+      if ((d > 0 ? i < COLS : i > 0) && okH(i, j, d)) opts.push({ k: 's', ni: i + d, nj: j });
       const rv = d > 0 ? 1 : -1;
       [[rv, 'r'], [-rv, 'l']].forEach(([vd, k]) => { if (vd > 0 ? j < ROWS : j > 0) opts.push({ k, axis: 'v', dir: vd, ni: i, nj: j + vd, trig: W.laneV(i, vd) }); });
     }
@@ -71,6 +73,7 @@
       for (const o of opts) { r -= wt[o.k]; if (r <= 0) { m = o; break; } }
       if (!m) m = opts[0];
     }
+    if (!m) m = { k: 's', ni: n.ni, nj: n.nj };   // sem opção: o carro fica parado até alguém resolver (o Olho de Deus vê isso)
     m = Object.assign({}, m);
     if (m.k === 's') m.trig = nodeCoord(n);
     return m;
