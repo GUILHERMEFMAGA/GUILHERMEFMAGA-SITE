@@ -20,6 +20,8 @@
   const PHONES = [
     W.sidePoint(0, 2, 'right', 0.3), W.sidePoint(2, 0, 'bottom', 0.7),
     W.sidePoint(4, 3, 'top', 0.3), W.sidePoint(5, 1, 'left', 0.6),
+    // telefones dos bairros novos (mapa dobrado)
+    W.sidePoint(7, 0, 'bottom', 0.4), W.sidePoint(8, 2, 'left', 0.5), W.sidePoint(2, 5, 'top', 0.6), W.sidePoint(6, 4, 'right', 0.5), W.sidePoint(4, 5, 'left', 0.4),
   ].map(p => Object.assign(p, { r: 40 }));
 
   // ---------- Definições das 12 missões ----------

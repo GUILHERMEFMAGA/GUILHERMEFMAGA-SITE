@@ -316,6 +316,13 @@
     // combate: mortos, caídos, atiradores e guardas são tratados em combat.js
     if (G.combat && G.combat.updatePed(p, dt, S)) return;
     if (p.talkT > 0 && p.state === 'walk') { p.walk = 0; return; }   // parou para conversar com você
+    // pedestre com destino marcado (ex.: dono do carro indo até a porta do mercado)
+    if (p.alvoMov && p.state === 'walk') {
+      const dx = p.alvoMov.x - p.x, dy = p.alvoMov.y - p.y, d = Math.hypot(dx, dy);
+      if (d < 10) { const f = p.fimMov; p.alvoMov = null; p.fimMov = null; if (f) f(p, S); return; }
+      p.x += dx / d * 52 * dt; p.y += dy / d * 52 * dt; p.walk += 52 * dt * 0.22;
+      p.h += wrap(Math.atan2(dy, dx) + Math.PI / 2 - p.h) * Math.min(1, 10 * dt); return;
+    }
     // susto com carros rápidos
     if (p.state === 'walk') for (const c of S.cars) {
       if (Math.abs(c.x - p.x) > 80 || Math.abs(c.y - p.y) > 80) continue;

@@ -63,6 +63,7 @@
     G.missions.PHONES.forEach(p => dot(p.x, p.y, G.missions.active ? '#4a88ff' : '#ffe04a', 2.5));
     const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     G.world.places.forEach(pl => dot(pl.x, pl.y, pl.cor, 2.5));
+    G.world.casas.forEach(c => { if (c.semPorta) return; const mine = S.save.casas && S.save.casas[c.id]; if (mine) dot(c.x, c.y, '#9dff9d', 2); else if (c.venda) dot(c.x, c.y, '#ff4a4a', 1.5); });   // casas suas (verde) e à venda (vermelho)
     if (S.guia) { const gp = G.world.places.find(q => q.id === S.guia.id); if (gp) dot(gp.x, gp.y, Math.floor(time * 5) % 2 ? '#ffffff' : gp.cor, 4); }
     S.cars.forEach(c => { if (c.kind === 'police' && !c.dead && c.mode !== 'wander') dot(c.x, c.y, Math.floor(time * 6) % 2 ? '#ff3030' : '#3a5bff', 2); });
     S.peds.forEach(p => { if ((p.kind === 'cop' || p.target) && p.state !== 'dead') dot(p.x, p.y, p.kind === 'cop' ? '#5a7bff' : '#ff3030', 1.5); });

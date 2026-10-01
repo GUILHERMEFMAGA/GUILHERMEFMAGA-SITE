@@ -12,7 +12,7 @@
   const ROAD = 6;        // largura da rua (tiles) = 2 faixas de 3 tiles
   const BLOCK = 12;      // lado de uma quadra (tiles)
   const PITCH = ROAD + BLOCK;
-  const COLS = 6, ROWS = 4;  // quadras na horizontal / vertical
+  const COLS = 9, ROWS = 6;  // quadras na horizontal / vertical (mapa dobrado: bairros novos a leste e ao sul)
   const RIVER = 3;       // coluna de quadras ocupada pelo rio
   const MG = 6;          // margem fora das ruas (calçada + prédios)
   const INNER_W = COLS * PITCH + ROAD;
@@ -21,7 +21,7 @@
   const W = TW * T, H = TH * T;
 
   // tipos de tile
-  const TILE = { ROAD: 0, SIDE: 1, BUILD: 2, GRASS: 3, WATER: 4, BRIDGE: 5, CROSS: 6 };
+  const TILE = { ROAD: 0, SIDE: 1, BUILD: 2, GRASS: 3, WATER: 4, BRIDGE: 5, CROSS: 6, LOT: 7 };   // LOT = estacionamento
 
   const tiles = new Uint8Array(TW * TH).fill(TILE.BUILD);
   const setRect = (tx, ty, tw, th, type) => {
@@ -101,38 +101,91 @@
   setRect(MG - 2, MG - 2, INNER_W + 4, INNER_H + 4, TILE.SIDE);
   setRect(MG, MG, INNER_W, INNER_H, TILE.ROAD);
 
-  const PARKS = [[1, 1], [5, 3]];
-  for (let by = 0; by < ROWS; by++) {
-    for (let bx = 0; bx < COLS; bx++) {
-      const tx = MG + ROAD + bx * PITCH, ty = MG + ROAD + by * PITCH;
-      let kind = 'city';
-      if (bx === RIVER) kind = 'river';
-      else if (PARKS.some(p => p[0] === bx && p[1] === by)) kind = 'park';
-      const blk = { bx, by, tx, ty, x: tx * T, y: ty * T, w: BLOCK * T, h: BLOCK * T, kind };
-      blocks.push(blk);
-      if (kind === 'river') {
-        setRect(tx, ty, BLOCK, BLOCK, TILE.WATER);
-      } else {
-        setRect(tx, ty, BLOCK, BLOCK, TILE.SIDE);
-        if (kind === 'city') {
-          setRect(tx + 2, ty + 2, 8, 8, TILE.BUILD);
-          partition(tx + 2, ty + 2, 8, 8);
-        } else {
-          setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
-          // lago
-          const cx = tx + 6, cy = ty + 6;
-          for (let y = ty + 2; y < ty + 10; y++) for (let x = tx + 2; x < tx + 10; x++) {
-            const dx = (x + 0.5 - cx) / 2.6, dy = (y + 0.5 - cy) / 2.0;
-            if (dx * dx + dy * dy <= 1) tiles[y * TW + x] = TILE.WATER;
-          }
-          ponds.push({ x: cx * T, y: cy * T, rx: 2.6 * T, ry: 2.0 * T });
-          // árvores nos cantos do parque
-          const tp = [[2.9, 2.9], [9.1, 2.9], [2.9, 9.1], [9.1, 9.1], [6, 2.7], [6, 9.3]];
-          tp.forEach(([a, b]) => trees.push({ x: (tx + a) * T, y: (ty + b) * T, r: 22 + rnd() * 6 }));
-        }
+  const PARKS = [[1, 1], [5, 3], [7, 3]];
+  const places = [];          // lugares grandes e comércios (dá para entrar)
+  const casas = [];           // todas as casas (dá para entrar em todas!)
+  const mercados = [];        // supermercados com estacionamento
+  const ESPECIAIS = { '6,1': 'mercado', '8,4': 'mercado', '1,4': 'hotel', '5,4': 'hotel', '0,5': 'hotel', '7,5': 'hotel' };
+  const MERCADOS_DEF = [
+    { id: 'mercadao', nome: 'MERCADÃO', cor: '#2e8b3e', horario: [6, 22] },
+    { id: 'atacadao', nome: 'ATACADÃO', cor: '#d9a40a', horario: [7, 21] }
+  ];
+  const HOTEIS_DEF = {
+    '1,4': { id: 'hotel_grand', nome: 'GRAND HOTEL RIBEIRÃO', cor: '#c8a24a', nivel: 'luxo', estrelas: 5 },
+    '5,4': { id: 'hotel_central', nome: 'HOTEL CENTRAL', cor: '#3a7ad3', nivel: 'medio', estrelas: 3 },
+    '7,5': { id: 'hotel_estrela', nome: 'HOTEL ESTRELA', cor: '#7a8a3a', nivel: 'simples', estrelas: 2 },
+    '0,5': { id: 'hotel_pensao', nome: 'PENSÃO DO ZÉ', cor: '#8a5a3a', nivel: 'feio', estrelas: 1 }
+  };
+  // a porta fica na calçada, embaixo da fachada: precisa de chão livre na frente
+  const temFrente = b => {
+    const cx = Math.floor((b.x + b.w / 2) / T);
+    return tiles[Math.floor((b.y + b.h + 10) / T) * TW + cx] !== TILE.BUILD && tiles[Math.floor((b.y + b.h + 26) / T) * TW + cx] !== TILE.BUILD
+      && tiles[Math.floor((b.y + b.h + 10) / T) * TW + cx] !== TILE.WATER;
+  };
+  function addCasa(b) {
+    const n = casas.length, area = b.w * b.h / (T * T), hr = mulberry32(1000 + n * 37);
+    const c = { id: 'c' + n, tipo: 'casa', nome: 'CASA', b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 30, seed: 1000 + n * 37, area: Math.round(area) };
+    c.venda = hr() < 0.16; c.preco = Math.round((1200 + area * 26) / 100) * 100;
+    b.casa = c; casas.push(c);
+  }
+  function criarBloco(bx, by) {
+    const tx = MG + ROAD + bx * PITCH, ty = MG + ROAD + by * PITCH, key = bx + ',' + by;
+    let kind = 'city';
+    if (bx === RIVER) kind = 'river';
+    else if (PARKS.some(p => p[0] === bx && p[1] === by)) kind = 'park';
+    else if (ESPECIAIS[key]) kind = ESPECIAIS[key];
+    else if ((bx >= 6 || by >= 4) && (bx * 5 + by * 3) % 4 !== 0) kind = 'vila';
+    const blk = { bx, by, tx, ty, x: tx * T, y: ty * T, w: BLOCK * T, h: BLOCK * T, kind };
+    blocks.push(blk);
+    if (kind === 'river') { setRect(tx, ty, BLOCK, BLOCK, TILE.WATER); return; }
+    setRect(tx, ty, BLOCK, BLOCK, TILE.SIDE);
+    if (kind === 'city') {
+      setRect(tx + 2, ty + 2, 8, 8, TILE.BUILD);
+      const antes = buildings.length;
+      partition(tx + 2, ty + 2, 8, 8);
+      for (let k = antes; k < buildings.length; k++) { const b = buildings[k]; if (b.p.kind !== 'flat' && temFrente(b)) addCasa(b); }
+    } else if (kind === 'vila') {
+      // 4 casinhas separadas por vielas em cruz: todas têm porta para uma calçada
+      [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c]) => {
+        setRect(tx + 2 + a, ty + 2 + c, 3, 3, TILE.BUILD);
+        addBuilding((tx + 2 + a) * T + 5, (ty + 2 + c) * T + 5, 3 * T - 10, 3 * T - 10, 3 + Math.floor(rnd() * 4));
+        addCasa(buildings[buildings.length - 1]);
+      });
+    } else if (kind === 'mercado') {
+      const def = MERCADOS_DEF[mercados.length];
+      setRect(tx + 1, ty + 1, 10, 5, TILE.BUILD);
+      addBuilding((tx + 1) * T + 5, (ty + 1) * T + 5, 10 * T - 10, 5 * T - 10, 1);
+      const b = buildings[buildings.length - 1]; b.det = [{ fx: 0.2, fy: 0.5, t: 'ac' }, { fx: 0.5, fy: 0.5, t: 'ac' }, { fx: 0.8, fy: 0.5, t: 'vent' }]; b.mercado = def;
+      setRect(tx, ty + 6, 12, 6, TILE.LOT);
+      const lotTop = (ty + 6) * T, vagas = [];
+      for (let i = 0; i < 8; i++) { const x = blk.x + 24 + i * 40; vagas.push({ x, y: lotTop + 66, a: 0, fila: 'A', i }); vagas.push({ x, y: lotTop + 164, a: Math.PI, fila: 'B', i }); }
+      const pl = Object.assign({}, def, { tipo: 'mercado', b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 40 });
+      b.place = pl; places.push(pl);
+      const m = { def, place: pl, blk, vagas, lotTop, gateX: blk.x + 354, aisleY: lotTop + 114, laneY: blk.y + blk.h + 1.5 * T, j: by + 1 };
+      blk.mercado = m; mercados.push(m);
+      lamps.push({ x: blk.x + 14, y: lotTop + 14 }, { x: blk.x + blk.w - 14, y: lotTop + 14 }, { x: blk.x + 14, y: lotTop + 112 }, { x: blk.x + blk.w - 14, y: lotTop + 112 });
+    } else if (kind === 'hotel') {
+      const def = HOTEIS_DEF[key];
+      setRect(tx + 1, ty + 1, 10, 9, TILE.BUILD);
+      addBuilding((tx + 1) * T + 5, (ty + 1) * T + 5, 10 * T - 10, 9 * T - 10, def.nivel === 'feio' ? 0 : 1);
+      const b = buildings[buildings.length - 1]; b.det = []; b.hotel = def; blk.hotel = def;
+      const pl = Object.assign({}, def, { tipo: 'hotel', b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 40 });
+      b.place = pl; places.push(pl);
+    } else {
+      setRect(tx + 2, ty + 2, 8, 8, TILE.GRASS);
+      const cx = tx + 6, cy = ty + 6;
+      for (let y = ty + 2; y < ty + 10; y++) for (let x = tx + 2; x < tx + 10; x++) {
+        const dx = (x + 0.5 - cx) / 2.6, dy = (y + 0.5 - cy) / 2.0;
+        if (dx * dx + dy * dy <= 1) tiles[y * TW + x] = TILE.WATER;
       }
+      ponds.push({ x: cx * T, y: cy * T, rx: 2.6 * T, ry: 2.0 * T });
+      const tp = [[2.9, 2.9], [9.1, 2.9], [2.9, 9.1], [9.1, 9.1], [6, 2.7], [6, 9.3]];
+      tp.forEach(([a, b]) => trees.push({ x: (tx + a) * T, y: (ty + b) * T, r: 22 + rnd() * 6 }));
     }
   }
+  // primeiro a cidade antiga (sempre igual), depois os bairros novos
+  for (let by = 0; by < 4; by++) for (let bx = 0; bx < 6; bx++) criarBloco(bx, by);
+  for (let by = 0; by < ROWS; by++) for (let bx = 0; bx < COLS; bx++) if (!(bx < 6 && by < 4)) criarBloco(bx, by);
   // pontes e faixas de pedestre
   const rv = blocks.find(b => b.kind === 'river');
   for (let j = 0; j <= ROWS; j++) setRect(rv.tx, MG + j * PITCH, BLOCK, ROAD, TILE.BRIDGE);
@@ -168,13 +221,12 @@
 
   // ---------- Lugares da nossa cidade (dá para entrar!) ----------
   const PLACE_DEFS = [
-    { id: 'pinguim', nome: 'PINGUIM', cor: '#1d5fb4' }, { id: 'mercadao', nome: 'MERCADÃO', cor: '#2e8b3e' },
+    { id: 'pinguim', nome: 'PINGUIM', cor: '#1d5fb4' }, { id: 'banco', nome: 'BANCO', cor: '#2a5a9a' }, { id: 'padaria', nome: 'PADARIA', cor: '#c8782a' }, { id: 'pizzaria', nome: 'PIZZARIA', cor: '#b02a2a' },
     { id: 'farmacia', nome: 'FARMÁCIA', cor: '#d9363e' }, { id: 'barbearia', nome: 'BARBEARIA', cor: '#7b3fa0' },
     { id: 'shopping', nome: 'SHOPPING', cor: '#e07b1a' }, { id: 'teatro', nome: 'TEATRO PEDRO II', cor: '#8a1f3a' },
     { id: 'casa', nome: 'MINHA CASA', cor: '#44607a' }, { id: 'academia', nome: 'ACADEMIA', cor: '#b8960c' },
     { id: 'catedral', nome: 'CATEDRAL', cor: '#6a6a78' }
   ];
-  const places = [];
   (function () {
     const excl = new Set(['0,0', '1,0', '4,1', '2,0']);   // quadras que já têm garagem, loja de armas, hospital e telefone
     const elig = [];
@@ -196,7 +248,7 @@
       let i = Math.floor(k * elig.length / PLACE_DEFS.length);
       for (let g = 0; g < elig.length && used.has(i % elig.length); g++) i++;
       i %= elig.length; if (!elig.length || used.has(i)) return; used.add(i);
-      const b = elig[i], p = Object.assign({}, df, { b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 38 });
+      const b = elig[i], p = Object.assign({ tipo: 'lugar' }, df, { b, x: b.x + b.w / 2, y: b.y + b.h + 24, r: 38 });
       b.place = p; places.push(p);
     });
   })();
@@ -218,7 +270,7 @@
     return false;
   }
   const isRoadTile = t => t === TILE.ROAD || t === TILE.BRIDGE || t === TILE.CROSS;
-  const pedWalkable = t => t === TILE.SIDE || t === TILE.CROSS || t === TILE.GRASS;
+  const pedWalkable = t => t === TILE.SIDE || t === TILE.CROSS || t === TILE.GRASS || t === TILE.LOT;
 
   // ---------- Desenho ----------
   const tex = {};
@@ -274,7 +326,7 @@
   }
 
   // altura da parede (fachada) que aparece embaixo do telhado — dá o efeito 2.5D
-  function fachada(b) { if (b.place) return Math.min(36, Math.floor(b.h * 0.34)); return b.p.kind === 'tile' ? Math.min(20, Math.floor(b.h * 0.26)) : Math.min(30, Math.floor(b.h * 0.3)); }
+  function fachada(b) { if (b.hotel) return 54; if (b.mercado) return 46; if (b.place) return Math.min(36, Math.floor(b.h * 0.34)); return b.p.kind === 'tile' ? Math.min(20, Math.floor(b.h * 0.26)) : Math.min(30, Math.floor(b.h * 0.3)); }
 
   // parede de frente do prédio: degradê, janelas com reflexo, porta e sombra do beiral
   function drawFacade(ctx, b, fh) {
@@ -302,7 +354,7 @@
     ctx.fillStyle = '#5a3d28'; ctx.fillRect(x + w / 2 - dw / 2, y + fh - 16, dw, 16);
     ctx.fillStyle = '#c8a24a'; ctx.fillRect(x + w / 2 + 4, y + fh - 9, 2, 2);
     if (b.place) { // letreiro do lugar (dá para entrar!)
-      const sw = Math.min(w - 16, 92), sx = x + w / 2 - sw / 2, sy = y + 2;
+      const sw = Math.min(w - 16, b.place.tipo === 'lugar' ? 92 : 170), sx = x + w / 2 - sw / 2, sy = y + 2;
       ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(sx + 1.5, sy + 2.5, sw, 10);
       const sg = ctx.createLinearGradient(0, sy, 0, sy + 10); sg.addColorStop(0, shade(b.place.cor, 0.25)); sg.addColorStop(1, shade(b.place.cor, -0.2));
       ctx.fillStyle = sg; ctx.fillRect(sx, sy, sw, 10); ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 0.8; ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, 9);
@@ -320,6 +372,34 @@
     ctx.fillStyle = 'rgba(190,190,200,0.7)'; ctx.fillRect(x + 3, y + 3, 2, fh - 3); ctx.fillRect(x + w - 5, y + 3, 2, fh - 3); // canos de chuva
   }
 
+  // telhados especiais: hotel (piscina, heliponto) e mercado (letreiro gigante)
+  function roofEspecial(ctx, b, fh) {
+    const { x, y, w } = b, h = b.h - fh;
+    if (b.mercado) {
+      ctx.save(); ctx.fillStyle = b.mercado.cor; ctx.globalAlpha = 0.92; ctx.fillRect(x + 20, y + 14, w - 40, 30); ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 26px Arial Black, Arial'; ctx.textAlign = 'center'; ctx.fillText(b.mercado.nome, x + w / 2, y + 38);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let k = 0; k < 6; k++) ctx.fillRect(x + 24 + k * ((w - 60) / 5), y + 56, 22, 12);   // claraboias
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 6; k++) ctx.strokeRect(x + 24.5 + k * ((w - 60) / 5), y + 56.5, 22, 12);
+      ctx.restore();
+    } else if (b.hotel) {
+      const lv = b.hotel.nivel;
+      ctx.save();
+      if (lv === 'luxo' || lv === 'medio') {
+        const pw = w * 0.5, ph = h * 0.26, px = x + w * 0.38, py = y + h * 0.58;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(px - 5, py - 5, pw + 10, ph + 10); ctx.fillStyle = '#e8e4d8'; ctx.fillRect(px - 4, py - 4, pw + 8, ph + 8);
+        const g = ctx.createLinearGradient(px, py, px + pw, py + ph); g.addColorStop(0, '#3ac8e8'); g.addColorStop(1, '#1a7ac8'); ctx.fillStyle = g; ctx.fillRect(px, py, pw, ph);
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 5; k++) ctx.fillRect(px + 8 + k * (pw / 5), py + 6 + (k % 2) * 10, 14, 2);
+        for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#f2f2f2' : lv === 'luxo' ? '#c8a24a' : '#3a7ad3'; ctx.fillRect(px + 6 + k * (pw / 6), py - 14, 18, 8); }   // espreguiçadeiras
+        if (lv === 'luxo') { ctx.fillStyle = '#e8402a'; ctx.beginPath(); ctx.arc(x + w * 0.16, y + h * 0.3, 26, 0, 7); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center'; ctx.fillText('H', x + w * 0.16, y + h * 0.3 + 10); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + w * 0.16, y + h * 0.3, 22, 0, 7); ctx.stroke(); }
+        ctx.fillStyle = b.hotel.cor; ctx.fillRect(x + 12, y + 12, w - 24, 5);
+      } else {
+        ctx.fillStyle = 'rgba(60,30,10,0.22)'; for (let k = 0; k < 9; k++) ctx.fillRect(x + 12 + (k * 53) % (w - 50), y + 10 + (k * 37) % (h - 40), 26, 16);   // manchas de ferrugem
+        ctx.fillStyle = '#7a5a3a'; ctx.beginPath(); ctx.arc(x + w * 0.72, y + h * 0.3, 14, 0, 7); ctx.fill(); ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2; ctx.stroke();   // caixa-d'água velha
+        if (lv === 'feio') { ctx.fillStyle = '#2a2a2a'; ctx.fillRect(x + w * 0.2, y + h * 0.55, 40, 24); ctx.fillStyle = '#55555f'; ctx.fillRect(x + w * 0.2 + 3, y + h * 0.55 + 3, 34, 18); }
+      }
+      ctx.restore();
+    }
+  }
   function drawRoof(ctx, b) {
     const fh = fachada(b); drawFacade(ctx, b, fh);
     const { x, y, w, p } = b, h = b.h - fh;
@@ -376,6 +456,7 @@
         ctx.fillStyle = '#555a66'; ctx.beginPath(); ctx.arc(dx + 9, dy + 9, 3, 0, 7); ctx.fill(); ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.arc(dx + 9, dy + 9, 1.4, 0, 7); ctx.fill(); }
       else { ctx.fillStyle = '#8a4a3a'; ctx.fillRect(dx, dy, 12, 12); ctx.fillStyle = '#2a1a1a'; ctx.fillRect(dx + 3, dy + 3, 6, 6); }
     });
+    if (b.hotel || b.mercado) roofEspecial(ctx, b, fh);
   }
 
   // rachaduras, remendos, manchas de óleo e bueiros (sorteados sempre do mesmo jeito)
@@ -499,6 +580,7 @@
     const lados = [['top', blk.x, blk.y + off, 1, 0, blk.w, 0], ['bottom', blk.x, blk.y + blk.h - off, 1, 0, blk.w, Math.PI], ['left', blk.x + off, blk.y, 0, 1, blk.h, -Math.PI / 2], ['right', blk.x + blk.w - off, blk.y, 0, 1, blk.h, Math.PI / 2]];
     lados.forEach(([lado, ox, oy, dx, dy, len, rot]) => {
       const n = 3 + Math.floor(r() * 3);
+      if (blk.kind === 'mercado' && lado === 'bottom') { for (let k = 0; k < n; k++) { r(); r(); r(); } return; }
       for (let k = 0; k < n; k++) {
         const t = M + r() * (len - 2 * M), x = ox + dx * t, y = oy + dy * t;
         const q = r(), q2 = r();
@@ -552,9 +634,31 @@
     rrect(ctx, x + 2, y + 2, w - 4, h - 4, 42); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5; ctx.stroke();
     rrect(ctx, x + 6, y + 6, w - 12, h - 12, 38); ctx.strokeStyle = 'rgba(120,100,50,0.35)'; ctx.lineWidth = 1.5; ctx.stroke();
 
-    if (kind === 'city') {
+    if (kind === 'city' || kind === 'hotel') {
       // "beco" escuro debaixo dos prédios
       ctx.fillStyle = ctx.createPattern(tex.alley, 'repeat'); ctx.fillRect(x + 2 * T, y + 2 * T, 8 * T, 8 * T);
+    } else if (kind === 'vila') {
+      // quintais de grama e vielas de calçada em cruz
+      const gx = x + 2 * T, gy = y + 2 * T;
+      ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(gx, gy, 8 * T, 8 * T);
+      [[3 * T, 0, 2 * T, 8 * T], [0, 3 * T, 8 * T, 2 * T]].forEach(([a, b, c, d]) => { ctx.fillStyle = '#ece1a2'; ctx.fillRect(gx + a, gy + b, c, d); ctx.fillStyle = ctx.createPattern(tex.paving, 'repeat'); ctx.fillRect(gx + a, gy + b, c, d); });
+      ctx.strokeStyle = 'rgba(150,130,70,0.4)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let k = 0; k <= 8; k += 1) { if (k >= 3 && k <= 5) { ctx.moveTo(gx + k * T + 0.5, gy); ctx.lineTo(gx + k * T + 0.5, gy + 8 * T); ctx.moveTo(gx, gy + k * T + 0.5); ctx.lineTo(gx + 8 * T, gy + k * T + 0.5); } }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; [[0, 0], [5, 0], [0, 5], [5, 5]].forEach(([a, c]) => ctx.fillRect(gx + a * T, gy + c * T, 3 * T, 3 * T));
+    } else if (kind === 'mercado') {
+      ctx.fillStyle = ctx.createPattern(tex.alley, 'repeat'); ctx.fillRect(x + T, y + T, 10 * T, 5 * T);
+      const lt = y + 6 * T;
+      ctx.fillStyle = ctx.createPattern(tex.asphalt, 'repeat'); ctx.fillRect(x, lt, w, 6 * T);
+      ctx.fillStyle = 'rgba(15,10,30,0.28)'; ctx.fillRect(x, lt, w, 6 * T);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(x, lt + 2, w, 3);                      // faixa junto da loja
+      for (let k = 0; k < 8; k++) { for (const yy of [lt + 40, lt + 138]) { ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(x + 4 + k * 40, yy, 2, 50); } }
+      for (const yy of [lt + 40, lt + 138]) { ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(x + 4 + 8 * 40, yy, 2, 50); }
+      ctx.fillStyle = 'rgba(40,90,200,0.55)'; ctx.fillRect(x + 8, lt + 44, 32, 42);                      // vaga de deficiente
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 20px Arial'; ctx.textAlign = 'center'; ctx.fillText('♿', x + 24, lt + 72);
+      ctx.fillStyle = 'rgba(255,224,74,0.7)'; ctx.font = 'bold 11px Arial'; ctx.fillText('ENTRADA / SAÍDA', x + 354, lt + 188 - 12); ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 7; k++) { ctx.fillRect(x + 20 + k * 40, lt + 112, 18, 3); }   // seta/tracejado do corredor
+      ctx.fillStyle = '#4a4e58'; ctx.fillRect(x + 332, lt + 12, 40, 18); ctx.fillStyle = '#c8ccd4'; for (let k = 0; k < 6; k++) ctx.fillRect(x + 336 + k * 6, lt + 14, 3, 14);   // abrigo dos carrinhos
     } else if (kind === 'park') {
       const gx = x + 2 * T, gy = y + 2 * T;
       rrect(ctx, gx, gy, 8 * T, 8 * T, 14); ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fill();
@@ -693,7 +797,7 @@
   }
 
   // ---------- Chunks (o cenário pré-desenhado) ----------
-  const CH = 512, RS = 1.25;
+  const CH = 512, RS = 1.1;
   const NCX = Math.ceil(W / CH), NCY = Math.ceil(H / CH);
   const chunks = new Array(NCX * NCY).fill(null);
   let chunkCursor = 0;
@@ -741,13 +845,13 @@
   const spots = [];
   blocks.forEach(b => {
     if (b.kind === 'river') return;
-    ['top', 'bottom', 'left', 'right'].forEach(s => [0.3, 0.7].forEach(t => spots.push(sidePoint(b.bx, b.by, s, t))));
+    ['top', 'bottom', 'left', 'right'].forEach(s => { if (b.kind === 'mercado' && s === 'bottom') return; [0.3, 0.7].forEach(t => spots.push(sidePoint(b.bx, b.by, s, t))); });
   });
 
   G.world = {
     T, ROAD, BLOCK, PITCH, COLS, ROWS, MG, TW, TH, W, H, RIVER, TILE, tiles, blocks, buildings, trees, lamps, fachada, manholes, drawWaterFx, places, propList,
     roadLeft, roadTop, nodeX, nodeY, laneV, laneH, tileAt, isSolid, treeHit, isRoadTile, pedWalkable,
-    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32,
+    buildSome, drawChunks, makeMini, sidePoint, spots, rrect, mulberry32, casas, mercados,
     chunkCount: chunks.length,
   };
 })(window.G = window.G || {});

@@ -174,7 +174,7 @@
     } else {
       // a pé
       const run = K('ShiftLeft', 'ShiftRight');
-      const sp = run ? 175 : 108;
+      const sp = (run ? 175 : 108) * (1 + 0.05 * (S.save.folego || 0)) * (S.energia > 0 ? 1.3 : 1);   // fôlego (academia) e energético deixam você mais rápido
       let dx = (K('KeyD', 'ArrowRight') ? 1 : 0) - (K('KeyA', 'ArrowLeft') ? 1 : 0), dy = (K('KeyS', 'ArrowDown') ? 1 : 0) - (K('KeyW', 'ArrowUp') ? 1 : 0);
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
       if (S.sentado || S.trans) { dx = 0; dy = 0; }
@@ -188,6 +188,7 @@
       if (P.punchT > 0) P.punchT -= dt;
       // armas: Espaço ataca/atira • Q troca de arma • 1-6 escolhem a arma
       if (Kp('KeyQ')) G.combat.cycle(S, 1);
+      if (Kp('KeyX')) G.lugares.comer(S);   // comer algo da mochila
       G.combat.ORDER.forEach((id, i) => { if (Kp('Digit' + (i + 1))) { if (!G.combat.select(S, id)) G.say('Você não tem essa arma (ou está sem munição).', 2); else G.snd.beep(); } });
       if (!S.sentado && !S.trans) G.combat.playerUpdate(S, dt, K('Space'), Kp('Space'));
       // o que dá para fazer aqui?
@@ -262,6 +263,7 @@
   function updateCars(dt) {
     const P = S.player;
     for (const c of S.cars) {
+      if (c.mode === 'script') { if (G.mercadosScript) G.mercadosScript(c, dt); continue; }   // carros do estacionamento (mercados.js)
       if (c.driver === 'ai') {
         if (c.mode === 'wander' || c.mode === 'race') AI.driveTraffic(c, dt, S);
         else if (c.mode === 'chase' || c.mode === 'leave') AI.driveChase(c, dt, S);
@@ -270,7 +272,7 @@
     }
     // carro x carro
     const n = S.cars.length;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) G.carVsCar(S.cars[i], S.cars[j]);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { if (S.cars[i].mode === 'script' || S.cars[j].mode === 'script') continue; G.carVsCar(S.cars[i], S.cars[j]); }
     // pedestres
     const hitPed = (p, c) => {
       const cc = G.carCircles(c);
@@ -366,7 +368,8 @@
     // pedestres
     S.pedSpawnT -= dt;
     const alive = S.peds.filter(p => !p.mission && !p.target && p.state !== 'dead').length;
-    if (alive < 34 && S.pedSpawnT <= 0) { S.pedSpawnT = 0.25; AI.spawnPed(S); }
+    const hr = G.lugares.hora(S), capPeds = (hr >= 22 || hr < 5) ? 14 : (hr >= 6 && hr < 9) || (hr >= 12 && hr < 14) || (hr >= 17 && hr < 20) ? 40 : 30;   // a rua enche na hora do rush e esvazia de madrugada
+    if (alive < capPeds && S.pedSpawnT <= 0) { S.pedSpawnT = 0.25; AI.spawnPed(S); }
     S.peds = S.peds.filter(p => !p.dead && (p.mission || p.target || Math.hypot(p.x - ref.x, p.y - ref.y) < 1150));
     for (const p of S.peds) if (p.state === 'wait') { p.walk = 0; } else AI.updatePed(p, dt, S);
   }
@@ -583,7 +586,7 @@
       if (Kp('KeyM')) G.say(G.snd.mute() ? 'Som desligado' : 'Som ligado', 2);
       G.snd.update({ inCar: false, car: null, horn: false, sirenVol: 0 });
       if (S.mode === 'inside') G.lugares.desenharDentro(ctx, S);
-      else { updateCamera(dt); drawWorld(); G.hud.draw(ctx, S, S.time); }
+      else { updateCamera(dt); drawWorld(); G.hud.draw(ctx, S, S.time); G.lugares.hudMochila(ctx, S); }
       G.lugares.desenharTrans(ctx, S);
       for (const k in pressed) delete pressed[k];
       return;
@@ -594,6 +597,7 @@
     else if (S.mode !== 'paused') update(dt);
     drawWorld();
     G.hud.draw(ctx, S, S.time);
+    if (S.mode === 'play' || S.mode === 'paused') G.lugares.hudMochila(ctx, S);
     if (S.mode === 'wasted') drawOverlay('VOCÊ MORREU', 'Os médicos te trouxeram de volta...', '#ff4a4a');
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
     if (S.mode === 'shop') G.combat.drawShop(ctx, S);
