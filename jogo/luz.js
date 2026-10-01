@@ -14,7 +14,7 @@
 (function (G) {
   'use strict';
   const VW = 800, VH = 600, TAU = Math.PI * 2;
-  const L = G.luz = { nivel: 1 };   // 1 = cinema nítido (padrão)
+  const L = G.luz = { nivel: 2 };   // 2 = pixel art (padrão); V troca
 
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -101,6 +101,23 @@
   }
 
   // ---- chamado pelo game.js depois que o mundo foi desenhado ----
+  // PALETA: poucas cores por canal + tramado em xadrez (matriz de Bayer 4x4) = cara de pixel art de verdade
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  function paleta(g) {
+    const w = VW / 2, h = VH / 2, im = g.getImageData(0, 0, w, h), d = im.data, N = 14, st = 255 / (N - 1);
+    for (let y = 0, i = 0; y < h; y++) {
+      for (let x = 0; x < w; x++, i += 4) {
+        const t = (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.47) * st * 0.45;
+        // realce leve de saturação para as cores ficarem vibrantes
+        const r = d[i], gg = d[i + 1], b = d[i + 2], m = (r + gg + b) / 3;
+        const rr = m + (r - m) * 1.12, g2 = m + (gg - m) * 1.12, bb = m + (b - m) * 1.12;
+        d[i] = Math.max(0, Math.min(255, Math.round((rr + t) / st) * st));
+        d[i + 1] = Math.max(0, Math.min(255, Math.round((g2 + t) / st) * st));
+        d[i + 2] = Math.max(0, Math.min(255, Math.round((bb + t) / st) * st));
+      }
+    }
+    g.putImageData(im, 0, 0);
+  }
   // devolve true se desenhou os efeitos (senão o game.js usa o visual clássico)
   L.desenhar = function (ctx, S, W, cam, z, inV) {
     if (L.nivel === 0) return false;
@@ -113,6 +130,7 @@
     // 1) pixel art: reduz pela metade e amplia sem suavizar
     if (L.nivel >= 2) {
       pxx.imageSmoothingEnabled = true; pxx.drawImage(ctx.canvas, 0, 0, VW / 2, VH / 2);
+      paleta(pxx);   // reduz as cores e tramado (dither) como nos jogos de 16 bits
       ctx.imageSmoothingEnabled = false; ctx.drawImage(pixC, 0, 0, VW, VH); ctx.imageSmoothingEnabled = true;
     }
 

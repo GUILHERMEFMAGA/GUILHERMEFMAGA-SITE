@@ -361,7 +361,7 @@
     };
     if (pt.pronta) { // ponte pronta: asfalto escuro, faixas amarelas e guarda-corpo (igual às outras)
       ctx.fillStyle = '#3a3646'; ctx.fillRect(x0, y0, w, h); ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x0, y0, w, h);
-      faixa(x0, x0 + w); ctx.fillStyle = '#f2c231'; for (let xx = x0 + 20; xx < x0 + w - 30; xx += 96) ctx.fillRect(xx, y0 + h / 2 - 3, 56, 6);
+      W.drawBridge(ctx, x0, y0, w, h, { main: true, asfalto: true });   // ponte larga, com calçadões e mirantes (world.js)
       return;
     }
     // em obras: duas metades crescendo das margens (o asfalto vem depois do concreto)
@@ -438,6 +438,7 @@
     for (let y = ty; y < ty + bh; y++) for (let x = tx; x < tx + bw; x++) W.tiles[y * W.TW + x] = W.TILE.BRIDGE;
     if (!Array.isArray(W.PONTES[pt.rio])) W.PONTES[pt.rio] = [W.PONTES[pt.rio]];
     W.PONTES[pt.rio].push(pt.j);
+    W.preparaPonte(pt.rio, pt.j);   // calçadas largas dos dois lados
     if (C.carregado) C.evento('ponte', pt);
   }
   C.evento = function (tipo, o, e) {

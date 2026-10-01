@@ -178,3 +178,9 @@ Na Prefeitura, a **mesa do prefeito** deixa você decidir: obras (escola, hospit
 - Perto de um assalto você vê os bandidos fugirem e a polícia chegar; derrubar um bandido rende recompensa. Sequestros têm cativeiro com refém (E: libertar).
 - **Assassino da Mata Escura**: corpos com fita da polícia na floresta e uma cabana escondida. Acabe com ele por $3000.
 - **Acidentes** chamam a **ambulância**, que leva a vítima ao hospital mais perto, ou ao seguinte se estiver lotado. Quando você morre vale a mesma regra.
+
+## Visual mais bonito (pontes, rio, telhados, pixel art)
+- **Pontes largas**: pista + calçadão de pedra portuguesa de 4 tiles de cada lado, parapeitos de pedra com balaústres, pilares com luminárias, arcos de pedra sob a ponte e **mirantes** com medalhão e bancos nas pontes principais (que ainda têm pórticos de aço por cima). Pontes novas, quando inauguradas, ganham o mesmo visual.
+- **Rio vivo**: águas rasas e fundas, correnteza, vitórias-régias com flores, juncos, pedras e muro de contenção de pedra.
+- **Telhados variados**: quatro águas, duas águas com lado de sol e de sombra, coberturas, jardins na laje e piscinas. As vilas ganharam uma pracinha redonda com medalhão e canteiros.
+- **Pixel art de verdade**: o nível de gráficos padrão agora reduz as cores com tramado (dither) e pixels grandes. A tecla **V** troca entre pixel art, cinema nítido e clássico.

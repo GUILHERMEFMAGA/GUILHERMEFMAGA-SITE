@@ -479,6 +479,7 @@
       ctx.restore();
     });
     G.cidade.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);   // guindastes e aviões no ar
+    W.drawBridgeHigh(ctx, vx0, vy0, vx1, vy1);   // arcos de aço das pontes principais
     if (G.pedagio) G.pedagio.desenharAlto(ctx, S, vx0, vy0, vx1, vy1, S.time);
     if (G.cameras) G.cameras.desenharRua(ctx, S, vx0, vy0, vx1, vy1, S.time);
     // helicóptero
