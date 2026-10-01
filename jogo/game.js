@@ -258,7 +258,7 @@
     S.cars = S.cars.filter(c => !(c.kind === 'police' && (c.mode === 'chase' || c.mode === 'block' || c.mode === 'leave')));
     if (S.redCar && S.redCar.dead) { S.cars = S.cars.filter(c => c !== S.redCar); S.redCar = null; }
     S.mode = 'play';
-    G.say(where === M.POI.hospital ? 'Você sobreviveu por pouco e acordou no hospital. Perdeu ' + Math.round(loss * 100) + '% do dinheiro.' : 'Solto da delegacia. A fiança custou ' + Math.round(loss * 100) + '% do dinheiro' + (hadGuns ? ' e suas armas foram confiscadas.' : '.'), 6);
+    G.say(where !== M.POI.delegacia ? 'Você sobreviveu por pouco e acordou no ' + (where.nome || 'hospital') + (where.lotado ? ' (o ' + where.perto + ' estava lotado, então a ambulância levou você mais longe)' : '') + '. Perdeu ' + Math.round(loss * 100) + '% do dinheiro.' : 'Solto da delegacia. A fiança custou ' + Math.round(loss * 100) + '% do dinheiro' + (hadGuns ? ' e suas armas foram confiscadas.' : '.'), 6);
   }
 
   // ---------- Carros (IA, física, colisões) ----------
@@ -360,7 +360,7 @@
     for (const c of S.cars) { if (c.driver === 'ai' && c.mode === 'wander') { if (c.speed < 8) c.idleT += dt; else c.idleT = 0; } }
     S.cars = S.cars.filter(c => {
       if (c.idleT > 14 && Math.hypot(c.x - ref.x, c.y - ref.y) > 650) return false;
-      if (c === P.car || c.owned || c.tag === 'mission' || (M.active && M.active.rivals && M.active.rivals.some(r => r.car === c))) return true;
+      if (c === P.car || c.owned || c.tag === 'mission' || c.tag === 'crime' || (M.active && M.active.rivals && M.active.rivals.some(r => r.car === c))) return true;
       const d = Math.hypot(c.x - ref.x, c.y - ref.y);
       if (c.mode === 'block') return d < 1700 && S.time - c.born < 70;
       if (c.mode === 'chase') return d < 1800;
@@ -418,7 +418,7 @@
       S.modeT += dt; G.justica.rodar(S, dt); updateCars(dt); managePopulation(dt); G.combat.update(S, dt);
     } else if (S.mode === 'wasted' || S.mode === 'busted') {
       S.modeT += dt; updateCars(dt); managePopulation(dt); G.combat.update(S, dt);
-      if (S.modeT > 3.2) respawn(S.mode === 'wasted' ? M.POI.hospital : M.POI.delegacia, S.mode === 'wasted' ? 0.1 : 0.15);
+      if (S.modeT > 3.2) respawn(S.mode === 'wasted' ? (G.crimes ? G.crimes.respawnHospital(S, S.player.x, S.player.y) : M.POI.hospital) : M.POI.delegacia, S.mode === 'wasted' ? 0.1 : 0.15);
     }
     updateParticles(dt);
     updateCamera(dt);

@@ -34,7 +34,7 @@
     const ctx = c.getContext('2d');
     ctx.scale(SS, SS); ctx.translate(c.width / SS / 2, c.height / SS / 2);
     const wreck = kind === 'wreck';
-    const base = wreck ? '#2b2b2f' : (kind === 'police' ? '#f1f1f3' : kind === 'taxi' ? '#f2c42a' : color);
+    const base = wreck ? '#2b2b2f' : (kind === 'police' ? '#f1f1f3' : kind === 'ambulancia' ? '#f6f6f8' : kind === 'taxi' ? '#f2c42a' : color);
     const glass = wreck ? '#111' : '#1f2a33';
 
     // rodas
@@ -58,6 +58,13 @@
       ctx.fillRect(-W / 2, -L / 2, W, 20); ctx.fillRect(-W / 2, L / 2 - 22, W, 22);
       ctx.fillRect(-W / 2, -4, 5, 26); ctx.fillRect(W / 2 - 5, -4, 5, 26);
       ctx.fillStyle = 'rgba(255,255,255,0.22)'; ctx.fillRect(-W / 2 + 6, -L / 2, 7, 20);
+      ctx.restore();
+    }
+    if (kind === 'ambulancia') {     // faixa vermelha nas laterais e cruz no teto
+      ctx.save(); bodyPath(ctx, W, L); ctx.clip();
+      ctx.fillStyle = '#d9262e'; ctx.fillRect(-W / 2, -2, 5, 30); ctx.fillRect(W / 2 - 5, -2, 5, 30); ctx.fillRect(-W / 2, -L / 2 + 15, W, 3);
+      ctx.fillStyle = '#e8eaee'; ctx.fillRect(-W / 2, L / 2 - 20, W, 20);
+      ctx.fillStyle = '#d9262e'; ctx.fillRect(-2.5, 4, 5, 15); ctx.fillRect(-7.5, 9, 15, 5);
       ctx.restore();
     }
     // brilho e volume da lataria (luz vinda de cima-esquerda)
@@ -146,9 +153,9 @@
     const sp = carSprite(car.dead ? 'wreck' : car.kind, car.color);
     ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.a);
     ctx.drawImage(sp, -sp.width / SS / 2, -sp.height / SS / 2, sp.width / SS, sp.height / SS);
-    if (car.kind === 'police' && !car.dead && car.siren) {
+    if ((car.kind === 'police' || car.kind === 'ambulancia') && !car.dead && car.siren) {
       const on = Math.floor(time * 8) % 2 === 0;
-      ctx.fillStyle = on ? '#ff2a2a' : '#3b3bff';
+      ctx.fillStyle = on ? '#ff2a2a' : (car.kind === 'ambulancia' ? '#ffffff' : '#3b3bff');
       ctx.fillRect(-9, -5, 8, 6); ctx.fillStyle = on ? '#3b3bff' : '#ff2a2a'; ctx.fillRect(1, -5, 8, 6);
       ctx.fillStyle = '#222'; ctx.fillRect(-9, 1, 18, 2);
     }
@@ -167,7 +174,7 @@
     }
     if (car.holes) car.holes.forEach(h => { ctx.fillStyle = '#050505'; ctx.beginPath(); ctx.arc(h.x, h.y, 1.5, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.6; ctx.stroke(); });
     ctx.restore();
-    if (car.kind === 'police' && !car.dead && car.siren) {
+    if ((car.kind === 'police' || car.kind === 'ambulancia') && !car.dead && car.siren) {
       const on = Math.floor(time * 8) % 2 === 0;
       const gx = car.x + Math.cos(car.a) * (on ? -6 : 6), gy = car.y + Math.sin(car.a) * (on ? -6 : 6);
       const gr = ctx.createRadialGradient(gx, gy, 2, gx, gy, 46);

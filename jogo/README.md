@@ -165,3 +165,16 @@ Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes d
 ## Olho de Deus e agentes do FBI (`olho.js`, `fbi.js`)
 - O **Olho de Deus** é invisível no jogo (só um "F9" pequeno no canto). A cada segundo observa carros, pedestres, jogador, salas, dinheiro, obras e erros de JavaScript. **Conserta sozinho** o que dá (carro NaN, carro na parede, carro travado, pedestre preso...) e guarda um **super cache** com hora, local, entidade e snapshot de cada caso (salvo em `localStorage`).
 - Quatro **agentes do FBI** (Cruz, Lima, Rocha e Duarte), de terno e óculos, andam pelas calçadas do mapa inteiro, **entram em cada estabelecimento** (hotéis, mercados, bancos...), conferem nomes, tamanho, objetos inalcançáveis, NPCs e câmeras, inspecionam as obras e **reportam os erros** ao Olho. Se você passar armado perto de um agente, ele grita e você ganha procurado.
+
+## Prisão de verdade (`justica.js`)
+Ao ser preso você é algemado, levado à viatura e fica no banco de trás até a **delegacia geral**. O **maior nível de procurado** que você atingiu decide o destino: níveis 1–3 ficam na delegacia (fiança ou pena em dias), nível 4 vai para a penitenciária distante e nível 5 para a **ILHA DO SILÊNCIO** (segurança máxima, de barco).
+
+## Prefeito e obras (`governo.js`)
+Na Prefeitura, a **mesa do prefeito** deixa você decidir: obras (escola, hospital, praças...), impostos, segurança, saúde, educação e pauta do dia. Construtoras planejam em fases e podem **interditar ruas** (cones e barreiras) até terminar. Há eleição a cada 10 dias.
+
+## Crimes, FBI e acidentes (`crimes.js`)
+- Crimes de NPC raros e probabilísticos: assalto a lojas e bancos (com **planejamento** de 1–2 dias; podem dar certo ou errado), sequestros, golpes, roubo de carros e incêndios.
+- Se a polícia não resolve, os casos graves passam para o **FBI**. Notícias no jornal da banca e no "PLANTÃO".
+- Perto de um assalto você vê os bandidos fugirem e a polícia chegar; derrubar um bandido rende recompensa. Sequestros têm cativeiro com refém (E: libertar).
+- **Assassino da Mata Escura**: corpos com fita da polícia na floresta e uma cabana escondida. Acabe com ele por $3000.
+- **Acidentes** chamam a **ambulância**, que leva a vítima ao hospital mais perto, ou ao seguinte se estiver lotado. Quando você morre vale a mesma regra.

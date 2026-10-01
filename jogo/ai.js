@@ -58,8 +58,10 @@
 
   // rios sem ponte nessa rua: o carro não pode seguir naquele sentido (só as pontes ligam as margens)
   const okH = (i, j, hd) => W.cruzaOk(hd > 0 ? i : i - 1, j);
+  // trecho de rua interditado? (axis 'v' = rua vertical idx, trecho a entre os nós a e a+1)
+  const fech = (axis, idx, a) => W.fechado.size > 0 && W.fechado.has(axis + idx + ':' + a);
   function chooseManeuver(car) {
-    const n = car.nav, i = n.ni, j = n.nj, d = n.dir, opts = [];
+    const n = car.nav, i = n.ni, j = n.nj, d = n.dir; let opts = [];
     if (n.axis === 'v') {
       if (d > 0 ? j < ROWS : j > 0) opts.push({ k: 's', ni: i, nj: j + d });
       const rh = d > 0 ? -1 : 1;
@@ -69,6 +71,10 @@
       const rv = d > 0 ? 1 : -1;
       [[rv, 'r'], [-rv, 'l']].forEach(([vd, k]) => { if (vd > 0 ? j < ROWS : j > 0) opts.push({ k, axis: 'v', dir: vd, ni: i, nj: j + vd, trig: W.laneV(i, vd) }); });
     }
+    // ruas interditadas por obra: o motorista escolhe outro caminho
+    const todas = opts;
+    opts = opts.filter(o => o.k === 's' ? !fech(n.axis, n.axis === 'v' ? i : j, Math.min(n.axis === 'v' ? j : i, (n.axis === 'v' ? j : i) + d)) : !(o.axis === 'h' ? fech('h', j, o.dir > 0 ? i : i - 1) : fech('v', i, o.dir > 0 ? j : j - 1)));
+    if (!opts.length) opts = todas;      // tudo interditado: passa mesmo assim
     let m;
     if (n.mode === 'goto' && n.target) {
       let best = 1e9;

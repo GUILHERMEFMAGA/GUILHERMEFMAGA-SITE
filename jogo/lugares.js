@@ -159,7 +159,7 @@
       if (st.t && S.time - st.t < 150) { G.say('A caixa está vazia.', 2); return; }
       st.t = S.time;
       if (Math.random() < 0.35) { const v = 5 + Math.floor(Math.random() * 20); S.save.money += v; G.save(); G.snd.cash(); G.say('Uma carta esquecida com $' + v + ' dentro!', 3); } else G.say('Só contas e propaganda...', 2.5);
-    } else if (pr.tipo === 'banca') { if (gasta(S, 2)) G.say(pick(MANCHETES), 5); }
+    } else if (pr.tipo === 'banca') { if (gasta(S, 2)) G.say((G.crimes && G.crimes.manchete(S)) || pick(MANCHETES), 5); }
     else if (pr.tipo === 'maquina') {
       if (!gasta(S, 4)) return;
       if (Math.random() < 0.2) G.say('A máquina engoliu seu dinheiro e não deu nada!', 3); else { cura(S, 12); G.say('Refrigerante gelado! (+vida)', 2.5); }
@@ -561,7 +561,7 @@
           L.trans(S, () => { S.dayT = Math.floor(S.dayT) + 1.02; S.player.hp = 100; S.heat = 0; S.heatLevel = 0; salvar(); G.say('Bom dia! Você dormiu bem. Vida cheia e jogo salvo.', 5); });
         } }));
         R.objs.push(O('geladeira', 620, 165, 60, 44, { e: 56, label: 'PEGAR ALGO NA GELADEIRA', act: S => { if (R.gelou) { G.say('A geladeira está vazia por enquanto.', 2.5); return; } R.gelou = true; cura(S, 20); G.say('Uma fatia fria de pizza! (+20 vida)', 3); } }));
-        R.objs.push(O('tv', 340, 180, 120, 36, { e: 34, label: 'LIGAR A TV (NOTÍCIAS)', act: S => G.say(pick(MANCHETES), 5) }));
+        R.objs.push(O('tv', 340, 180, 120, 36, { e: 34, label: 'LIGAR A TV (NOTÍCIAS)', act: S => G.say((G.crimes && G.crimes.manchete(S)) || pick(MANCHETES), 5) }));
         R.objs.push(O('sofa', 300, 400, 200, 50, { e: 18, label: 'SENTAR NO SOFÁ', r: 30, act: S => { cura(S, 10); G.say('Você deu uma relaxada no sofá. (+10 vida)', 3); } }));
         R.objs.push(O('computador', 560, 340, 110, 40, { e: 24, label: 'VER MEU PROGRESSO NO COMPUTADOR', act: S => { const r = G.missions.rank(S.save.done); G.say('Missões: ' + S.save.done + '/' + (G.missions ? G.missions.TOTAL : 12) + '  —  Dinheiro: $' + S.save.money + (r ? '  —  Posição: ' + (r.n || r.name || r) : ''), 6); } }));
         R.objs.push(O('planta', 90, 440, 40, 50, {}), O('planta', 670, 440, 40, 50, {}));

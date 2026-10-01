@@ -11,6 +11,7 @@
     sedan:  { max: 320, acc: 380, turn: 2.4 },
     taxi:   { max: 340, acc: 400, turn: 2.45 },
     police: { max: 420, acc: 500, turn: 2.6 },
+    ambulancia: { max: 340, acc: 380, turn: 2.3 },
   };
 
   class Car {

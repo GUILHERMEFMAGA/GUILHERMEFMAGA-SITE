@@ -37,12 +37,13 @@
   // ---------- cria os projetos de cada lote (sempre iguais: sementes fixas) ----------
   const ordemG = ['hotel', 'hospital', 'empresa', 'escola', 'shopping', 'fabrica', 'hotel', 'empresa'];
   let nG = 0, nLoja = 0, nHotel = 0, nCasa = 0;
-  W.lotes.forEach((l, idx) => {
+  const montaLote = (l, idx, forca, iniForca) => {
     const r = rg(9100 + idx * 131);
     let tipo;
     if (l.tam === 'a') tipo = 'aeroporto';
     else if (l.tam === 'g') tipo = ordemG[nG++ % ordemG.length];
     else { const q = r(); tipo = q < 0.42 ? 'casa' : q < 0.68 ? 'comercio' : q < 0.84 ? 'predio' : 'escritorio'; }
+    if (forca) tipo = forca;            // encomenda do prefeito (governo.js)
     const df = TIPOS[tipo];
     const dur = Math.round(df.dur[0] + r() * (df.dur[1] - df.dur[0]));
     const interior = l.bx >= 17 && l.bx <= 22;
@@ -50,6 +51,9 @@
     const u = r(), q1 = interior ? 0.30 : 0.14, q2 = interior ? 0.66 : 0.48;
     let inicio = u < q1 ? -dur * (1.05 + r() * 0.8) : u < q2 ? -dur * (0.08 + r() * 0.85) : 20 + r() * (interior ? 700 : 1500);
     if (tipo === 'aeroporto') inicio = -0.32 * dur;
+    if (iniForca != null) inicio = iniForca;
+    // obras que fecham a rua da frente (algumas construtoras esquecem de reabrir!)
+    const rr = rg(9100 + idx * 131 + 55); l.rua = l.tam === 'g' ? rr() < 0.7 : rr() < 0.15; l.neg = rr() < 0.3;
     const nome = df.nome ? df.nome(r) : null;
     const p = { tipo, dur, inicio, nome, cor: df.cor, and: df.and, roof: ROOF_P[tipo][Math.floor(r() * ROOF_P[tipo].length)], seed: 9100 + idx * 131 };
     l.proj = p; l.fase = -2; l.ativo = false; l.cx = l.x + l.w / 2; l.cy = l.y + l.h / 2;
@@ -72,7 +76,17 @@
       const pl = { tipo: 'loja', id: 'aeroporto', loja: 'cafe', nome: p.nome, cor: '#2a6ab8', horario: [0, 24], b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 40 };
       l.b.place = pl; l.place = pl;
     }
-  });
+  };
+  W.lotes.forEach((l, idx) => montaLote(l, idx));
+
+  // o prefeito manda construir algo num lote que ainda não começou: planejamento e depois as obras
+  C.encomenda = function (l, tipo, planejamento) {
+    if (!l || l.ativo || (l.est && l.est.f >= 0)) return false;
+    const idx = W.lotes.indexOf(l);
+    montaLote(l, idx, tipo, C.t + (planejamento || 90));
+    l.img = null; l.est = estadoDe(l, C.t); l.fase = -1; l.encomendado = true;
+    return true;
+  };
 
   // ---------- pontes que estão sendo construídas ----------
   C.pontes = [
@@ -377,6 +391,8 @@
       if (e.f === 5) { ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad); return; }
       desenhaObra(ctx, l, e, t);
     });
+    if (G.governo) G.governo.desenhar(ctx, S, x0, y0, x1, y1, t);
+    if (G.crimes) G.crimes.desenhar(ctx, S, x0, y0, x1, y1, t);
   };
   C.desenharAlto = function (ctx, S, x0, y0, x1, y1, t) {
     const v = { x0, y0, x1, y1 };
@@ -412,6 +428,7 @@
     const pl = l.place;
     if (l.casa) { W.casas.push(l.casa); }
     else if (pl) { W.places.push(pl); if (pl.tipo === 'loja') W.lojas.push(pl); }
+    if (l.proj.tipo === 'hospital' && pl) W.hospitais.push({ x: pl.x, y: pl.y + 8, r: 44, nome: pl.nome || 'HOSPITAL SÃO LUCAS', lot: Math.random() * 0.5 });
     if (l.proj.tipo === 'aeroporto') { const tr = l.torre; }
     if (C.carregado) C.evento('pronto', l, l.est);
   }
