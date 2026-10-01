@@ -94,6 +94,7 @@
     count() { tone(520, 0.15, 0.3, 'square'); }, go() { tone(1040, 0.4, 0.3, 'square'); },
     mute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.7; return muted; },
     isMuted: () => muted,
+    honk(vol) { if (!ac || muted) return; const t = ac.currentTime, g = ac.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.07 * Math.max(0.1, vol), t + 0.02); g.gain.setValueAtTime(0.07 * Math.max(0.1, vol), t + 0.32); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4); [350, 440].forEach(f => { const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f + Math.random() * 20; o.connect(g); o.start(t); o.stop(t + 0.42); }); g.connect(sfx); },
     station() { return station; }, stationName() { return STATIONS[station]; },
     nextStation() { station = (station + 1) % STATIONS.length; step = 0; nextBeat = 0; bpm = [130, 130, 124, 126][station]; return STATIONS[station]; },
 

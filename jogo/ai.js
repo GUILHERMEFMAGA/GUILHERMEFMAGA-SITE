@@ -137,10 +137,27 @@
       }
       if (block) v = Math.min(v, Math.max(0, toNode - (ROAD_HALF() + 14)) * 1.7);
     }
-    // carro / pessoa na frente
+    // pisca-pisca: avisa antes de virar
+    car.blink = (n.m && n.m.k !== 's' && toNode < 280) ? (n.m.k === 'r' ? 1 : -1) : 0;
+    // ambulância/polícia de sirene atrás: reduz e deixa passar
+    if (car.kind !== 'police') for (const o of S.cars) {
+      if (o.kind !== 'police' || !o.siren || o.dead || o === car) continue;
+      const dx = o.x - car.x, dy = o.y - car.y; if (Math.abs(dx) > 340 || Math.abs(dy) > 340) continue;
+      const al = dx * car.fx + dy * car.fy, lat = dx * Math.cos(car.a) + dy * Math.sin(car.a);
+      if (al < 0 && al > -320 && Math.abs(lat) < 70) { v = Math.min(v, 45); car.blink = 1; break; }
+    }
+    // carro / pessoa na frente (cada motorista tem seu jeito: calmo, normal ou apressado)
     const look = 70 + Math.max(0, car.vf) * 0.9;
     const gap = aheadGap(car, S, look);
-    if (gap < 1e8) v = Math.min(v, Math.max(0, gap - 26) * 1.7);
+    if (gap < 1e8) v = Math.min(v, Math.max(0, gap - 26 - (car.gapX || 0)) * 1.7);
+    // buzina quando fica preso atrás de alguém por muito tempo
+    if (gap < 70 && car.vf < 10 && lightState(n.axis, S.time) === 'g') car.blockT = (car.blockT || 0) + dt; else if (car.blockT > 0) car.blockT = 0; else if (car.blockT < 0) car.blockT = Math.min(0, car.blockT + dt);
+    if (car.blockT > 2.6) {
+      car.blockT = -4;
+      const P = S.player, d = Math.hypot(car.x - P.x, car.y - P.y);
+      if (d < 650 && G.snd.honk) G.snd.honk(1 - d / 650);
+      car.honkFlash = 0.5;
+    }
     // controle
     const vf = car.vf, err = v - vf;
     car.hb = false;
@@ -249,7 +266,11 @@
     let kind = kindForce || (Math.random() < 0.16 ? 'taxi' : 'sedan');
     if (kind === 'police' && S.cars.filter(c => c.kind === 'police' && c.mode === 'wander').length >= 2) kind = 'sedan';
     const car = new G.Car({ x: pt.x, y: pt.y, a: pt.a, kind, color: kind === 'police' ? '#ffffff' : kind === 'taxi' ? '#f2c42a' : pick(CAR_COLORS), driver: 'ai', mode: 'wander' });
-    car.cruise = rand(150, 235); car.nav = initNav(pt.axis, pt.idx, pt.dir, pt.along);
+    const jeito = Math.random();
+    car.pers = jeito < 0.2 ? 'apressado' : jeito < 0.42 ? 'calmo' : 'normal';
+    car.cruise = car.pers === 'apressado' ? rand(235, 280) : car.pers === 'calmo' ? rand(120, 160) : rand(160, 230);
+    car.gapX = car.pers === 'apressado' ? -10 : car.pers === 'calmo' ? 16 : 0;
+    car.nav = initNav(pt.axis, pt.idx, pt.dir, pt.along);
     car.vx = car.fx * 120; car.vy = car.fy * 120;
     S.cars.push(car); return car;
   }
@@ -294,6 +315,7 @@
   function updatePed(p, dt, S) {
     // combate: mortos, caídos, atiradores e guardas são tratados em combat.js
     if (G.combat && G.combat.updatePed(p, dt, S)) return;
+    if (p.talkT > 0 && p.state === 'walk') { p.walk = 0; return; }   // parou para conversar com você
     // susto com carros rápidos
     if (p.state === 'walk') for (const c of S.cars) {
       if (Math.abs(c.x - p.x) > 80 || Math.abs(c.y - p.y) > 80) continue;

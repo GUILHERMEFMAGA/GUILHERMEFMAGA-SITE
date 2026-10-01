@@ -24,7 +24,7 @@ python -m http.server 8080      # depois abra http://localhost:8080
 | Shift | correr |
 | Espaço | atacar / atirar (segure para armas automáticas) |
 | Q · 1 a 6 | trocar de arma (punhos, taco, pistola, SMG, escopeta, granada) |
-| E | entrar em carro (qualquer um!), atender telefone, pegar o carro na garagem, **comprar na loja de armas** (prédio rosa, perto da garagem) |
+| E | entrar em carro (qualquer um!), atender telefone, pegar o carro na garagem, **comprar na loja de armas** (prédio rosa, perto da garagem), **entrar nos lugares**, usar objetos da rua e conversar com pedestres |
 
 | De carro | |
 |---|---|
@@ -40,6 +40,26 @@ Geral: **R** troca de rádio (funk, rock, eletrônica) · **M** liga/desliga o s
 Visual 2.5D com luz dinâmica (`luz.js`; o modo pixel art fica na tecla V): prédios com fachada e janelas, ciclo de dia/noite com cor de ambiente, faróis, postes, sirenes e explosões que iluminam de verdade, neblina em camadas, raios de sol, bloom e cor de cinema. Detalhes extras: hidrantes, lixeiras, bancos, caixas de correio, bancas, vasos e pontos de ônibus nas calçadas; toldos, janelas e canos nas fachadas; painéis solares, exaustores e antenas nos telhados; poças, flores no parque, brilhos na água, fumaça saindo dos bueiros, pombos que voam quando você chega perto e pedestres com boné, chapéu, óculos e mochila.
 
 Se ficar pesado no seu computador, aperte **V** para um visual mais leve.
+
+## A nossa cidade (Ribeirão Preto)
+Nove lugares da cidade têm **portas para entrar** (círculo colorido no chão, ponto colorido no minimapa; tecla **E**). Por dentro cada um é uma sala desenhada por código, com atendente e objetos para usar. **ESC** ou a porta de baixo = sair. Com a polícia atrás de você só a igreja aceita visita.
+
+| Lugar | O que dá para fazer |
+|---|---|
+| **Pinguim Chopp** | chopp ($12, cura mas deixa tonto), pastel, jukebox troca a música, sinuca valendo aposta |
+| **Mercadão** | pastel, caldo de cana, colete à prova de balas ($150) |
+| **Farmácia** | kit médico ($60), vitaminas ($25), balança |
+| **Barbearia** | muda o corte e a cor do cabelo (mostra o seu visual no cartão) |
+| **Shopping** | camisa, calça, tênis e acessórios — o visual do personagem muda de verdade |
+| **Theatro Pedro II** | compre ingresso na bilheteria e assista ao espetáculo (passa o tempo e cura) |
+| **Minha casa** | cama (dorme até amanhecer, **salva o jogo**), geladeira, TV com notícias, computador com seu progresso |
+| **Academia** | cada treino ($10) dá +força nos socos (até 5) |
+| **Catedral** | velas, bancos para rezar e confissão ($100 limpa a ficha na polícia) |
+
+Na rua: **hidrantes** (jorram água), **lixeiras** (às vezes tem dinheiro), **bancos** (sente e recupere vida), **caixas de correio**, **bancas de jornal**, **máquinas de refrigerante** e **pontos de ônibus** (viagem rápida, $5). Os pedestres agora respondem: aperte **E** perto de um deles para conversar — eles dão dicas, falam da cidade e às vezes mostram o caminho até um lugar (seta no jogo e no minimapa). Também cumprimentam e reagem a armas.
+
+## Trânsito mais vivo
+Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes de virar, carros que cedem à sirene da polícia, buzinas quando alguém fica preso no verde, mais carros na hora do rush e menos de madrugada.
 
 ## Objetivo
 - Atenda os **telefones amarelos** espalhados pela cidade para receber missões.
@@ -75,6 +95,7 @@ Se ficar pesado no seu computador, aperte **V** para um visual mais leve.
 | `missions.js` | telefones, lugares e as 12 missões |
 | `luz.js` | iluminação dinâmica, neblina, bloom, pixel art e cor de cinema |
 | `detalhes.js` | pombos e fumaça dos bueiros |
+| `lugares.js` | lugares de Ribeirão para entrar (salas por dentro), objetos de rua, conversas, visual do personagem |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |

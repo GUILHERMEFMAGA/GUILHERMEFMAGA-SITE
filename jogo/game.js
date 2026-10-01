@@ -21,7 +21,7 @@
 
   // ---------- Salvar / carregar ----------
   G.save = function () { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.save)); } catch (e) { } };
-  function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j && typeof j.money === 'number') S.save = Object.assign({ money: 0, done: 0, paint: 0, king: false }, j); } catch (e) { } }
+  function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j && typeof j.money === 'number') S.save = Object.assign({ money: 0, done: 0, paint: 0, king: false, look: {}, forca: 0 }, j); } catch (e) { } }
   const hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
 
   // ---------- Mensagens ----------
@@ -90,6 +90,8 @@
     S.cars.push(red); S.redCar = red;
     S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
     G.combat.reset(S);
+    S.sentado = null; S.trans = null; S.inside = null; S.bebado = 0; S.guia = null; S.prop = {};
+    G.lugares.aplicarLook(S);
     for (let k = 0; k < 10; k++) AI.spawnTraffic(S);
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
@@ -175,6 +177,8 @@
       const sp = run ? 175 : 108;
       let dx = (K('KeyD', 'ArrowRight') ? 1 : 0) - (K('KeyA', 'ArrowLeft') ? 1 : 0), dy = (K('KeyS', 'ArrowDown') ? 1 : 0) - (K('KeyW', 'ArrowUp') ? 1 : 0);
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      if (S.sentado || S.trans) { dx = 0; dy = 0; }
+      if (S.bebado > 0) { const b = Math.min(1, S.bebado / 3); dx += Math.sin(S.time * 2.7) * 0.55 * b; dy += Math.cos(S.time * 2.1) * 0.55 * b; }
       // empurrão de carro / explosão
       P.x += 0; let mvx = dx * sp + P.vx, mvy = dy * sp + P.vy; P.vx *= 0.88; P.vy *= 0.88;
       const okp = (x, y) => !W.isSolid(x, y) && !W.treeHit(x, y, 4);
@@ -185,11 +189,12 @@
       // armas: Espaço ataca/atira • Q troca de arma • 1-6 escolhem a arma
       if (Kp('KeyQ')) G.combat.cycle(S, 1);
       G.combat.ORDER.forEach((id, i) => { if (Kp('Digit' + (i + 1))) { if (!G.combat.select(S, id)) G.say('Você não tem essa arma (ou está sem munição).', 2); else G.snd.beep(); } });
-      G.combat.playerUpdate(S, dt, K('Space'), Kp('Space'));
+      if (!S.sentado && !S.trans) G.combat.playerUpdate(S, dt, K('Space'), Kp('Space'));
       // o que dá para fazer aqui?
       let action = null;
-      const car = nearestCar(P.x, P.y, 62);
-      if (car) { action = { t: 'car', car, s: 'E: ENTRAR NO CARRO' + (car.driver === 'ai' ? ' (ROUBAR)' : '') }; }
+      const car = S.sentado ? null : nearestCar(P.x, P.y, 62);
+      if (S.sentado) action = G.lugares.acao(S);
+      else if (car) { action = { t: 'car', car, s: 'E: ENTRAR NO CARRO' + (car.driver === 'ai' ? ' (ROUBAR)' : '') }; }
       else {
         for (const ph of M.PHONES) if (Math.hypot(ph.x - P.x, ph.y - P.y) < 50) action = { t: 'phone', s: M.active ? 'TELEFONE (MISSÃO EM ANDAMENTO)' : 'E: ATENDER TELEFONE', ph };
         const gg = M.POI.garage, hh = M.POI.hospital;
@@ -198,9 +203,11 @@
         const ar = M.POI.armas;
         if (!action && Math.hypot(ar.x - P.x, ar.y - P.y) < ar.r + 10) action = { t: 'shop', s: 'E: LOJA DE ARMAS' };
       }
+      if (!action) action = G.lugares.acao(S);
       if (action) S.prompt = action.s;
       if (action && Kp('KeyE')) {
-        if (action.t === 'car') enterCar(action.car);
+        if (action.t === 'lugar') action.run();
+        else if (action.t === 'car') enterCar(action.car);
         else if (action.t === 'phone') { if (!M.active) M.startNext(S, action.ph); else G.say('Termine a missão atual primeiro.', 3); }
         else if (action.t === 'garage') {
           const g = M.POI.garage; let r = S.redCar;
@@ -223,12 +230,14 @@
   }
 
   function goWasted() {
+    S.sentado = null;
     S.mode = 'wasted'; S.modeT = 0;
     if (M.active) M.fail(S, 'você foi levado ao hospital');
     if (S.player.car) exitCar();
     G.snd.fail();
   }
   function goBusted() {
+    S.sentado = null;
     S.mode = 'busted'; S.modeT = 0;
     if (M.active) M.fail(S, 'você foi preso');
     if (S.player.car) exitCar();
@@ -341,7 +350,8 @@
     // carros
     S.spawnT -= dt;
     const civ = S.cars.filter(c => c.driver === 'ai' && (c.mode === 'wander'));
-    if (civ.length < 16 && S.spawnT <= 0) { S.spawnT = 0.5; AI.spawnTraffic(S, Math.random() < 0.06 ? 'police' : null); }
+    const fd = S.dayT - Math.floor(S.dayT), capCarros = (fd > 0.3 && fd < 0.4) || (fd > 0.68 && fd < 0.78) ? 22 : (fd < 0.16 || fd > 0.88) ? 11 : 16;   // hora do rush tem mais carros, madrugada menos
+    if (civ.length < capCarros && S.spawnT <= 0) { S.spawnT = 0.5; AI.spawnTraffic(S, Math.random() < 0.06 ? 'police' : null); }
     for (const c of S.cars) { if (c.driver === 'ai' && c.mode === 'wander') { if (c.speed < 8) c.idleT += dt; else c.idleT = 0; } }
     S.cars = S.cars.filter(c => {
       if (c.idleT > 14 && Math.hypot(c.x - ref.x, c.y - ref.y) > 650) return false;
@@ -391,6 +401,7 @@
       updateCars(dt);
       managePopulation(dt);
       G.detalhes.update(S, W, dt);
+      G.lugares.atualizar(S, dt);
       updatePolice(dt);
       G.combat.update(S, dt);
       M.update(S, dt);
@@ -437,6 +448,7 @@
     vis.forEach(p => { if (p.state !== 'dead') SP.drawPed(ctx, p, S.time); });
     if (!S.player.car && S.mode !== 'title') { if (S.player.iframes > 0 && Math.floor(S.time * 14) % 2 === 0) { } else SP.drawPed(ctx, S.player, S.time); }
     G.detalhes.draw(ctx, S, inV);            // pombos
+    G.lugares.desenhar(ctx, S, inV);         // marcadores dos lugares, balões de fala, seta do guia
     AI.drawLights(ctx, vx0, vy0, vx1, vy1, S.time);
     G.combat.drawAir(ctx, S, inV);          // balas e granadas
     // partículas
@@ -561,6 +573,21 @@
       for (const k in pressed) delete pressed[k];
       return;
     }
+    G.lugares.atualizarTrans(S, dt);
+    if (S.mode === 'inside') {
+      // dentro de um lugar (barbearia, teatro, casa...): outra tela, outro mundo
+      if (S.msg) { S.msg.t -= dt; if (S.msg.t <= 0) S.msg = null; }
+      if (S.radioT > 0) S.radioT -= dt;
+      G.lugares.atualizarDentro(S, dt, K, Kp);
+      if (Kp('KeyR')) { G.snd.nextStation(); S.radioT = 3; }
+      if (Kp('KeyM')) G.say(G.snd.mute() ? 'Som desligado' : 'Som ligado', 2);
+      G.snd.update({ inCar: false, car: null, horn: false, sirenVol: 0 });
+      if (S.mode === 'inside') G.lugares.desenharDentro(ctx, S);
+      else { updateCamera(dt); drawWorld(); G.hud.draw(ctx, S, S.time); }
+      G.lugares.desenharTrans(ctx, S);
+      for (const k in pressed) delete pressed[k];
+      return;
+    }
     if (Kp('KeyP', 'Escape')) { if (S.mode === 'play') S.mode = 'paused'; else if (S.mode === 'paused') S.mode = 'play'; }
     if (S.mode === 'paused' && Kp('Enter')) S.mode = 'play';
     if (S.mode === 'shop') { for (const k in pressed) if (G.combat.shopKey(S, k)) { S.mode = 'play'; G.snd.door(); break; } }
@@ -571,6 +598,7 @@
     if (S.mode === 'busted') drawOverlay('PRESO!', 'A polícia te pegou...', '#6a8bff');
     if (S.mode === 'shop') G.combat.drawShop(ctx, S);
     if (S.mode === 'paused') drawOverlay('PAUSADO', 'P ou ENTER para continuar', '#ffe04a');
+    G.lugares.desenharTrans(ctx, S);
     for (const k in pressed) delete pressed[k];
   }
 

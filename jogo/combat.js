@@ -308,7 +308,7 @@
       if (p.state === 'dead' || p.mission) continue;
       const dx = p.x - P.x, dy = p.y - P.y, d = Math.hypot(dx, dy);
       if (d < w.range && (dx * fx + dy * fy) > 0) {
-        hurtPed(S, p, w.dmg * rand(0.85, 1.25), P.x, P.y, w.id === 'bat' ? 230 : 140, 'player');
+        hurtPed(S, p, w.dmg * (1 + 0.18 * ((S.save && S.save.forca) || 0)) * rand(0.85, 1.25), P.x, P.y, w.id === 'bat' ? 230 : 140, 'player');
         if (w.id === 'bat') G.snd.thud();
         hits++; if (hits >= (w.id === 'bat' ? 2 : 1)) break;
       }
