@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17151d">
+  <meta name="description" content="Jogo de fuga em visão superior, inspirado na referência enviada.">
+  <title>Fuga Urbana — jogo</title>
+  <link rel="stylesheet" href="./game.css">
+  <script src="./game.js" defer></script>
+</head>
+<body>
+  <main class="cabinet" aria-label="Fuga Urbana, jogo de perseguição">
+    <canvas id="game" aria-label="Jogo em visão superior. Use as setas ou WASD para dirigir.">
+      Seu navegador não oferece suporte ao Canvas.
+    </canvas>
+
+    <div id="message" class="message" hidden>
+      <section class="message-card" role="dialog" aria-modal="true" aria-labelledby="message-title">
+        <p id="message-kicker" class="message-kicker">PERSEGUIÇÃO</p>
+        <h1 id="message-title">FIM DE JOGO</h1>
+        <p id="message-copy">A polícia alcançou seu carro.</p>
+        <button id="message-action" type="button">Tentar novamente</button>
+        <span class="message-hint">ou pressione R</span>
+      </section>
+    </div>
+
+    <div class="touch-controls" aria-label="Controles de direção">
+      <button type="button" data-control="up" class="touch-up" aria-label="Acelerar">▲</button>
+      <button type="button" data-control="left" class="touch-left" aria-label="Virar à esquerda">◀</button>
+      <button type="button" data-control="down" class="touch-down" aria-label="Frear ou dar ré">▼</button>
+      <button type="button" data-control="right" class="touch-right" aria-label="Virar à direita">▶</button>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,1500 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17151d">
+  <meta name="description" content="Jogo de fuga em visão superior, inspirado na referência enviada.">
+  <title>Fuga Urbana — jogo</title>
+  <style>
+:root {
+  color-scheme: dark;
+  font-family: 'Barlow Condensed', Impact, 'Arial Narrow', sans-serif;
+  background: #17151d;
+  color: #fff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(72, 65, 83, .42), transparent 60%),
+    #17151d;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.cabinet {
+  position: relative;
+  isolation: isolate;
+  width: min(100vw, 133.333dvh);
+  height: min(100dvh, 75vw);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #746c82;
+  border: 1px solid rgba(229, 221, 185, .24);
+  box-shadow:
+    0 24px 90px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(0, 0, 0, .5),
+    inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #746c82;
+  touch-action: none;
+}
+
+.cabinet::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  box-shadow: inset 0 0 64px rgba(20, 15, 27, .13);
+}
+
+.message {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(19, 17, 25, .56);
+  backdrop-filter: blur(3px);
+}
+
+.message[hidden] { display: none; }
+
+.message-card {
+  width: min(440px, 92%);
+  padding: 32px 34px 28px;
+  text-align: center;
+  border: 1px solid rgba(255, 226, 92, .36);
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(48, 43, 57, .98), rgba(26, 24, 32, .98));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .45), inset 0 1px rgba(255, 255, 255, .08);
+}
+
+.message-kicker {
+  margin: 0 0 8px;
+  color: #f6cf35;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.message-card h1 {
+  margin: 0;
+  color: #fff4c3;
+  font-size: clamp(34px, 8vw, 54px);
+  font-weight: 900;
+  line-height: .98;
+  letter-spacing: .015em;
+  text-shadow: 0 3px 0 #4b3b17;
+}
+
+.message-card > p:not(.message-kicker) {
+  margin: 14px 0 22px;
+  color: #d8d2dc;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.message-card button {
+  min-width: 190px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(#ffdf43, #f2b725);
+  color: #241d10;
+  font: 900 17px 'Barlow Condensed', Impact, sans-serif;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 0 #966b17, 0 9px 18px rgba(0, 0, 0, .28);
+  cursor: pointer;
+}
+
+.message-card button:hover { filter: brightness(1.08); }
+.message-card button:active { transform: translateY(2px); box-shadow: 0 2px 0 #966b17; }
+.message-card button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+
+.message-hint {
+  display: block;
+  margin-top: 13px;
+  color: #a7a1ad;
+  font: 11px system-ui, sans-serif;
+}
+
+.touch-controls {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(73px, env(safe-area-inset-bottom));
+  width: 154px;
+  height: 148px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 5px;
+  pointer-events: none;
+}
+
+.touch-controls button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 13px;
+  background: rgba(24, 22, 32, .62);
+  color: rgba(255, 255, 255, .92);
+  font: 700 20px system-ui, sans-serif;
+  text-shadow: 0 2px 4px #000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .1);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.touch-controls button:active,
+.touch-controls button.is-pressed {
+  background: rgba(246, 193, 42, .8);
+  color: #1a1720;
+}
+
+.touch-up { grid-area: 1 / 2; }
+.touch-left { grid-area: 2 / 1; }
+.touch-down { grid-area: 2 / 2; }
+.touch-right { grid-area: 2 / 3; }
+
+@media (pointer: coarse), (max-width: 700px) {
+  .touch-controls { display: grid; }
+}
+
+@media (max-width: 520px) {
+  .cabinet {
+    border: 0;
+    box-shadow: none;
+  }
+  .message-card { padding: 25px 22px 23px; }
+}
+
+</style>
+</head>
+<body>
+  <main class="cabinet" aria-label="Fuga Urbana, jogo de perseguição">
+    <canvas id="game" aria-label="Jogo em visão superior. Use as setas ou WASD para dirigir.">
+      Seu navegador não oferece suporte ao Canvas.
+    </canvas>
+
+    <div id="message" class="message" hidden>
+      <section class="message-card" role="dialog" aria-modal="true" aria-labelledby="message-title">
+        <p id="message-kicker" class="message-kicker">PERSEGUIÇÃO</p>
+        <h1 id="message-title">FIM DE JOGO</h1>
+        <p id="message-copy">A polícia alcançou seu carro.</p>
+        <button id="message-action" type="button">Tentar novamente</button>
+        <span class="message-hint">ou pressione R</span>
+      </section>
+    </div>
+
+    <div class="touch-controls" aria-label="Controles de direção">
+      <button type="button" data-control="up" class="touch-up" aria-label="Acelerar">▲</button>
+      <button type="button" data-control="left" class="touch-left" aria-label="Virar à esquerda">◀</button>
+      <button type="button" data-control="down" class="touch-down" aria-label="Frear ou dar ré">▼</button>
+      <button type="button" data-control="right" class="touch-right" aria-label="Virar à direita">▶</button>
+    </div>
+  </main>
+  <script>
+(() => {
+  'use strict';
+
+  const WORLD = { width: 1200, height: 900 };
+  const ROAD = { left: 320, right: 880, top: 270, bottom: 630 };
+  const TARGET = { x: 790, y: 112 };
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const cabinet = document.querySelector('.cabinet');
+  const message = document.getElementById('message');
+  const messageKicker = document.getElementById('message-kicker');
+  const messageTitle = document.getElementById('message-title');
+  const messageCopy = document.getElementById('message-copy');
+  const messageAction = document.getElementById('message-action');
+  const background = document.createElement('canvas');
+  background.width = WORLD.width;
+  background.height = WORLD.height;
+  const bg = background.getContext('2d');
+
+  const pressed = new Set();
+  let view = { width: 0, height: 0, dpr: 1, scale: 1, x: 0, y: 0 };
+  let lastFrame = 0;
+  let elapsed = 0;
+  let gameState = 'playing';
+  let cash = 15280;
+  let multiplier = 1;
+  let heat = 0;
+  let toast = { text: '', time: 0 };
+  let collisionCooldown = 0;
+  let startHint = 7;
+
+  const playerStart = { x: 600, y: 454, angle: 0 };
+  const copStarts = [
+    { x: 431, y: 570, angle: 0.68, pace: 77 },
+    { x: 806, y: 405, angle: -0.78, pace: 72 },
+  ];
+  const trafficStarts = [
+    { x: 677, y: 828, angle: Math.PI, color: 'green', pace: 31 },
+    { x: 1104, y: 450, angle: -Math.PI / 2, color: 'cream', pace: 25 },
+  ];
+
+  let player;
+  let cops;
+  let traffic;
+  let pedestrians;
+
+  const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+  const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  function roundedRect(context, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    context.beginPath();
+    context.moveTo(x + r, y);
+    context.lineTo(x + width - r, y);
+    context.quadraticCurveTo(x + width, y, x + width, y + r);
+    context.lineTo(x + width, y + height - r);
+    context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    context.lineTo(x + r, y + height);
+    context.quadraticCurveTo(x, y + height, x, y + height - r);
+    context.lineTo(x, y + r);
+    context.quadraticCurveTo(x, y, x + r, y);
+    context.closePath();
+  }
+
+  function sidewalkPathTopLeft(context) {
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(340, 0);
+    context.lineTo(340, 190);
+    context.quadraticCurveTo(340, 270, 260, 270);
+    context.lineTo(0, 270);
+    context.closePath();
+  }
+
+  function sidewalkPathTopRight(context) {
+    context.beginPath();
+    context.moveTo(860, 0);
+    context.lineTo(1200, 0);
+    context.lineTo(1200, 270);
+    context.lineTo(940, 270);
+    context.quadraticCurveTo(860, 270, 860, 190);
+    context.closePath();
+  }
+
+  function sidewalkPathBottomLeft(context) {
+    context.beginPath();
+    context.moveTo(0, 630);
+    context.lineTo(260, 630);
+    context.quadraticCurveTo(340, 630, 340, 710);
+    context.lineTo(340, 900);
+    context.lineTo(0, 900);
+    context.closePath();
+  }
+
+  function sidewalkPathBottomRight(context) {
+    context.beginPath();
+    context.moveTo(940, 630);
+    context.lineTo(1200, 630);
+    context.lineTo(1200, 900);
+    context.lineTo(860, 900);
+    context.lineTo(860, 710);
+    context.quadraticCurveTo(860, 630, 940, 630);
+    context.closePath();
+  }
+
+  const sidewalkPaths = [
+    sidewalkPathTopLeft,
+    sidewalkPathTopRight,
+    sidewalkPathBottomLeft,
+    sidewalkPathBottomRight,
+  ];
+
+  function drawSidewalkTiles(context) {
+    const tileColors = ['#d9d4aa', '#d4d0a6', '#dfd9b0', '#d7d2a9'];
+    sidewalkPaths.forEach((makePath, shapeIndex) => {
+      context.save();
+      makePath(context);
+      context.clip();
+      context.fillStyle = '#d8d3a9';
+      context.fillRect(0, 0, WORLD.width, WORLD.height);
+
+      for (let row = 0, y = 0; y < WORLD.height; row += 1, y += 58) {
+        for (let col = 0, x = 0; x < WORLD.width; col += 1, x += 58) {
+          const variant = (row * 7 + col * 3 + shapeIndex * 5) % tileColors.length;
+          context.globalAlpha = ((row + col + shapeIndex) % 3 === 0) ? 0.2 : 0.11;
+          context.fillStyle = tileColors[variant];
+          context.fillRect(x + 1, y + 1, 56, 56);
+        }
+      }
+      context.globalAlpha = 1;
+      context.strokeStyle = 'rgba(105, 100, 77, .3)';
+      context.lineWidth = 2;
+      for (let x = 0; x <= WORLD.width; x += 58) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, WORLD.height);
+        context.stroke();
+      }
+      for (let y = 0; y <= WORLD.height; y += 58) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(WORLD.width, y);
+        context.stroke();
+      }
+      context.restore();
+    });
+  }
+
+  function drawBuildings(context) {
+    // Pequeno canteiro/área verde no quarteirão superior esquerdo.
+    context.save();
+    context.fillStyle = 'rgba(35, 39, 34, .22)';
+    context.fillRect(11, 15, 137, 132);
+    context.fillStyle = '#596153';
+    context.fillRect(3, 5, 137, 132);
+    context.fillStyle = '#838b70';
+    context.fillRect(11, 13, 121, 116);
+    context.fillStyle = '#747d65';
+    context.fillRect(18, 21, 107, 99);
+    context.strokeStyle = 'rgba(34, 43, 36, .45)';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(18, 70);
+    context.lineTo(125, 70);
+    context.moveTo(72, 21);
+    context.lineTo(72, 120);
+    context.stroke();
+    // Arbustos vistos de cima.
+    for (const bush of [[37, 42], [98, 42], [40, 97], [97, 98]]) {
+      context.fillStyle = 'rgba(24, 30, 26, .32)';
+      context.beginPath();
+      context.ellipse(bush[0] + 3, bush[1] + 5, 18, 13, 0, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = '#647858';
+      context.beginPath();
+      context.ellipse(bush[0], bush[1], 17, 12, -0.2, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = 'rgba(190, 190, 130, .28)';
+      context.beginPath();
+      context.ellipse(bush[0] - 4, bush[1] - 3, 6, 3, -0.3, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+
+    // Clubhouse no quarteirão superior direito.
+    context.save();
+    context.fillStyle = 'rgba(42, 34, 28, .28)';
+    context.beginPath();
+    context.moveTo(894, 5);
+    context.lineTo(1200, 5);
+    context.lineTo(1200, 192);
+    context.lineTo(938, 192);
+    context.lineTo(894, 151);
+    context.closePath();
+    context.fill();
+
+    context.fillStyle = '#594739';
+    context.fillRect(885, -18, 315, 191);
+    const roof = context.createLinearGradient(890, 0, 1200, 165);
+    roof.addColorStop(0, '#9c8066');
+    roof.addColorStop(0.55, '#8d715a');
+    roof.addColorStop(1, '#765e4d');
+    context.fillStyle = roof;
+    context.fillRect(896, -12, 304, 179);
+    context.strokeStyle = 'rgba(53, 42, 34, .72)';
+    context.lineWidth = 7;
+    context.strokeRect(898, -10, 299, 178);
+    context.strokeStyle = 'rgba(225, 195, 158, .16)';
+    context.lineWidth = 2;
+    for (let y = 20; y < 156; y += 37) {
+      context.beginPath();
+      context.moveTo(905, y);
+      context.lineTo(1190, y);
+      context.stroke();
+    }
+    context.fillStyle = '#6b5343';
+    context.fillRect(931, 111, 92, 41);
+    context.fillStyle = '#d7bd87';
+    context.fillRect(937, 116, 80, 29);
+    context.fillStyle = '#463d31';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = '900 15px Impact, "Arial Narrow", sans-serif';
+    context.fillText('GOLF CLUB', 977, 130);
+    // Janelas e toldo na fachada.
+    for (const x of [1051, 1095, 1139]) {
+      context.fillStyle = '#534538';
+      context.fillRect(x, 97, 31, 46);
+      context.fillStyle = '#9da6a0';
+      context.fillRect(x + 4, 102, 23, 35);
+      context.fillStyle = 'rgba(203, 220, 204, .38)';
+      context.fillRect(x + 6, 104, 6, 29);
+    }
+    context.fillStyle = '#6c513d';
+    context.fillRect(897, 161, 303, 13);
+    context.restore();
+
+    // Fachada cortada no canto inferior direito.
+    context.save();
+    context.fillStyle = 'rgba(41, 31, 27, .25)';
+    context.fillRect(966, 790, 255, 124);
+    context.fillStyle = '#6a5142';
+    context.fillRect(972, 783, 249, 117);
+    context.fillStyle = '#92755e';
+    context.fillRect(985, 792, 236, 108);
+    context.fillStyle = '#755c49';
+    context.fillRect(1002, 810, 66, 90);
+    context.fillStyle = '#4c4037';
+    context.fillRect(1010, 818, 50, 82);
+    context.fillStyle = '#a8a17d';
+    context.fillRect(1090, 817, 95, 54);
+    context.fillStyle = '#66746a';
+    context.fillRect(1095, 822, 85, 44);
+    context.strokeStyle = 'rgba(46, 38, 32, .55)';
+    context.lineWidth = 5;
+    context.strokeRect(1090, 817, 95, 54);
+    context.restore();
+
+    // Caixas de serviço na calçada inferior esquerda.
+    context.save();
+    context.fillStyle = '#81795e';
+    context.fillRect(0, 832, 85, 68);
+    context.fillStyle = '#393a34';
+    context.fillRect(8, 840, 69, 50);
+    context.fillStyle = '#687b61';
+    context.fillRect(14, 846, 56, 27);
+    context.fillStyle = 'rgba(209, 229, 166, .75)';
+    context.font = '700 7px monospace';
+    context.fillText('RUA 04', 19, 858);
+    context.fillText('CLUBE →', 19, 868);
+    context.fillStyle = '#303039';
+    for (let i = 0; i < 4; i += 1) {
+      context.beginPath();
+      context.arc(20 + i * 15, 881, 3, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.restore();
+  }
+
+  function drawRoads(context) {
+    const asphalt = context.createLinearGradient(180, 0, 1000, 900);
+    asphalt.addColorStop(0, '#6d667b');
+    asphalt.addColorStop(0.43, '#817991');
+    asphalt.addColorStop(0.7, '#756d85');
+    asphalt.addColorStop(1, '#655e77');
+    context.fillStyle = asphalt;
+    context.beginPath();
+    context.rect(ROAD.left, 0, ROAD.right - ROAD.left, WORLD.height);
+    context.rect(0, ROAD.top, WORLD.width, ROAD.bottom - ROAD.top);
+    context.fill();
+
+    // Granulação sutil no asfalto para tirar o aspecto chapado.
+    let seed = 24681357;
+    const random = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    };
+    for (let i = 0; i < 1550; i += 1) {
+      const x = random() * WORLD.width;
+      const y = random() * WORLD.height;
+      if ((x > ROAD.left && x < ROAD.right) || (y > ROAD.top && y < ROAD.bottom)) {
+        context.globalAlpha = 0.025 + random() * 0.045;
+        context.fillStyle = random() > 0.5 ? '#f2eaf1' : '#342e42';
+        const size = 1 + random() * 2.3;
+        context.fillRect(x, y, size * 1.7, size);
+      }
+    }
+    context.globalAlpha = 1;
+
+    // Meio-fio: sombra escura, faixa de concreto e brilho da borda.
+    const curbs = [
+      (c) => { c.beginPath(); c.moveTo(0, 270); c.lineTo(260, 270); c.quadraticCurveTo(340, 270, 340, 190); c.lineTo(340, 0); },
+      (c) => { c.beginPath(); c.moveTo(860, 0); c.lineTo(860, 190); c.quadraticCurveTo(860, 270, 940, 270); c.lineTo(1200, 270); },
+      (c) => { c.beginPath(); c.moveTo(0, 630); c.lineTo(260, 630); c.quadraticCurveTo(340, 630, 340, 710); c.lineTo(340, 900); },
+      (c) => { c.beginPath(); c.moveTo(860, 900); c.lineTo(860, 710); c.quadraticCurveTo(860, 630, 940, 630); c.lineTo(1200, 630); },
+    ];
+    curbs.forEach((makePath) => {
+      context.save();
+      makePath(context);
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.strokeStyle = 'rgba(52, 46, 59, .58)';
+      context.lineWidth = 18;
+      context.stroke();
+      context.strokeStyle = '#e9e4cf';
+      context.lineWidth = 10;
+      context.stroke();
+      context.strokeStyle = 'rgba(255, 255, 245, .72)';
+      context.lineWidth = 3;
+      context.stroke();
+      context.restore();
+    });
+
+    // Faixas amarelas tracejadas das avenidas.
+    context.save();
+    context.strokeStyle = '#f4d34d';
+    context.lineWidth = 6;
+    context.lineCap = 'butt';
+    context.setLineDash([39, 51]);
+    context.beginPath();
+    context.moveTo(600, -8);
+    context.lineTo(600, WORLD.height + 8);
+    context.moveTo(-10, 450);
+    context.lineTo(WORLD.width + 10, 450);
+    context.stroke();
+    context.setLineDash([28, 45]);
+    context.lineWidth = 5;
+    context.beginPath();
+    context.moveTo(447, 660);
+    context.lineTo(447, 900);
+    context.moveTo(753, 660);
+    context.lineTo(753, 900);
+    context.stroke();
+    context.restore();
+
+    // Tampas de bueiro discretas.
+    for (const manhole of [[368, 342], [833, 575], [931, 467], [517, 647], [738, 212]]) {
+      context.save();
+      context.fillStyle = 'rgba(47, 43, 55, .32)';
+      context.beginPath();
+      context.ellipse(manhole[0], manhole[1], 14, 9, -0.12, 0, Math.PI * 2);
+      context.fill();
+      context.strokeStyle = 'rgba(190, 185, 198, .2)';
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.ellipse(manhole[0], manhole[1], 10, 6, -0.12, 0, Math.PI * 2);
+      context.stroke();
+      context.restore();
+    }
+  }
+
+  function drawStreetFurniture(context) {
+    const poles = [
+      [286, 105], [919, 221], [286, 766], [912, 690], [1110, 625], [111, 637],
+    ];
+    poles.forEach(([x, y], index) => {
+      context.save();
+      context.fillStyle = 'rgba(43, 38, 34, .2)';
+      context.beginPath();
+      context.ellipse(x + 4, y + 7, 11, 7, 0, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = '#726e60';
+      context.beginPath();
+      context.arc(x, y, 7, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = index % 2 ? '#dfd8b9' : '#b5ad8e';
+      context.beginPath();
+      context.arc(x - 1, y - 1, 3, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    });
+
+    // Lixeiras e pequenas manchas urbanas nas calçadas.
+    for (const [x, y] of [[245, 193], [950, 184], [296, 722], [889, 817]]) {
+      context.save();
+      context.fillStyle = 'rgba(30, 28, 30, .22)';
+      context.beginPath();
+      context.ellipse(x + 2, y + 10, 10, 5, 0, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = '#465352';
+      roundedRect(context, x - 7, y - 9, 15, 19, 3);
+      context.fill();
+      context.fillStyle = '#74847b';
+      context.fillRect(x - 5, y - 8, 10, 3);
+      context.restore();
+    }
+  }
+
+  function buildBackground() {
+    bg.clearRect(0, 0, WORLD.width, WORLD.height);
+    const ground = bg.createLinearGradient(0, 0, WORLD.width, WORLD.height);
+    ground.addColorStop(0, '#c9c49e');
+    ground.addColorStop(0.55, '#d8d2a8');
+    ground.addColorStop(1, '#bdb894');
+    bg.fillStyle = ground;
+    bg.fillRect(0, 0, WORLD.width, WORLD.height);
+    drawSidewalkTiles(bg);
+    drawRoads(bg);
+    drawBuildings(bg);
+    drawStreetFurniture(bg);
+
+    // Vinheta quase imperceptível, como uma tela de arcade.
+    const vignette = bg.createRadialGradient(600, 440, 270, 600, 450, 820);
+    vignette.addColorStop(0, 'rgba(17, 14, 27, 0)');
+    vignette.addColorStop(1, 'rgba(17, 14, 27, .16)');
+    bg.fillStyle = vignette;
+    bg.fillRect(0, 0, WORLD.width, WORLD.height);
+  }
+
+  function makePedestrians() {
+    return [
+      { x: 151, y: 167, shirt: '#293f3d', pants: '#263136', skin: '#bd8d65', hair: '#201c1c', axis: 'x', phase: 0.3, pace: 4 },
+      { x: 971, y: 141, shirt: '#532c37', pants: '#263139', skin: '#c08a68', hair: '#211c1c', axis: 'y', phase: 1.4, pace: 3 },
+      { x: 1091, y: 224, shirt: '#e2b84c', pants: '#233045', skin: '#d5a47c', hair: '#3d3026', axis: 'x', phase: 2.2, pace: 3 },
+      { x: 861, y: 693, shirt: '#31476c', pants: '#2e3339', skin: '#d1a27b', hair: '#28201b', axis: 'y', phase: 3.5, pace: 4 },
+      { x: 804, y: 809, shirt: '#474032', pants: '#25292c', skin: '#b98b6c', hair: '#26211c', axis: 'x', phase: 4.2, pace: 3 },
+      { x: 172, y: 749, shirt: '#2b3b4d', pants: '#343138', skin: '#d4a07d', hair: '#261c1b', axis: 'y', phase: 5.1, pace: 3 },
+    ];
+  }
+
+  function resetActors() {
+    player = { ...playerStart, speed: 0, width: 62, length: 116, hitFlash: 0 };
+    cops = copStarts.map((car, index) => ({ ...car, index, width: 62, length: 111, kind: 'police' }));
+    traffic = trafficStarts.map((car) => ({ ...car, width: 59, length: 108, kind: car.color }));
+    pedestrians = makePedestrians();
+  }
+
+  function drawPedestrian(context, person, time) {
+    const bob = Math.sin(time * 0.006 + person.phase) * 1.5;
+    const stride = Math.sin(time * 0.013 + person.phase) * 2.2;
+    const drift = Math.sin(time * 0.0018 + person.phase) * person.pace;
+    const x = person.x + (person.axis === 'x' ? drift : 0);
+    const y = person.y + (person.axis === 'y' ? drift : 0) + bob;
+    const direction = person.axis === 'x' ? (Math.cos(time * 0.0018 + person.phase) >= 0 ? 1 : -1) : 0;
+
+    context.save();
+    context.translate(x, y);
+    if (direction < 0) context.scale(-1, 1);
+    context.fillStyle = 'rgba(32, 27, 29, .32)';
+    context.beginPath();
+    context.ellipse(2, 10, 10, 5, 0, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#28272a';
+    context.lineWidth = 4;
+    context.lineCap = 'round';
+    context.beginPath();
+    context.moveTo(-2, 6);
+    context.lineTo(-3 - stride, 12);
+    context.moveTo(2, 6);
+    context.lineTo(3 + stride, 12);
+    context.stroke();
+    context.fillStyle = person.pants;
+    roundedRect(context, -5, 0, 10, 9, 3);
+    context.fill();
+    context.fillStyle = '#292b2d';
+    context.beginPath();
+    context.ellipse(-4 - stride, 13, 4, 2.3, 0, 0, Math.PI * 2);
+    context.ellipse(4 + stride, 13, 4, 2.3, 0, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = person.shirt;
+    roundedRect(context, -7, -7, 14, 12, 4);
+    context.fill();
+    context.strokeStyle = person.shirt;
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(-5, -3);
+    context.lineTo(-8 - stride * 0.4, 3);
+    context.moveTo(5, -3);
+    context.lineTo(8 + stride * 0.4, 3);
+    context.stroke();
+    context.fillStyle = person.skin;
+    context.beginPath();
+    context.arc(0, -10, 5.5, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = person.hair;
+    context.beginPath();
+    context.ellipse(0, -13, 5.2, 3.2, 0, Math.PI, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+
+  function drawCar(context, car, time, isPlayer = false) {
+    context.save();
+    context.translate(car.x, car.y);
+    context.rotate(car.angle);
+
+    const width = car.width;
+    const length = car.length;
+    const halfW = width / 2;
+    const halfL = length / 2;
+
+    // Sombra projetada para baixo e para a direita.
+    context.fillStyle = 'rgba(23, 19, 29, .38)';
+    context.beginPath();
+    context.ellipse(5, 8, halfW + 9, halfL + 5, 0, 0, Math.PI * 2);
+    context.fill();
+
+    // Pneus e pequenos reflexos nas rodas.
+    for (const side of [-1, 1]) {
+      for (const axle of [-1, 1]) {
+        const wx = side * (halfW - 1);
+        const wy = axle * (halfL * 0.48);
+        context.fillStyle = '#17191d';
+        roundedRect(context, wx - 5, wy - 15, 11, 30, 4);
+        context.fill();
+        context.fillStyle = 'rgba(160, 164, 164, .35)';
+        context.fillRect(wx - 3, wy - 11, 2, 18);
+      }
+    }
+
+    let topColor = '#d94643';
+    let midColor = '#b52f34';
+    let lowColor = '#8d252c';
+    if (car.kind === 'police') {
+      topColor = '#edf0e8';
+      midColor = '#d8ddd9';
+      lowColor = '#aeb9bd';
+    } else if (car.kind === 'green') {
+      topColor = '#71a978';
+      midColor = '#428052';
+      lowColor = '#28543f';
+    } else if (car.kind === 'cream') {
+      topColor = '#d8c9a6';
+      midColor = '#b9aa88';
+      lowColor = '#88785d';
+    }
+
+    const bodyGradient = context.createLinearGradient(-halfW, 0, halfW, 0);
+    bodyGradient.addColorStop(0, lowColor);
+    bodyGradient.addColorStop(0.2, midColor);
+    bodyGradient.addColorStop(0.52, topColor);
+    bodyGradient.addColorStop(0.84, midColor);
+    bodyGradient.addColorStop(1, lowColor);
+
+    context.shadowColor = 'rgba(0, 0, 0, .25)';
+    context.shadowBlur = 5;
+    context.shadowOffsetY = 2;
+    context.fillStyle = bodyGradient;
+    context.strokeStyle = '#28262b';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.moveTo(-halfW * 0.61, -halfL);
+    context.quadraticCurveTo(-halfW * 0.96, -halfL + 2, -halfW * 0.97, -halfL + 19);
+    context.lineTo(-halfW * 0.83, halfL - 18);
+    context.quadraticCurveTo(-halfW * 0.77, halfL - 2, -halfW * 0.44, halfL);
+    context.lineTo(halfW * 0.44, halfL);
+    context.quadraticCurveTo(halfW * 0.77, halfL - 2, halfW * 0.83, halfL - 18);
+    context.lineTo(halfW * 0.97, -halfL + 19);
+    context.quadraticCurveTo(halfW * 0.96, -halfL + 2, halfW * 0.61, -halfL);
+    context.closePath();
+    context.fill();
+    context.shadowColor = 'transparent';
+    context.shadowBlur = 0;
+    context.shadowOffsetY = 0;
+    context.stroke();
+
+    // Para-lamas e vincos do capô.
+    context.strokeStyle = 'rgba(255, 255, 255, .32)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(-halfW + 8, -halfL + 21);
+    context.lineTo(-halfW + 10, halfL - 20);
+    context.moveTo(halfW - 8, -halfL + 21);
+    context.lineTo(halfW - 10, halfL - 20);
+    context.stroke();
+
+    // Capô dianteiro.
+    context.fillStyle = car.kind === 'police' ? '#f5f5ec' : (car.kind === 'green' ? '#77ae7b' : (car.kind === 'cream' ? '#dfd2b5' : '#e95450'));
+    context.beginPath();
+    context.moveTo(-halfW * 0.58, -halfL + 9);
+    context.quadraticCurveTo(0, -halfL + 4, halfW * 0.58, -halfL + 9);
+    context.lineTo(halfW * 0.59, -halfL + 32);
+    context.quadraticCurveTo(0, -halfL + 37, -halfW * 0.59, -halfL + 32);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = 'rgba(48, 38, 43, .48)';
+    context.lineWidth = 1.3;
+    context.stroke();
+
+    // Vidro dianteiro, teto e vidro traseiro.
+    const glass = context.createLinearGradient(-halfW, -18, halfW, 20);
+    glass.addColorStop(0, '#24313a');
+    glass.addColorStop(0.46, '#52636a');
+    glass.addColorStop(1, '#202a32');
+    context.fillStyle = glass;
+    context.strokeStyle = 'rgba(26, 27, 32, .9)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(-halfW * 0.67, -halfL + 34);
+    context.quadraticCurveTo(0, -halfL + 27, halfW * 0.67, -halfL + 34);
+    context.lineTo(halfW * 0.58, -9);
+    context.quadraticCurveTo(0, -4, -halfW * 0.58, -9);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    context.fillStyle = car.kind === 'police' ? '#d9e0df' : (car.kind === 'green' ? '#559061' : (car.kind === 'cream' ? '#cabb99' : '#c43b3e'));
+    context.beginPath();
+    context.moveTo(-halfW * 0.61, -5);
+    context.quadraticCurveTo(0, -1, halfW * 0.61, -5);
+    context.lineTo(halfW * 0.63, 23);
+    context.quadraticCurveTo(0, 29, -halfW * 0.63, 23);
+    context.closePath();
+    context.fill();
+    context.strokeStyle = 'rgba(40, 37, 42, .64)';
+    context.lineWidth = 1.5;
+    context.stroke();
+
+    context.fillStyle = glass;
+    context.beginPath();
+    context.moveTo(-halfW * 0.59, 27);
+    context.quadraticCurveTo(0, 32, halfW * 0.59, 27);
+    context.lineTo(halfW * 0.55, halfL - 13);
+    context.quadraticCurveTo(0, halfL - 7, -halfW * 0.55, halfL - 13);
+    context.closePath();
+    context.fill();
+    context.stroke();
+
+    // Reflexos nos vidros.
+    context.strokeStyle = 'rgba(230, 239, 233, .34)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(-halfW * 0.42, -halfL + 37);
+    context.lineTo(-halfW * 0.3, -12);
+    context.moveTo(-halfW * 0.39, 31);
+    context.lineTo(-halfW * 0.29, halfL - 16);
+    context.stroke();
+
+    if (car.kind === 'police') {
+      // Faixas azuis e barra de luz vermelha/azul.
+      context.fillStyle = '#244c82';
+      context.fillRect(-halfW + 5, -10, 9, 34);
+      context.fillRect(halfW - 14, -10, 9, 34);
+      context.fillStyle = '#f0eee6';
+      context.fillRect(-halfW + 3, 4, width - 6, 14);
+      context.fillStyle = '#2d4f82';
+      context.font = '900 7px Arial, sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      context.fillText('POLICE', 0, 11);
+
+      const pulse = Math.sin(time * 0.018 + car.index * 1.4) > 0;
+      context.save();
+      context.globalAlpha = pulse ? 0.92 : 0.56;
+      context.shadowColor = pulse ? '#ff3b32' : '#348aff';
+      context.shadowBlur = 12;
+      roundedRect(context, -17, -1, 16, 8, 2);
+      context.fillStyle = pulse ? '#f54c40' : '#f1f4f4';
+      context.fill();
+      roundedRect(context, 1, -1, 16, 8, 2);
+      context.fillStyle = pulse ? '#f1f4f4' : '#3681e5';
+      context.fill();
+      context.restore();
+    }
+
+    // Faróis e lanternas traseiras.
+    context.fillStyle = '#fff0b5';
+    roundedRect(context, -halfW + 5, -halfL + 3, 10, 5, 2);
+    context.fill();
+    roundedRect(context, halfW - 15, -halfL + 3, 10, 5, 2);
+    context.fill();
+    context.fillStyle = '#9e292f';
+    roundedRect(context, -halfW + 6, halfL - 8, 9, 4, 2);
+    context.fill();
+    roundedRect(context, halfW - 15, halfL - 8, 9, 4, 2);
+    context.fill();
+
+    if (isPlayer) {
+      // Reflexo de pintura na lateral do carro do jogador.
+      context.strokeStyle = 'rgba(255, 221, 206, .44)';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(-halfW + 4, -halfL + 24);
+      context.lineTo(-halfW + 7, halfL - 24);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  function drawBriefcase(context, x, y, size = 1) {
+    context.save();
+    context.translate(x, y);
+    context.scale(size, size);
+    context.fillStyle = '#302720';
+    roundedRect(context, -13, -9, 26, 19, 4);
+    context.fill();
+    context.fillStyle = '#d4a848';
+    roundedRect(context, -11, -8, 22, 15, 3);
+    context.fill();
+    context.fillStyle = '#55402b';
+    roundedRect(context, -5, -12, 10, 5, 2);
+    context.fill();
+    context.fillRect(-1, -3, 2, 6);
+    context.fillStyle = '#f5d887';
+    context.fillRect(-8, -5, 5, 2);
+    context.restore();
+  }
+
+  function drawDestination(context, time) {
+    const pulse = 0.5 + (Math.sin(time * 0.004) + 1) * 0.18;
+    context.save();
+    context.translate(TARGET.x, TARGET.y);
+    context.globalAlpha = pulse;
+    const glow = context.createRadialGradient(0, 0, 4, 0, 0, 54);
+    glow.addColorStop(0, 'rgba(250, 225, 84, .36)');
+    glow.addColorStop(1, 'rgba(250, 225, 84, 0)');
+    context.fillStyle = glow;
+    context.beginPath();
+    context.arc(0, 0, 54, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#ffe45a';
+    context.lineWidth = 4;
+    context.setLineDash([7, 6]);
+    context.beginPath();
+    context.ellipse(0, 0, 35, 16, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.setLineDash([]);
+    context.globalAlpha = 1;
+    context.fillStyle = 'rgba(20, 19, 25, .75)';
+    roundedRect(context, -37, -62, 74, 20, 7);
+    context.fill();
+    context.strokeStyle = 'rgba(255, 227, 88, .86)';
+    context.lineWidth = 1.5;
+    context.stroke();
+    context.fillStyle = '#ffdf49';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.font = '900 11px Impact, "Arial Narrow", sans-serif';
+    context.fillText('DESTINO', 0, -52);
+    drawBriefcase(context, 0, -7, 0.84);
+    context.restore();
+  }
+
+  function drawPoliceAvatar(context, cx, cy, variant = 0) {
+    const skin = ['#d3a17c', '#b98261', '#744a39'][variant % 3];
+    context.save();
+    context.translate(cx, cy);
+    context.fillStyle = 'rgba(13, 15, 20, .28)';
+    context.beginPath();
+    context.ellipse(1, 20, 20, 6, 0, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#233754';
+    context.beginPath();
+    context.moveTo(-17, 17);
+    context.quadraticCurveTo(-16, 8, -9, 7);
+    context.lineTo(9, 7);
+    context.quadraticCurveTo(17, 9, 18, 18);
+    context.closePath();
+    context.fill();
+    context.fillStyle = skin;
+    context.beginPath();
+    context.ellipse(0, 2, 11.5, 12.5, 0, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#28211e';
+    context.beginPath();
+    context.ellipse(0, -3, 11, 6, 0, Math.PI, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#17263d';
+    roundedRect(context, -17, -14, 34, 9, 4);
+    context.fill();
+    context.fillStyle = '#1e3452';
+    context.beginPath();
+    context.ellipse(0, -15, 15, 5, 0, Math.PI, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#f2c449';
+    context.beginPath();
+    context.arc(0, -12, 2.3, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = '#241e1d';
+    context.lineWidth = 1.4;
+    context.beginPath();
+    context.moveTo(-6, 1);
+    context.lineTo(-3, 1);
+    context.moveTo(3, 1);
+    context.lineTo(6, 1);
+    context.stroke();
+    context.restore();
+  }
+
+  function drawMiniMap(context) {
+    const x = 13;
+    const y = 823;
+    context.save();
+    context.fillStyle = 'rgba(15, 16, 19, .48)';
+    roundedRect(context, x + 3, y + 5, 73, 61, 9);
+    context.fill();
+    context.fillStyle = '#23252a';
+    roundedRect(context, x, y, 73, 60, 8);
+    context.fill();
+    context.strokeStyle = '#08090c';
+    context.lineWidth = 3;
+    context.stroke();
+    context.fillStyle = '#5e6d50';
+    roundedRect(context, x + 8, y + 7, 57, 31, 4);
+    context.fill();
+    context.fillStyle = '#727e5c';
+    context.fillRect(x + 10, y + 10, 53, 25);
+    // Miniatura da malha de ruas.
+    context.strokeStyle = '#9a9b85';
+    context.lineWidth = 6;
+    context.beginPath();
+    context.moveTo(x + 36, y + 10);
+    context.lineTo(x + 36, y + 35);
+    context.moveTo(x + 10, y + 23);
+    context.lineTo(x + 63, y + 23);
+    context.stroke();
+    context.strokeStyle = '#f0d044';
+    context.lineWidth = 1.5;
+    context.setLineDash([3, 2]);
+    context.beginPath();
+    context.moveTo(x + 38, y + 27);
+    context.lineTo(x + 47, y + 14);
+    context.stroke();
+    context.setLineDash([]);
+    context.fillStyle = '#ffe455';
+    context.beginPath();
+    context.arc(x + 47, y + 14, 3, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#f54f42';
+    context.beginPath();
+    context.arc(x + 36, y + 23, 3, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = '#111216';
+    for (let i = 0; i < 4; i += 1) {
+      context.beginPath();
+      context.arc(x + 15 + i * 13, y + 49, 3, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.fillStyle = '#8d9283';
+    context.fillRect(x + 12, y + 44, 49, 2);
+    context.restore();
+  }
+
+  function outlinedText(context, text, x, y, maxWidth, startSize, color, outline = '#17131b') {
+    let size = startSize;
+    context.textAlign = 'left';
+    context.textBaseline = 'alphabetic';
+    context.font = `900 ${size}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
+    while (context.measureText(text).width > maxWidth && size > 16) {
+      size -= 1;
+      context.font = `900 ${size}px Impact, "Arial Narrow", "Arial Black", sans-serif`;
+    }
+    context.lineJoin = 'round';
+    context.lineWidth = Math.max(4, size * 0.24);
+    context.strokeStyle = outline;
+    context.strokeText(text, x, y, maxWidth);
+    context.fillStyle = color;
+    context.fillText(text, x, y, maxWidth);
+  }
+
+  function drawHud(context, time) {
+    // Pequena dica de teclado.
+    if (startHint > 0) {
+      const alpha = Math.min(1, startHint / 1.2);
+      context.save();
+      context.globalAlpha = alpha * 0.9;
+      context.fillStyle = 'rgba(26, 24, 31, .74)';
+      roundedRect(context, 17, 16, 193, 30, 8);
+      context.fill();
+      context.fillStyle = '#e4dfd0';
+      context.textAlign = 'left';
+      context.textBaseline = 'middle';
+      context.font = '800 12px system-ui, sans-serif';
+      context.fillText('WASD  /  SETAS  •  ESPAÇO FREIA', 28, 31);
+      context.restore();
+    }
+
+    // Retratos dos policiais e medidor de perseguição.
+    drawPoliceAvatar(context, 539, 32, 0);
+    drawPoliceAvatar(context, 599, 32, 1);
+    drawPoliceAvatar(context, 659, 32, 2);
+    context.save();
+    context.fillStyle = 'rgba(19, 18, 25, .68)';
+    roundedRect(context, 522, 58, 154, 9, 5);
+    context.fill();
+    const heatWidth = 146 * (heat / 100);
+    if (heatWidth > 0) {
+      const meter = context.createLinearGradient(526, 0, 672, 0);
+      meter.addColorStop(0, '#efcf4a');
+      meter.addColorStop(0.55, '#f18c36');
+      meter.addColorStop(1, '#f2413d');
+      context.fillStyle = meter;
+      roundedRect(context, 526, 60, heatWidth, 5, 3);
+      context.fill();
+    }
+    context.restore();
+
+    // Dinheiro e multiplicador no alto à direita.
+    const moneyText = cash.toLocaleString('en-US');
+    context.save();
+    context.textBaseline = 'alphabetic';
+    context.textAlign = 'left';
+    context.lineJoin = 'round';
+    context.lineWidth = 8;
+    context.strokeStyle = '#211b20';
+    context.font = '900 43px Impact, "Arial Narrow", "Arial Black", sans-serif';
+    context.strokeText('$', 930, 51);
+    context.fillStyle = '#45d634';
+    context.fillText('$', 930, 51);
+    context.strokeText(moneyText, 972, 51);
+    context.fillStyle = '#ffe145';
+    context.fillText(moneyText, 972, 51);
+    context.font = '900 31px Impact, "Arial Narrow", "Arial Black", sans-serif';
+    context.strokeText(`x${multiplier}`, 1113, 50);
+    context.fillStyle = '#ffe145';
+    context.fillText(`x${multiplier}`, 1113, 50);
+    context.restore();
+
+    drawMiniMap(context);
+    outlinedText(context, 'ENTREGUE A MALETA AO CLUBE DE GOLFE. DESPISTE A POLÍCIA.', 91, 881, 1092, 26, '#ffe134');
+
+    if (heat > 70) {
+      context.save();
+      context.globalAlpha = 0.18 + Math.sin(time * 0.012) * 0.08;
+      context.fillStyle = '#e53236';
+      context.fillRect(0, 0, WORLD.width, 7);
+      context.restore();
+    }
+
+    if (toast.time > 0) {
+      const alpha = Math.min(1, toast.time * 2);
+      context.save();
+      context.globalAlpha = alpha;
+      context.font = '900 18px Impact, "Arial Narrow", sans-serif';
+      context.textAlign = 'center';
+      context.textBaseline = 'middle';
+      const width = Math.min(460, context.measureText(toast.text).width + 46);
+      context.fillStyle = 'rgba(24, 22, 30, .88)';
+      roundedRect(context, 600 - width / 2, 91, width, 38, 10);
+      context.fill();
+      context.strokeStyle = 'rgba(255, 221, 78, .68)';
+      context.lineWidth = 1.5;
+      context.stroke();
+      context.fillStyle = '#ffe45b';
+      context.fillText(toast.text, 600, 111);
+      context.restore();
+    }
+
+    // Aro discreto de perigo quando a viatura está muito perto.
+    const closest = Math.min(...cops.map((cop) => distance(player, cop)));
+    if (closest < 125) {
+      const dangerAlpha = clamp((125 - closest) / 125, 0, 0.28);
+      context.save();
+      context.globalAlpha = dangerAlpha * (0.65 + 0.35 * Math.sin(time * 0.018));
+      const edge = context.createRadialGradient(600, 450, 310, 600, 450, 740);
+      edge.addColorStop(0, 'rgba(198, 30, 44, 0)');
+      edge.addColorStop(1, 'rgba(198, 30, 44, .72)');
+      context.fillStyle = edge;
+      context.fillRect(0, 0, WORLD.width, WORLD.height);
+      context.restore();
+    }
+  }
+
+  function drawFrame(time) {
+    const pixelRatio = view.dpr;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.clearRect(0, 0, view.width, view.height);
+    ctx.setTransform(
+      pixelRatio * view.scale,
+      0,
+      0,
+      pixelRatio * view.scale,
+      pixelRatio * view.x,
+      pixelRatio * view.y,
+    );
+
+    ctx.drawImage(background, 0, 0);
+    pedestrians.forEach((person) => drawPedestrian(ctx, person, time));
+    drawDestination(ctx, time);
+    traffic.forEach((car) => drawCar(ctx, car, time));
+    cops.forEach((car) => drawCar(ctx, car, time));
+    drawCar(ctx, player, time, true);
+    drawHud(ctx, time);
+  }
+
+  function resizeCanvas() {
+    const rect = cabinet.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const width = Math.max(1, rect.width);
+    const height = Math.max(1, rect.height);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    view = {
+      width,
+      height,
+      dpr,
+      scale: Math.min(width / WORLD.width, height / WORLD.height),
+      x: (width - WORLD.width * Math.min(width / WORLD.width, height / WORLD.height)) / 2,
+      y: (height - WORLD.height * Math.min(width / WORLD.width, height / WORLD.height)) / 2,
+    };
+  }
+
+  function showToast(text, seconds = 2.2) {
+    toast = { text, time: seconds };
+  }
+
+  function showMessage(type) {
+    message.hidden = false;
+    if (type === 'caught') {
+      message.dataset.type = 'caught';
+      messageKicker.textContent = 'PERSEGUIÇÃO ENCERRADA';
+      messageTitle.textContent = 'VOCÊ FOI PEGO';
+      messageCopy.textContent = 'A polícia alcançou seu carro. Tente outra rota e acelere antes que o cerco feche.';
+      messageAction.textContent = 'Tentar novamente';
+    } else if (type === 'delivered') {
+      message.dataset.type = 'delivered';
+      messageKicker.textContent = 'MISSÃO CONCLUÍDA';
+      messageTitle.textContent = 'MALETA ENTREGUE';
+      messageCopy.textContent = `Entrega feita! Você recebeu $2,500. Saldo final: $${cash.toLocaleString('en-US')}.`;
+      messageAction.textContent = 'Jogar novamente';
+    } else {
+      message.dataset.type = 'paused';
+      messageKicker.textContent = 'FUGA URBANA';
+      messageTitle.textContent = 'PAUSADO';
+      messageCopy.textContent = 'A cidade espera. Quando estiver pronto, volte para a perseguição.';
+      messageAction.textContent = 'Continuar';
+    }
+  }
+
+  function setGameOver(type) {
+    gameState = type;
+    pressed.clear();
+    showMessage(type);
+  }
+
+  function resetGame() {
+    resetActors();
+    cash = 15280;
+    multiplier = 1;
+    heat = 0;
+    toast = { text: '', time: 0 };
+    collisionCooldown = 0;
+    startHint = 7;
+    gameState = 'playing';
+    message.hidden = true;
+    delete message.dataset.type;
+    pressed.clear();
+    lastFrame = performance.now();
+  }
+
+  function onRoad(x, y) {
+    return (x >= ROAD.left - 4 && x <= ROAD.right + 4) || (y >= ROAD.top - 4 && y <= ROAD.bottom + 4);
+  }
+
+  function turnTowards(current, target, amount) {
+    let difference = target - current;
+    while (difference > Math.PI) difference -= Math.PI * 2;
+    while (difference < -Math.PI) difference += Math.PI * 2;
+    return current + clamp(difference, -amount, amount);
+  }
+
+  function updatePlayer(dt) {
+    const oldX = player.x;
+    const oldY = player.y;
+    const oldAngle = player.angle;
+    const forward = pressed.has('up');
+    const reverse = pressed.has('down');
+    const braking = pressed.has('brake');
+    const steer = (pressed.has('right') ? 1 : 0) - (pressed.has('left') ? 1 : 0);
+
+    if (forward) player.speed += 245 * dt;
+    if (reverse) player.speed -= 310 * dt;
+    if (braking) player.speed *= Math.exp(-5.2 * dt);
+    else if (!forward && !reverse) player.speed *= Math.exp(-1.25 * dt);
+    player.speed = clamp(player.speed, -102, 254);
+    if (Math.abs(player.speed) < 1.2 && !forward && !reverse) player.speed = 0;
+
+    if (steer !== 0) {
+      const speedFactor = player.speed === 0 ? 0.48 : clamp(Math.abs(player.speed) / 105, 0.42, 1.25);
+      const reverseFactor = player.speed < -5 ? -1 : 1;
+      player.angle += steer * 2.35 * speedFactor * reverseFactor * dt;
+    }
+
+    player.x += Math.sin(player.angle) * player.speed * dt;
+    player.y -= Math.cos(player.angle) * player.speed * dt;
+
+    if (!onRoad(player.x, player.y)) {
+      player.x = oldX;
+      player.y = oldY;
+      player.angle = oldAngle;
+      player.speed *= -0.22;
+      if (collisionCooldown <= 0) {
+        showToast('CUIDADO COM A CALÇADA!');
+        collisionCooldown = 1.1;
+      }
+    }
+    player.x = clamp(player.x, 36, WORLD.width - 36);
+    player.y = clamp(player.y, 55, WORLD.height - 45);
+    player.hitFlash = Math.max(0, player.hitFlash - dt);
+  }
+
+  function updatePolice(dt) {
+    cops.forEach((cop, index) => {
+      const dx = player.x - cop.x;
+      const dy = player.y - cop.y;
+      const d = Math.hypot(dx, dy);
+      const desiredAngle = Math.atan2(dx, -dy);
+      cop.angle = turnTowards(cop.angle, desiredAngle, (1.08 + heat * 0.002) * dt);
+      const pace = cop.pace + heat * 0.12;
+      if (d > 62) {
+        const oldX = cop.x;
+        const oldY = cop.y;
+        cop.x += Math.sin(cop.angle) * pace * dt;
+        cop.y -= Math.cos(cop.angle) * pace * dt;
+        if (!onRoad(cop.x, cop.y)) {
+          cop.x = oldX;
+          cop.y = oldY;
+          // Se chegou a uma esquina, contorna pelo cruzamento.
+          cop.angle += (index === 0 ? 1 : -1) * 1.1 * dt;
+        }
+      }
+    });
+  }
+
+  function updateTraffic(dt) {
+    traffic.forEach((car) => {
+      car.x += Math.sin(car.angle) * car.pace * dt;
+      car.y -= Math.cos(car.angle) * car.pace * dt;
+      if (car.kind === 'green' && car.y < 730) car.y = 828;
+      if (car.kind === 'cream' && car.x < 900) car.x = 1120;
+    });
+  }
+
+  function update(dt) {
+    if (gameState !== 'playing') return;
+    elapsed += dt;
+    collisionCooldown = Math.max(0, collisionCooldown - dt);
+    toast.time = Math.max(0, toast.time - dt);
+    startHint = Math.max(0, startHint - dt);
+
+    updatePlayer(dt);
+    updatePolice(dt);
+    updateTraffic(dt);
+
+    const nearestCop = Math.min(...cops.map((cop) => distance(player, cop)));
+    if (nearestCop < 126) {
+      const pressure = nearestCop < 75 ? 31 : 14;
+      heat = clamp(heat + pressure * dt, 0, 100);
+    } else {
+      heat = clamp(heat - 11 * dt, 0, 100);
+    }
+
+    // Batidas reduzem parte do dinheiro e quebram o ritmo da fuga.
+    if (collisionCooldown <= 0) {
+      const hitCar = [...cops, ...traffic].find((car) => distance(player, car) < 49);
+      if (hitCar) {
+        player.speed *= -0.48;
+        player.hitFlash = 0.3;
+        cash = Math.max(0, cash - 120);
+        showToast('BATIDA! -$120');
+        collisionCooldown = 1.2;
+      }
+    }
+
+    if (distance(player, TARGET) < 52) {
+      cash += 2500 * multiplier;
+      multiplier = Math.min(5, multiplier + 1);
+      setGameOver('delivered');
+      return;
+    }
+
+    if (heat >= 100) {
+      setGameOver('caught');
+    }
+  }
+
+  function animationFrame(timestamp) {
+    const dt = lastFrame ? Math.min((timestamp - lastFrame) / 1000, 0.035) : 0;
+    lastFrame = timestamp;
+    update(dt);
+    drawFrame(timestamp);
+    window.requestAnimationFrame(animationFrame);
+  }
+
+  const keyBindings = {
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    Space: 'brake',
+  };
+
+  window.addEventListener('keydown', (event) => {
+    const control = keyBindings[event.code];
+    if (control) {
+      event.preventDefault();
+      pressed.add(control);
+    }
+    if (event.code === 'KeyR') {
+      event.preventDefault();
+      resetGame();
+    } else if (event.code === 'KeyP' || event.code === 'Escape') {
+      event.preventDefault();
+      if (gameState === 'playing') {
+        gameState = 'paused';
+        showMessage('paused');
+      } else if (gameState === 'paused') {
+        gameState = 'playing';
+        message.hidden = true;
+        pressed.clear();
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (event) => {
+    const control = keyBindings[event.code];
+    if (control) pressed.delete(control);
+  });
+
+  window.addEventListener('blur', () => pressed.clear());
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pressed.clear();
+  });
+
+  messageAction.addEventListener('click', () => {
+    if (gameState === 'paused') {
+      gameState = 'playing';
+      message.hidden = true;
+      pressed.clear();
+    } else {
+      resetGame();
+    }
+  });
+
+  document.querySelectorAll('.touch-controls button').forEach((button) => {
+    const control = button.dataset.control;
+    const release = (event) => {
+      if (event) event.preventDefault();
+      pressed.delete(control);
+      button.classList.remove('is-pressed');
+    };
+    button.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      pressed.add(control);
+      button.classList.add('is-pressed');
+      if (button.setPointerCapture) button.setPointerCapture(event.pointerId);
+    });
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointercancel', release);
+    button.addEventListener('lostpointercapture', release);
+    button.addEventListener('contextmenu', (event) => event.preventDefault());
+  });
+
+  buildBackground();
+  resetActors();
+  resizeCanvas();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(resizeCanvas).observe(cabinet);
+  } else {
+    window.addEventListener('resize', resizeCanvas);
+  }
+  window.requestAnimationFrame(animationFrame);
+})();
+
+  </script>
+</body>
+</html>

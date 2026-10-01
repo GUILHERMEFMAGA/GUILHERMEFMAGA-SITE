@@ -1,0 +1,187 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Barlow Condensed', Impact, 'Arial Narrow', sans-serif;
+  background: #17151d;
+  color: #fff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(72, 65, 83, .42), transparent 60%),
+    #17151d;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.cabinet {
+  position: relative;
+  isolation: isolate;
+  width: min(100vw, 133.333dvh);
+  height: min(100dvh, 75vw);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #746c82;
+  border: 1px solid rgba(229, 221, 185, .24);
+  box-shadow:
+    0 24px 90px rgba(0, 0, 0, .55),
+    0 0 0 1px rgba(0, 0, 0, .5),
+    inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #746c82;
+  touch-action: none;
+}
+
+.cabinet::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  box-shadow: inset 0 0 64px rgba(20, 15, 27, .13);
+}
+
+.message {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(19, 17, 25, .56);
+  backdrop-filter: blur(3px);
+}
+
+.message[hidden] { display: none; }
+
+.message-card {
+  width: min(440px, 92%);
+  padding: 32px 34px 28px;
+  text-align: center;
+  border: 1px solid rgba(255, 226, 92, .36);
+  border-radius: 18px;
+  background: linear-gradient(160deg, rgba(48, 43, 57, .98), rgba(26, 24, 32, .98));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .45), inset 0 1px rgba(255, 255, 255, .08);
+}
+
+.message-kicker {
+  margin: 0 0 8px;
+  color: #f6cf35;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .2em;
+}
+
+.message-card h1 {
+  margin: 0;
+  color: #fff4c3;
+  font-size: clamp(34px, 8vw, 54px);
+  font-weight: 900;
+  line-height: .98;
+  letter-spacing: .015em;
+  text-shadow: 0 3px 0 #4b3b17;
+}
+
+.message-card > p:not(.message-kicker) {
+  margin: 14px 0 22px;
+  color: #d8d2dc;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.message-card button {
+  min-width: 190px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(#ffdf43, #f2b725);
+  color: #241d10;
+  font: 900 17px 'Barlow Condensed', Impact, sans-serif;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 0 #966b17, 0 9px 18px rgba(0, 0, 0, .28);
+  cursor: pointer;
+}
+
+.message-card button:hover { filter: brightness(1.08); }
+.message-card button:active { transform: translateY(2px); box-shadow: 0 2px 0 #966b17; }
+.message-card button:focus-visible { outline: 3px solid white; outline-offset: 4px; }
+
+.message-hint {
+  display: block;
+  margin-top: 13px;
+  color: #a7a1ad;
+  font: 11px system-ui, sans-serif;
+}
+
+.touch-controls {
+  display: none;
+  position: absolute;
+  z-index: 3;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(73px, env(safe-area-inset-bottom));
+  width: 154px;
+  height: 148px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 5px;
+  pointer-events: none;
+}
+
+.touch-controls button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 13px;
+  background: rgba(24, 22, 32, .62);
+  color: rgba(255, 255, 255, .92);
+  font: 700 20px system-ui, sans-serif;
+  text-shadow: 0 2px 4px #000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .1);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.touch-controls button:active,
+.touch-controls button.is-pressed {
+  background: rgba(246, 193, 42, .8);
+  color: #1a1720;
+}
+
+.touch-up { grid-area: 1 / 2; }
+.touch-left { grid-area: 2 / 1; }
+.touch-down { grid-area: 2 / 2; }
+.touch-right { grid-area: 2 / 3; }
+
+@media (pointer: coarse), (max-width: 700px) {
+  .touch-controls { display: grid; }
+}
+
+@media (max-width: 520px) {
+  .cabinet {
+    border: 0;
+    box-shadow: none;
+  }
+  .message-card { padding: 25px 22px 23px; }
+}
