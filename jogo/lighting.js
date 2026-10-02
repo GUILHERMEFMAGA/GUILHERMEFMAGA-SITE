@@ -55,7 +55,9 @@ export function drawStreetLighting(ctx, elapsed, width, height, road) {
 
 /** Adiciona pequenos brilhos no capô e na lateral voltada para o sol. */
 export function drawCarHighlights(ctx, car, sun) {
-  if (!sun || !Number.isFinite(car.x) || !Number.isFinite(car.y)) return;
+  if (!ctx || !car || !sun
+    || !Number.isFinite(car.x) || !Number.isFinite(car.y) || !Number.isFinite(car.angle)
+    || !Number.isFinite(sun.x) || !Number.isFinite(sun.intensity) || !Number.isFinite(sun.warmth)) return;
   const litSide = sun.x < car.x ? -1 : 1;
   ctx.save();
   ctx.translate(Math.round(car.x), Math.round(car.y));

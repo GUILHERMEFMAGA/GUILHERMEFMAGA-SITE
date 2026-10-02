@@ -25,6 +25,16 @@ python3 jogo/build_offline.py
 
 O comando cria `Rua-Vermelha-offline.html` na raiz do repositório.
 
+## Simulação e validação
+
+A física do sedã fica isolada em `vehicle-physics.js`: aceleração, frenagem, geometria de bicicleta, aderência lateral e derrapagem com freio de mão. O loop simula a 60 Hz fixos, limita o tempo acumulado em travamentos e interpola a pose do carro durante a renderização para reduzir tremulação em telas de alta frequência.
+
+Rode os testes de física e iluminação com Node.js, sem dependências externas:
+
+```bash
+node --test jogo/tests/*.test.js
+```
+
 ## Controles
 
 - **WASD / setas:** dirigir; a pé, caminhar.

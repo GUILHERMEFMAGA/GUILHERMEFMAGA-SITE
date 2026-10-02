@@ -1,7 +1,11 @@
 import { drawCarHighlights, drawStreetLighting } from './lighting.js';
+import { stepVehicle } from './vehicle-physics.js';
 
 const WIDTH = 1568;
 const HEIGHT = 960;
+const FIXED_STEP = 1 / 60;
+const MAX_FRAME_DELTA = .1;
+const MAX_CATCH_UP_STEPS = 5;
 const CAR_CROP = { x: 708, y: 345, width: 154, height: 280 };
 // Silhueta do sedã na imagem normalizada. Cada linha define [y, x inicial, x final];
 // os limites incluem a borda escura do carro, mas excluem a sombra projetada na rua.
@@ -43,7 +47,8 @@ let engineOscillator = null;
 let engineGain = null;
 let sirenOscillator = null;
 let sirenGain = null;
-let lastFrame = 0;
+let lastFrame = null;
+let simulationAccumulator = 0;
 let hintTimer = 0;
 let toastTimer = 0;
 let radioTimer = 0;
@@ -88,12 +93,15 @@ const state = {
   mission: null,
   wanted: 0,
   foot: { x: 1035, y: 526, angle: 0 },
-  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, health: 100, hitCooldown: 0 },
+  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, lateralSpeed: 0, health: 100, hitCooldown: 0 },
+  previousCar: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0 },
   toast: '',
   toastUntil: 0,
   cameraShake: 0,
   capture: 0,
 };
+
+const renderCarPose = { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, health: 100 };
 
 const missions = [
   { id: 'delivery', title: 'Peça na hora', category: 'ENTREGA', description: 'Leve a peça até a oficina no fim da rua.', timer: 70, reward: 420, rep: 12, targets: [{ x: 784, y: 166, label: 'OFICINA' }] },
@@ -258,6 +266,8 @@ function changeSection(index, x, y) {
   streetCanvas = nextSection.background;
   state.car.x = x;
   state.car.y = y;
+  state.car.lateralSpeed = 0;
+  syncPreviousCarPose();
   policeCars.length = 0;
   state.capture = 0;
   state.cameraShake = Math.max(state.cameraShake, 1.4);
@@ -391,28 +401,27 @@ function vehicleHalfExtents(angle = state.car.angle) {
   };
 }
 
+function vehicleSpeedMagnitude(car = state.car) {
+  const forward = Number.isFinite(car.speed) ? car.speed : 0;
+  const lateral = Number.isFinite(car.lateralSpeed) ? car.lateralSpeed : 0;
+  return Math.hypot(forward, lateral);
+}
+
+function syncPreviousCarPose() {
+  state.previousCar.x = state.car.x;
+  state.previousCar.y = state.car.y;
+  state.previousCar.angle = state.car.angle;
+}
+
 function drive(dt) {
   const car = state.car;
   const forward = keys.has('w') || keys.has('arrowup');
   const backward = keys.has('s') || keys.has('arrowdown');
-  const left = keys.has('a') || keys.has('arrowleft');
-  const right = keys.has('d') || keys.has('arrowright');
+  const steer = Number(keys.has('d') || keys.has('arrowright')) - Number(keys.has('a') || keys.has('arrowleft'));
   const handbrake = keys.has('space');
-
-  if (forward) car.speed = Math.min(236, car.speed + 246 * dt);
-  else if (backward) car.speed = car.speed > 0 ? Math.max(0, car.speed - 440 * dt) : Math.max(-92, car.speed - 170 * dt);
-  else car.speed += Math.sign(-car.speed) * Math.min(Math.abs(car.speed), 86 * dt);
-  if (handbrake) car.speed *= Math.max(0, 1 - dt * 1.4);
-
-  const steer = (right ? 1 : 0) - (left ? 1 : 0);
-  if (steer) {
-    const pace = clamp(Math.abs(car.speed) / 95, 0, 1);
-    car.angle += steer * 1.35 * (.22 + pace * .78) * Math.sign(car.speed || 1) * dt;
-    if (handbrake && Math.abs(car.speed) > 50) car.angle += steer * .35 * dt;
-  }
-
-  const nextX = car.x + Math.sin(car.angle) * car.speed * dt;
-  const nextY = car.y - Math.cos(car.angle) * car.speed * dt;
+  const movement = stepVehicle(car, { forward, backward, steer, handbrake }, dt);
+  const nextX = car.x + movement.dx;
+  const nextY = car.y + movement.dy;
   const bounds = vehicleHalfExtents(car.angle);
   const insideLane = nextX - bounds.x > ROAD.left + 8 && nextX + bounds.x < ROAD.right - 8;
   const enteringMarket = state.section === 0 && sections.length > 1 && insideLane && nextY < car.y && nextY - bounds.y <= 12;
@@ -426,6 +435,7 @@ function drive(dt) {
     const insideRoad = insideLane && nextY - bounds.y > 12 && nextY + bounds.y < HEIGHT - 12;
     if (!insideRoad) {
       car.speed *= -.16;
+      car.lateralSpeed *= -.12;
       car.health = Math.max(0, car.health - (car.hitCooldown <= 0 ? 6 : 0));
       car.hitCooldown = .65;
       state.cameraShake = Math.min(7, state.cameraShake + 3.2);
@@ -471,7 +481,7 @@ function nearPhone() {
 
 function interact() {
   if (state.driving) {
-    if (Math.abs(state.car.speed) > 48) {
+    if (vehicleSpeedMagnitude() > 48) {
       showToast('FREIE O CARRO ANTES DE SAIR', 1800);
       return;
     }
@@ -480,6 +490,7 @@ function interact() {
     state.foot.x = clamp(state.car.x + side * 250, 365, 1190);
     state.foot.y = state.car.y;
     state.foot.angle = state.car.angle;
+    syncPreviousCarPose();
     showToast('A PÉ · APROXIME-SE DO ORELHÃO AMARELO');
     return;
   }
@@ -492,6 +503,8 @@ function interact() {
   if (distance(state.foot.x, state.foot.y, state.car.x, state.car.y) < 300) {
     state.driving = true;
     state.car.speed = 0;
+    state.car.lateralSpeed = 0;
+    syncPreviousCarPose();
     showToast('SEU SEDÃ VERMELHO · PRONTO PARA PARTIR');
     return;
   }
@@ -517,7 +530,8 @@ function interact() {
 function shove() {
   if (state.driving) {
     state.car.speed *= .67;
-    if (Math.abs(state.car.speed) > 65) showToast('FREIO DE MÃO', 900);
+    state.car.lateralSpeed *= .67;
+    if (vehicleSpeedMagnitude() > 65) showToast('FREIO DE MÃO', 900);
     return;
   }
   const pedestrian = state.section === 0
@@ -611,7 +625,7 @@ function updatePolice(dt) {
     police.x = clamp(police.x, 628, 940);
     nearest = Math.min(nearest, distance(police.x, police.y, target.x, target.y));
   }
-  if (nearest < (state.driving ? 102 : 54) && (!state.driving || Math.abs(state.car.speed) < 105)) {
+  if (nearest < (state.driving ? 102 : 54) && (!state.driving || vehicleSpeedMagnitude() < 105)) {
     state.capture += dt;
     if (state.capture > 2.2) arrestPlayer();
   } else {
@@ -639,6 +653,8 @@ function arrestPlayer() {
   state.car.y = CAR_SPAWN.y;
   state.car.angle = 0;
   state.car.speed = 0;
+  state.car.lateralSpeed = 0;
+  syncPreviousCarPose();
   state.foot.x = 1035;
   state.foot.y = 526;
   saveProgress();
@@ -689,14 +705,26 @@ function drawPerson(person, isPlayer = false) {
   ctx.fillRect(x - 6, y - 17, 13, 4);
 }
 
-function drawPlayerCar() {
+function interpolateCarPose(alpha) {
+  const previous = state.previousCar;
+  const current = state.car;
+  const blend = clamp(alpha, 0, 1);
+  const angleDelta = Math.atan2(Math.sin(current.angle - previous.angle), Math.cos(current.angle - previous.angle));
+  renderCarPose.x = previous.x + (current.x - previous.x) * blend;
+  renderCarPose.y = previous.y + (current.y - previous.y) * blend;
+  renderCarPose.angle = previous.angle + angleDelta * blend;
+  renderCarPose.health = current.health;
+  return renderCarPose;
+}
+
+function drawPlayerCar(car = state.car) {
   if (!streetSprite) return;
   ctx.save();
-  ctx.translate(Math.round(state.car.x), Math.round(state.car.y));
-  ctx.rotate(state.car.angle);
+  ctx.translate(Math.round(car.x), Math.round(car.y));
+  ctx.rotate(car.angle);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(streetSprite, -CAR_CROP.width / 2, -CAR_CROP.height / 2);
-  if (state.car.health < 38) {
+  if (car.health < 38) {
     ctx.globalAlpha = .35 + Math.sin(elapsed * .01) * .12;
     ctx.fillStyle = '#272924';
     ctx.fillRect(-13, -120, 24, 14);
@@ -866,7 +894,7 @@ function drawHud() {
 function drawInteractionPrompt() {
   let text = '';
   if (state.driving) {
-    text = Math.abs(state.car.speed) > 48 ? 'SOLTE O ACELERADOR PARA SAIR' : 'E  ·  SAIR DO CARRO';
+    text = vehicleSpeedMagnitude() > 48 ? 'SOLTE O ACELERADOR PARA SAIR' : 'E  ·  SAIR DO CARRO';
   } else if (nearPhone()) {
     text = state.mission ? 'TRABALHO EM ANDAMENTO' : 'E  ·  USAR O ORELHÃO';
   } else if (distance(state.foot.x, state.foot.y, state.car.x, state.car.y) < 300) {
@@ -887,7 +915,7 @@ function drawInteractionPrompt() {
   ctx.textAlign = 'left';
 }
 
-function render() {
+function render(interpolation = 1) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
   if (!state.ready || !streetCanvas) {
     ctx.fillStyle = '#090b09';
@@ -895,6 +923,7 @@ function render() {
     return;
   }
   ctx.imageSmoothingEnabled = false;
+  const renderCar = interpolateCarPose(interpolation);
   const shakeX = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   const shakeY = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   ctx.save();
@@ -912,8 +941,8 @@ function render() {
   if (target) drawTarget(target);
   for (const police of policeCars) drawPoliceCar(police);
   drawHelicopter();
-  drawPlayerCar();
-  drawCarHighlights(ctx, state.car, sunlight);
+  drawPlayerCar(renderCar);
+  drawCarHighlights(ctx, renderCar, sunlight);
   if (!state.driving) drawPerson(state.foot, true);
   drawHud();
   drawInteractionPrompt();
@@ -965,10 +994,11 @@ function update(dt) {
   if (state.section === 0) {
     for (const pedestrian of people) {
       const personY = pedestrian.baseY + Math.sin(elapsed * .001 + pedestrian.phase) * pedestrian.range;
-      if (state.driving && Math.abs(state.car.speed) > 90 && distance(state.car.x, state.car.y, pedestrian.x, personY) < 42 && elapsed > (pedestrian.hitAt || 0)) {
+      if (state.driving && vehicleSpeedMagnitude() > 90 && distance(state.car.x, state.car.y, pedestrian.x, personY) < 42 && elapsed > (pedestrian.hitAt || 0)) {
         pedestrian.hitAt = elapsed + 2600;
         state.wanted = clamp(state.wanted + 1, 0, 5);
         state.car.speed *= .65;
+        state.car.lateralSpeed *= .45;
         showToast('O PEDESTRE SE LEVANTOU E SAIU CORRENDO', 2300);
       }
     }
@@ -990,20 +1020,45 @@ function update(dt) {
 }
 
 function frame(timestamp) {
-  const dt = Number.isFinite(lastFrame) ? clamp((timestamp - lastFrame) / 1000, 0, .05) : 0;
-  lastFrame = timestamp;
+  const currentFrame = Number.isFinite(timestamp) ? timestamp : performance.now();
+  const frameDelta = lastFrame === null ? 0 : clamp((currentFrame - lastFrame) / 1000, 0, MAX_FRAME_DELTA);
+  lastFrame = currentFrame;
+
   if (!paused && state.ready) {
-    elapsed += dt * 1000;
     handleActionKeys();
-    update(dt);
-    updateSound(dt);
-  } else if (paused) {
-    updateSound(0);
+    simulationAccumulator = Math.min(simulationAccumulator + frameDelta, FIXED_STEP * MAX_CATCH_UP_STEPS);
+    let steps = 0;
+    while (simulationAccumulator >= FIXED_STEP && steps < MAX_CATCH_UP_STEPS) {
+      syncPreviousCarPose();
+      elapsed += FIXED_STEP * 1000;
+      update(FIXED_STEP);
+      simulationAccumulator -= FIXED_STEP;
+      steps += 1;
+    }
+    updateSound(frameDelta);
+  } else {
+    // Do not simulate a burst of stale time after a pause, load, or tab switch.
+    simulationAccumulator = 0;
+    if (paused) {
+      syncPreviousCarPose();
+      updateSound(0);
+    }
   }
-  render();
+
+  render(!state.ready || paused ? 1 : simulationAccumulator / FIXED_STEP);
   pressed.clear();
   requestAnimationFrame(frame);
 }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    lastFrame = null;
+    simulationAccumulator = 0;
+    keys.clear();
+    pressed.clear();
+    syncPreviousCarPose();
+  }
+});
 
 window.addEventListener('keydown', (event) => {
   const key = keyName(event.key);

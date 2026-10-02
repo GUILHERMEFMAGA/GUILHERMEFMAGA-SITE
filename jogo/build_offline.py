@@ -28,6 +28,7 @@ def main() -> None:
     css = (GAME_DIR / "style.css").read_text(encoding="utf-8")
     game = (GAME_DIR / "game.js").read_text(encoding="utf-8")
     lighting = (GAME_DIR / "lighting.js").read_text(encoding="utf-8")
+    vehicle_physics = (GAME_DIR / "vehicle-physics.js").read_text(encoding="utf-8")
 
     stylesheet_link = '  <link rel="stylesheet" href="./style.css">'
     module_script = '  <script type="module" src="./game.js"></script>'
@@ -36,12 +37,14 @@ def main() -> None:
 
     html = html.replace(stylesheet_link, f"  <style>\n{css}\n  </style>")
 
-    game = re.sub(
+    module_imports = (
         r"^import\s+\{\s*drawCarHighlights\s*,\s*drawStreetLighting\s*\}\s+from\s+['\"]\./lighting\.js['\"];\s*\n",
-        "",
-        game,
-        count=1,
+        r"^import\s+\{\s*stepVehicle\s*\}\s+from\s+['\"]\./vehicle-physics\.js['\"];\s*\n",
     )
+    for import_pattern in module_imports:
+        game, replacements = re.subn(import_pattern, "", game, count=1)
+        if replacements != 1:
+            raise RuntimeError(f"game.js is missing expected module import: {import_pattern}")
     if "import.meta" in game:
         asset_loader = "image.src = new URL(`./${filename}`, import.meta.url).href;"
         if asset_loader not in game:
@@ -51,6 +54,7 @@ def main() -> None:
         raise RuntimeError("game.js has neither a module asset URL nor the offline asset loader")
 
     bundled_lighting = re.sub(r"^export\s+", "", lighting, flags=re.MULTILINE)
+    bundled_vehicle_physics = re.sub(r"^export\s+", "", vehicle_physics, flags=re.MULTILINE)
     embedded_assets = {
         filename: data_uri(filename, media_type)
         for filename, media_type in ASSETS.items()
@@ -60,6 +64,8 @@ def main() -> None:
         + json.dumps(embedded_assets, ensure_ascii=True, separators=(",", ":"))
         + ");\n\n"
         + bundled_lighting
+        + "\n\n"
+        + bundled_vehicle_physics
         + "\n\n"
         + game
     )
