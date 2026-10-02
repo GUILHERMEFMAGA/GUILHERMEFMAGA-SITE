@@ -50,11 +50,24 @@ test('street lighting clips its glow and restores canvas state', () => {
   const ctx = new ContextStub();
   const light = drawStreetLighting(ctx, 18_000, 1568, 960, road);
   assert.equal(ctx.clipCount, 1);
-  assert.equal(ctx.fillRects.length, 10);
+  assert.equal(ctx.fillRects.length, 20);
   assert.equal(ctx.stack.length, 0);
   assert.equal(ctx.globalAlpha, 1);
   assert.equal(ctx.globalCompositeOperation, 'source-over');
   assert.ok(light.intensity >= .28 && light.intensity <= 1);
+});
+
+test('aligned curbside lamps cast warm pools at night and fade out at noon', () => {
+  const nightCtx = new ContextStub();
+  const night = drawStreetLighting(nightCtx, 0, 1568, 960, road);
+  const dayCtx = new ContextStub();
+  const day = drawStreetLighting(dayCtx, 75_000, 1568, 960, road);
+  assert.equal(night.night, 1);
+  assert.equal(nightCtx.fillRects.length, 20);
+  assert.equal(day.night, 0);
+  assert.equal(dayCtx.fillRects.length, 10);
+  assert.equal(nightCtx.stack.length, 0);
+  assert.equal(dayCtx.stack.length, 0);
 });
 
 test('bar neon adds warm facade glow and road reflections without leaking canvas state', () => {

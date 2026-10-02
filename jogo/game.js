@@ -97,15 +97,15 @@ const state = {
   mission: null,
   wanted: 0,
   foot: { x: 1035, y: 526, angle: 0 },
-  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, lateralSpeed: 0, health: 100, hitCooldown: 0 },
-  previousCar: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0 },
+  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, lateralSpeed: 0, health: 100, hitCooldown: 0, suspension: 0, curbCooldown: 0 },
+  previousCar: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, suspension: 0 },
   toast: '',
   toastUntil: 0,
   cameraShake: 0,
   capture: 0,
 };
 
-const renderCarPose = { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, health: 100 };
+const renderCarPose = { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, health: 100, suspension: 0 };
 
 const missions = [
   { id: 'delivery', title: 'Peça na hora', category: 'ENTREGA', description: 'Leve a peça até a oficina no fim da rua.', timer: 70, reward: 420, rep: 12, targets: [{ x: 784, y: 166, label: 'OFICINA' }] },
@@ -246,15 +246,17 @@ function makeCarSprite(reference) {
 }
 
 function createSectionColliders(index) {
-  const laneLeft = ROAD.left + ROAD_CLEARANCE;
-  const laneRight = ROAD.right - ROAD_CLEARANCE;
   const colliders = [
-    { id: `section-${index}-west-curb`, kind: 'curb', x: 0, y: -HEIGHT, width: laneLeft, height: HEIGHT * 3 },
-    { id: `section-${index}-east-curb`, kind: 'curb', x: laneRight, y: -HEIGHT, width: WIDTH - laneRight, height: HEIGHT * 3 },
+    { id: `section-${index}-west-world-edge`, kind: 'barrier', x: -32, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+    { id: `section-${index}-east-world-edge`, kind: 'barrier', x: WIDTH, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+    // A narrow, low curb marks the road lip. The solver reports it as a soft
+    // suspension event so the car can roll onto the sidewalk instead of sticking.
+    { id: `section-${index}-west-curb`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
+    { id: `section-${index}-east-curb`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
   ];
 
-  // Every section edge is a road portal; north and south link the three
-  // streets into a closed route with no invisible end wall.
+  // Open north/south portals connect all three streets into a closed route;
+  // solid footprints still protect buildings beside the sidewalk.
   if (index < 2) {
     colliders.push(
       { id: `section-${index}-building-west-1`, kind: 'building', x: 0, y: 0, width: 356, height: 303 },
@@ -267,9 +269,7 @@ function createSectionColliders(index) {
   }
 
   if (index === 2) {
-    // Building footprint, raised patio planters and stools on the new bar block.
-    // These specific colliders remain available if sidewalk driving is added;
-    // the continuous curb is still the first and strongest boundary.
+    // Building footprint and patio props remain solid after the traversable curb.
     colliders.push(
       { id: 'bar-building', kind: 'building', x: 1130, y: 332, width: 410, height: 342 },
       { id: 'bar-patio-planter-north', kind: 'prop', x: 1082, y: 395, width: 24, height: 26 },
@@ -455,6 +455,7 @@ function syncPreviousCarPose() {
   state.previousCar.x = state.car.x;
   state.previousCar.y = state.car.y;
   state.previousCar.angle = state.car.angle;
+  state.previousCar.suspension = state.car.suspension || 0;
 }
 
 function drive(dt) {
@@ -470,9 +471,7 @@ function drive(dt) {
   const nextX = startX + movement.dx;
   const nextY = startY + movement.dy;
   const bounds = vehicleHalfExtents(car.angle);
-  const laneLeft = ROAD.left + ROAD_CLEARANCE;
-  const laneRight = ROAD.right - ROAD_CLEARANCE;
-  const fitsPortal = nextX - bounds.x >= laneLeft && nextX + bounds.x <= laneRight;
+  const fitsPortal = nextX - bounds.x >= 0 && nextX + bounds.x <= WIDTH;
   const movingNorth = movement.dy < 0;
   const movingSouth = movement.dy > 0;
   const routeLength = sections.length;
@@ -523,10 +522,25 @@ function drive(dt) {
         state.cameraShake = Math.min(7, state.cameraShake + Math.min(5, impact * .035));
         if (elapsed > (state.lastBump || 0) + 850) {
           state.lastBump = elapsed;
-          const hitKind = motion.collisions.find((collision) => collision.impactSpeed === impact)?.obstacle?.kind;
-          showToast(hitKind === 'curb' ? 'MEIO-FIO · DEVAGAR NA CURVA' : 'OBSTÁCULO · REDUZA A VELOCIDADE', 1500);
+          showToast('OBSTÁCULO · REDUZA A VELOCIDADE', 1500);
           playTone(120, .11, 'triangle', .028);
         }
+      }
+    }
+
+    const curbImpact = motion.curbEvents.reduce((maximum, event) => Math.max(maximum, event.impactSpeed || 0), 0);
+    const curbSeverity = motion.curbEvents.reduce((maximum, event) => {
+      const height = Number.isFinite(event.obstacle?.stepHeight) ? event.obstacle.stepHeight : 6;
+      const heightScale = clamp(height / 6, .5, 1.5);
+      return Math.max(maximum, clamp((event.impactSpeed || 0) / 190 * heightScale, 0, 1));
+    }, 0);
+    if (curbImpact > 2) {
+      car.speed *= 1 - (.035 + curbSeverity * .11);
+      car.lateralSpeed *= 1 - (.06 + curbSeverity * .16);
+      car.suspension = Math.max(car.suspension || 0, .62 + curbSeverity * .33);
+      if (car.curbCooldown <= 0 && curbImpact > 48) {
+        car.curbCooldown = .28;
+        playTone(155, .055, 'triangle', .012);
       }
     }
   }
@@ -734,6 +748,8 @@ function arrestPlayer() {
   state.car.angle = 0;
   state.car.speed = 0;
   state.car.lateralSpeed = 0;
+  state.car.suspension = 0;
+  state.car.curbCooldown = 0;
   syncPreviousCarPose();
   state.foot.x = 1035;
   state.foot.y = 526;
@@ -794,13 +810,17 @@ function interpolateCarPose(alpha) {
   renderCarPose.y = previous.y + (current.y - previous.y) * blend;
   renderCarPose.angle = previous.angle + angleDelta * blend;
   renderCarPose.health = current.health;
+  const previousSuspension = Number.isFinite(previous.suspension) ? previous.suspension : 0;
+  const currentSuspension = Number.isFinite(current.suspension) ? current.suspension : 0;
+  renderCarPose.suspension = previousSuspension + (currentSuspension - previousSuspension) * blend;
   return renderCarPose;
 }
 
 function drawPlayerCar(car = state.car) {
   if (!streetSprite) return;
   ctx.save();
-  ctx.translate(Math.round(car.x), Math.round(car.y));
+  const suspensionBounce = Math.sin((1 - clamp(car.suspension || 0, 0, 1)) * Math.PI) * 1.5;
+  ctx.translate(Math.round(car.x), Math.round(car.y - suspensionBounce));
   ctx.rotate(car.angle);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(streetSprite, -CAR_CROP.width / 2, -CAR_CROP.height / 2);
@@ -1095,6 +1115,8 @@ function update(dt) {
   }
 
   updatePolice(dt);
+  state.car.suspension = Math.max(0, (state.car.suspension || 0) - dt * 5.5);
+  state.car.curbCooldown = Math.max(0, (state.car.curbCooldown || 0) - dt);
   state.cameraShake = Math.max(0, state.cameraShake - dt * 11);
   if (state.toast && elapsed > state.toastUntil) state.toast = '';
 }

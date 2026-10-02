@@ -149,6 +149,23 @@ function findEarliestHit(position, displacement, angle, halfWidth, halfLength, c
   return earliest;
 }
 
+function findSweptHits(position, displacement, angle, halfWidth, halfLength, colliders, margin) {
+  const radius = Math.hypot(halfWidth, halfLength) + margin;
+  const minX = Math.min(position.x, position.x + displacement.x) - radius;
+  const maxX = Math.max(position.x, position.x + displacement.x) + radius;
+  const minY = Math.min(position.y, position.y + displacement.y) - radius;
+  const maxY = Math.max(position.y, position.y + displacement.y) + radius;
+  const hits = [];
+
+  for (const obstacle of colliders) {
+    const aabb = getAabb(obstacle);
+    if (!aabb || aabb.right < minX || aabb.left > maxX || aabb.bottom < minY || aabb.top > maxY) continue;
+    const hit = sweepObbAabb(position, displacement, angle, halfWidth, halfLength, obstacle, margin);
+    if (hit) hits.push(hit);
+  }
+  return hits.sort((a, b) => a.time - b.time);
+}
+
 function separateInitialOverlaps(position, angle, halfWidth, halfLength, colliders, skin, maxPasses = 8) {
   const contacts = [];
   for (let pass = 0; pass < maxPasses; pass += 1) {
@@ -201,9 +218,10 @@ function dampVelocity(velocity, normal, restitution, tangentialFriction) {
 
 /**
  * Resolves a vehicle's complete fixed-step motion, including rotation, against
- * static AABB curbs/obstacles. Translation is swept continuously with SAT;
- * angular motion is divided into small conservative slices. Impacts slide along
- * surfaces, and initial/end overlaps are depenetrated to avoid sticky states.
+ * static AABBs. Low colliders marked kind='curb' emit one step/bump event but do
+ * not block the vehicle; all other colliders remain solid. Translation is swept
+ * continuously with SAT, angular motion uses conservative slices, and solid
+ * impacts slide along surfaces while initial overlaps are depenetrated.
  */
 export function resolveVehicleMotion({
   x,
@@ -231,7 +249,11 @@ export function resolveVehicleMotion({
   const safeFriction = Number.isFinite(tangentialFriction) ? Math.max(0, Math.min(1, tangentialFriction)) : .08;
   const impactLimit = Number.isInteger(maxImpacts) ? Math.max(1, Math.min(12, maxImpacts)) : DEFAULT_MAX_IMPACTS;
   const position = { x, y };
-  const collisions = separateInitialOverlaps(position, startAngle, halfWidth, halfLength, colliders, safeSkin);
+  const curbs = colliders.filter((obstacle) => obstacle?.kind === 'curb');
+  const solidColliders = colliders.filter((obstacle) => obstacle?.kind !== 'curb');
+  const collisions = separateInitialOverlaps(position, startAngle, halfWidth, halfLength, solidColliders, safeSkin);
+  const curbEvents = [];
+  const contactedCurbs = new Set();
   const validStep = dt > 0;
   let velocity = validStep ? { x: dx / dt, y: dy / dt } : { x: 0, y: 0 };
   if (!Number.isFinite(velocity.x) || !Number.isFinite(velocity.y)) velocity = { x: 0, y: 0 };
@@ -253,15 +275,35 @@ export function resolveVehicleMotion({
       for (let impact = 0; impact < impactLimit && remainingTime > MIN_MOVE; impact += 1) {
         const movement = { x: velocity.x * remainingTime, y: velocity.y * remainingTime };
         if (Math.hypot(movement.x, movement.y) <= MIN_MOVE) break;
+        const margin = safeSkin + rotationMargin;
         const hit = findEarliestHit(
           position,
           movement,
           angleMid,
           halfWidth,
           halfLength,
-          colliders,
-          safeSkin + rotationMargin,
+          solidColliders,
+          margin,
         );
+        const curbHits = findSweptHits(
+          position,
+          movement,
+          angleMid,
+          halfWidth,
+          halfLength,
+          curbs,
+          margin,
+        );
+        for (const curbHit of curbHits) {
+          if (hit && curbHit.time > hit.time + EPSILON) break;
+          if (contactedCurbs.has(curbHit.obstacle)) continue;
+          contactedCurbs.add(curbHit.obstacle);
+          curbEvents.push({
+            obstacle: curbHit.obstacle,
+            normal: curbHit.normal,
+            impactSpeed: Math.max(0, -dot(velocity, curbHit.normal)),
+          });
+        }
         if (!hit) {
           position.x += movement.x;
           position.y += movement.y;
@@ -281,9 +323,9 @@ export function resolveVehicleMotion({
         // slide along this surface and still hit a second obstacle this tick.
       }
 
-      collisions.push(...separateInitialOverlaps(position, angleEnd, halfWidth, halfLength, colliders, safeSkin));
+      collisions.push(...separateInitialOverlaps(position, angleEnd, halfWidth, halfLength, solidColliders, safeSkin));
     }
   }
 
-  return { x: position.x, y: position.y, velocityX: velocity.x, velocityY: velocity.y, collisions };
+  return { x: position.x, y: position.y, velocityX: velocity.x, velocityY: velocity.y, collisions, curbEvents };
 }

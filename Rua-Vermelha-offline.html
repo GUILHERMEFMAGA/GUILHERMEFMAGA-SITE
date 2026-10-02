@@ -273,7 +273,7 @@ const EMBEDDED_ASSETS = Object.freeze({"gta-retro.png":"data:image/png;base64,iV
 /**
  * Lightweight, deterministic lighting for the top-down pixel-art streets.
  * The sun follows a continuous day/night cycle; diffuse tint, asphalt glints,
- * and the bar's warm signage are additive overlays over the untouched artwork.
+ * curbside lamp pools, and bar signage layer over the untouched artwork.
  */
 const TAU = Math.PI * 2;
 const LIGHT_CYCLE_MS = 150_000;
@@ -294,6 +294,33 @@ function getSunlight(elapsed, width, height, road) {
     intensity: .28 + daylight * .72,
     warmth: .5 + .5 * Math.sin(phase + .55),
   };
+}
+
+function drawCurbsideLampPools(ctx, elapsed, height, road, night) {
+  if (night <= .015) return;
+  const clock = Number.isFinite(elapsed) ? elapsed : 0;
+  const lampRows = 5;
+  const spacing = height / lampRows;
+  const radius = 92;
+  const lampXPositions = [road.left - 18, road.right + 18];
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let row = 0; row < lampRows; row += 1) {
+    const y = Math.round((row + .5) * spacing);
+    for (let side = 0; side < lampXPositions.length; side += 1) {
+      const x = Math.round(lampXPositions[side]);
+      const flicker = .96 + .04 * Math.sin(clock * .0017 + row * 1.31 + side * .73);
+      const pool = ctx.createRadialGradient(x, y, 3, x, y, radius);
+      pool.addColorStop(0, 'rgba(255, 208, 142, .42)');
+      pool.addColorStop(.38, 'rgba(255, 181, 108, .17)');
+      pool.addColorStop(1, 'rgba(255, 166, 89, 0)');
+      ctx.globalAlpha = night * .34 * flicker;
+      ctx.fillStyle = pool;
+      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+  }
+  ctx.restore();
 }
 
 function drawBarGlow(ctx, elapsed, width, height, road, night) {
@@ -366,6 +393,10 @@ function drawStreetLighting(ctx, elapsed, width, height, road, scene = {}) {
   }
   ctx.restore();
 
+  // The map artwork already places matching lamp posts along both curbs;
+  // these restrained pools make their warm light visible after dusk.
+  drawCurbsideLampPools(ctx, clock, height, road, night);
+
   const barLight = scene.bar
     ? { x: width * .815, y: height * .555, intensity: .07 + night * .34 }
     : null;
@@ -379,8 +410,10 @@ function drawCarHighlights(ctx, car, sun) {
     || !Number.isFinite(car.x) || !Number.isFinite(car.y) || !Number.isFinite(car.angle)
     || !Number.isFinite(sun.x) || !Number.isFinite(sun.intensity) || !Number.isFinite(sun.warmth)) return;
   const litSide = sun.x < car.x ? -1 : 1;
+  const suspensionBounce = Math.sin((1 - clampLight(car.suspension || 0, 0, 1)) * Math.PI) * 1.5;
+  const renderY = car.y - suspensionBounce;
   ctx.save();
-  ctx.translate(Math.round(car.x), Math.round(car.y));
+  ctx.translate(Math.round(car.x), Math.round(renderY));
   ctx.rotate(car.angle);
   ctx.globalCompositeOperation = 'screen';
   ctx.globalAlpha = .55 + sun.intensity * .35;
@@ -389,7 +422,7 @@ function drawCarHighlights(ctx, car, sun) {
   ctx.fillRect(litSide < 0 ? -33 : 8, -105, 25, 2);
 
   if (sun.barLight && Number.isFinite(sun.barLight.x) && Number.isFinite(sun.barLight.y)) {
-    const distanceToBar = Math.hypot(car.x - sun.barLight.x, car.y - sun.barLight.y);
+    const distanceToBar = Math.hypot(car.x - sun.barLight.x, renderY - sun.barLight.y);
     const proximity = clampLight(1 - distanceToBar / 520, 0, 1);
     if (proximity > 0) {
       ctx.globalAlpha = proximity * sun.barLight.intensity * .75;
@@ -552,6 +585,23 @@ function findEarliestHit(position, displacement, angle, halfWidth, halfLength, c
   return earliest;
 }
 
+function findSweptHits(position, displacement, angle, halfWidth, halfLength, colliders, margin) {
+  const radius = Math.hypot(halfWidth, halfLength) + margin;
+  const minX = Math.min(position.x, position.x + displacement.x) - radius;
+  const maxX = Math.max(position.x, position.x + displacement.x) + radius;
+  const minY = Math.min(position.y, position.y + displacement.y) - radius;
+  const maxY = Math.max(position.y, position.y + displacement.y) + radius;
+  const hits = [];
+
+  for (const obstacle of colliders) {
+    const aabb = getAabb(obstacle);
+    if (!aabb || aabb.right < minX || aabb.left > maxX || aabb.bottom < minY || aabb.top > maxY) continue;
+    const hit = sweepObbAabb(position, displacement, angle, halfWidth, halfLength, obstacle, margin);
+    if (hit) hits.push(hit);
+  }
+  return hits.sort((a, b) => a.time - b.time);
+}
+
 function separateInitialOverlaps(position, angle, halfWidth, halfLength, colliders, skin, maxPasses = 8) {
   const contacts = [];
   for (let pass = 0; pass < maxPasses; pass += 1) {
@@ -604,9 +654,10 @@ function dampVelocity(velocity, normal, restitution, tangentialFriction) {
 
 /**
  * Resolves a vehicle's complete fixed-step motion, including rotation, against
- * static AABB curbs/obstacles. Translation is swept continuously with SAT;
- * angular motion is divided into small conservative slices. Impacts slide along
- * surfaces, and initial/end overlaps are depenetrated to avoid sticky states.
+ * static AABBs. Low colliders marked kind='curb' emit one step/bump event but do
+ * not block the vehicle; all other colliders remain solid. Translation is swept
+ * continuously with SAT, angular motion uses conservative slices, and solid
+ * impacts slide along surfaces while initial overlaps are depenetrated.
  */
 function resolveVehicleMotion({
   x,
@@ -634,7 +685,11 @@ function resolveVehicleMotion({
   const safeFriction = Number.isFinite(tangentialFriction) ? Math.max(0, Math.min(1, tangentialFriction)) : .08;
   const impactLimit = Number.isInteger(maxImpacts) ? Math.max(1, Math.min(12, maxImpacts)) : DEFAULT_MAX_IMPACTS;
   const position = { x, y };
-  const collisions = separateInitialOverlaps(position, startAngle, halfWidth, halfLength, colliders, safeSkin);
+  const curbs = colliders.filter((obstacle) => obstacle?.kind === 'curb');
+  const solidColliders = colliders.filter((obstacle) => obstacle?.kind !== 'curb');
+  const collisions = separateInitialOverlaps(position, startAngle, halfWidth, halfLength, solidColliders, safeSkin);
+  const curbEvents = [];
+  const contactedCurbs = new Set();
   const validStep = dt > 0;
   let velocity = validStep ? { x: dx / dt, y: dy / dt } : { x: 0, y: 0 };
   if (!Number.isFinite(velocity.x) || !Number.isFinite(velocity.y)) velocity = { x: 0, y: 0 };
@@ -656,15 +711,35 @@ function resolveVehicleMotion({
       for (let impact = 0; impact < impactLimit && remainingTime > MIN_MOVE; impact += 1) {
         const movement = { x: velocity.x * remainingTime, y: velocity.y * remainingTime };
         if (Math.hypot(movement.x, movement.y) <= MIN_MOVE) break;
+        const margin = safeSkin + rotationMargin;
         const hit = findEarliestHit(
           position,
           movement,
           angleMid,
           halfWidth,
           halfLength,
-          colliders,
-          safeSkin + rotationMargin,
+          solidColliders,
+          margin,
         );
+        const curbHits = findSweptHits(
+          position,
+          movement,
+          angleMid,
+          halfWidth,
+          halfLength,
+          curbs,
+          margin,
+        );
+        for (const curbHit of curbHits) {
+          if (hit && curbHit.time > hit.time + EPSILON) break;
+          if (contactedCurbs.has(curbHit.obstacle)) continue;
+          contactedCurbs.add(curbHit.obstacle);
+          curbEvents.push({
+            obstacle: curbHit.obstacle,
+            normal: curbHit.normal,
+            impactSpeed: Math.max(0, -dot(velocity, curbHit.normal)),
+          });
+        }
         if (!hit) {
           position.x += movement.x;
           position.y += movement.y;
@@ -684,11 +759,11 @@ function resolveVehicleMotion({
         // slide along this surface and still hit a second obstacle this tick.
       }
 
-      collisions.push(...separateInitialOverlaps(position, angleEnd, halfWidth, halfLength, colliders, safeSkin));
+      collisions.push(...separateInitialOverlaps(position, angleEnd, halfWidth, halfLength, solidColliders, safeSkin));
     }
   }
 
-  return { x: position.x, y: position.y, velocityX: velocity.x, velocityY: velocity.y, collisions };
+  return { x: position.x, y: position.y, velocityX: velocity.x, velocityY: velocity.y, collisions, curbEvents };
 }
 
 
@@ -899,15 +974,15 @@ const state = {
   mission: null,
   wanted: 0,
   foot: { x: 1035, y: 526, angle: 0 },
-  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, lateralSpeed: 0, health: 100, hitCooldown: 0 },
-  previousCar: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0 },
+  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, lateralSpeed: 0, health: 100, hitCooldown: 0, suspension: 0, curbCooldown: 0 },
+  previousCar: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, suspension: 0 },
   toast: '',
   toastUntil: 0,
   cameraShake: 0,
   capture: 0,
 };
 
-const renderCarPose = { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, health: 100 };
+const renderCarPose = { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, health: 100, suspension: 0 };
 
 const missions = [
   { id: 'delivery', title: 'Peça na hora', category: 'ENTREGA', description: 'Leve a peça até a oficina no fim da rua.', timer: 70, reward: 420, rep: 12, targets: [{ x: 784, y: 166, label: 'OFICINA' }] },
@@ -1048,15 +1123,17 @@ function makeCarSprite(reference) {
 }
 
 function createSectionColliders(index) {
-  const laneLeft = ROAD.left + ROAD_CLEARANCE;
-  const laneRight = ROAD.right - ROAD_CLEARANCE;
   const colliders = [
-    { id: `section-${index}-west-curb`, kind: 'curb', x: 0, y: -HEIGHT, width: laneLeft, height: HEIGHT * 3 },
-    { id: `section-${index}-east-curb`, kind: 'curb', x: laneRight, y: -HEIGHT, width: WIDTH - laneRight, height: HEIGHT * 3 },
+    { id: `section-${index}-west-world-edge`, kind: 'barrier', x: -32, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+    { id: `section-${index}-east-world-edge`, kind: 'barrier', x: WIDTH, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+    // A narrow, low curb marks the road lip. The solver reports it as a soft
+    // suspension event so the car can roll onto the sidewalk instead of sticking.
+    { id: `section-${index}-west-curb`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
+    { id: `section-${index}-east-curb`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
   ];
 
-  // Every section edge is a road portal; north and south link the three
-  // streets into a closed route with no invisible end wall.
+  // Open north/south portals connect all three streets into a closed route;
+  // solid footprints still protect buildings beside the sidewalk.
   if (index < 2) {
     colliders.push(
       { id: `section-${index}-building-west-1`, kind: 'building', x: 0, y: 0, width: 356, height: 303 },
@@ -1069,9 +1146,7 @@ function createSectionColliders(index) {
   }
 
   if (index === 2) {
-    // Building footprint, raised patio planters and stools on the new bar block.
-    // These specific colliders remain available if sidewalk driving is added;
-    // the continuous curb is still the first and strongest boundary.
+    // Building footprint and patio props remain solid after the traversable curb.
     colliders.push(
       { id: 'bar-building', kind: 'building', x: 1130, y: 332, width: 410, height: 342 },
       { id: 'bar-patio-planter-north', kind: 'prop', x: 1082, y: 395, width: 24, height: 26 },
@@ -1257,6 +1332,7 @@ function syncPreviousCarPose() {
   state.previousCar.x = state.car.x;
   state.previousCar.y = state.car.y;
   state.previousCar.angle = state.car.angle;
+  state.previousCar.suspension = state.car.suspension || 0;
 }
 
 function drive(dt) {
@@ -1272,9 +1348,7 @@ function drive(dt) {
   const nextX = startX + movement.dx;
   const nextY = startY + movement.dy;
   const bounds = vehicleHalfExtents(car.angle);
-  const laneLeft = ROAD.left + ROAD_CLEARANCE;
-  const laneRight = ROAD.right - ROAD_CLEARANCE;
-  const fitsPortal = nextX - bounds.x >= laneLeft && nextX + bounds.x <= laneRight;
+  const fitsPortal = nextX - bounds.x >= 0 && nextX + bounds.x <= WIDTH;
   const movingNorth = movement.dy < 0;
   const movingSouth = movement.dy > 0;
   const routeLength = sections.length;
@@ -1325,10 +1399,25 @@ function drive(dt) {
         state.cameraShake = Math.min(7, state.cameraShake + Math.min(5, impact * .035));
         if (elapsed > (state.lastBump || 0) + 850) {
           state.lastBump = elapsed;
-          const hitKind = motion.collisions.find((collision) => collision.impactSpeed === impact)?.obstacle?.kind;
-          showToast(hitKind === 'curb' ? 'MEIO-FIO · DEVAGAR NA CURVA' : 'OBSTÁCULO · REDUZA A VELOCIDADE', 1500);
+          showToast('OBSTÁCULO · REDUZA A VELOCIDADE', 1500);
           playTone(120, .11, 'triangle', .028);
         }
+      }
+    }
+
+    const curbImpact = motion.curbEvents.reduce((maximum, event) => Math.max(maximum, event.impactSpeed || 0), 0);
+    const curbSeverity = motion.curbEvents.reduce((maximum, event) => {
+      const height = Number.isFinite(event.obstacle?.stepHeight) ? event.obstacle.stepHeight : 6;
+      const heightScale = clamp(height / 6, .5, 1.5);
+      return Math.max(maximum, clamp((event.impactSpeed || 0) / 190 * heightScale, 0, 1));
+    }, 0);
+    if (curbImpact > 2) {
+      car.speed *= 1 - (.035 + curbSeverity * .11);
+      car.lateralSpeed *= 1 - (.06 + curbSeverity * .16);
+      car.suspension = Math.max(car.suspension || 0, .62 + curbSeverity * .33);
+      if (car.curbCooldown <= 0 && curbImpact > 48) {
+        car.curbCooldown = .28;
+        playTone(155, .055, 'triangle', .012);
       }
     }
   }
@@ -1536,6 +1625,8 @@ function arrestPlayer() {
   state.car.angle = 0;
   state.car.speed = 0;
   state.car.lateralSpeed = 0;
+  state.car.suspension = 0;
+  state.car.curbCooldown = 0;
   syncPreviousCarPose();
   state.foot.x = 1035;
   state.foot.y = 526;
@@ -1596,13 +1687,17 @@ function interpolateCarPose(alpha) {
   renderCarPose.y = previous.y + (current.y - previous.y) * blend;
   renderCarPose.angle = previous.angle + angleDelta * blend;
   renderCarPose.health = current.health;
+  const previousSuspension = Number.isFinite(previous.suspension) ? previous.suspension : 0;
+  const currentSuspension = Number.isFinite(current.suspension) ? current.suspension : 0;
+  renderCarPose.suspension = previousSuspension + (currentSuspension - previousSuspension) * blend;
   return renderCarPose;
 }
 
 function drawPlayerCar(car = state.car) {
   if (!streetSprite) return;
   ctx.save();
-  ctx.translate(Math.round(car.x), Math.round(car.y));
+  const suspensionBounce = Math.sin((1 - clamp(car.suspension || 0, 0, 1)) * Math.PI) * 1.5;
+  ctx.translate(Math.round(car.x), Math.round(car.y - suspensionBounce));
   ctx.rotate(car.angle);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(streetSprite, -CAR_CROP.width / 2, -CAR_CROP.height / 2);
@@ -1897,6 +1992,8 @@ function update(dt) {
   }
 
   updatePolice(dt);
+  state.car.suspension = Math.max(0, (state.car.suspension || 0) - dt * 5.5);
+  state.car.curbCooldown = Math.max(0, (state.car.curbCooldown || 0) - dt);
   state.cameraShake = Math.max(0, state.cameraShake - dt * 11);
   if (state.toast && elapsed > state.toastUntil) state.toast = '';
 }

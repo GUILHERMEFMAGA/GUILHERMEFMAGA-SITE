@@ -2,7 +2,7 @@
  
 ## Jogo no navegador — Rua Vermelha 🚗
 
-Protótipo 2D jogável baseado na imagem de referência, com três trechos conectados, colisão contínua contra meios-fios e obstáculos, iluminação dinâmica e um bar pixel art. O jogo usa a própria imagem como cenário inicial e permite dirigir o sedã vermelho, sair do carro e iniciar trabalhos no orelhão.
+Protótipo 2D jogável baseado na imagem de referência, com três trechos conectados, guias transponíveis sem travar o carro, obstáculos sólidos, postes alinhados e iluminação dinâmica de dia/noite. O jogo mantém a arquitetura pixel art aérea e permite dirigir o sedã vermelho, sair do carro e iniciar trabalhos no orelhão.
 
 👉 **[Abrir o jogo](jogo/index.html)** · [Controles e instruções](jogo/README.md)
 

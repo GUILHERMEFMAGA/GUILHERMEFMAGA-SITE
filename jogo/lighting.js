@@ -1,7 +1,7 @@
 /**
  * Lightweight, deterministic lighting for the top-down pixel-art streets.
  * The sun follows a continuous day/night cycle; diffuse tint, asphalt glints,
- * and the bar's warm signage are additive overlays over the untouched artwork.
+ * curbside lamp pools, and bar signage layer over the untouched artwork.
  */
 const TAU = Math.PI * 2;
 const LIGHT_CYCLE_MS = 150_000;
@@ -22,6 +22,33 @@ export function getSunlight(elapsed, width, height, road) {
     intensity: .28 + daylight * .72,
     warmth: .5 + .5 * Math.sin(phase + .55),
   };
+}
+
+function drawCurbsideLampPools(ctx, elapsed, height, road, night) {
+  if (night <= .015) return;
+  const clock = Number.isFinite(elapsed) ? elapsed : 0;
+  const lampRows = 5;
+  const spacing = height / lampRows;
+  const radius = 92;
+  const lampXPositions = [road.left - 18, road.right + 18];
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (let row = 0; row < lampRows; row += 1) {
+    const y = Math.round((row + .5) * spacing);
+    for (let side = 0; side < lampXPositions.length; side += 1) {
+      const x = Math.round(lampXPositions[side]);
+      const flicker = .96 + .04 * Math.sin(clock * .0017 + row * 1.31 + side * .73);
+      const pool = ctx.createRadialGradient(x, y, 3, x, y, radius);
+      pool.addColorStop(0, 'rgba(255, 208, 142, .42)');
+      pool.addColorStop(.38, 'rgba(255, 181, 108, .17)');
+      pool.addColorStop(1, 'rgba(255, 166, 89, 0)');
+      ctx.globalAlpha = night * .34 * flicker;
+      ctx.fillStyle = pool;
+      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+  }
+  ctx.restore();
 }
 
 function drawBarGlow(ctx, elapsed, width, height, road, night) {
@@ -94,6 +121,10 @@ export function drawStreetLighting(ctx, elapsed, width, height, road, scene = {}
   }
   ctx.restore();
 
+  // The map artwork already places matching lamp posts along both curbs;
+  // these restrained pools make their warm light visible after dusk.
+  drawCurbsideLampPools(ctx, clock, height, road, night);
+
   const barLight = scene.bar
     ? { x: width * .815, y: height * .555, intensity: .07 + night * .34 }
     : null;
@@ -107,8 +138,10 @@ export function drawCarHighlights(ctx, car, sun) {
     || !Number.isFinite(car.x) || !Number.isFinite(car.y) || !Number.isFinite(car.angle)
     || !Number.isFinite(sun.x) || !Number.isFinite(sun.intensity) || !Number.isFinite(sun.warmth)) return;
   const litSide = sun.x < car.x ? -1 : 1;
+  const suspensionBounce = Math.sin((1 - clampLight(car.suspension || 0, 0, 1)) * Math.PI) * 1.5;
+  const renderY = car.y - suspensionBounce;
   ctx.save();
-  ctx.translate(Math.round(car.x), Math.round(car.y));
+  ctx.translate(Math.round(car.x), Math.round(renderY));
   ctx.rotate(car.angle);
   ctx.globalCompositeOperation = 'screen';
   ctx.globalAlpha = .55 + sun.intensity * .35;
@@ -117,7 +150,7 @@ export function drawCarHighlights(ctx, car, sun) {
   ctx.fillRect(litSide < 0 ? -33 : 8, -105, 25, 2);
 
   if (sun.barLight && Number.isFinite(sun.barLight.x) && Number.isFinite(sun.barLight.y)) {
-    const distanceToBar = Math.hypot(car.x - sun.barLight.x, car.y - sun.barLight.y);
+    const distanceToBar = Math.hypot(car.x - sun.barLight.x, renderY - sun.barLight.y);
     const proximity = clampLight(1 - distanceToBar / 520, 0, 1);
     if (proximity > 0) {
       ctx.globalAlpha = proximity * sun.barLight.intensity * .75;
