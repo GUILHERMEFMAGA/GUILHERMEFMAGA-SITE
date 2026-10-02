@@ -26,7 +26,7 @@ polícia e o corpo de bombeiros respondem a ocorrências.
 
 | Como | Link |
 |---|---|
-| **No navegador (um clique)** | https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/1382a02a69c9b8796e43a993384eb1d3376a6a14/LIFE-CIDADE-VIVA.html |
+| **No navegador (um clique)** | https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/44599b24da76e21f93c51c15b76e23378fdcc8e6/LIFE-CIDADE-VIVA.html |
 | **Baixar e jogar offline** | [LIFE-CIDADE-VIVA.html (Release)](https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html) |
 
 ### Em 10 segundos

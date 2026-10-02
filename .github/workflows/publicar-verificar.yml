@@ -9,6 +9,8 @@ on:
   push:
     paths:
       - '.github/workflows/publicar-verificar.yml'
+      - 'LIFE-CIDADE-VIVA.html'
+      - 'life-cidade-viva/**'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +26,7 @@ jobs:
       - name: Verificar quais endereços servem o jogo
         run: |
           echo "=== VERIFICACAO DE LINKS ==="
-          SHA="1382a02a69c9b8796e43a993384eb1d3376a6a14"
+          SHA="${GITHUB_SHA}"
           REPO="GUILHERMEFMAGA/GUILHERMEFMAGA-SITE"
           ARQ="LIFE-CIDADE-VIVA.html"
           testar() {
@@ -57,18 +59,18 @@ jobs:
             --title "LIFE: CIDADE VIVA — jogo completo em um arquivo" \
             --notes "Baixe o arquivo LIFE-CIDADE-VIVA.html e abra com dois cliques.
 
-          O jogo roda offline, sem servidor e sem instalação: cidade procedural com 579 imóveis,
+          O jogo roda offline, sem servidor e sem instalação: cidade procedural com mais de 1.000 imóveis,
           2.200 moradores com rotina própria, trânsito com semáforos, ciclo de 24 horas, clima
           dinâmico, interiores exploráveis, empregos e economia viva.
 
           Controles: WASD para andar, E para interagir, TAB para o celular." \
-            --target "1382a02a69c9b8796e43a993384eb1d3376a6a14"
+            --target "${GITHUB_SHA}"
           echo "resultado_create=$?"
           if ! gh release view v1.0-cidade-viva >/dev/null 2>&1; then
             echo "=== RELEASE NAO EXISTE, CRIANDO SEM ANEXO E ENVIANDO ==="
             gh release create v1.0-cidade-viva --title "LIFE: CIDADE VIVA" \
               --notes "Jogo completo em um arquivo HTML." \
-              --target "1382a02a69c9b8796e43a993384eb1d3376a6a14"
+              --target "${GITHUB_SHA}"
             gh release upload v1.0-cidade-viva LIFE-CIDADE-VIVA.html --clobber
           fi
           echo "=== ESTADO FINAL DO RELEASE ==="
@@ -107,7 +109,9 @@ jobs:
             echo "2. Dê dois cliques no arquivo baixado. Ele abre no navegador e roda offline."
             echo "3. Se o Windows avisar que o arquivo veio da internet: clique em **Manter** / **Executar mesmo assim**."
             echo ""
-            echo "O jogo é um único arquivo HTML de 255 KB — não precisa de servidor, instalação nem internet."
+            echo "**Jogar no navegador (um clique):** https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/${GITHUB_SHA}/LIFE-CIDADE-VIVA.html"
+            echo ""
+            echo "O jogo é um único arquivo HTML ($(du -h LIFE-CIDADE-VIVA.html | cut -f1)) — não precisa de servidor, instalação nem internet."
             echo ""
             echo "---"
             echo ""

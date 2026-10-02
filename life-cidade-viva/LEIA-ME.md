@@ -13,7 +13,7 @@ e a polícia respondendo a ocorrências.
 
 | Como | Link | Observação |
 |---|---|---|
-| **Jogar no navegador** | https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/1382a02a69c9b8796e43a993384eb1d3376a6a14/LIFE-CIDADE-VIVA.html | Abre e roda direto, sem baixar nada (verificado: `text/html`, 255 KB) |
+| **Jogar no navegador** | https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/44599b24da76e21f93c51c15b76e23378fdcc8e6/LIFE-CIDADE-VIVA.html | Abre e roda direto, sem baixar nada (verificado: `text/html`, 272 KB) |
 | **Baixar o arquivo** | https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html | Baixa o HTML único — dois cliques e joga offline |
 | **Servidor local** | `python serve.py 8137` → http://localhost:8137 | Para desenvolvimento |
 
