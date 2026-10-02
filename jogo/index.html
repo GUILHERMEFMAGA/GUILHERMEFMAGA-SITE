@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080907">
+  <meta name="description" content="Rua Vermelha — um jogo 2D de direção e exploração em visão de cima.">
+  <title>Rua Vermelha · Nova Aurora, 1998</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="cabinet" id="cabinet" aria-label="Rua Vermelha, jogo retrô de visão superior">
+    <canvas id="game" width="1568" height="960" tabindex="0" aria-label="Jogo em visão de cima. Use WASD ou as setas para dirigir e E para sair ou entrar no carro.">
+      Seu navegador precisa oferecer suporte ao Canvas para jogar.
+    </canvas>
+
+    <div id="loading" class="loading-screen" aria-live="polite">
+      <span class="loading-mark">RV</span>
+      <span>CARREGANDO FITA · NOVA AURORA</span>
+      <i></i>
+    </div>
+
+    <button id="helpButton" class="help-trigger" type="button" aria-label="Como jogar" title="Como jogar (?)">?</button>
+
+    <div id="hint" class="hint" aria-hidden="true">
+      <span class="hint-dot"></span>
+      <span><kbd>WASD</kbd> DIRIGIR <b>·</b> <kbd>E</kbd> SAIR / ENTRAR <b>·</b> <kbd>H</kbd> BUZINA <b>·</b> <kbd>?</kbd> AJUDA</span>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <section id="helpPanel" class="help-panel" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+      <button id="closeHelp" class="close-help" type="button" aria-label="Fechar ajuda">×</button>
+      <span class="help-eyebrow">NOVA AURORA · 1998</span>
+      <h1 id="helpTitle">RUA <em>VERMELHA</em></h1>
+      <p>Explore este quarteirão em visão de cima. A cena usa a imagem de referência como base: mesma rua, mesmos telhados e o sedã vermelho original.</p>
+      <div class="help-controls">
+        <div><kbd>WASD</kbd><span>Dirigir ou andar</span></div>
+        <div><kbd>Shift</kbd><span>Correr a pé</span></div>
+        <div><kbd>E</kbd><span>Sair / entrar / usar orelhão</span></div>
+        <div><kbd>Espaço</kbd><span>Freio de mão / empurrão leve</span></div>
+        <div><kbd>H</kbd><span>Buzina</span></div>
+        <div><kbd>R</kbd><span>Trocar a estação do rádio</span></div>
+        <div><kbd>V</kbd><span>Ligar / desligar sons</span></div>
+        <div><kbd>Esc</kbd><span>Pausar</span></div>
+      </div>
+      <div class="help-note">Trabalhos aparecem no orelhão amarelo quando você sai do carro. A violência é cartunesca, sem sangue.</div>
+      <button id="resumeButton" class="resume-button" type="button">VOLTAR À RUA</button>
+    </section>
+
+    <div class="touch-controls" id="touchControls" aria-label="Controles de toque">
+      <div class="dpad">
+        <button data-key="arrowup" aria-label="Para cima">▲</button>
+        <button data-key="arrowleft" aria-label="Para esquerda">◀</button>
+        <button data-key="arrowdown" aria-label="Para baixo">▼</button>
+        <button data-key="arrowright" aria-label="Para direita">▶</button>
+      </div>
+      <button data-key="e" class="touch-e" aria-label="Sair, entrar ou interagir">E</button>
+      <button data-key="space" class="touch-space" aria-label="Freio de mão">⤺</button>
+    </div>
+  </main>
+
+  <script type="module" src="./game.js"></script>
+</body>
+</html>
