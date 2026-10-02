@@ -3,6 +3,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { clamp } from './config.js';
+import { makeGlowTexture } from './textures.js';
 
 export class Rain {
   constructor(scene, count, splashCount = 240) {
@@ -31,7 +32,7 @@ export class Rain {
     this.attr.setUsage(THREE.DynamicDrawUsage);
     g.setAttribute('position', this.attr);
     const m = new THREE.LineBasicMaterial({
-      color: 0xbcd4ee, transparent: true, opacity: 0.3, depthWrite: false, fog: false,
+      color: 0xa8c4e2, transparent: true, opacity: 0.2, depthWrite: false, fog: false,
     });
     this.lines = new THREE.LineSegments(g, m);
     this.lines.frustumCulled = false;
@@ -47,8 +48,8 @@ export class Rain {
       this.sAttr.setUsage(THREE.DynamicDrawUsage);
       sg.setAttribute('position', this.sAttr);
       this.sMat = new THREE.PointsMaterial({
-        size: 0.9, color: 0xcfe0f2, transparent: true, opacity: 0.35,
-        depthWrite: false, sizeAttenuation: true, fog: true,
+        size: 0.55, map: makeGlowTexture(), color: 0xbcd2e8, transparent: true, opacity: 0.16,
+        depthWrite: false, sizeAttenuation: true, fog: true, blending: THREE.AdditiveBlending,
       });
       this.splash = new THREE.Points(sg, this.sMat);
       this.splash.frustumCulled = false;
@@ -73,7 +74,7 @@ export class Rain {
     this.lAttr.setUsage(THREE.DynamicDrawUsage);
     lg.setAttribute('position', this.lAttr);
     this.lMat = new THREE.PointsMaterial({
-      size: 9, color: 0xdfeaff, transparent: true, opacity: 0.14,
+      size: 6, map: makeGlowTexture(), color: 0xcfe0f5, transparent: true, opacity: 0.07,
       depthWrite: false, depthTest: false, sizeAttenuation: false, fog: false,
     });
     this.lensPts = new THREE.Points(lg, this.lMat);
@@ -86,10 +87,10 @@ export class Rain {
 
   setIntensity(v) {
     const k = clamp(v, 0, 1);
-    this.lines.material.opacity = 0.3 * k;
+    this.lines.material.opacity = 0.2 * k;
     this.lines.visible = k > 0.02;
     if (this.splash) { this.sMat.opacity = 0.38 * k; this.splash.visible = k > 0.02; }
-    this.lMat.opacity = 0.15 * k;
+    this.lMat.opacity = 0.07 * k;
     this.lensPts.visible = k > 0.02;
     this.k = k;
   }

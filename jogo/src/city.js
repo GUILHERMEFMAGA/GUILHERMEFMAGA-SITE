@@ -40,6 +40,8 @@ const B_FRAG = /* glsl */`
 precision highp float;
 uniform sampler2D uF0, uF1, uF2, uF3;
 uniform vec3  uFogColor;
+uniform vec3  uSunDir, uSunColor;
+uniform float uSunI, uAmbI;
 uniform float uFogDensity, uNight, uTime, uBright;
 varying vec3  vN;  varying vec3  vW;
 varying float vVar, vLit, vH;
@@ -74,6 +76,10 @@ void main(){
     col = vTint2 * (0.70 + 0.42 * g);
     // cascalho / manta asfáltica
     col *= 0.86 + 0.18 * hash(floor(vW.xz * 22.0));
+    // iluminação simples: sol direcional + céu ambiente (dá volume às caixas)
+    float ndl = max(dot(n, normalize(uSunDir)), 0.0);
+    vec3 amb = mix(vec3(0.30, 0.27, 0.25), vec3(0.62, 0.66, 0.75), n.y * 0.5 + 0.5);
+    col *= (amb * uAmbI + uSunColor * uSunI * (0.28 + 0.85 * ndl));
   } else {
     // ---------- fachada ----------
     float mask = clamp(triMask(vW, n, s, int(vVar + 0.5)).r, 0.0, 1.0);
@@ -84,7 +90,7 @@ void main(){
 
     // vidro apaga reflexo do céu durante o dia
     float refl = 0.28 + 0.5 * pow(clamp(n.y * 0.55 + 0.5, 0.0, 1.0), 1.6);
-    vec3 glassDay = mix(vec3(0.045, 0.058, 0.078), vec3(0.60, 0.44, 0.30), refl);
+    vec3 glassDay = mix(vec3(0.085, 0.105, 0.135), vec3(0.62, 0.47, 0.33), refl);
 
     float lit = step(1.0 - vLit, r1) * step(0.22, r2);
     float flick = 0.88 + 0.12 * sin(uTime * (0.5 + r2 * 2.2) + r1 * 40.0);
@@ -92,12 +98,17 @@ void main(){
     vec3 cool = mix(vec3(0.55, 0.82, 1.0), vec3(0.86, 0.94, 1.0), r2);
     vec3 emit = mix(warm, cool, step(0.86, r1)) * (1.15 + 1.5 * r2) * flick;
 
-    vec3 winCol = mix(glassDay, emit, clamp(uNight * lit, 0.0, 1.0));
-    col = mix(vTint * (0.84 + 0.3 * wallN), winCol, mask);
+    // albedo recebe luz do sol/ambiente; janelas acesas são emissivas (não apagam à noite)
+    float litAmt = clamp(uNight * lit, 0.0, 1.0);
+    vec3 baseCol = mix(vTint * (0.84 + 0.3 * wallN), glassDay, mask);
+    vec3 emisCol = emit * litAmt * mask;
+    float ndl2 = max(dot(n, normalize(uSunDir)), 0.0);
+    vec3 amb2 = mix(vec3(0.30, 0.27, 0.25), vec3(0.62, 0.66, 0.75), n.y * 0.5 + 0.5);
+    col = baseCol * (amb2 * uAmbI + uSunColor * uSunI * (0.26 + 0.9 * ndl2)) + emisCol;
 
     // térreo mais escuro (lojas/sombra da rua)
     float ground = 1.0 - smoothstep(0.0, 15.0, vW.y);
-    col *= (1.0 - 0.44 * ground);
+    col *= (1.0 - 0.30 * ground);
     // vitrines acesas no nível da rua
     col += vec3(1.0, 0.72, 0.42) * ground * uNight * 0.30 * step(0.45, mask);
     // sujeira e claridade atmosférica conforme a altura
@@ -155,10 +166,10 @@ export function buildCity(scene, renderer, q, seed = 20261002) {
   scene.add(far);
 
   const roadMat = new THREE.MeshStandardMaterial({
-    color: 0x15161a, roughness: 0.30, metalness: 0.42,
+    color: 0x101114, roughness: 0.46, metalness: 0.10,
     roughnessMap: rough, normalMap: ripple,
-    normalScale: new THREE.Vector2(0.42, 0.42),
-    envMapIntensity: 1.45,
+    normalScale: new THREE.Vector2(0.10, 0.10),
+    envMapIntensity: 0.85,
   });
   const roadSize = CFG.HALF * 2;
   const road = new THREE.Mesh(new THREE.PlaneGeometry(roadSize, roadSize), roadMat);
@@ -349,7 +360,10 @@ export function buildCity(scene, renderer, q, seed = 20261002) {
       uF2: { value: facades[2] }, uF3: { value: facades[3] },
       uFogColor: { value: new THREE.Color(0xd09060) },
       uFogDensity: { value: 0.00072 },
-      uNight: { value: 0 }, uTime: { value: 0 }, uBright: { value: 1.75 },
+      uNight: { value: 0 }, uTime: { value: 0 }, uBright: { value: 1.0 },
+      uSunDir: { value: new THREE.Vector3(0.4, 0.2, 0.9) },
+      uSunColor: { value: new THREE.Color(1, 0.83, 0.63) },
+      uSunI: { value: 1.0 }, uAmbI: { value: 0.55 },
     },
   });
   const bMesh = new THREE.InstancedMesh(box, bMat, count);
@@ -471,7 +485,7 @@ export function buildCity(scene, renderer, q, seed = 20261002) {
       trunks.setMatrixAt(k, m4);
       m4.makeScale(3.4 * t.s, 4.2 * t.s, 3.4 * t.s); m4.setPosition(t.x, h + 1.4 * t.s, t.z);
       crowns.setMatrixAt(k, m4);
-      col.setHSL(0.26 + rnd() * 0.07, 0.34 + rnd() * 0.2, 0.17 + rnd() * 0.12);
+      col.setHSL(0.27 + rnd() * 0.08, 0.45 + rnd() * 0.25, 0.24 + rnd() * 0.16);
       crowns.setColorAt(k, col);
     });
     trunks.instanceMatrix.needsUpdate = true;
@@ -756,16 +770,16 @@ export function buildCity(scene, renderer, q, seed = 20261002) {
   const colOff = new THREE.Color(0.1, 0.06, 0.05);
 
   const roadDay = new THREE.Color(0x15161a), roadNight = new THREE.Color(0x0a0b0e);
-  const swDay = new THREE.Color(0x6d6d68), swNight = new THREE.Color(0x3a3b40);
+  const swDay = new THREE.Color(0x75767a), swNight = new THREE.Color(0x3a3b40);
   const farDay = new THREE.Color(0x0a0b0e), farNight = new THREE.Color(0x05060a);
 
   city.update = function (dt, time, camPos, night, player) {
     bMat.uniforms.uNight.value = night;
     bMat.uniforms.uTime.value = time;
     // de dia o shader não tem iluminação real: compensa; à noite deixa escurecer
-    bMat.uniforms.uBright.value = 1.85 - night * 1.18;
+    bMat.uniforms.uBright.value = 1.05 - night * 0.55;
     roadMat.color.copy(roadDay).lerp(roadNight, night);
-    roadMat.envMapIntensity = 1.5 - night * 0.95;
+    roadMat.envMapIntensity = 0.85 - night * 0.45;
     swMat.color.copy(swDay).lerp(swNight, night);
     groundMat.color.copy(farDay).lerp(farNight, night);
 
@@ -860,6 +874,13 @@ export function buildCity(scene, renderer, q, seed = 20261002) {
       city.passenger.rotation.y += dt * 0.5;
       city.passenger.position.y = Math.sin(time * 2) * 0.05;
     }
+  };
+
+  city.setSun = function (dir, color, intensity, amb) {
+    bMat.uniforms.uSunDir.value.copy(dir);
+    bMat.uniforms.uSunColor.value.copy(color);
+    bMat.uniforms.uSunI.value = intensity;
+    bMat.uniforms.uAmbI.value = amb;
   };
 
   city.setFog = function (color, density) {

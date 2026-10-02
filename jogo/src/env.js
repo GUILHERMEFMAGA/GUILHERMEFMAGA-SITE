@@ -31,10 +31,10 @@ void main() {
 
   // brilho espalhado em volta do sol
   float mu = max(dot(d, normalize(uSunDir)), 0.0);
-  col += uSunColor * (pow(mu, 5.0) * 0.55 + pow(mu, 64.0) * 1.2) * uSunIntensity;
+  col += uSunColor * (pow(mu, 6.0) * 0.20 + pow(mu, 90.0) * 0.45) * uSunIntensity;
   // disco solar
   float disc = smoothstep(uSunSize, uSunSize * 0.86, acos(clamp(mu, -1.0, 1.0)));
-  col += uSunColor * disc * 7.0 * uSunIntensity;
+  col += uSunColor * disc * 3.2 * uSunIntensity;
 
   // nuvens em faixas (projeção no plano)
   if (h > 0.005) {
@@ -68,16 +68,16 @@ const KEYS = [
     zenith: 0x2f5f9e, horizon: 0xffa457, ground: 0x3a2b23,
     sun: 0xffd3a0, sunI: 1.0, sunSize: 0.055,
     cloud: 0xffc79a, star: 0.0,
-    fog: 0xd09060, fogD: 0.00072, fogY: 0.010,
-    dirI: 3.5, hemiSky: 0xffbe86, hemiGnd: 0x2c2622, hemiI: 0.85, exp: 1.0,
+    fog: 0xc98a58, fogD: 0.00058, fogY: 0.010,
+    dirI: 2.6, hemiSky: 0xffbe86, hemiGnd: 0x2c2622, hemiI: 0.85, exp: 0.95,
   },
   { // pôr do sol
     t: 0.34, elev: 4.5, azi: 104,
     zenith: 0x1d3468, horizon: 0xff5e34, ground: 0x241a19,
     sun: 0xff9a52, sunI: 1.15, sunSize: 0.075,
     cloud: 0xff8a63, star: 0.15,
-    fog: 0x8c4b3d, fogD: 0.00092, fogY: 0.012,
-    dirI: 2.1, hemiSky: 0xa96a63, hemiGnd: 0x221d1e, hemiI: 0.7, exp: 1.03,
+    fog: 0x7c4437, fogD: 0.00080, fogY: 0.012,
+    dirI: 1.7, hemiSky: 0xa96a63, hemiGnd: 0x221d1e, hemiI: 0.7, exp: 1.03,
   },
   { // crepúsculo azulado
     t: 0.55, elev: -1.5, azi: 96,

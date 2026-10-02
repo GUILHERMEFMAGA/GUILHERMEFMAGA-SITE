@@ -271,7 +271,7 @@ export function makeRippleNormal() {
     for (let y = -r; y <= r; y++) for (let xx = -r; xx <= r; xx++) {
       const d = Math.hypot(xx, y); if (d > r) continue;
       const px = ((cx + xx + S) | 0) % S, py = ((cy + y + S) | 0) % S;
-      h[py * S + px] += Math.cos((d / r) * Math.PI * 1.6) * a * (1 - d / r);
+      h[py * S + px] += Math.cos((d / r) * Math.PI * 1.6) * a * (1 - d / r) * 0.28;
     }
   }
   const d = img.data;
@@ -279,7 +279,7 @@ export function makeRippleNormal() {
     const k = y * S + xx;
     const dx = h[y * S + ((xx + 1) % S)] - h[y * S + ((xx - 1 + S) % S)];
     const dy = h[((y + 1) % S) * S + xx] - h[((y - 1 + S) % S) * S + xx];
-    const nx = -dx * 3, ny = -dy * 3, nz = 1;
+    const nx = -dx * 1.4, ny = -dy * 1.4, nz = 1;
     const l = Math.hypot(nx, ny, nz);
     d[k * 4] = ((nx / l) * 0.5 + 0.5) * 255;
     d[k * 4 + 1] = ((ny / l) * 0.5 + 0.5) * 255;
@@ -289,7 +289,7 @@ export function makeRippleNormal() {
   x.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(24, 24);
+  t.repeat.set(90, 90);
   return t;
 }
 

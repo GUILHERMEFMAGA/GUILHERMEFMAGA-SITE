@@ -65,7 +65,7 @@ const GradeShader = {
 
       // contraste suave + leves realce/sombra
       col = clamp(col, 0.0, 1.0);
-      col = (col - 0.5) * 1.09 + 0.5;
+      col = (col - 0.5) * 1.05 + 0.5;
       col += 0.012 * (1.0 - uNight);
 
       // vinheta
@@ -202,7 +202,7 @@ class Game {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.bloom = null;
     if (this.q.bloom) {
-      this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), this.q.bloomStrength, 0.72, 0.78);
+      this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), this.q.bloomStrength, 0.6, 0.92);
       this.composer.addPass(this.bloom);
     }
     this.grade = new ShaderPass(GradeShader);
@@ -594,6 +594,8 @@ class Game {
     this.sky.update(dt, focus, this._envDirty);
     this._envDirty = false;
     this.city.setFog(this.scene.fog.color, this.scene.fog.density);
+    this.city.setSun(this.sky.sunDir, this.sky.sun.color,
+      clamp(this.sky.sun.intensity * 0.42, 0.06, 1.5), 0.42 + this.sky.hemi.intensity * 0.28);
     this.city.update(dt, tNow, this.camera.position, this.sky.night,
       playing ? p : { x: p.x, y: 0, z: p.z });
     this.traffic.update(dt, tNow, playing ? p : null, this.sky.night);
@@ -779,7 +781,7 @@ class Game {
     ctx.translate(-p.x, -p.z);
 
     // quarteirões
-    ctx.fillStyle = 'rgba(150,150,160,0.20)';
+    ctx.fillStyle = 'rgba(165,168,178,0.34)';
     const inner = CFG.SPACING / 2 - CFG.ROAD_HALF;
     for (let i = 0; i < CFG.BLOCKS; i++) for (let j = 0; j < CFG.BLOCKS; j++) {
       const cx = -CFG.SPAN / 2 + CFG.SPACING / 2 + i * CFG.SPACING;
