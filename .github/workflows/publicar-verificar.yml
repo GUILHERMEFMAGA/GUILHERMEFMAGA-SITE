@@ -38,12 +38,14 @@ jobs:
             if grep -qi "LIFE: CIDADE VIVA" /tmp/saida.html 2>/dev/null; then marca="SIM"; fi
             echo "LINK|$codigo|$tipo|$tam bytes|jogo_presente=$marca|$url"
           }
+          exec > >(tee /tmp/links.txt) 2>&1
+          echo "=== VERIFICACAO DE LINKS (qual serve o jogo ao navegador?) ==="
           testar "https://raw.githubusercontent.com/$REPO/arena/01a0f9be-guilhermefmaga-site/$ARQ"
           testar "https://cdn.jsdelivr.net/gh/$REPO@$SHA/$ARQ"
           testar "https://raw.githack.com/$REPO/$SHA/$ARQ"
           testar "https://cdn.statically.io/gh/$REPO/$SHA/$ARQ"
           testar "https://htmlpreview.github.io/?https://github.com/$REPO/blob/$SHA/$ARQ"
-          echo "=== FIM DA VERIFICACAO ===" > /tmp/fim.txt
+          echo "=== FIM DA VERIFICACAO ==="
 
       - name: Publicar o jogo como anexo de Release
         env:
@@ -84,6 +86,9 @@ jobs:
             else
               echo "RELEASE|jogo_presente=nao"
             fi
+            echo ""
+            cat /tmp/links.txt 2>/dev/null
+            echo ""
             echo "=== CABECALHOS FINAIS (o navegador renderiza ou baixa?) ==="
             curl -sIL -m 60 "https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html" \
               | grep -i -E "^(HTTP/|content-type|content-disposition|content-length)" | tail -8
