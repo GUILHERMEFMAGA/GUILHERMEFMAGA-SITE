@@ -5,6 +5,7 @@ Uso:
     python serve.py            # abre em http://localhost:8000
     python serve.py 8137       # escolhe a porta
     python serve.py 8137 0.0.0.0
+    python serve.py 8000 0.0.0.0 ..     # serve a pasta acima (raiz do projeto)
 
 Por que usar este arquivo em vez de "python -m http.server"?
 Além de servir os arquivos, ele manda cabeçalhos que impedem o navegador
@@ -19,7 +20,8 @@ import socketserver
 
 PORTA = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 HOST = sys.argv[2] if len(sys.argv) > 2 else "0.0.0.0"
-PASTA = os.path.dirname(os.path.abspath(__file__))
+# pasta a servir: 3º argumento, senão a própria pasta deste arquivo
+PASTA = os.path.abspath(sys.argv[3]) if len(sys.argv) > 3 else os.path.dirname(os.path.abspath(__file__))
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
