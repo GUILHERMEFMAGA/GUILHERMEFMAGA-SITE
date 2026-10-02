@@ -21,7 +21,6 @@ const pressed = new Set();
 const policeCars = [];
 
 let referenceScene = null;
-let sceneHasBuiltInCar = true;
 let streetCanvas = null;
 let streetSprite = null;
 let audioContext = null;
@@ -66,7 +65,6 @@ const saved = loadProgress();
 const state = {
   ready: false,
   driving: true,
-  carMoved: false,
   time: 0,
   money: saved.money,
   reputation: saved.reputation,
@@ -179,9 +177,10 @@ function makeCarSprite(reference) {
   spriteContext.imageSmoothingEnabled = false;
   spriteContext.save();
   spriteContext.beginPath();
+  // O recorte termina na linha do para-choque, excluindo a sombra do asfalto.
   const points = [
     [37, 24], [112, 24], [125, 30], [133, 47], [135, 76], [129, 87],
-    [138, 98], [138, 234], [132, 247], [119, 256], [33, 256], [20, 248],
+    [138, 98], [138, 234], [132, 246], [119, 255], [33, 255], [20, 247],
     [12, 234], [12, 99], [21, 87], [15, 76], [17, 47], [24, 30],
   ];
   spriteContext.moveTo(points[0][0], points[0][1]);
@@ -195,7 +194,6 @@ function makeCarSprite(reference) {
 
 function finishLoading(image) {
   referenceScene = normalizeScene(image);
-  sceneHasBuiltInCar = true;
   streetCanvas = makeStreet(referenceScene);
   streetSprite = makeCarSprite(referenceScene);
   state.ready = true;
@@ -375,9 +373,6 @@ function drive(dt) {
     car.y = nextY;
   }
   car.hitCooldown = Math.max(0, car.hitCooldown - dt);
-  if (Math.abs(car.x - CAR_SPAWN.x) > 1 || Math.abs(car.y - CAR_SPAWN.y) > 1 || Math.abs(car.angle) > .02) {
-    state.carMoved = true;
-  }
 }
 
 function blockedOnFoot(x, y) {
@@ -573,7 +568,6 @@ function arrestPlayer() {
   state.car.y = CAR_SPAWN.y;
   state.car.angle = 0;
   state.car.speed = 0;
-  state.carMoved = !sceneHasBuiltInCar;
   state.foot.x = 1035;
   state.foot.y = 526;
   saveProgress();
@@ -834,8 +828,7 @@ function render() {
   const shakeY = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   ctx.save();
   ctx.translate(shakeX, shakeY);
-  const untouchedReference = !state.carMoved && sceneHasBuiltInCar && referenceScene;
-  ctx.drawImage(untouchedReference || streetCanvas, 0, 0);
+  ctx.drawImage(streetCanvas, 0, 0);
 
   // Pedestres só aparecem depois que o jogador sai do carro, mantendo a cena inicial igual à referência.
   if (!state.driving || state.mission) {
@@ -847,7 +840,7 @@ function render() {
   if (target) drawTarget(target);
   for (const police of policeCars) drawPoliceCar(police);
   drawHelicopter();
-  if (state.carMoved || !sceneHasBuiltInCar) drawPlayerCar();
+  drawPlayerCar();
   if (!state.driving) drawPerson(state.foot, true);
   drawHud();
   drawInteractionPrompt();
@@ -988,10 +981,8 @@ backgroundImage.onload = () => finishLoading(backgroundImage);
 backgroundImage.onerror = () => {
   const fallback = fallbackScene();
   referenceScene = fallback;
-  sceneHasBuiltInCar = false;
   streetCanvas = makeStreet(fallback);
   streetSprite = makeCarSprite(fallback);
-  state.carMoved = true;
   state.ready = true;
   loading.classList.add('is-ready');
   hint.classList.add('is-visible');
