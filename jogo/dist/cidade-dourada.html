@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<title>CIDADE DOURADA — Táxi 3D | GUILHERMEFMAGA</title>
+<style>
+/* ============================================================
+   CIDADE DOURADA — interface
+   ============================================================ */
+:root{
+  --gold:#ffb457;
+  --gold2:#ffd9a0;
+  --cyan:#37e6ff;
+  --orange:#ff8a2b;
+  --pink:#ff2d6f;
+  --bg:#07070c;
+  --glass:rgba(10,11,18,.62);
+  --line:rgba(255,255,255,.14);
+  --font:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:#fff;font-family:var(--font);
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+canvas{display:block}
+.hidden{display:none !important}
+
+/* ---------------- overlays ---------------- */
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 10%,rgba(255,150,60,.16),rgba(4,4,8,.82) 55%,rgba(2,2,5,.95));
+  backdrop-filter:blur(7px) saturate(1.1);animation:fade .35s ease}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+
+/* loader */
+.loader-box{text-align:center}
+.loader-logo{font-size:clamp(34px,7vw,64px);font-weight:800;letter-spacing:.16em;
+  background:linear-gradient(180deg,#fff,var(--gold) 60%,#ff6a2b);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 24px rgba(255,150,60,.45))}
+.loader-logo span{display:block;font-size:.42em;letter-spacing:.52em;color:#cfe9ff;
+  -webkit-text-fill-color:#cfe9ff;margin-top:.35em;opacity:.85}
+.bar{width:min(420px,72vw);height:6px;margin:26px auto 10px;border-radius:99px;
+  background:rgba(255,255,255,.12);overflow:hidden}
+.bar i{display:block;height:100%;width:8%;border-radius:99px;
+  background:linear-gradient(90deg,var(--gold),var(--pink));transition:width .3s ease;
+  box-shadow:0 0 18px rgba(255,140,60,.8)}
+#loadTxt{font-size:13px;letter-spacing:.14em;text-transform:uppercase;opacity:.7;font-family:var(--mono)}
+
+/* menu */
+.menu-card{width:min(620px,92vw);padding:clamp(20px,3.4vw,38px);border-radius:22px;
+  background:linear-gradient(170deg,rgba(24,20,32,.86),rgba(8,9,15,.9));
+  border:1px solid var(--line);box-shadow:0 40px 120px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.08)}
+.menu-card.narrow{width:min(480px,92vw);text-align:center}
+.kick{font-size:11px;letter-spacing:.4em;opacity:.6;margin-bottom:10px;font-family:var(--mono)}
+.menu-card h1{font-size:clamp(40px,8vw,74px);line-height:.9;font-weight:800;letter-spacing:.02em;
+  text-shadow:0 0 40px rgba(255,140,60,.35)}
+.menu-card h1.sm{font-size:clamp(30px,6vw,50px)}
+.menu-card h1 b{color:var(--gold);text-shadow:0 0 34px rgba(255,150,60,.6)}
+.tag{margin:12px 0 22px;opacity:.82;font-size:15px}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.row.small{align-items:center;font-size:13px;opacity:.9}
+.row.small label{display:flex;gap:6px;align-items:center}
+.btn{flex:1 1 auto;min-width:150px;padding:15px 20px;border-radius:14px;border:1px solid var(--line);
+  background:rgba(255,255,255,.06);color:#fff;font-family:var(--font);font-size:16px;font-weight:700;
+  letter-spacing:.04em;cursor:pointer;transition:.18s}
+.btn:hover{background:rgba(255,255,255,.13);transform:translateY(-2px)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn.primary{background:linear-gradient(180deg,#ffbf63,#ff7a2f);color:#22140a;border-color:#ffd9a0;
+  box-shadow:0 12px 34px rgba(255,120,40,.36)}
+.btn.primary:hover{box-shadow:0 16px 46px rgba(255,120,40,.55)}
+select{background:#14151d;color:#fff;border:1px solid var(--line);border-radius:9px;padding:6px 8px;font-family:var(--font)}
+.how{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+.how summary{cursor:pointer;font-size:13px;letter-spacing:.16em;text-transform:uppercase;opacity:.75}
+.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px;margin:14px 0}
+.keys div{font-size:13px;opacity:.85;background:rgba(255,255,255,.05);padding:8px 10px;border-radius:9px}
+.keys b{display:inline-block;min-width:58px;color:var(--gold2);font-family:var(--mono);font-size:12px}
+.goal{font-size:13.5px;line-height:1.65;opacity:.85}
+.cy{color:var(--cyan);font-weight:700}.or{color:var(--orange);font-weight:700}
+.foot{position:absolute;bottom:16px;font-size:11px;letter-spacing:.2em;opacity:.4;font-family:var(--mono)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0 14px}
+.stats div{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:12px 6px}
+.stats span{display:block;font-size:clamp(20px,4vw,30px);font-weight:800;color:var(--gold2);font-family:var(--mono)}
+.stats label{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;opacity:.6}
+.rank{font-size:14px;letter-spacing:.24em;color:var(--cyan);margin-bottom:8px;text-transform:uppercase}
+
+/* countdown */
+#countdown{position:fixed;inset:0;z-index:35;display:flex;align-items:center;justify-content:center;
+  font-size:clamp(90px,22vw,200px);font-weight:800;color:#fff;pointer-events:none;
+  text-shadow:0 0 60px rgba(255,150,60,.8),0 0 160px rgba(255,60,120,.5);
+  font-family:var(--mono);animation:pop .9s ease-out}
+@keyframes pop{0%{transform:scale(2.2);opacity:0}25%{transform:scale(1);opacity:1}100%{transform:scale(.86);opacity:0}}
+
+/* ---------------- HUD ---------------- */
+#hud{position:fixed;inset:0;z-index:20;pointer-events:none}
+.top{position:absolute;top:0;left:0;right:0;display:flex;gap:10px;padding:14px;align-items:flex-start}
+.panel{background:var(--glass);border:1px solid var(--line);border-radius:14px;padding:9px 14px;
+  backdrop-filter:blur(9px);box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.panel label{display:block;font-size:9.5px;letter-spacing:.22em;opacity:.6;text-transform:uppercase;font-family:var(--mono)}
+.panel.time #hTime{font-size:30px;font-weight:800;font-family:var(--mono);letter-spacing:.02em}
+.panel.time.warn #hTime{color:#ff5470;animation:blink .6s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.panel.score{margin-left:auto;text-align:right;min-width:150px}
+.panel.score #hScore{font-size:30px;font-weight:800;font-family:var(--mono);color:var(--gold2);
+  text-shadow:0 0 22px rgba(255,170,70,.55)}
+.combo{font-size:13px;font-weight:800;color:var(--cyan);font-family:var(--mono);opacity:.5;transition:.2s}
+.combo.on{opacity:1;text-shadow:0 0 18px rgba(55,230,255,.8);transform:scale(1.12)}
+.panel.fare{position:absolute;top:14px;left:50%;transform:translateX(-50%);text-align:center;max-width:min(46vw,380px)}
+.panel.fare #hFare{font-size:15px;font-weight:700;margin-top:2px}
+.panel.fare .sub{font-size:12px;opacity:.75;font-family:var(--mono);margin-top:2px}
+
+.bottom{position:absolute;bottom:0;left:0;right:0;display:flex;justify-content:space-between;
+  align-items:flex-end;padding:14px;gap:12px}
+.speedo{min-width:190px}
+.kmh{display:flex;align-items:baseline;gap:6px}
+.kmh span{font-size:44px;font-weight:800;font-family:var(--mono);line-height:1;
+  text-shadow:0 0 26px rgba(255,180,90,.4)}
+.kmh i{font-style:normal;font-size:12px;opacity:.65;letter-spacing:.1em}
+.gear{position:absolute;right:14px;top:12px;font-family:var(--mono);font-size:16px;font-weight:800;color:var(--cyan)}
+.spd-bar{margin-top:8px;height:5px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;width:170px}
+.spd-bar i{display:block;height:100%;width:0%;border-radius:99px;
+  background:linear-gradient(90deg,#5ce07a,var(--gold),#ff3b5c)}
+#minimap{width:min(28vw,190px);height:min(28vw,190px);border-radius:16px;border:1px solid var(--line);
+  background:rgba(6,7,12,.72);backdrop-filter:blur(6px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+
+#toast{position:absolute;left:50%;top:26%;transform:translate(-50%,-50%);text-align:center;
+  font-size:clamp(26px,5vw,46px);font-weight:800;letter-spacing:.02em;opacity:0;
+  text-shadow:0 0 40px rgba(255,150,60,.7),0 6px 20px rgba(0,0,0,.6)}
+#toast.show{animation:toast 1.5s cubic-bezier(.2,.9,.2,1)}
+#toast small{display:block;font-size:.42em;letter-spacing:.2em;opacity:.85;margin-top:6px;font-family:var(--mono)}
+@keyframes toast{0%{opacity:0;transform:translate(-50%,-30%) scale(.7)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.06)}
+  70%{opacity:1;transform:translate(-50%,-52%) scale(1)}
+  100%{opacity:0;transform:translate(-50%,-70%) scale(.95)}}
+
+#hint{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);font-size:13px;
+  letter-spacing:.1em;background:rgba(8,9,14,.6);padding:7px 14px;border-radius:99px;
+  border:1px solid var(--line);opacity:0;transition:opacity .3s}
+#hint.show{opacity:.95}
+#hint b{color:var(--gold2);font-family:var(--mono)}
+
+#edgeArrow{position:absolute;left:50%;top:50%;font-size:34px;color:var(--orange);
+  text-shadow:0 0 20px rgba(255,140,40,.9);transform-origin:50% 50%;pointer-events:none}
+#edgeArrow.pick{color:var(--cyan);text-shadow:0 0 20px rgba(55,230,255,.9)}
+
+#vignette{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(120% 85% at 50% 50%,transparent 45%,rgba(0,0,0,.55) 100%)}
+#flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:#fff;mix-blend-mode:overlay}
+#flash.hit{animation:fl .35s ease-out}
+@keyframes fl{0%{opacity:.85}100%{opacity:0}}
+
+/* ---------------- touch ---------------- */
+#touch{position:fixed;inset:0;z-index:25;pointer-events:none}
+.t-left,.t-right{position:absolute;bottom:18px;display:flex;gap:12px;pointer-events:auto}
+.t-left{left:16px}.t-right{right:16px}
+.tbtn{width:74px;height:74px;border-radius:50%;border:1px solid var(--line);
+  background:rgba(12,13,20,.55);color:#fff;font-size:15px;font-weight:800;backdrop-filter:blur(6px)}
+.tbtn:active{background:rgba(255,180,90,.35)}
+.tbtn.gas{background:rgba(255,150,60,.28)}
+.tbtn.brake{background:rgba(255,60,90,.24)}
+
+@media (max-width:760px){
+  .panel.fare{max-width:52vw;top:auto;bottom:120px}
+  .panel.score #hScore,.panel.time #hTime{font-size:22px}
+  .kmh span{font-size:32px}
+  #minimap{width:110px;height:110px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
+
+</style>
+</head>
+<body>
+
+<!-- =================== TELA DE CARREGAMENTO =================== -->
+<div id="loader" class="overlay">
+  <div class="loader-box">
+    <div class="loader-logo">CIDADE<span>DOURADA</span></div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div id="loadTxt">Construindo a metrópole…</div>
+  </div>
+</div>
+
+<!-- =================== MENU PRINCIPAL =================== -->
+<div id="menu" class="overlay hidden">
+  <div class="menu-card">
+    <div class="kick">GUILHERMEFMAGA · APRESENTA</div>
+    <h1>CIDADE<br><b>DOURADA</b></h1>
+    <p class="tag">Táxi em mundo aberto · 3D fotorrealista</p>
+
+    <div class="row">
+      <button id="btnPlay" class="btn primary">▶&nbsp; JOGAR</button>
+      <button id="btnFree" class="btn">🚖&nbsp; MODO LIVRE</button>
+    </div>
+
+    <div class="row small">
+      <label>Qualidade
+        <select id="selQuality">
+          <option value="high">Alta</option>
+          <option value="medium">Média</option>
+          <option value="low">Baixa</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="chkSound" checked> Som</label>
+      <label class="chk"><input type="checkbox" id="chkRadio" checked> Rádio</label>
+    </div>
+
+    <details class="how">
+      <summary>Como jogar</summary>
+      <div class="keys">
+        <div><b>W / ↑</b> acelerar</div>
+        <div><b>S / ↓</b> frear · ré</div>
+        <div><b>A D / ← →</b> volante</div>
+        <div><b>Espaço</b> freio de mão (drift)</div>
+        <div><b>C</b> câmera · <b>R</b> rádio · <b>M</b> som</div>
+        <div><b>P / Esc</b> pausar</div>
+        <div><b>H</b> buzina</div>
+      </div>
+      <p class="goal">Pegue o passageiro no <span class="cy">feixe ciano</span>, leve até o
+      <span class="or">feixe laranja</span> antes do tempo acabar. Cada corrida aumenta o
+      <b>combo</b> e dá +14 s no relógio. Pare perto do marcador para embarcar.</p>
+    </details>
+  </div>
+  <div class="foot">renderizado em tempo real com WebGL · Three.js · build <b id="buildTag">?</b></div>
+</div>
+
+<!-- =================== PAUSA =================== -->
+<div id="pause" class="overlay hidden">
+  <div class="menu-card narrow">
+    <h1 class="sm">PAUSADO</h1>
+    <div class="row"><button id="btnResume" class="btn primary">Continuar</button>
+    <button id="btnQuit" class="btn">Menu</button></div>
+  </div>
+</div>
+
+<!-- =================== FIM DE JOGO =================== -->
+<div id="over" class="overlay hidden">
+  <div class="menu-card narrow">
+    <div class="kick">FIM DO EXPEDIENTE</div>
+    <h1 class="sm">CORRIDAS<br><b>ENCERRADAS</b></h1>
+    <div class="stats">
+      <div><span id="stScore">0</span><label>pontos</label></div>
+      <div><span id="stDeliv">0</span><label>corridas</label></div>
+      <div><span id="stCombo">x1</span><label>melhor combo</label></div>
+      <div><span id="stDist">0</span><label>km rodados</label></div>
+      <div><span id="stTop">0</span><label>km/h máx.</label></div>
+      <div><span id="stCoins">0</span><label>fichas</label></div>
+    </div>
+    <div id="stRank" class="rank">MOTORISTA DE APP</div>
+    <div class="row"><button id="btnAgain" class="btn primary">↻&nbsp; Jogar de novo</button>
+    <button id="btnMenu" class="btn">Menu</button></div>
+  </div>
+</div>
+
+<!-- =================== CONTAGEM =================== -->
+<div id="countdown" class="hidden">3</div>
+
+<!-- =================== HUD =================== -->
+<div id="hud" class="hidden">
+  <div class="top">
+    <div class="panel time">
+      <label>TEMPO</label>
+      <div id="hTime">2:30</div>
+    </div>
+    <div class="panel score">
+      <label>PONTOS</label>
+      <div id="hScore">0</div>
+      <div id="hCombo" class="combo">x1</div>
+    </div>
+    <div class="panel fare">
+      <label id="hFareLbl">PASSAGEIRO</label>
+      <div id="hFare">Procure o feixe de luz</div>
+      <div id="hDist" class="sub"></div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel speedo">
+      <div class="kmh"><span id="hSpeed">0</span><i>km/h</i></div>
+      <div class="gear" id="hGear">N</div>
+      <div class="spd-bar"><i id="hSpdBar"></i></div>
+    </div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+  </div>
+
+  <div id="toast"></div>
+  <div id="hint">Segure <b>W</b> para acelerar</div>
+  <div id="edgeArrow" class="hidden">▲</div>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<!-- =================== CONTROLES TOUCH =================== -->
+<div id="touch" class="hidden">
+  <div class="t-left">
+    <button data-k="left" class="tbtn">◀</button>
+    <button data-k="right" class="tbtn">▶</button>
+  </div>
+  <div class="t-right">
+    <button data-k="brake" class="tbtn brake">FREIO</button>
+    <button data-k="gas" class="tbtn gas">GÁS</button>
+  </div>
+</div>
+
+<div id="fatal" class="overlay hidden">
+  <div class="menu-card narrow">
+    <h1 class="sm">Ops…</h1>
+    <p id="fatalMsg" class="tag"></p>
+  </div>
+</div>
+
+
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>CIDADE DOURADA — Táxi 3D | GUILHERMEFMAGA</title>
+<meta name="description" content="Jogo 3D de mundo aberto: dirija um táxi por uma metrópole fotorrealista ao entardecer." />
+<link rel="stylesheet" href="./style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.min.js",
+    "three/addons/": "./vendor/three/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<!-- =================== TELA DE CARREGAMENTO =================== -->
+<div id="loader" class="overlay">
+  <div class="loader-box">
+    <div class="loader-logo">CIDADE<span>DOURADA</span></div>
+    <div class="bar"><i id="loadBar"></i></div>
+    <div id="loadTxt">Construindo a metrópole…</div>
+  </div>
+</div>
+
+<!-- =================== MENU PRINCIPAL =================== -->
+<div id="menu" class="overlay hidden">
+  <div class="menu-card">
+    <div class="kick">GUILHERMEFMAGA · APRESENTA</div>
+    <h1>CIDADE<br><b>DOURADA</b></h1>
+    <p class="tag">Táxi em mundo aberto · 3D fotorrealista</p>
+
+    <div class="row">
+      <button id="btnPlay" class="btn primary">▶&nbsp; JOGAR</button>
+      <button id="btnFree" class="btn">🚖&nbsp; MODO LIVRE</button>
+    </div>
+
+    <div class="row small">
+      <label>Qualidade
+        <select id="selQuality">
+          <option value="high">Alta</option>
+          <option value="medium">Média</option>
+          <option value="low">Baixa</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="chkSound" checked> Som</label>
+      <label class="chk"><input type="checkbox" id="chkRadio" checked> Rádio</label>
+    </div>
+
+    <details class="how">
+      <summary>Como jogar</summary>
+      <div class="keys">
+        <div><b>W / ↑</b> acelerar</div>
+        <div><b>S / ↓</b> frear · ré</div>
+        <div><b>A D / ← →</b> volante</div>
+        <div><b>Espaço</b> freio de mão (drift)</div>
+        <div><b>C</b> câmera · <b>R</b> rádio · <b>M</b> som</div>
+        <div><b>P / Esc</b> pausar</div>
+        <div><b>H</b> buzina</div>
+      </div>
+      <p class="goal">Pegue o passageiro no <span class="cy">feixe ciano</span>, leve até o
+      <span class="or">feixe laranja</span> antes do tempo acabar. Cada corrida aumenta o
+      <b>combo</b> e dá +14 s no relógio. Pare perto do marcador para embarcar.</p>
+    </details>
+  </div>
+  <div class="foot">renderizado em tempo real com WebGL · Three.js · build <b id="buildTag">?</b></div>
+</div>
+
+<!-- =================== PAUSA =================== -->
+<div id="pause" class="overlay hidden">
+  <div class="menu-card narrow">
+    <h1 class="sm">PAUSADO</h1>
+    <div class="row"><button id="btnResume" class="btn primary">Continuar</button>
+    <button id="btnQuit" class="btn">Menu</button></div>
+  </div>
+</div>
+
+<!-- =================== FIM DE JOGO =================== -->
+<div id="over" class="overlay hidden">
+  <div class="menu-card narrow">
+    <div class="kick">FIM DO EXPEDIENTE</div>
+    <h1 class="sm">CORRIDAS<br><b>ENCERRADAS</b></h1>
+    <div class="stats">
+      <div><span id="stScore">0</span><label>pontos</label></div>
+      <div><span id="stDeliv">0</span><label>corridas</label></div>
+      <div><span id="stCombo">x1</span><label>melhor combo</label></div>
+      <div><span id="stDist">0</span><label>km rodados</label></div>
+      <div><span id="stTop">0</span><label>km/h máx.</label></div>
+      <div><span id="stCoins">0</span><label>fichas</label></div>
+    </div>
+    <div id="stRank" class="rank">MOTORISTA DE APP</div>
+    <div class="row"><button id="btnAgain" class="btn primary">↻&nbsp; Jogar de novo</button>
+    <button id="btnMenu" class="btn">Menu</button></div>
+  </div>
+</div>
+
+<!-- =================== CONTAGEM =================== -->
+<div id="countdown" class="hidden">3</div>
+
+<!-- =================== HUD =================== -->
+<div id="hud" class="hidden">
+  <div class="top">
+    <div class="panel time">
+      <label>TEMPO</label>
+      <div id="hTime">2:30</div>
+    </div>
+    <div class="panel score">
+      <label>PONTOS</label>
+      <div id="hScore">0</div>
+      <div id="hCombo" class="combo">x1</div>
+    </div>
+    <div class="panel fare">
+      <label id="hFareLbl">PASSAGEIRO</label>
+      <div id="hFare">Procure o feixe de luz</div>
+      <div id="hDist" class="sub"></div>
+    </div>
+  </div>
+
+  <div class="bottom">
+    <div class="panel speedo">
+      <div class="kmh"><span id="hSpeed">0</span><i>km/h</i></div>
+      <div class="gear" id="hGear">N</div>
+      <div class="spd-bar"><i id="hSpdBar"></i></div>
+    </div>
+    <canvas id="minimap" width="200" height="200"></canvas>
+  </div>
+
+  <div id="toast"></div>
+  <div id="hint">Segure <b>W</b> para acelerar</div>
+  <div id="edgeArrow" class="hidden">▲</div>
+  <div id="vignette"></div>
+  <div id="flash"></div>
+</div>
+
+<!-- =================== CONTROLES TOUCH =================== -->
+<div id="touch" class="hidden">
+  <div class="t-left">
+    <button data-k="left" class="tbtn">◀</button>
+    <button data-k="right" class="tbtn">▶</button>
+  </div>
+  <div class="t-right">
+    <button data-k="brake" class="tbtn brake">FREIO</button>
+    <button data-k="gas" class="tbtn gas">GÁS</button>
+  </div>
+</div>
+
+<div id="fatal" class="overlay hidden">
+  <div class="menu-card narrow">
+    <h1 class="sm">Ops…</h1>
+    <p id="fatalMsg" class="tag"></p>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
