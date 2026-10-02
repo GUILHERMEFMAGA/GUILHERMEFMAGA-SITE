@@ -1,8 +1,10 @@
 const WIDTH = 1568;
 const HEIGHT = 960;
-const CAR_CROP = { x: 708, y: 386, width: 154, height: 279 };
-const CAR_PATCH = { x: 714, y: 392, width: 144, height: 270 };
+const CAR_CROP = { x: 708, y: 345, width: 154, height: 280 };
+const CAR_PATCH = { x: 696, y: 340, width: 176, height: 300 };
+const CAR_PATCH_FEATHER = 18;
 const ROAD = { left: 548, right: 1018, center: 784, top: 0, bottom: HEIGHT };
+const CAR_SPAWN = { x: 784, y: 485 };
 const SAVE_KEY = 'rua-vermelha-reference-demo-v1';
 const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, value));
 const distance = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
@@ -18,7 +20,8 @@ const keys = new Set();
 const pressed = new Set();
 const policeCars = [];
 
-let sceneImage = null;
+let referenceScene = null;
+let sceneHasBuiltInCar = true;
 let streetCanvas = null;
 let streetSprite = null;
 let audioContext = null;
@@ -63,6 +66,7 @@ const saved = loadProgress();
 const state = {
   ready: false,
   driving: true,
+  carMoved: false,
   time: 0,
   money: saved.money,
   reputation: saved.reputation,
@@ -70,7 +74,7 @@ const state = {
   mission: null,
   wanted: 0,
   foot: { x: 1035, y: 526, angle: 0 },
-  car: { x: 784, y: 527, angle: 0, speed: 0, health: 100, hitCooldown: 0 },
+  car: { x: CAR_SPAWN.x, y: CAR_SPAWN.y, angle: 0, speed: 0, health: 100, hitCooldown: 0 },
   toast: '',
   toastUntil: 0,
   cameraShake: 0,
@@ -98,40 +102,76 @@ function seedRandom(seed) {
   };
 }
 
-function makeStreet(image) {
+function normalizeScene(image) {
+  const reference = document.createElement('canvas');
+  reference.width = WIDTH;
+  reference.height = HEIGHT;
+  const referenceContext = reference.getContext('2d', { alpha: false });
+  referenceContext.imageSmoothingEnabled = false;
+  referenceContext.drawImage(image, 0, 0, WIDTH, HEIGHT);
+  return reference;
+}
+
+function makeStreet(reference) {
   const background = document.createElement('canvas');
   background.width = WIDTH;
   background.height = HEIGHT;
   const backgroundContext = background.getContext('2d', { alpha: false });
   backgroundContext.imageSmoothingEnabled = false;
-  backgroundContext.drawImage(image, 0, 0, WIDTH, HEIGHT);
+  backgroundContext.drawImage(reference, 0, 0);
 
-  // A imagem original já tem o carro no lugar certo. Copio o asfalto vizinho
-  // para limpar somente a silhueta, permitindo que o carro se mova sem deixar rastro.
-  backgroundContext.drawImage(image, 646, CAR_PATCH.y, 68, CAR_PATCH.height, CAR_PATCH.x, CAR_PATCH.y, 70, CAR_PATCH.height);
-  backgroundContext.drawImage(image, 852, CAR_PATCH.y, 68, CAR_PATCH.height, 784, CAR_PATCH.y, 74, CAR_PATCH.height);
+  // Clona o asfalto dos dois lados da área do carro; as bordas são mescladas
+  // para não deixar um retângulo evidente quando o sedã se afasta.
+  const patch = document.createElement('canvas');
+  patch.width = CAR_PATCH.width;
+  patch.height = CAR_PATCH.height;
+  const patchContext = patch.getContext('2d');
+  patchContext.imageSmoothingEnabled = false;
+  const halfPatch = Math.floor(CAR_PATCH.width / 2);
+  patchContext.drawImage(reference, CAR_PATCH.x - halfPatch, CAR_PATCH.y, halfPatch, CAR_PATCH.height, 0, 0, halfPatch, CAR_PATCH.height);
+  patchContext.drawImage(reference, CAR_PATCH.x + CAR_PATCH.width, CAR_PATCH.y, halfPatch, CAR_PATCH.height, halfPatch, 0, halfPatch, CAR_PATCH.height);
 
   const texture = seedRandom(1998);
-  backgroundContext.save();
-  backgroundContext.beginPath();
-  backgroundContext.rect(CAR_PATCH.x, CAR_PATCH.y, CAR_PATCH.width, CAR_PATCH.height);
-  backgroundContext.clip();
-  for (let index = 0; index < 820; index += 1) {
-    const x = CAR_PATCH.x + texture() * CAR_PATCH.width;
-    const y = CAR_PATCH.y + texture() * CAR_PATCH.height;
-    const width = 1 + Math.floor(texture() * 6);
+  for (let index = 0; index < 1050; index += 1) {
+    const x = texture() * patch.width;
+    const y = texture() * patch.height;
+    const width = 1 + Math.floor(texture() * 5);
     const height = 1 + Math.floor(texture() * 3);
-    backgroundContext.fillStyle = texture() > 0.5 ? 'rgba(25, 27, 27, .11)' : 'rgba(212, 204, 180, .09)';
-    backgroundContext.fillRect(x, y, width, height);
+    patchContext.fillStyle = texture() > 0.5 ? 'rgba(25, 27, 27, .075)' : 'rgba(212, 204, 180, .06)';
+    patchContext.fillRect(x, y, width, height);
   }
-  // A linha central continua por baixo do veículo, mantendo a rua alinhada.
-  backgroundContext.fillStyle = 'rgba(194, 161, 69, .84)';
-  for (const y of [400, 480, 580, 630]) backgroundContext.fillRect(781, y, 7, 24);
-  backgroundContext.restore();
+  patchContext.fillStyle = 'rgba(194, 161, 69, .84)';
+  for (const y of [400, 480, 580, 630]) {
+    patchContext.fillRect(ROAD.center - CAR_PATCH.x - 3, y - CAR_PATCH.y, 7, 24);
+  }
+
+  const fade = CAR_PATCH_FEATHER;
+  const mask = document.createElement('canvas');
+  mask.width = patch.width;
+  mask.height = patch.height;
+  const maskContext = mask.getContext('2d');
+  const horizontalFade = maskContext.createLinearGradient(0, 0, patch.width, 0);
+  horizontalFade.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  horizontalFade.addColorStop(fade / patch.width, 'rgba(255, 255, 255, 1)');
+  horizontalFade.addColorStop(1 - fade / patch.width, 'rgba(255, 255, 255, 1)');
+  horizontalFade.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  maskContext.fillStyle = horizontalFade;
+  maskContext.fillRect(0, 0, mask.width, mask.height);
+  maskContext.globalCompositeOperation = 'destination-in';
+  const verticalFade = maskContext.createLinearGradient(0, 0, 0, patch.height);
+  verticalFade.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  verticalFade.addColorStop(fade / patch.height, 'rgba(255, 255, 255, 1)');
+  verticalFade.addColorStop(1 - fade / patch.height, 'rgba(255, 255, 255, 1)');
+  verticalFade.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  maskContext.fillStyle = verticalFade;
+  maskContext.fillRect(0, 0, mask.width, mask.height);
+  patchContext.globalCompositeOperation = 'destination-in';
+  patchContext.drawImage(mask, 0, 0);
+  backgroundContext.drawImage(patch, CAR_PATCH.x, CAR_PATCH.y);
   return background;
 }
 
-function makeCarSprite(image) {
+function makeCarSprite(reference) {
   const sprite = document.createElement('canvas');
   sprite.width = CAR_CROP.width;
   sprite.height = CAR_CROP.height;
@@ -140,23 +180,24 @@ function makeCarSprite(image) {
   spriteContext.save();
   spriteContext.beginPath();
   const points = [
-    [37, 14], [112, 14], [125, 20], [133, 37], [135, 71], [129, 82],
-    [138, 93], [138, 241], [132, 256], [119, 265], [33, 265], [20, 257],
-    [12, 242], [12, 94], [21, 82], [15, 71], [17, 38], [24, 21],
+    [37, 24], [112, 24], [125, 30], [133, 47], [135, 76], [129, 87],
+    [138, 98], [138, 234], [132, 247], [119, 256], [33, 256], [20, 248],
+    [12, 234], [12, 99], [21, 87], [15, 76], [17, 47], [24, 30],
   ];
   spriteContext.moveTo(points[0][0], points[0][1]);
   for (let index = 1; index < points.length; index += 1) spriteContext.lineTo(points[index][0], points[index][1]);
   spriteContext.closePath();
   spriteContext.clip();
-  spriteContext.drawImage(image, -CAR_CROP.x, -CAR_CROP.y);
+  spriteContext.drawImage(reference, -CAR_CROP.x, -CAR_CROP.y);
   spriteContext.restore();
   return sprite;
 }
 
 function finishLoading(image) {
-  sceneImage = image;
-  streetCanvas = makeStreet(image);
-  streetSprite = makeCarSprite(image);
+  referenceScene = normalizeScene(image);
+  sceneHasBuiltInCar = true;
+  streetCanvas = makeStreet(referenceScene);
+  streetSprite = makeCarSprite(referenceScene);
   state.ready = true;
   loading.classList.add('is-ready');
   hint.classList.add('is-visible');
@@ -334,6 +375,9 @@ function drive(dt) {
     car.y = nextY;
   }
   car.hitCooldown = Math.max(0, car.hitCooldown - dt);
+  if (Math.abs(car.x - CAR_SPAWN.x) > 1 || Math.abs(car.y - CAR_SPAWN.y) > 1 || Math.abs(car.angle) > .02) {
+    state.carMoved = true;
+  }
 }
 
 function blockedOnFoot(x, y) {
@@ -525,10 +569,11 @@ function arrestPlayer() {
   policeCars.length = 0;
   state.capture = 0;
   state.driving = true;
-  state.car.x = 784;
-  state.car.y = 527;
+  state.car.x = CAR_SPAWN.x;
+  state.car.y = CAR_SPAWN.y;
   state.car.angle = 0;
   state.car.speed = 0;
+  state.carMoved = !sceneHasBuiltInCar;
   state.foot.x = 1035;
   state.foot.y = 526;
   saveProgress();
@@ -789,7 +834,8 @@ function render() {
   const shakeY = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   ctx.save();
   ctx.translate(shakeX, shakeY);
-  ctx.drawImage(streetCanvas, 0, 0);
+  const untouchedReference = !state.carMoved && sceneHasBuiltInCar && referenceScene;
+  ctx.drawImage(untouchedReference || streetCanvas, 0, 0);
 
   // Pedestres só aparecem depois que o jogador sai do carro, mantendo a cena inicial igual à referência.
   if (!state.driving || state.mission) {
@@ -801,7 +847,7 @@ function render() {
   if (target) drawTarget(target);
   for (const police of policeCars) drawPoliceCar(police);
   drawHelicopter();
-  drawPlayerCar();
+  if (state.carMoved || !sceneHasBuiltInCar) drawPlayerCar();
   if (!state.driving) drawPerson(state.foot, true);
   drawHud();
   drawInteractionPrompt();
@@ -941,9 +987,11 @@ const backgroundImage = new Image();
 backgroundImage.onload = () => finishLoading(backgroundImage);
 backgroundImage.onerror = () => {
   const fallback = fallbackScene();
-  sceneImage = fallback;
+  referenceScene = fallback;
+  sceneHasBuiltInCar = false;
   streetCanvas = makeStreet(fallback);
   streetSprite = makeCarSprite(fallback);
+  state.carMoved = true;
   state.ready = true;
   loading.classList.add('is-ready');
   hint.classList.add('is-visible');
