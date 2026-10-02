@@ -30,3 +30,24 @@ python main.py web    # painel no navegador (http://localhost:8000)
 | Automações estilo n8n: gatilho por horário/intervalo e passos com `{{variaveis}}` | ✅ |
 | Painel web sem Flask (servidor HTTP da biblioteca padrão) | ✅ |
 | "Não sei" honesto quando a confiança é baixa (anti-alucinação) | ✅ |
+
+---
+
+# 🌇 Cidade Dourada — meu jogo 3D no navegador
+
+Também mora aqui um **jogo 3D de mundo aberto** feito com Three.js: você dirige um
+**táxi** por uma metrópole fotorrealista que vai da **hora dourada** ao **pôr do sol**
+e à **noite neon**, com chuva, asfalto molhado, trânsito e pedestres.
+
+Cidade, fachadas, céu, chuva, sons e a rádio synthwave são **100% gerados por código**
+(nenhum modelo, textura ou áudio baixado). O Three.js está *vendored*, então funciona
+**offline**.
+
+```bash
+cd jogo
+python3 -m http.server 8000     # abra http://localhost:8000
+```
+
+👉 Detalhes, controles e arquitetura: **[jogo/README.md](jogo/README.md)**
+
+---
