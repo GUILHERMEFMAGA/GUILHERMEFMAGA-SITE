@@ -276,6 +276,8 @@
       // faróis
       if (LIFE.Input.justPressed('l')) { v.lights = !v.lights; this.toast(v.lights ? 'Faróis ligados' : 'Faróis desligados'); }
       if (LIFE.Input.justPressed('h')) { LIFE.Audio.horn(); v.horn = .3; }
+      // o jogador acompanha o veículo: missões, bairro, minimapa e celular usam p.x / p.y
+      p.x = v.x; p.y = v.y;
       // sair do veículo
       if (LIFE.Input.justPressed('e')) {
         const spot = this.findExitSpot(v);
@@ -650,9 +652,10 @@
       if (!store) { this.toast('Nenhum ponto de coleta disponível.', 'bad'); return; }
       const homes = w.buildings.filter((b) => ['house', 'house_big', 'apartment', 'condo'].includes(b.kind));
       const dest = homes[(Math.random() * homes.length) | 0];
+      const sd = w.doorTile(store);
       this.mission = {
         type: 'entrega', stage: 'coleta', store, dest,
-        x: store.x + store.w / 2, y: store.y + store.h / 2, pay: 90 + Math.random() * 120
+        x: sd.x, y: sd.y, pay: 90 + Math.random() * 120
       };
       this.setJobTarget(this.mission.x, this.mission.y, 'Coleta');
       this.toast('Nova entrega! Busque o pacote em ' + store.name + '.', 'good');
@@ -663,7 +666,8 @@
       const places = w.buildings.filter((b) => b.biz);
       const from = places[(Math.random() * places.length) | 0];
       const to = places[(Math.random() * places.length) | 0];
-      this.mission = { type: 'taxi', stage: 'buscar', from, to, x: from.x + from.w / 2, y: from.y + from.h / 2, pay: 70 + Math.random() * 90 };
+      const fd = w.doorTile(from);
+      this.mission = { type: 'taxi', stage: 'buscar', from, to, x: fd.x, y: fd.y, pay: 70 + Math.random() * 90 };
       this.setJobTarget(this.mission.x, this.mission.y, 'Passageiro');
       this.toast('Corrida de táxi! Vá buscar o passageiro.', 'good');
     }
@@ -671,11 +675,11 @@
       const m = this.mission, p = this.player;
       if (!m) return;
       const d = U.dist(p.x, p.y, m.x, m.y);
-      if (d > 4) return;
+      if (d > 5) return;
       if (m.type === 'entrega') {
         if (m.stage === 'coleta') {
           m.stage = 'entrega';
-          m.x = m.dest.x + m.dest.w / 2; m.y = m.dest.y + m.dest.h / 2;
+          const dd = this.world.doorTile(m.dest); m.x = dd.x; m.y = dd.y;
           this.setJobTarget(m.x, m.y, 'Entrega');
           this.toast('Pacote coletado. Entregue no destino marcado.', 'good');
           LIFE.Audio.beep(700, .12, 'square', .07);
@@ -690,7 +694,7 @@
         if (m.stage === 'buscar') {
           if (!p.vehicle) { this.toast('Você precisa estar em um veículo para levar o passageiro.', 'bad'); return; }
           m.stage = 'levar';
-          m.x = m.to.x + m.to.w / 2; m.y = m.to.y + m.to.h / 2;
+          const td = this.world.doorTile(m.to); m.x = td.x; m.y = td.y;
           this.setJobTarget(m.x, m.y, 'Destino');
           this.toast('Passageiro embarcado. Leve-o ao destino.', 'good');
         } else {
@@ -739,7 +743,19 @@
 
     /* ---------------- HUD ----------------
        (implementado em ui.js) */
-    updateHUD(dt) { LIFE.UI.updateHUD(this, dt); }
+    updateHUD(dt) {
+      // morador mais próximo (para mostrar só um nome na tela)
+      if (!this.player.indoor) {
+        let melhor = null, menor = 5.5 * 5.5;
+        for (const a of this.sim.agents) {
+          if (a.inside || a.dead) continue;
+          const d = U.dist2(a.x, a.y, this.player.x, this.player.y);
+          if (d < menor) { menor = d; melhor = a; }
+        }
+        this.closestPed = melhor;
+      } else this.closestPed = null;
+      LIFE.UI.updateHUD(this, dt);
+    }
     updateZone() {
       const p = this.player;
       const d = this.world.districtAt(p.x, p.y);
@@ -813,8 +829,8 @@
         ctx.fillStyle = '#e8f0f8'; ctx.fillRect(2.6, -3.4, 2.2, 3.6);
       }
       ctx.restore();
-      // nome de quem está falando/conversando
-      if (isPed && p.citizen && this.nearPlayerName && U.dist2(p.x, p.y, this.player.x, this.player.y) < 52) {
+      // nome apenas do morador mais próximo (evita poluir a tela)
+      if (isPed && p.citizen && this.nearPlayerName && this.closestPed === p) {
         ctx.save();
         ctx.font = '7px monospace'; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0,0,0,.55)';

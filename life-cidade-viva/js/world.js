@@ -378,8 +378,64 @@
         const pat = patterns[(rnd() * patterns.length) | 0];
         const kinds = this.lotsFor(pat[0], rnd, b, zone);
         for (const k of kinds) this.createBuilding(k, b, rnd);
+        // preenche o que sobrou: deixa os quarteirões densos como na referência
+        this.fillBlockGaps(b, rnd);
       }
+      // urbaniza o interior dos quarteirões (piso em vez de grama) nas zonas de comércio
+      this.paveBlocks(L, rnd);
       this.rnd = rnd;
+      // estacionamentos com carros parados
+      this.placeParkingLots(L, rnd);
+      this.rnd = rnd;
+    }
+
+    /* Converte a grama restante dos quarteirões comerciais em piso de lote,
+       deixando pequenos canteiros verdes — é o que dá o aspecto urbano denso. */
+    paveBlocks(L, rnd) {
+      const verdes = ['RESIDENTIAL', 'SUBURB', 'RURAL', 'PARK', 'FOREST'];
+      for (const b of L.blocks) {
+        if (verdes.includes(b.zone)) continue;
+        const denso = b.zone === 'COMMERCIAL' || b.zone === 'DOWNTOWN' || b.zone === 'INDUSTRIAL' || b.zone === 'PORT';
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            if (this.tile(x, y) !== TT.GRASS && this.tile(x, y) !== TT.FIELD) continue;
+            if (this.buildingAt(x, y)) continue;
+            const nz = this.noise(x * .12, y * .12);
+            // canteiros verdes ocasionais (pátios internos dos quarteirões)
+            if (nz > .62 && rnd() < .55) continue;
+            this.setTile(x, y, denso ? TT.CONCRETE : TT.LOT);
+          }
+        }
+      }
+      // quintais: nas zonas residenciais, a grama encostada nos prédios vira quintal/entrada de terra
+      for (const b of L.blocks) {
+        if (!['RESIDENTIAL', 'SUBURB', 'BEACH'].includes(b.zone)) continue;
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            if (this.tile(x, y) !== TT.GRASS) continue;
+            let perto = false;
+            for (let yy = y - 2; yy <= y + 2 && !perto; yy++) for (let xx = x - 2; xx <= x + 2; xx++) {
+              if (this.buildingAt(xx, yy)) { perto = true; break; }
+            }
+            if (perto && rnd() < .8) this.setTile(x, y, TT.LOT);
+          }
+        }
+      }
+      // pátios internos: vegetação nos canteiros que sobraram (tira o aspecto de laje vazia)
+      this.props = this.props || [];
+      for (const b of L.blocks) {
+        if (b.zone === 'PARK' || b.zone === 'FOREST' || b.zone === 'RURAL') continue;
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            const t = this.tile(x, y);
+            if (t !== TT.GRASS && t !== TT.FIELD) continue;
+            if (this.buildingAt(x, y)) continue;
+            if (rnd() > .16) continue;
+            const tt = rnd() < .55 ? 'bush' : 'tree_small';
+            this.props.push({ t: tt, x: x + .5, y: y + .5 });
+          }
+        }
+      }
     }
 
     // devolve lista de {kind,x,y,w,h} em coordenadas absolutas
@@ -481,6 +537,131 @@
       return out;
     }
 
+
+    /* preenche vazios do quarteirão com construções menores que encostam na calçada */
+    fillBlockGaps(b, rnd) {
+      const porZona = {
+        RESIDENTIAL: ['house', 'house_big', 'shop', 'apartment'],
+        SUBURB: ['house_big', 'house', 'condo'],
+        DOWNTOWN: ['office', 'tower', 'bank', 'shop'],
+        COMMERCIAL: ['shop', 'bakery', 'pharmacy', 'restaurant', 'market'],
+        INDUSTRIAL: ['warehouse', 'garage', 'factory', 'darkstore'],
+        RURAL: ['farm', 'warehouse', 'house'],
+        PORT: ['warehouse', 'port'],
+        AIRPORT: ['warehouse', 'darkstore'],
+        BEACH: ['shop', 'bar', 'restaurant'],
+        PARK: [],
+        FOREST: []
+      };
+      const opcoes = (porZona[b.zone] || porZona.RESIDENTIAL)
+        .map((k) => ({ k, def: D.BUILDINGS[k] }))
+        .filter((o) => o.def);
+      if (!opcoes.length) return;
+      const livre = (x, y, w, h) => {
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (this.tile(xx, yy) === TT.WATER) return false;
+          if (this.buildingAt(xx, yy)) return false;
+        }
+        return true;
+      };
+      // encosta em alguma borda do quarteirão (garante acesso pela calçada)
+      const naBorda = (x, y, w, h) =>
+        x === b.x || y === b.y || x + w === b.x + b.w || y + h === b.y + b.h;
+      let colocados = 0;
+      for (const o of U.shuffledCopy(rnd, opcoes)) {
+        const dw = o.def.size[0], dh = o.def.size[1];
+        for (let y = b.y; y + dh <= b.y + b.h; y++) {
+          for (let x = b.x; x + dw <= b.x + b.w; x++) {
+            if (colocados >= 8) return;
+            if (!livre(x, y, dw, dh)) continue;
+            if (!naBorda(x, y, dw, dh)) continue;
+            const novo = this.createBuilding({ kind: o.k, x, y, w: dw, h: dh, floors: o.def.floors, zone: b.zone }, b, rnd);
+            if (novo) { colocados++; y += dh; break; }
+          }
+        }
+      }
+      // segunda passada: miolo do quarteirão (com 1 tile de folga dos vizinhos) —
+      // deixa o bloco denso como na referência, em vez de um piso vazio enorme
+      const denso = b.zone === 'COMMERCIAL' || b.zone === 'DOWNTOWN' || b.zone === 'INDUSTRIAL' || b.zone === 'PORT';
+      if (b.w * b.h < 60 || (!denso && rnd() > .5)) return;
+      const folga = (x, y, w, h) => {
+        for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (this.buildingAt(xx, yy)) return false;
+        }
+        return true;
+      };
+      const limite = denso ? 16 : 11;
+      for (const o of U.shuffledCopy(rnd, opcoes)) {
+        const dw = o.def.size[0], dh = o.def.size[1];
+        for (let y = b.y; y + dh <= b.y + b.h; y++) {
+          for (let x = b.x; x + dw <= b.x + b.w; x++) {
+            if (colocados >= limite) return;
+            if (!folga(x, y, dw, dh)) continue;
+            if (rnd() > (denso ? .75 : .4)) continue;
+            const novo = this.createBuilding({ kind: o.k, x, y, w: dw, h: dh, floors: o.def.floors, zone: b.zone }, b, rnd);
+            if (novo) { colocados++; y += dh; break; }
+          }
+        }
+      }
+    }
+
+    /* estacionamentos: áreas livres viram vagas com carros parados */
+    placeParkingLots(L, rnd) {
+      this.parkingLots = [];
+      this.parkedCars = [];
+      const modelos = Object.keys(LIFE.VEHICLE_TYPES || {});
+      const ocupado = new Set();   // evita estacionamentos sobrepostos
+      const livre = (x, y, w, h) => {
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (ocupado.has(xx + ',' + yy)) return false;
+          if (this.buildingAt(xx, yy)) return false;
+          const t = this.tile(xx, yy);
+          // piso de lote, grama, praça, campo e concreto (quarteirões já urbanizados)
+          if (t !== TT.GRASS && t !== TT.LOT && t !== TT.PLAZA && t !== TT.FIELD && t !== TT.CONCRETE) return false;
+        }
+        return true;
+      };
+      const zonas = { DOWNTOWN: 1, COMMERCIAL: 1, INDUSTRIAL: 1, PORT: 1, RESIDENTIAL: .5, SUBURB: .35, BEACH: .6, AIRPORT: .7 };
+      for (const b of L.blocks) {
+        const chance = zonas[b.zone] || 0;
+        if (!chance || rnd() > chance) continue;
+        const quantos = b.zone === 'DOWNTOWN' || b.zone === 'COMMERCIAL' ? (rnd() < .5 ? 2 : 1) : 1;
+        for (let k = 0; k < quantos; k++) {
+          // tamanhos preferidos, do maior para o menor
+          let loc = null, lot = null;
+          for (const [lw, lh] of [[6, 5], [5, 4], [4, 4]]) {
+            if (lw > b.w || lh > b.h) continue;
+            const tentativas = [];
+            for (let y = b.y; y + lh <= b.y + b.h; y += 1) for (let x = b.x; x + lw <= b.x + b.w; x += 1) {
+              if (livre(x, y, lw, lh) &&
+                  (y === b.y || y + lh === b.y + b.h || x === b.x || x + lw === b.x + b.w)) tentativas.push({ x, y });
+            }
+            if (tentativas.length) { loc = tentativas[(rnd() * tentativas.length) | 0]; lot = { x: loc.x, y: loc.y, w: lw, h: lh, vertical: rnd() < .5 }; break; }
+          }
+          if (!lot) break;
+          for (let yy = lot.y; yy < lot.y + lot.h; yy++) for (let xx = lot.x; xx < lot.x + lot.w; xx++) {
+            ocupado.add(xx + ',' + yy); this.setTile(xx, yy, TT.LOT);
+          }
+          this.parkingLots.push(lot);
+          const n = Math.min(10, 2 + ((rnd() * 4) | 0) + (lot.w >= 5 ? 2 : 0));
+          for (let i = 0; i < n; i++) {
+            const tipo = U.pick(rnd, ['car', 'car', 'car', 'pickup', 'van', 'moto']);
+            const def = (LIFE.VEHICLE_TYPES || {})[tipo] || { color: ['#b8433a'], w: 1.5, h: 2.7 };
+            const cols = lot.vertical ? 3 : 2, linhas = lot.vertical ? 2 : 3;
+            const gx = lot.x + 1 + (i % cols) * ((lot.w - 2) / cols) + .4;
+            const gy = lot.y + 1 + (Math.floor(i / cols) % linhas) * ((lot.h - 2) / linhas);
+            this.parkedCars.push({
+              x: gx, y: gy, angle: lot.vertical ? 0 : Math.PI / 2,
+              color: def.color[(rnd() * def.color.length) | 0], type: tipo, w: def.w, h: def.h
+            });
+          }
+        }
+      }
+    }
+
     createBuilding(spec, block, rnd) {
       const def = D.BUILDINGS[spec.kind];
       if (!def) return null;
@@ -547,12 +728,12 @@
             const x = e.d === 'h' ? e.x + k : e.x, y = e.d === 'h' ? e.y : e.y + k;
             if (near(x, y) !== TT.SIDEWALK) continue;
             const r = rnd();
-            if (r < .38) add({ t: 'lamp', x: x + .5, y: y + .5, zone });
-            else if (r < .5) add({ t: 'tree_small', x: x + .5, y: y + .5, r: 6 });
-            else if (r < .56) add({ t: 'bin', x: x + .5, y: y + .5 });
-            else if (r < .6) add({ t: 'hydrant', x: x + .5, y: y + .5 });
-            else if (r < .66) add({ t: 'sign', x: x + .5, y: y + .5, v: rnd() });
-            else if (r < .72) add({ t: 'bench', x: x + .5, y: y + .5 });
+            if (r < .3) add({ t: 'lamp', x: x + .5, y: y + .5, zone });
+            else if (r < .58) add({ t: 'tree_small', x: x + .5, y: y + .5, r: 6 });
+            else if (r < .64) add({ t: 'bin', x: x + .5, y: y + .5 });
+            else if (r < .68) add({ t: 'hydrant', x: x + .5, y: y + .5 });
+            else if (r < .74) add({ t: 'sign', x: x + .5, y: y + .5, v: rnd() });
+            else if (r < .8) add({ t: 'bench', x: x + .5, y: y + .5 });
           }
         }
         // interior do quarteirão: árvores nos quintais
@@ -811,20 +992,20 @@
       const g = cv.getContext('2d');
       const rnd = U.rngOf(this.seed, 'groundpaint');
       const pal = {
-        [TT.GRASS]: ['#3d7a3f', '#427f44', '#45833f', '#3a7239'],
+        [TT.GRASS]: ['#4e7a44', '#527e48', '#4a7640', '#567f4b', '#4c7842', '#517d46'],
         [TT.ROAD]: ['#3a3f46', '#3c4148', '#383d44'],
         [TT.SIDEWALK]: ['#9aa0a6', '#8f959b', '#a3a9af'],
         [TT.CROSSWALK]: ['#3a3f46'],
         [TT.WATER]: ['#1b4f77', '#1d547e', '#1a4a70'],
         [TT.SAND]: ['#d9c48a', '#d2bd83', '#e0cb91'],
-        [TT.FOREST]: ['#2c5f33', '#2f6636', '#28572f'],
+        [TT.FOREST]: ['#33562f', '#365a32', '#304f2c', '#3a5f34'],
         [TT.PLAZA]: ['#b9b2a0', '#b2ab99', '#c0b9a7'],
         [TT.PATH]: ['#b09a72', '#a89268'],
-        [TT.LOT]: ['#c2b8a4', '#bcb29e'],
+        [TT.LOT]: ['#b9b0a0', '#b3aa9a', '#c0b7a7', '#aea696', '#9c968d', '#8f8a83', '#a7a199'],
         [TT.BRIDGE]: ['#6b6f76', '#64686f', '#72767d'],
-        [TT.FIELD]: ['#8a9c4a', '#93a552', '#83954a'],
+        [TT.FIELD]: ['#93a155', '#9aa85c', '#8b9950', '#a0ad63'],
         [TT.RUNWAY]: ['#4a4e54', '#45494f'],
-        [TT.CONCRETE]: ['#b0b0ac'],
+        [TT.CONCRETE]: ['#a8a8a2', '#a2a29c', '#aeaea8', '#9b9b96', '#94948f'],
         [TT.PIER]: ['#8d8b84', '#96948d']
       };
       for (let y = 0; y < this.H; y++) {
@@ -870,24 +1051,64 @@
           }
         }
       }
-      // faixas de pedestres
-      g.fillStyle = 'rgba(240,240,235,.75)';
-      for (const it of this.crosswalks) {
-        const off = 2;
-        for (let k = 0; k < it.vw; k++) {
-          if (k % 2 === 0) {
-            g.fillRect((it.vx + k) * S, (it.hy - off) * S, S, S);
-            g.fillRect((it.vx + k) * S, (it.hy + it.hh + off - 1) * S, S, S);
-          }
+      // ---- marcações de rua: faixas centrais, bordas e faixas de pedestres ----
+      // faixas de interseção (para não pintar linha no meio do cruzamento)
+      const bandasH = this.hRoads.map((r) => [r.pos - 1, r.pos + r.w + 1]);
+      const bandasV = this.vRoads.map((r) => [r.pos - 1, r.pos + r.w + 1]);
+      const naBanda = (v, bandas) => bandas.some((b) => v >= b[0] && v <= b[1]);
+      const yIni = this.layoutInfo.margin, yFim = this.beachY - 2;
+
+      // linha central tracejada (amarela nas avenidas) + bordas brancas
+      for (const r of this.vRoads) {
+        const cx = (r.pos + r.w / 2) * S;
+        g.fillStyle = r.avenue ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.55)';
+        for (let y = yIni; y < yFim; y += 4) {
+          if (naBanda(y, bandasH) || naBanda(y + 1, bandasH)) continue;
+          g.fillRect(cx - S * .06, y * S, S * .12 + 1, S * 2);
         }
-        for (let k = 0; k < it.hh; k++) {
-          if (k % 2 === 0) {
-            g.fillRect((it.vx - off) * S, (it.hy + k) * S, S, S);
-            g.fillRect((it.vx + it.vw + off - 1) * S, (it.hy + k) * S, S, S);
-          }
+        g.fillStyle = 'rgba(255,255,255,.22)';
+        for (let y = yIni; y < yFim; y += 1) {
+          if (naBanda(y, bandasH)) continue;
+          g.fillRect((r.pos + .35) * S, y * S, S * .08 + .6, S);
+          g.fillRect((r.pos + r.w - .45) * S, y * S, S * .08 + .6, S);
         }
       }
+      for (const r of this.hRoads) {
+        const cy = (r.pos + r.w / 2) * S;
+        g.fillStyle = r.avenue ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.55)';
+        for (let x = this.layoutInfo.margin; x < this.W - this.layoutInfo.margin; x += 4) {
+          if (naBanda(x, bandasV) || naBanda(x + 1, bandasV)) continue;
+          g.fillRect(x * S, cy - S * .06, S * 2, S * .12 + 1);
+        }
+        g.fillStyle = 'rgba(255,255,255,.22)';
+        for (let x = this.layoutInfo.margin; x < this.W - this.layoutInfo.margin; x += 1) {
+          if (naBanda(x, bandasV)) continue;
+          g.fillRect(x * S, (r.pos + .35) * S, S, S * .08 + .6);
+          g.fillRect(x * S, (r.pos + r.w - .45) * S, S, S * .08 + .6);
+        }
+      }
+
+      // faixas de pedestres em escada (barras atravessando a via)
+      g.fillStyle = 'rgba(242,242,236,.85)';
+      const barra = (x, y, w, h) => g.fillRect(x * S, y * S, w * S, h * S);
+      for (const it of this.crosswalks) {
+        // aproximações norte e sul (atravessam a via vertical)
+        barra(it.vx, it.hy - 5, it.vw, .55);
+        barra(it.vx, it.hy - 4, it.vw, .55);
+        barra(it.vx, it.hy - 3, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 2, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 3, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 4, it.vw, .55);
+        // aproximações leste e oeste (atravessam a via horizontal)
+        barra(it.vx - 5, it.hy, .55, it.hh);
+        barra(it.vx - 4, it.hy, .55, it.hh);
+        barra(it.vx - 3, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 2, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 3, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 4, it.hy, .55, it.hh);
+      }
       g.restore();
+      this.groundCanvas = cv;
       this.groundCanvas = cv;
 
       // minimapa (1px por tile)

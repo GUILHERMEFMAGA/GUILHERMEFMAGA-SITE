@@ -343,7 +343,7 @@ button.ghost{background:transparent}
     SEED: '20261001',
     POPULATION: 2200,    // moradores simulados (abstratos + ativos)
     ACTIVE_RADIUS: 55,   // tiles: raio de simulação completa
-    MAX_ACTIVE_AGENTS: 170,
+    MAX_ACTIVE_AGENTS: 220,
     MAX_VEHICLES: 150,
     MIN_PER_SEC: 1,      // 1x = 1 minuto de jogo por segundo real
     DAY_START_MIN: 7 * 60,
@@ -552,19 +552,19 @@ button.ghost{background:transparent}
   D.BUILDINGS = {
     house: { name: 'Casa', zone: 'RESIDENTIAL', size: [4, 4], floors: 1, colors: ['#c76b4a', '#a8553a', '#d08b5b', '#8f6b4f'], interior: 'house', w: 10 },
     house_big: { name: 'Sobrado', zone: 'RESIDENTIAL', size: [5, 4], floors: 2, colors: ['#b8644a', '#9c5a3c'], interior: 'house', w: 4 },
-    apartment: { name: 'Prédio Residencial', zone: 'RESIDENTIAL', size: [5, 5], floors: 5, colors: ['#8b95a3', '#7a8697', '#9aa5b2'], interior: 'apartment', w: 8 },
+    apartment: { name: 'Prédio Residencial', zone: 'RESIDENTIAL', size: [5, 5], floors: 5, colors: ['#8b95a3', '#7a8697', '#9aa5b2', '#c98a6a', '#b8765a'], interior: 'apartment', w: 8 },
     condo: { name: 'Condomínio', zone: 'SUBURB', size: [6, 5], floors: 8, colors: ['#93a0ae', '#8492a0'], interior: 'apartment', w: 4 },
-    tower: { name: 'Torre Corporativa', zone: 'DOWNTOWN', size: [6, 6], floors: 16, colors: ['#5f7d95', '#4e6c85', '#6b8aa3'], interior: 'office', w: 7 },
-    office: { name: 'Escritórios', zone: 'DOWNTOWN', size: [5, 5], floors: 8, colors: ['#6d8a9f', '#7d95a8'], interior: 'office', w: 8 },
+    tower: { name: 'Torre Corporativa', zone: 'DOWNTOWN', size: [6, 6], floors: 16, colors: ['#5f7d95', '#4e6c85', '#6b8aa3', '#8a6a52', '#a3765a'], interior: 'office', w: 7 },
+    office: { name: 'Escritórios', zone: 'DOWNTOWN', size: [5, 5], floors: 8, colors: ['#6d8a9f', '#7d95a8', '#a8764f', '#b38459', '#8f7a8a'], interior: 'office', w: 8 },
     bank: { name: 'Banco', zone: 'DOWNTOWN', size: [5, 4], floors: 3, colors: ['#c9b47a', '#b8a469'], interior: 'bank', w: 3 },
     mall: { name: 'Shopping', zone: 'COMMERCIAL', size: [9, 7], floors: 4, colors: ['#b9c4d0', '#a9b6c4'], interior: 'mall', w: 2 },
-    shop: { name: 'Loja', zone: 'COMMERCIAL', size: [4, 3], floors: 2, colors: ['#d9876a', '#c47a5e'], interior: 'shop', w: 14 },
+    shop: { name: 'Loja', zone: 'COMMERCIAL', size: [4, 3], floors: 2, colors: ['#d9876a', '#c47a5e', '#d9a06a', '#c06a6a', '#b8765a'], interior: 'shop', w: 14 },
     bakery: { name: 'Padaria', zone: 'COMMERCIAL', size: [4, 3], floors: 1, colors: ['#e0a86a', '#cf9757'], interior: 'bakery', w: 5 },
     pharmacy: { name: 'Farmácia', zone: 'COMMERCIAL', size: [4, 3], floors: 1, colors: ['#7bc47f', '#63b06a'], interior: 'pharmacy', w: 4 },
-    restaurant: { name: 'Restaurante', zone: 'COMMERCIAL', size: [5, 4], floors: 1, colors: ['#cc6f52', '#b85f45'], interior: 'restaurant', w: 6 },
+    restaurant: { name: 'Restaurante', zone: 'COMMERCIAL', size: [5, 4], floors: 1, colors: ['#cc6f52', '#b85f45', '#d1795a', '#a8624a'], interior: 'restaurant', w: 6 },
     bar: { name: 'Bar', zone: 'COMMERCIAL', size: [4, 3], floors: 1, colors: ['#a35f7a', '#8f5268'], interior: 'bar', w: 3 },
     supermarket: { name: 'Supermercado', zone: 'COMMERCIAL', size: [8, 6], floors: 1, colors: ['#d8d2c4', '#c8c2b4'], interior: 'supermarket', w: 6 },
-    hotel: { name: 'Hotel', zone: 'COMMERCIAL', size: [7, 6], floors: 9, colors: ['#a58c6f', '#94806a'], interior: 'hotel', w: 4 },
+    hotel: { name: 'Hotel', zone: 'COMMERCIAL', size: [7, 6], floors: 9, colors: ['#a58c6f', '#94806a', '#b5987a'], interior: 'hotel', w: 4 },
     hospital: { name: 'Hospital', zone: 'RESIDENTIAL', size: [8, 6], floors: 4, colors: ['#d9e2ea', '#c8d3dd'], interior: 'hospital', w: 2 },
     clinic: { name: 'Clínica', zone: 'COMMERCIAL', size: [4, 4], floors: 2, colors: ['#cfe0e8', '#bcd0da'], interior: 'clinic', w: 3 },
     school: { name: 'Escola', zone: 'RESIDENTIAL', size: [7, 5], floors: 2, colors: ['#e3d59c', '#d3c58c'], interior: 'school', w: 3 },
@@ -575,10 +575,10 @@ button.ghost{background:transparent}
     cityhall: { name: 'Prefeitura', zone: 'DOWNTOWN', size: [7, 5], floors: 3, colors: ['#d5cbb5', '#c5bba5'], interior: 'cityhall', w: 1 },
     prison: { name: 'Penitenciária', zone: 'INDUSTRIAL', size: [9, 7], floors: 2, colors: ['#7d8a92', '#6d7a82'], interior: 'prison', w: 1 },
     factory: { name: 'Fábrica', zone: 'INDUSTRIAL', size: [9, 7], floors: 2, colors: ['#8f8f96', '#7d7d84'], interior: 'factory', w: 6 },
-    warehouse: { name: 'Galpão', zone: 'INDUSTRIAL', size: [8, 6], floors: 1, colors: ['#9aa0a6', '#888e94'], interior: 'warehouse', w: 6 },
+    warehouse: { name: 'Galpão', zone: 'INDUSTRIAL', size: [8, 6], floors: 1, colors: ['#9aa0a6', '#888e94', '#a89078', '#98a08a'], interior: 'warehouse', w: 6 },
     garage: { name: 'Oficina', zone: 'INDUSTRIAL', size: [5, 4], floors: 1, colors: ['#8a8378', '#7a7368'], interior: 'garage', w: 4 },
     gas: { name: 'Posto de Combustível', zone: 'COMMERCIAL', size: [6, 5], floors: 1, colors: ['#e0e0e0', '#c8c8c8'], interior: 'gas', w: 6 },
-    market: { name: 'Mercado de Bairro', zone: 'COMMERCIAL', size: [4, 3], floors: 1, colors: ['#cf9a6a', '#bf8a5a'], interior: 'market', w: 8 },
+    market: { name: 'Mercado de Bairro', zone: 'COMMERCIAL', size: [4, 3], floors: 1, colors: ['#cf9a6a', '#bf8a5a', '#c88a5a'], interior: 'market', w: 8 },
     darkstore: { name: 'Central de Entregas', zone: 'INDUSTRIAL', size: [5, 4], floors: 1, colors: ['#7f9aa8', '#6f8a98'], interior: 'warehouse', w: 4 },
     farm: { name: 'Fazenda', zone: 'RURAL', size: [7, 6], floors: 1, colors: ['#b98d5c', '#a97d4c'], interior: 'farm', w: 3 },
     port: { name: 'Terminal Portuário', zone: 'PORT', size: [9, 6], floors: 1, colors: ['#8d9ba6', '#7d8b96'], interior: 'port', w: 1 },
@@ -1214,8 +1214,64 @@ button.ghost{background:transparent}
         const pat = patterns[(rnd() * patterns.length) | 0];
         const kinds = this.lotsFor(pat[0], rnd, b, zone);
         for (const k of kinds) this.createBuilding(k, b, rnd);
+        // preenche o que sobrou: deixa os quarteirões densos como na referência
+        this.fillBlockGaps(b, rnd);
       }
+      // urbaniza o interior dos quarteirões (piso em vez de grama) nas zonas de comércio
+      this.paveBlocks(L, rnd);
       this.rnd = rnd;
+      // estacionamentos com carros parados
+      this.placeParkingLots(L, rnd);
+      this.rnd = rnd;
+    }
+
+    /* Converte a grama restante dos quarteirões comerciais em piso de lote,
+       deixando pequenos canteiros verdes — é o que dá o aspecto urbano denso. */
+    paveBlocks(L, rnd) {
+      const verdes = ['RESIDENTIAL', 'SUBURB', 'RURAL', 'PARK', 'FOREST'];
+      for (const b of L.blocks) {
+        if (verdes.includes(b.zone)) continue;
+        const denso = b.zone === 'COMMERCIAL' || b.zone === 'DOWNTOWN' || b.zone === 'INDUSTRIAL' || b.zone === 'PORT';
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            if (this.tile(x, y) !== TT.GRASS && this.tile(x, y) !== TT.FIELD) continue;
+            if (this.buildingAt(x, y)) continue;
+            const nz = this.noise(x * .12, y * .12);
+            // canteiros verdes ocasionais (pátios internos dos quarteirões)
+            if (nz > .62 && rnd() < .55) continue;
+            this.setTile(x, y, denso ? TT.CONCRETE : TT.LOT);
+          }
+        }
+      }
+      // quintais: nas zonas residenciais, a grama encostada nos prédios vira quintal/entrada de terra
+      for (const b of L.blocks) {
+        if (!['RESIDENTIAL', 'SUBURB', 'BEACH'].includes(b.zone)) continue;
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            if (this.tile(x, y) !== TT.GRASS) continue;
+            let perto = false;
+            for (let yy = y - 2; yy <= y + 2 && !perto; yy++) for (let xx = x - 2; xx <= x + 2; xx++) {
+              if (this.buildingAt(xx, yy)) { perto = true; break; }
+            }
+            if (perto && rnd() < .8) this.setTile(x, y, TT.LOT);
+          }
+        }
+      }
+      // pátios internos: vegetação nos canteiros que sobraram (tira o aspecto de laje vazia)
+      this.props = this.props || [];
+      for (const b of L.blocks) {
+        if (b.zone === 'PARK' || b.zone === 'FOREST' || b.zone === 'RURAL') continue;
+        for (let y = b.y; y < b.y + b.h; y++) {
+          for (let x = b.x; x < b.x + b.w; x++) {
+            const t = this.tile(x, y);
+            if (t !== TT.GRASS && t !== TT.FIELD) continue;
+            if (this.buildingAt(x, y)) continue;
+            if (rnd() > .16) continue;
+            const tt = rnd() < .55 ? 'bush' : 'tree_small';
+            this.props.push({ t: tt, x: x + .5, y: y + .5 });
+          }
+        }
+      }
     }
 
     // devolve lista de {kind,x,y,w,h} em coordenadas absolutas
@@ -1317,6 +1373,131 @@ button.ghost{background:transparent}
       return out;
     }
 
+
+    /* preenche vazios do quarteirão com construções menores que encostam na calçada */
+    fillBlockGaps(b, rnd) {
+      const porZona = {
+        RESIDENTIAL: ['house', 'house_big', 'shop', 'apartment'],
+        SUBURB: ['house_big', 'house', 'condo'],
+        DOWNTOWN: ['office', 'tower', 'bank', 'shop'],
+        COMMERCIAL: ['shop', 'bakery', 'pharmacy', 'restaurant', 'market'],
+        INDUSTRIAL: ['warehouse', 'garage', 'factory', 'darkstore'],
+        RURAL: ['farm', 'warehouse', 'house'],
+        PORT: ['warehouse', 'port'],
+        AIRPORT: ['warehouse', 'darkstore'],
+        BEACH: ['shop', 'bar', 'restaurant'],
+        PARK: [],
+        FOREST: []
+      };
+      const opcoes = (porZona[b.zone] || porZona.RESIDENTIAL)
+        .map((k) => ({ k, def: D.BUILDINGS[k] }))
+        .filter((o) => o.def);
+      if (!opcoes.length) return;
+      const livre = (x, y, w, h) => {
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (this.tile(xx, yy) === TT.WATER) return false;
+          if (this.buildingAt(xx, yy)) return false;
+        }
+        return true;
+      };
+      // encosta em alguma borda do quarteirão (garante acesso pela calçada)
+      const naBorda = (x, y, w, h) =>
+        x === b.x || y === b.y || x + w === b.x + b.w || y + h === b.y + b.h;
+      let colocados = 0;
+      for (const o of U.shuffledCopy(rnd, opcoes)) {
+        const dw = o.def.size[0], dh = o.def.size[1];
+        for (let y = b.y; y + dh <= b.y + b.h; y++) {
+          for (let x = b.x; x + dw <= b.x + b.w; x++) {
+            if (colocados >= 8) return;
+            if (!livre(x, y, dw, dh)) continue;
+            if (!naBorda(x, y, dw, dh)) continue;
+            const novo = this.createBuilding({ kind: o.k, x, y, w: dw, h: dh, floors: o.def.floors, zone: b.zone }, b, rnd);
+            if (novo) { colocados++; y += dh; break; }
+          }
+        }
+      }
+      // segunda passada: miolo do quarteirão (com 1 tile de folga dos vizinhos) —
+      // deixa o bloco denso como na referência, em vez de um piso vazio enorme
+      const denso = b.zone === 'COMMERCIAL' || b.zone === 'DOWNTOWN' || b.zone === 'INDUSTRIAL' || b.zone === 'PORT';
+      if (b.w * b.h < 60 || (!denso && rnd() > .5)) return;
+      const folga = (x, y, w, h) => {
+        for (let yy = y - 1; yy <= y + h; yy++) for (let xx = x - 1; xx <= x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (this.buildingAt(xx, yy)) return false;
+        }
+        return true;
+      };
+      const limite = denso ? 16 : 11;
+      for (const o of U.shuffledCopy(rnd, opcoes)) {
+        const dw = o.def.size[0], dh = o.def.size[1];
+        for (let y = b.y; y + dh <= b.y + b.h; y++) {
+          for (let x = b.x; x + dw <= b.x + b.w; x++) {
+            if (colocados >= limite) return;
+            if (!folga(x, y, dw, dh)) continue;
+            if (rnd() > (denso ? .75 : .4)) continue;
+            const novo = this.createBuilding({ kind: o.k, x, y, w: dw, h: dh, floors: o.def.floors, zone: b.zone }, b, rnd);
+            if (novo) { colocados++; y += dh; break; }
+          }
+        }
+      }
+    }
+
+    /* estacionamentos: áreas livres viram vagas com carros parados */
+    placeParkingLots(L, rnd) {
+      this.parkingLots = [];
+      this.parkedCars = [];
+      const modelos = Object.keys(LIFE.VEHICLE_TYPES || {});
+      const ocupado = new Set();   // evita estacionamentos sobrepostos
+      const livre = (x, y, w, h) => {
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
+          if (!this.inBounds(xx, yy)) return false;
+          if (ocupado.has(xx + ',' + yy)) return false;
+          if (this.buildingAt(xx, yy)) return false;
+          const t = this.tile(xx, yy);
+          // piso de lote, grama, praça, campo e concreto (quarteirões já urbanizados)
+          if (t !== TT.GRASS && t !== TT.LOT && t !== TT.PLAZA && t !== TT.FIELD && t !== TT.CONCRETE) return false;
+        }
+        return true;
+      };
+      const zonas = { DOWNTOWN: 1, COMMERCIAL: 1, INDUSTRIAL: 1, PORT: 1, RESIDENTIAL: .5, SUBURB: .35, BEACH: .6, AIRPORT: .7 };
+      for (const b of L.blocks) {
+        const chance = zonas[b.zone] || 0;
+        if (!chance || rnd() > chance) continue;
+        const quantos = b.zone === 'DOWNTOWN' || b.zone === 'COMMERCIAL' ? (rnd() < .5 ? 2 : 1) : 1;
+        for (let k = 0; k < quantos; k++) {
+          // tamanhos preferidos, do maior para o menor
+          let loc = null, lot = null;
+          for (const [lw, lh] of [[6, 5], [5, 4], [4, 4]]) {
+            if (lw > b.w || lh > b.h) continue;
+            const tentativas = [];
+            for (let y = b.y; y + lh <= b.y + b.h; y += 1) for (let x = b.x; x + lw <= b.x + b.w; x += 1) {
+              if (livre(x, y, lw, lh) &&
+                  (y === b.y || y + lh === b.y + b.h || x === b.x || x + lw === b.x + b.w)) tentativas.push({ x, y });
+            }
+            if (tentativas.length) { loc = tentativas[(rnd() * tentativas.length) | 0]; lot = { x: loc.x, y: loc.y, w: lw, h: lh, vertical: rnd() < .5 }; break; }
+          }
+          if (!lot) break;
+          for (let yy = lot.y; yy < lot.y + lot.h; yy++) for (let xx = lot.x; xx < lot.x + lot.w; xx++) {
+            ocupado.add(xx + ',' + yy); this.setTile(xx, yy, TT.LOT);
+          }
+          this.parkingLots.push(lot);
+          const n = Math.min(10, 2 + ((rnd() * 4) | 0) + (lot.w >= 5 ? 2 : 0));
+          for (let i = 0; i < n; i++) {
+            const tipo = U.pick(rnd, ['car', 'car', 'car', 'pickup', 'van', 'moto']);
+            const def = (LIFE.VEHICLE_TYPES || {})[tipo] || { color: ['#b8433a'], w: 1.5, h: 2.7 };
+            const cols = lot.vertical ? 3 : 2, linhas = lot.vertical ? 2 : 3;
+            const gx = lot.x + 1 + (i % cols) * ((lot.w - 2) / cols) + .4;
+            const gy = lot.y + 1 + (Math.floor(i / cols) % linhas) * ((lot.h - 2) / linhas);
+            this.parkedCars.push({
+              x: gx, y: gy, angle: lot.vertical ? 0 : Math.PI / 2,
+              color: def.color[(rnd() * def.color.length) | 0], type: tipo, w: def.w, h: def.h
+            });
+          }
+        }
+      }
+    }
+
     createBuilding(spec, block, rnd) {
       const def = D.BUILDINGS[spec.kind];
       if (!def) return null;
@@ -1383,12 +1564,12 @@ button.ghost{background:transparent}
             const x = e.d === 'h' ? e.x + k : e.x, y = e.d === 'h' ? e.y : e.y + k;
             if (near(x, y) !== TT.SIDEWALK) continue;
             const r = rnd();
-            if (r < .38) add({ t: 'lamp', x: x + .5, y: y + .5, zone });
-            else if (r < .5) add({ t: 'tree_small', x: x + .5, y: y + .5, r: 6 });
-            else if (r < .56) add({ t: 'bin', x: x + .5, y: y + .5 });
-            else if (r < .6) add({ t: 'hydrant', x: x + .5, y: y + .5 });
-            else if (r < .66) add({ t: 'sign', x: x + .5, y: y + .5, v: rnd() });
-            else if (r < .72) add({ t: 'bench', x: x + .5, y: y + .5 });
+            if (r < .3) add({ t: 'lamp', x: x + .5, y: y + .5, zone });
+            else if (r < .58) add({ t: 'tree_small', x: x + .5, y: y + .5, r: 6 });
+            else if (r < .64) add({ t: 'bin', x: x + .5, y: y + .5 });
+            else if (r < .68) add({ t: 'hydrant', x: x + .5, y: y + .5 });
+            else if (r < .74) add({ t: 'sign', x: x + .5, y: y + .5, v: rnd() });
+            else if (r < .8) add({ t: 'bench', x: x + .5, y: y + .5 });
           }
         }
         // interior do quarteirão: árvores nos quintais
@@ -1647,20 +1828,20 @@ button.ghost{background:transparent}
       const g = cv.getContext('2d');
       const rnd = U.rngOf(this.seed, 'groundpaint');
       const pal = {
-        [TT.GRASS]: ['#3d7a3f', '#427f44', '#45833f', '#3a7239'],
+        [TT.GRASS]: ['#4e7a44', '#527e48', '#4a7640', '#567f4b', '#4c7842', '#517d46'],
         [TT.ROAD]: ['#3a3f46', '#3c4148', '#383d44'],
         [TT.SIDEWALK]: ['#9aa0a6', '#8f959b', '#a3a9af'],
         [TT.CROSSWALK]: ['#3a3f46'],
         [TT.WATER]: ['#1b4f77', '#1d547e', '#1a4a70'],
         [TT.SAND]: ['#d9c48a', '#d2bd83', '#e0cb91'],
-        [TT.FOREST]: ['#2c5f33', '#2f6636', '#28572f'],
+        [TT.FOREST]: ['#33562f', '#365a32', '#304f2c', '#3a5f34'],
         [TT.PLAZA]: ['#b9b2a0', '#b2ab99', '#c0b9a7'],
         [TT.PATH]: ['#b09a72', '#a89268'],
-        [TT.LOT]: ['#c2b8a4', '#bcb29e'],
+        [TT.LOT]: ['#b9b0a0', '#b3aa9a', '#c0b7a7', '#aea696', '#9c968d', '#8f8a83', '#a7a199'],
         [TT.BRIDGE]: ['#6b6f76', '#64686f', '#72767d'],
-        [TT.FIELD]: ['#8a9c4a', '#93a552', '#83954a'],
+        [TT.FIELD]: ['#93a155', '#9aa85c', '#8b9950', '#a0ad63'],
         [TT.RUNWAY]: ['#4a4e54', '#45494f'],
-        [TT.CONCRETE]: ['#b0b0ac'],
+        [TT.CONCRETE]: ['#a8a8a2', '#a2a29c', '#aeaea8', '#9b9b96', '#94948f'],
         [TT.PIER]: ['#8d8b84', '#96948d']
       };
       for (let y = 0; y < this.H; y++) {
@@ -1706,24 +1887,64 @@ button.ghost{background:transparent}
           }
         }
       }
-      // faixas de pedestres
-      g.fillStyle = 'rgba(240,240,235,.75)';
-      for (const it of this.crosswalks) {
-        const off = 2;
-        for (let k = 0; k < it.vw; k++) {
-          if (k % 2 === 0) {
-            g.fillRect((it.vx + k) * S, (it.hy - off) * S, S, S);
-            g.fillRect((it.vx + k) * S, (it.hy + it.hh + off - 1) * S, S, S);
-          }
+      // ---- marcações de rua: faixas centrais, bordas e faixas de pedestres ----
+      // faixas de interseção (para não pintar linha no meio do cruzamento)
+      const bandasH = this.hRoads.map((r) => [r.pos - 1, r.pos + r.w + 1]);
+      const bandasV = this.vRoads.map((r) => [r.pos - 1, r.pos + r.w + 1]);
+      const naBanda = (v, bandas) => bandas.some((b) => v >= b[0] && v <= b[1]);
+      const yIni = this.layoutInfo.margin, yFim = this.beachY - 2;
+
+      // linha central tracejada (amarela nas avenidas) + bordas brancas
+      for (const r of this.vRoads) {
+        const cx = (r.pos + r.w / 2) * S;
+        g.fillStyle = r.avenue ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.55)';
+        for (let y = yIni; y < yFim; y += 4) {
+          if (naBanda(y, bandasH) || naBanda(y + 1, bandasH)) continue;
+          g.fillRect(cx - S * .06, y * S, S * .12 + 1, S * 2);
         }
-        for (let k = 0; k < it.hh; k++) {
-          if (k % 2 === 0) {
-            g.fillRect((it.vx - off) * S, (it.hy + k) * S, S, S);
-            g.fillRect((it.vx + it.vw + off - 1) * S, (it.hy + k) * S, S, S);
-          }
+        g.fillStyle = 'rgba(255,255,255,.22)';
+        for (let y = yIni; y < yFim; y += 1) {
+          if (naBanda(y, bandasH)) continue;
+          g.fillRect((r.pos + .35) * S, y * S, S * .08 + .6, S);
+          g.fillRect((r.pos + r.w - .45) * S, y * S, S * .08 + .6, S);
         }
       }
+      for (const r of this.hRoads) {
+        const cy = (r.pos + r.w / 2) * S;
+        g.fillStyle = r.avenue ? 'rgba(255,214,80,.85)' : 'rgba(255,255,255,.55)';
+        for (let x = this.layoutInfo.margin; x < this.W - this.layoutInfo.margin; x += 4) {
+          if (naBanda(x, bandasV) || naBanda(x + 1, bandasV)) continue;
+          g.fillRect(x * S, cy - S * .06, S * 2, S * .12 + 1);
+        }
+        g.fillStyle = 'rgba(255,255,255,.22)';
+        for (let x = this.layoutInfo.margin; x < this.W - this.layoutInfo.margin; x += 1) {
+          if (naBanda(x, bandasV)) continue;
+          g.fillRect(x * S, (r.pos + .35) * S, S, S * .08 + .6);
+          g.fillRect(x * S, (r.pos + r.w - .45) * S, S, S * .08 + .6);
+        }
+      }
+
+      // faixas de pedestres em escada (barras atravessando a via)
+      g.fillStyle = 'rgba(242,242,236,.85)';
+      const barra = (x, y, w, h) => g.fillRect(x * S, y * S, w * S, h * S);
+      for (const it of this.crosswalks) {
+        // aproximações norte e sul (atravessam a via vertical)
+        barra(it.vx, it.hy - 5, it.vw, .55);
+        barra(it.vx, it.hy - 4, it.vw, .55);
+        barra(it.vx, it.hy - 3, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 2, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 3, it.vw, .55);
+        barra(it.vx, it.hy + it.hh + 4, it.vw, .55);
+        // aproximações leste e oeste (atravessam a via horizontal)
+        barra(it.vx - 5, it.hy, .55, it.hh);
+        barra(it.vx - 4, it.hy, .55, it.hh);
+        barra(it.vx - 3, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 2, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 3, it.hy, .55, it.hh);
+        barra(it.vx + it.vw + 4, it.hy, .55, it.hh);
+      }
       g.restore();
+      this.groundCanvas = cv;
       this.groundCanvas = cv;
 
       // minimapa (1px por tile)
@@ -2127,6 +2348,11 @@ button.ghost{background:transparent}
    ========================================================================= */
 (function () {
   'use strict';
+  // converte '#rrggbb' em 'r,g,b' (para rgba em degradês de luz)
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255);
+  }
   const LIFE = window.LIFE, U = LIFE.Util, C = LIFE.CONFIG, TT = LIFE.TT, IT = LIFE.IT;
 
   LIFE.Renderer = class Renderer {
@@ -2193,11 +2419,14 @@ button.ghost{background:transparent}
     adaptQuality(dt) {
       this._ft = this._ft || [];
       this._ft.push(dt);
-      if (this._ft.length < 90) return;
+      // se o último ciclo já estava lento, decide com amostra curta (converge em ~1s, não ~22s)
+      const n = (this._lastAvg > .045) ? 20 : 90;
+      if (this._ft.length < n) return;
       const avg = this._ft.reduce((a, b) => a + b, 0) / this._ft.length;
+      this._lastAvg = avg;
       this._ft.length = 0;
       const scale = this.renderScale || 1;
-      if (avg > .032 && scale > .6) { this.renderScale = Math.max(.6, scale - .12); this.resize(); }
+      if (avg > .032 && scale > .6) { this.renderScale = Math.max(.6, scale - (avg > .05 ? .2 : .12)); this.resize(); }
       else if (avg < .015 && scale < 1) { this.renderScale = Math.min(1, scale + .08); this.resize(); }
     }
 
@@ -2235,6 +2464,39 @@ button.ghost{background:transparent}
       const gx = Math.max(0, view.x0) * C.TILE, gy = Math.max(0, view.y0) * C.TILE;
       const gw = Math.min(w.W, view.x1) * C.TILE - gx, gh = Math.min(w.H, view.y1) * C.TILE - gy;
       if (gw > 0 && gh > 0) ctx.drawImage(w.groundCanvas, gx, gy, gw, gh, gx, gy, gw, gh);
+
+      // 1b. estacionamentos (linhas de vaga) e carros parados
+      if (w.parkingLots) {
+        for (const lot of w.parkingLots) {
+          if (lot.x + lot.w < view.x0 || lot.x > view.x1 || lot.y + lot.h < view.y0 || lot.y > view.y1) continue;
+          const lx = lot.x * C.TILE, ly = lot.y * C.TILE, lw = lot.w * C.TILE, lh = lot.h * C.TILE;
+          ctx.fillStyle = 'rgba(70,74,80,.55)';
+          ctx.fillRect(lx, ly, lw, lh);
+          ctx.strokeStyle = 'rgba(245,245,240,.75)';
+          ctx.lineWidth = 1.6;
+          if (lot.vertical) {
+            for (let i = 1; i < lot.w * 2; i++) {
+              const x = lx + (lw / (lot.w * 2)) * i;
+              ctx.beginPath(); ctx.moveTo(x, ly + 2); ctx.lineTo(x, ly + lh - 2); ctx.stroke();
+            }
+          } else {
+            for (let i = 1; i < lot.h * 2; i++) {
+              const y = ly + (lh / (lot.h * 2)) * i;
+              ctx.beginPath(); ctx.moveTo(lx + 2, y); ctx.lineTo(lx + lw - 2, y); ctx.stroke();
+            }
+          }
+          ctx.strokeStyle = 'rgba(0,0,0,.35)';
+          ctx.strokeRect(lx + .5, ly + .5, lw - 1, lh - 1);
+        }
+      }
+
+      // 1c. carros estacionados
+      if (w.parkedCars) {
+        for (const c of w.parkedCars) {
+          if (c.x < view.x0 || c.x > view.x1 || c.y < view.y0 || c.y > view.y1) continue;
+          this.drawParkedCar(ctx, c, light);
+        }
+      }
 
       // 2. props planos
       const props = w.propsIn(view.x0, view.y0, view.x1, view.y1);
@@ -2315,24 +2577,28 @@ button.ghost{background:transparent}
       const T = this.tile;
       const sx = T / C.TILE;
       const toScreen = (wx, wy) => ({ x: (wx - this.cam.x) * T + this.vw / 2, y: (wy - this.cam.y) * T + this.vh / 2 });
-      // postes
+      // postes (em qualidade baixa desenha só metade dos postes)
+      const doisPostes = (this.renderScale || 1) >= .75 ? 1 : 2;
+      let nPoste = 0;
       for (const p of this.world.propsIn(view.x0, view.y0, view.x1, view.y1)) {
         if (p.t !== 'lamp') continue;
+        if (doisPostes === 2 && (nPoste++ % 2)) continue;
         const s = toScreen(p.x, p.y);
-        const r = 62 * sx;
+        const r = 46 * sx;
         const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
-        g.addColorStop(0, 'rgba(255,214,130,' + (.30 * strength) + ')');
-        g.addColorStop(.45, 'rgba(255,190,100,' + (.12 * strength) + ')');
+        g.addColorStop(0, 'rgba(255,214,130,' + (.24 * strength) + ')');
+        g.addColorStop(.45, 'rgba(255,190,100,' + (.09 * strength) + ')');
         g.addColorStop(1, 'rgba(255,180,90,0)');
         ctx.fillStyle = g;
         ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, 6.283); ctx.fill();
       }
-      // janelas e letreiros
-      for (const b of this.world.buildings) {
+      // janelas e letreiros — cortado quando a qualidade está reduzida (custo alto, ganho baixo)
+      const brilhoPredios = (this.renderScale || 1) >= .85;
+      for (const b of (brilhoPredios ? this.world.buildings : [])) {
         if (b.x + b.w < view.x0 || b.x > view.x1 || b.y + b.h < view.y0 || b.y > view.y1) continue;
         const s = toScreen(b.x + b.w / 2, b.y + b.h);
         const r = Math.min(120 * sx, (10 + b.w * 3.2) * sx);
-        const alpha = (light.dark > .6 ? .16 : .07) * strength;
+        const alpha = (light.dark > .6 ? .12 : .05) * strength;
         const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
         g.addColorStop(0, 'rgba(255,236,180,' + alpha + ')');
         g.addColorStop(1, 'rgba(255,230,170,0)');
@@ -2384,6 +2650,31 @@ button.ghost{background:transparent}
         ctx.lineTo(d.x - (wind || 0) * d.l * .5, d.y + d.l);
       }
       ctx.stroke();
+      ctx.restore();
+    }
+
+    drawParkedCar(ctx, v, light) {
+      const T = C.TILE;
+      const x = v.x * T, y = v.y * T, w = v.w * T, h = v.h * T;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      ctx.fillRect(-w / 2 + 2, -h / 2 + 3, w, h);
+      ctx.rotate(v.angle);
+      ctx.fillStyle = '#1a1d21';
+      ctx.fillRect(-w / 2 - 1, -h * .34, 3.2, h * .18);
+      ctx.fillRect(w / 2 - 2.2, -h * .34, 3.2, h * .18);
+      ctx.fillRect(-w / 2 - 1, h * .18, 3.2, h * .18);
+      ctx.fillRect(w / 2 - 2.2, h * .18, 3.2, h * .18);
+      ctx.fillStyle = v.color;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-w / 2, -h / 2, w, h, 4); else ctx.rect(-w / 2, -h / 2, w, h);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(26,38,52,.85)';
+      ctx.fillRect(-w / 2 + 2, -h * .32, w - 4, h * .19);
+      ctx.fillRect(-w / 2 + 2, h * .15, w - 4, h * .16);
+      ctx.fillStyle = 'rgba(0,0,0,.25)';
+      ctx.fillRect(-w / 2, -h * .05, w, h * .1);
       ctx.restore();
     }
 
@@ -2524,85 +2815,152 @@ button.ghost{background:transparent}
     drawBuilding(ctx, b, game, light) {
       const T = C.TILE;
       const x = b.x * T, y = b.y * T, w = b.w * T, h = b.h * T;
-      const night = light.dark > .35;
-      // sombra
-      ctx.fillStyle = 'rgba(0,0,0,' + (.22 + Math.min(.16, b.floors * .012)) + ')';
+      const noite = light.dark > .35;
+      const base = noite ? U.shade(b.color, -.45) : b.color;
+      const r = U.rng(b.id * 7919 + 13);
+
+      // sombra projetada
+      ctx.fillStyle = 'rgba(0,0,0,' + (.2 + Math.min(.16, b.floors * .012)) + ')';
       ctx.fillRect(x + 3, y + 4, w, h);
-      // teto
-      const base = night ? U.shade(b.color, -.42) : b.color;
+
+      // ---------- TELHADO ----------
       ctx.fillStyle = base;
       ctx.fillRect(x, y, w, h);
-      // variação de telhado
-      const r = U.rng(b.id * 7919);
-      ctx.fillStyle = U.shade(base, .07);
-      ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
-      // borda superior iluminada
-      ctx.fillStyle = U.shade(base, night ? .05 : .18);
+      // textura de telha/ripado
+      ctx.strokeStyle = 'rgba(0,0,0,.10)';
+      ctx.lineWidth = 1;
+      const passo = Math.max(3, Math.round(4 + r() * 3));
+      const horizontal = r() < .5;
+      for (let k = passo; k < (horizontal ? h : w); k += passo) {
+        ctx.beginPath();
+        if (horizontal) { ctx.moveTo(x, y + k); ctx.lineTo(x + w, y + k); }
+        else { ctx.moveTo(x + k, y); ctx.lineTo(x + k, y + h); }
+        ctx.stroke();
+      }
+      // borda iluminada + contorno interno
+      ctx.fillStyle = U.shade(base, noite ? .06 : .2);
       ctx.fillRect(x, y, w, 2);
-      ctx.fillStyle = U.shade(base, -.22);
+      ctx.fillStyle = U.shade(base, -.2);
       ctx.fillRect(x, y + h - 2, w, 2);
       ctx.fillRect(x + w - 2, y, 2, h);
-      // detalhes de telhado: caixas de ar, claraboias, acesso
-      const nDet = Math.min(6, 1 + ((b.w * b.h) / 9) | 0);
+
+      // caixas d'água, ar-condicionado e antenas
+      const nDet = Math.min(7, 1 + ((b.w * b.h) / 8) | 0);
       for (let i = 0; i < nDet; i++) {
-        const dw = 5 + r() * 9, dh = 5 + r() * 9;
-        const dx = x + 4 + r() * Math.max(1, w - dw - 8);
-        const dy = y + 4 + r() * Math.max(1, h - dh - 10);
-        ctx.fillStyle = U.shade(base, night ? -.12 : -.16);
+        const dw = 4 + r() * 7, dh = 4 + r() * 7;
+        const dx = x + 3 + r() * Math.max(1, w - dw - 6);
+        const dy = y + 3 + r() * Math.max(1, h - dh - 8);
+        ctx.fillStyle = 'rgba(0,0,0,.22)';
+        ctx.fillRect(dx + 1.5, dy + 2, dw, dh);
+        ctx.fillStyle = U.shade(base, noite ? -.15 : -.22);
         ctx.fillRect(dx, dy, dw, dh);
-        ctx.fillStyle = U.shade(base, night ? .02 : .1);
+        ctx.fillStyle = U.shade(base, noite ? .04 : .14);
         ctx.fillRect(dx, dy, dw, 1.5);
+      }
+      // antenas
+      if (r() < .4) {
+        const ax = x + 4 + r() * Math.max(1, w - 8), ay = y + 4 + r() * Math.max(1, h - 8);
+        ctx.strokeStyle = noite ? '#5a6169' : '#7a8290';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(ax, ay - 6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax - 3, ay - 3); ctx.lineTo(ax + 3, ay - 3); ctx.stroke();
       }
       // casa: telhado de duas águas
       if (b.kind === 'house' || b.kind === 'house_big' || b.kind === 'farm') {
-        ctx.strokeStyle = U.shade(base, -.28); ctx.lineWidth = 1.4;
+        ctx.strokeStyle = U.shade(base, -.3); ctx.lineWidth = 1.4;
         ctx.beginPath(); ctx.moveTo(x + 3, y + h / 2); ctx.lineTo(x + w / 2, y + 3);
         ctx.lineTo(x + w - 3, y + h / 2); ctx.lineTo(x + w / 2, y + h - 3); ctx.closePath(); ctx.stroke();
-        ctx.fillStyle = U.shade(base, -.35);
-        ctx.fillRect(x + w / 2 - 3, y + h / 2 - 4, 6, 8); // chaminé
-      }
-      // fachada sul (dentro da pegada): altura proporcional aos andares
-      const fh = Math.min(h * .42, 4 + Math.min(20, b.floors * 1.9));
-      const fy = y + h - fh;
-      const facade = night ? U.shade(b.color, -.52) : U.shade(b.color, -.3);
-      ctx.fillStyle = facade;
-      ctx.fillRect(x, fy, w, fh);
-      ctx.fillStyle = U.shade(b.color, night ? -.6 : -.42);
-      ctx.fillRect(x, y + h - 1.6, w, 1.6);
-      // janelas
-      if (b.litWindows && b.litWindows.length) {
-        const rows = Math.min(b.litWindows.length, Math.max(1, Math.floor(fh / 3.4)));
-        const cols = Math.max(2, Math.min(b.w, 8));
-        const ww = (w - 6) / cols, wh = Math.max(1.6, (fh - 4) / rows - 1.2);
-        for (let ri = 0; ri < rows; ri++) {
-          const winRow = b.litWindows[ri % b.litWindows.length];
-          for (let ci = 0; ci < cols; ci++) {
-            const lit = winRow[ci % winRow.length] && night;
-            ctx.fillStyle = lit ? '#ffe9a8' : (night ? '#243040' : '#2b3948');
-            ctx.fillRect(x + 3 + ci * ww + 1, fy + 2 + ri * (wh + 1.2), ww - 2, wh);
-          }
+        ctx.fillStyle = U.shade(base, -.34);
+        ctx.fillRect(x + w / 2 - 3, y + h / 2 - 5, 6, 9);
+        // chaminé com fumaça discreta
+        if (noite && r() < .5) {
+          ctx.fillStyle = 'rgba(220,220,220,.14)';
+          ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2 - 9, 3, 0, 6.283); ctx.fill();
         }
       }
-      // porta
+
+      // ---------- FACHADA SUL (altura pelos andares) ----------
+      const fh = Math.min(h * .46, 5 + Math.min(26, b.floors * 2.1));
+      const fy = y + h - fh;
+      const fachada = noite ? U.shade(b.color, -.52) : U.shade(b.color, -.26);
+      ctx.fillStyle = fachada;
+      ctx.fillRect(x, fy, w, fh);
+      // sombra da laje sobre a fachada
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      ctx.fillRect(x, fy, w, 1.6);
+      ctx.fillStyle = U.shade(b.color, noite ? -.62 : -.45);
+      ctx.fillRect(x, y + h - 1.6, w, 1.6);
+
+      // fileiras de JANELAS (o que dá vida à fachada)
+      const linhas = Math.max(1, Math.floor(fh / 4.2));
+      const colunas = Math.max(2, Math.min(9, Math.round(b.w * .95)));
+      const margem = 2.5;
+      const vaoX = (w - margem * 2) / colunas;
+      const vaoY = (fh - 3) / linhas;
+      for (let li = 0; li < linhas; li++) {
+        const row = b.litWindows[li % b.litWindows.length];
+        for (let ci = 0; ci < colunas; ci++) {
+          const aceso = noite && row[ci % row.length];
+          const wx = x + margem + ci * vaoX + vaoX * .16;
+          const wy = fy + 2 + li * vaoY;
+          const ww = vaoX * .68, wh = Math.max(1.6, vaoY * .58);
+          if (ww < 1 || wy + wh > y + h - 2.2) continue;
+          ctx.fillStyle = aceso ? '#ffe9a8' : (noite ? '#233043' : '#2b3a4a');
+          ctx.fillRect(wx, wy, ww, wh);
+          // brilho da janela acesa
+          if (aceso) {
+            ctx.fillStyle = 'rgba(255,225,150,.28)';
+            ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
+            ctx.fillStyle = '#fff3c4';
+            ctx.fillRect(wx, wy, ww, wh);
+          }
+          // moldura
+          ctx.strokeStyle = noite ? 'rgba(0,0,0,.5)' : 'rgba(0,0,0,.32)';
+          ctx.lineWidth = .9;
+          ctx.strokeRect(wx, wy, ww, wh);
+        }
+      }
+
+      // porta de entrada
       if (b.door && fh > 4) {
         const dxp = (b.door.x - b.x) * T;
-        ctx.fillStyle = night ? '#2a2018' : '#463326';
-        ctx.fillRect(x + U.clamp(dxp, 4, w - 12), y + h - Math.min(fh, 7), 7, Math.min(fh, 7));
+        const dw = 6, dh = Math.min(fh - 2, 8);
+        const px = x + U.clamp(dxp, 3, Math.max(3, w - 9));
+        ctx.fillStyle = noite ? '#2a2018' : '#463326';
+        ctx.fillRect(px, y + h - dh - 1, dw, dh);
+        ctx.fillStyle = noite ? '#4a3a26' : '#6a5038';
+        ctx.fillRect(px, y + h - dh - 1, dw, 1.4);
+        if (noite) {
+          ctx.fillStyle = 'rgba(255,214,130,.5)';
+          ctx.fillRect(px - 1.5, y + h - dh - 3, dw + 3, 2.2);
+        }
       }
-      // letreiro luminoso para comércio
-      if (['shop', 'bar', 'restaurant', 'pharmacy', 'bakery', 'mall', 'supermarket', 'hotel', 'bank', 'gas', 'market', 'nightclub', 'clinic'].includes(b.kind)) {
-        const txt = b.name.toUpperCase().slice(0, 12);
-        const colors = { shop: '#ff6ba8', bar: '#ffb03a', restaurant: '#ff8b3d', pharmacy: '#4dff9e', bakery: '#ffd23f', mall: '#7ad7ff', supermarket: '#8bff5a', hotel: '#ff5f7e', bank: '#ffd700', gas: '#59d0ff', market: '#ffa24d', clinic: '#9ce8ff' };
-        const col = colors[b.kind] || '#ffd23f';
-        ctx.fillStyle = night ? col : U.shade(col, -.3);
-        ctx.fillRect(x + 3, fy - 8, Math.min(w - 6, 10 + txt.length * 5.4), 7);
-        ctx.fillStyle = night ? '#1a1207' : '#20160a';
-        ctx.font = 'bold 6px monospace'; ctx.textAlign = 'left';
-        ctx.fillText(txt, x + 5, fy - 3);
-        if (night) { ctx.globalAlpha = .25; ctx.fillStyle = col; ctx.fillRect(x + 1, fy - 11, Math.min(w - 2, 14 + txt.length * 5.4), 13); ctx.globalAlpha = 1; }
+
+      // letreiro luminoso (comércio)
+      const comercio = ['shop', 'bar', 'restaurant', 'pharmacy', 'bakery', 'mall', 'supermarket', 'hotel', 'bank', 'gas', 'market', 'clinic', 'nightclub'];
+      if (comercio.includes(b.kind)) {
+        const txt = b.name.toUpperCase().slice(0, 13);
+        const cores = { shop: '#ff6ba8', bar: '#ffb03a', restaurant: '#ff8b3d', pharmacy: '#4dff9e',
+          bakery: '#ffd23f', mall: '#7ad7ff', supermarket: '#8bff5a', hotel: '#ff5f7e', bank: '#ffd700',
+          gas: '#59d0ff', market: '#ffa24d', clinic: '#9ce8ff' };
+        const col = cores[b.kind] || '#ffd23f';
+        const lw = Math.min(w - 4, 12 + txt.length * 5.6);
+        const ly = Math.max(fy - 9, y + 2);
+        if (noite) {
+          ctx.fillStyle = 'rgba(' + hexRgb(col) + ',.28)';
+          ctx.fillRect(x + 1, ly - 4, lw + 4, 15);
+        }
+        ctx.fillStyle = noite ? col : U.shade(col, -.28);
+        ctx.fillRect(x + 3, ly, lw, 7);
+        ctx.fillStyle = noite ? '#14100a' : '#241a0c';
+        ctx.font = 'bold 6px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(txt, x + 5, ly + 5.4);
       }
-      // contorno
-      ctx.strokeStyle = 'rgba(0,0,0,.42)'; ctx.lineWidth = 1;
+
+      // contorno geral
+      ctx.strokeStyle = 'rgba(0,0,0,.45)';
+      ctx.lineWidth = 1;
       ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
     }
 
@@ -2693,16 +3051,16 @@ button.ghost{background:transparent}
   const MEAL_KINDS = ['restaurant', 'bakery', 'bar'];
 
   const VEHICLE_TYPES = {
-    car: { w: 1.5, h: 2.7, speed: [5.5, 8.5], color: ['#b8433a', '#3a6bb8', '#d8d8d8', '#2f2f33', '#3f9a52', '#c9a227', '#8a5cc0', '#d97b2b'], fuel: 42, sound: 1 },
-    taxi: { w: 1.5, h: 2.7, speed: [5.5, 8.5], color: ['#e8c33a'], fuel: 45, taxi: true },
-    moto: { w: .8, h: 1.8, speed: [7, 11], color: ['#c03030', '#2a2a2e', '#3060c0'], fuel: 14, rider: true },
-    van: { w: 1.7, h: 3.2, speed: [5, 7.5], color: ['#dddddd', '#5a7fa8'], fuel: 60 },
-    truck: { w: 2.1, h: 4.4, speed: [4, 6.5], color: ['#3f4a55', '#8a5a3a', '#2f6b4a'], fuel: 120 },
-    bus: { w: 2.2, h: 5.6, speed: [4, 6], color: ['#e0a63a', '#3a7ac0'], fuel: 160, bus: true },
-    police: { w: 1.6, h: 3, speed: [7, 11], color: ['#2a4a7a', '#1b1f26'], fuel: 55, emergency: 'police' },
-    ambulance: { w: 1.8, h: 3.6, speed: [7, 11], color: ['#e9eef2'], fuel: 65, emergency: 'medical' },
-    firetruck: { w: 2.2, h: 4.8, speed: [6, 9], color: ['#c0392b'], fuel: 140, emergency: 'fire' },
-    pickup: { w: 1.7, h: 3.2, speed: [5.5, 8], color: ['#7a5a3a', '#3f6b8a'], fuel: 60 }
+    car: { w: 1.85, h: 3.3, speed: [5.5, 8.5], color: ['#b8433a', '#3a6bb8', '#d8d8d8', '#2f2f33', '#3f9a52', '#c9a227', '#8a5cc0', '#d97b2b'], fuel: 42, sound: 1 },
+    taxi: { w: 1.85, h: 3.3, speed: [5.5, 8.5], color: ['#e8c33a'], fuel: 45, taxi: true },
+    moto: { w: .95, h: 2.2, speed: [7, 11], color: ['#c03030', '#2a2a2e', '#3060c0'], fuel: 14, rider: true },
+    van: { w: 2.05, h: 3.9, speed: [5, 7.5], color: ['#dddddd', '#5a7fa8'], fuel: 60 },
+    truck: { w: 2.5, h: 5.3, speed: [4, 6.5], color: ['#3f4a55', '#8a5a3a', '#2f6b4a'], fuel: 120 },
+    bus: { w: 2.6, h: 6.6, speed: [4, 6], color: ['#e0a63a', '#3a7ac0'], fuel: 160, bus: true },
+    police: { w: 1.95, h: 3.6, speed: [7, 11], color: ['#2a4a7a', '#1b1f26'], fuel: 55, emergency: 'police' },
+    ambulance: { w: 2.15, h: 4.3, speed: [7, 11], color: ['#e9eef2'], fuel: 65, emergency: 'medical' },
+    firetruck: { w: 2.6, h: 5.8, speed: [6, 9], color: ['#c0392b'], fuel: 140, emergency: 'fire' },
+    pickup: { w: 2.05, h: 3.9, speed: [5.5, 8], color: ['#7a5a3a', '#3f6b8a'], fuel: 60 }
   };
   LIFE.VEHICLE_TYPES = VEHICLE_TYPES;
 
@@ -2957,7 +3315,7 @@ button.ghost{background:transparent}
       const R = C.ACTIVE_RADIUS, R2 = R * R;
       const minute = this.clock.min;
       const budget = this.budget || 1;
-      const wantAgents = Math.round(C.MAX_ACTIVE_AGENTS * this.density() * budget);
+      const wantAgents = Math.round(C.MAX_ACTIVE_AGENTS * this.density() * budget * 1.35);
       // remove agentes distantes
       for (let i = this.agents.length - 1; i >= 0; i--) {
         const a = this.agents[i];
@@ -3971,6 +4329,8 @@ button.ghost{background:transparent}
       // faróis
       if (LIFE.Input.justPressed('l')) { v.lights = !v.lights; this.toast(v.lights ? 'Faróis ligados' : 'Faróis desligados'); }
       if (LIFE.Input.justPressed('h')) { LIFE.Audio.horn(); v.horn = .3; }
+      // o jogador acompanha o veículo: missões, bairro, minimapa e celular usam p.x / p.y
+      p.x = v.x; p.y = v.y;
       // sair do veículo
       if (LIFE.Input.justPressed('e')) {
         const spot = this.findExitSpot(v);
@@ -4345,9 +4705,10 @@ button.ghost{background:transparent}
       if (!store) { this.toast('Nenhum ponto de coleta disponível.', 'bad'); return; }
       const homes = w.buildings.filter((b) => ['house', 'house_big', 'apartment', 'condo'].includes(b.kind));
       const dest = homes[(Math.random() * homes.length) | 0];
+      const sd = w.doorTile(store);
       this.mission = {
         type: 'entrega', stage: 'coleta', store, dest,
-        x: store.x + store.w / 2, y: store.y + store.h / 2, pay: 90 + Math.random() * 120
+        x: sd.x, y: sd.y, pay: 90 + Math.random() * 120
       };
       this.setJobTarget(this.mission.x, this.mission.y, 'Coleta');
       this.toast('Nova entrega! Busque o pacote em ' + store.name + '.', 'good');
@@ -4358,7 +4719,8 @@ button.ghost{background:transparent}
       const places = w.buildings.filter((b) => b.biz);
       const from = places[(Math.random() * places.length) | 0];
       const to = places[(Math.random() * places.length) | 0];
-      this.mission = { type: 'taxi', stage: 'buscar', from, to, x: from.x + from.w / 2, y: from.y + from.h / 2, pay: 70 + Math.random() * 90 };
+      const fd = w.doorTile(from);
+      this.mission = { type: 'taxi', stage: 'buscar', from, to, x: fd.x, y: fd.y, pay: 70 + Math.random() * 90 };
       this.setJobTarget(this.mission.x, this.mission.y, 'Passageiro');
       this.toast('Corrida de táxi! Vá buscar o passageiro.', 'good');
     }
@@ -4366,11 +4728,11 @@ button.ghost{background:transparent}
       const m = this.mission, p = this.player;
       if (!m) return;
       const d = U.dist(p.x, p.y, m.x, m.y);
-      if (d > 4) return;
+      if (d > 5) return;
       if (m.type === 'entrega') {
         if (m.stage === 'coleta') {
           m.stage = 'entrega';
-          m.x = m.dest.x + m.dest.w / 2; m.y = m.dest.y + m.dest.h / 2;
+          const dd = this.world.doorTile(m.dest); m.x = dd.x; m.y = dd.y;
           this.setJobTarget(m.x, m.y, 'Entrega');
           this.toast('Pacote coletado. Entregue no destino marcado.', 'good');
           LIFE.Audio.beep(700, .12, 'square', .07);
@@ -4385,7 +4747,7 @@ button.ghost{background:transparent}
         if (m.stage === 'buscar') {
           if (!p.vehicle) { this.toast('Você precisa estar em um veículo para levar o passageiro.', 'bad'); return; }
           m.stage = 'levar';
-          m.x = m.to.x + m.to.w / 2; m.y = m.to.y + m.to.h / 2;
+          const td = this.world.doorTile(m.to); m.x = td.x; m.y = td.y;
           this.setJobTarget(m.x, m.y, 'Destino');
           this.toast('Passageiro embarcado. Leve-o ao destino.', 'good');
         } else {
@@ -4434,7 +4796,19 @@ button.ghost{background:transparent}
 
     /* ---------------- HUD ----------------
        (implementado em ui.js) */
-    updateHUD(dt) { LIFE.UI.updateHUD(this, dt); }
+    updateHUD(dt) {
+      // morador mais próximo (para mostrar só um nome na tela)
+      if (!this.player.indoor) {
+        let melhor = null, menor = 5.5 * 5.5;
+        for (const a of this.sim.agents) {
+          if (a.inside || a.dead) continue;
+          const d = U.dist2(a.x, a.y, this.player.x, this.player.y);
+          if (d < menor) { menor = d; melhor = a; }
+        }
+        this.closestPed = melhor;
+      } else this.closestPed = null;
+      LIFE.UI.updateHUD(this, dt);
+    }
     updateZone() {
       const p = this.player;
       const d = this.world.districtAt(p.x, p.y);
@@ -4508,8 +4882,8 @@ button.ghost{background:transparent}
         ctx.fillStyle = '#e8f0f8'; ctx.fillRect(2.6, -3.4, 2.2, 3.6);
       }
       ctx.restore();
-      // nome de quem está falando/conversando
-      if (isPed && p.citizen && this.nearPlayerName && U.dist2(p.x, p.y, this.player.x, this.player.y) < 52) {
+      // nome apenas do morador mais próximo (evita poluir a tela)
+      if (isPed && p.citizen && this.nearPlayerName && this.closestPed === p) {
         ctx.save();
         ctx.font = '7px monospace'; ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(0,0,0,.55)';

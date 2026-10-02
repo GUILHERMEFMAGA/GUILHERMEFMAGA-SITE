@@ -16,16 +16,16 @@
   const MEAL_KINDS = ['restaurant', 'bakery', 'bar'];
 
   const VEHICLE_TYPES = {
-    car: { w: 1.5, h: 2.7, speed: [5.5, 8.5], color: ['#b8433a', '#3a6bb8', '#d8d8d8', '#2f2f33', '#3f9a52', '#c9a227', '#8a5cc0', '#d97b2b'], fuel: 42, sound: 1 },
-    taxi: { w: 1.5, h: 2.7, speed: [5.5, 8.5], color: ['#e8c33a'], fuel: 45, taxi: true },
-    moto: { w: .8, h: 1.8, speed: [7, 11], color: ['#c03030', '#2a2a2e', '#3060c0'], fuel: 14, rider: true },
-    van: { w: 1.7, h: 3.2, speed: [5, 7.5], color: ['#dddddd', '#5a7fa8'], fuel: 60 },
-    truck: { w: 2.1, h: 4.4, speed: [4, 6.5], color: ['#3f4a55', '#8a5a3a', '#2f6b4a'], fuel: 120 },
-    bus: { w: 2.2, h: 5.6, speed: [4, 6], color: ['#e0a63a', '#3a7ac0'], fuel: 160, bus: true },
-    police: { w: 1.6, h: 3, speed: [7, 11], color: ['#2a4a7a', '#1b1f26'], fuel: 55, emergency: 'police' },
-    ambulance: { w: 1.8, h: 3.6, speed: [7, 11], color: ['#e9eef2'], fuel: 65, emergency: 'medical' },
-    firetruck: { w: 2.2, h: 4.8, speed: [6, 9], color: ['#c0392b'], fuel: 140, emergency: 'fire' },
-    pickup: { w: 1.7, h: 3.2, speed: [5.5, 8], color: ['#7a5a3a', '#3f6b8a'], fuel: 60 }
+    car: { w: 1.85, h: 3.3, speed: [5.5, 8.5], color: ['#b8433a', '#3a6bb8', '#d8d8d8', '#2f2f33', '#3f9a52', '#c9a227', '#8a5cc0', '#d97b2b'], fuel: 42, sound: 1 },
+    taxi: { w: 1.85, h: 3.3, speed: [5.5, 8.5], color: ['#e8c33a'], fuel: 45, taxi: true },
+    moto: { w: .95, h: 2.2, speed: [7, 11], color: ['#c03030', '#2a2a2e', '#3060c0'], fuel: 14, rider: true },
+    van: { w: 2.05, h: 3.9, speed: [5, 7.5], color: ['#dddddd', '#5a7fa8'], fuel: 60 },
+    truck: { w: 2.5, h: 5.3, speed: [4, 6.5], color: ['#3f4a55', '#8a5a3a', '#2f6b4a'], fuel: 120 },
+    bus: { w: 2.6, h: 6.6, speed: [4, 6], color: ['#e0a63a', '#3a7ac0'], fuel: 160, bus: true },
+    police: { w: 1.95, h: 3.6, speed: [7, 11], color: ['#2a4a7a', '#1b1f26'], fuel: 55, emergency: 'police' },
+    ambulance: { w: 2.15, h: 4.3, speed: [7, 11], color: ['#e9eef2'], fuel: 65, emergency: 'medical' },
+    firetruck: { w: 2.6, h: 5.8, speed: [6, 9], color: ['#c0392b'], fuel: 140, emergency: 'fire' },
+    pickup: { w: 2.05, h: 3.9, speed: [5.5, 8], color: ['#7a5a3a', '#3f6b8a'], fuel: 60 }
   };
   LIFE.VEHICLE_TYPES = VEHICLE_TYPES;
 
@@ -280,7 +280,7 @@
       const R = C.ACTIVE_RADIUS, R2 = R * R;
       const minute = this.clock.min;
       const budget = this.budget || 1;
-      const wantAgents = Math.round(C.MAX_ACTIVE_AGENTS * this.density() * budget);
+      const wantAgents = Math.round(C.MAX_ACTIVE_AGENTS * this.density() * budget * 1.35);
       // remove agentes distantes
       for (let i = this.agents.length - 1; i >= 0; i--) {
         const a = this.agents[i];
