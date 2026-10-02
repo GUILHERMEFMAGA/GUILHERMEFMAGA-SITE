@@ -1,9 +1,0 @@
-{
-  "name": "the-ashen-way",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build:preview": "node scripts/build-preview.mjs",
-    "test": "node --test"
-  }
-}

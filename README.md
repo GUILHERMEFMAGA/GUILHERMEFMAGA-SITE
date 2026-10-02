@@ -1,20 +1,8 @@
-# The Ashen Way — first-person pixel-fantasy framework
-
-A dependency-free WebGL 2 game prototype: walk a fixed, winding road through a dark forest toward a distant gothic keep. The world renders continuously from a stable seed, with a visible armored arm and glowing broadsword, pixel-grid stone surfaces, sunset light, fog, soft ray-marched shadows, and a castle that gains facade detail as you approach.
-
-**Jogar online:** [Abrir The Ashen Way](https://html-preview.github.io/?url=https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/blob/8b97b4215a02af652f887ed083cd2b7e50f60206/game/preview.html) — prévia HTML executável no navegador.
-
-**Run locally:** `python3 -m http.server 8000 --bind 0.0.0.0` from the repository root, then open <http://localhost:8000/game/>.
-
-**Controls:** WASD to move, mouse to look, Shift to run; touch controls appear on mobile. Press Escape to pause; use ↺ to restart. The game architecture and implementation notes are in [game/README.md](game/README.md). Run the state tests with `npm --prefix game test`.
-
----
-
 <img width="800" height="450" alt="b_deixe_um_pouco_mais_-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/a73e7bcd-c59c-463b-8b60-aae618b7e519" />
 
 # Meu agente de IA local 🤖
 
-Este repositório também contém o **NÚCLEO**: um agente de IA que roda no meu computador,
+Este repositório contém o **NÚCLEO**: um agente de IA que roda no meu computador,
 escrito em **Python puro**, **sem API paga**, **sem Ollama** e **sem instalar nenhum pacote**.
 
 Ele tem rede neural (feita do zero), memória, ferramentas e automações no estilo n8n.
@@ -42,3 +30,7 @@ python main.py web    # painel no navegador (http://localhost:8000)
 | Automações estilo n8n: gatilho por horário/intervalo e passos com `{{variaveis}}` | ✅ |
 | Painel web sem Flask (servidor HTTP da biblioteca padrão) | ✅ |
 | "Não sei" honesto quando a confiança é baixa (anti-alucinação) | ✅ |
+
+## Referência visual para a próxima configuração
+
+![Paisagem de fantasia sombria em pixel art — referência visual](images/dark-fantasy-pixel-landscape.png)
