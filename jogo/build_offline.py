@@ -16,6 +16,8 @@ ASSETS = {
     "gta-retro.png": "image/png",
     "rua-segmento-02.png": "image/png",
     "rua-segmento-03.png": "image/png",
+    "rua-segmento-04.png": "image/png",
+    "rua-segmento-05.png": "image/png",
 }
 
 
@@ -31,6 +33,7 @@ def main() -> None:
     lighting = (GAME_DIR / "lighting.js").read_text(encoding="utf-8")
     collision = (GAME_DIR / "collision.js").read_text(encoding="utf-8")
     vehicle_physics = (GAME_DIR / "vehicle-physics.js").read_text(encoding="utf-8")
+    weather = (GAME_DIR / "weather.js").read_text(encoding="utf-8")
 
     stylesheet_link = '  <link rel="stylesheet" href="./style.css">'
     module_script = '  <script type="module" src="./game.js"></script>'
@@ -43,6 +46,7 @@ def main() -> None:
         r"^import\s+\{\s*drawCarHighlights\s*,\s*drawStreetLighting\s*\}\s+from\s+['\"]\./lighting\.js['\"];\s*\n",
         r"^import\s+\{\s*resolveVehicleMotion\s*\}\s+from\s+['\"]\./collision\.js['\"];\s*\n",
         r"^import\s+\{\s*stepVehicle\s*\}\s+from\s+['\"]\./vehicle-physics\.js['\"];\s*\n",
+        r"^import\s+\{\s*drawWeather\s*,\s*getWeatherState\s*\}\s+from\s+['\"]\./weather\.js['\"];\s*\n",
     )
     for import_pattern in module_imports:
         game, replacements = re.subn(import_pattern, "", game, count=1)
@@ -59,6 +63,7 @@ def main() -> None:
     bundled_lighting = re.sub(r"^export\s+", "", lighting, flags=re.MULTILINE)
     bundled_collision = re.sub(r"^export\s+", "", collision, flags=re.MULTILINE)
     bundled_vehicle_physics = re.sub(r"^export\s+", "", vehicle_physics, flags=re.MULTILINE)
+    bundled_weather = re.sub(r"^export\s+", "", weather, flags=re.MULTILINE)
     embedded_assets = {
         filename: data_uri(filename, media_type)
         for filename, media_type in ASSETS.items()
@@ -72,6 +77,8 @@ def main() -> None:
         + bundled_collision
         + "\n\n"
         + bundled_vehicle_physics
+        + "\n\n"
+        + bundled_weather
         + "\n\n"
         + game
     )

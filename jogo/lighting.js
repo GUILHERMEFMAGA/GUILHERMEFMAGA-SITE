@@ -24,29 +24,34 @@ export function getSunlight(elapsed, width, height, road) {
   };
 }
 
-function drawCurbsideLampPools(ctx, elapsed, height, road, night) {
+function drawCurbsideLampPools(ctx, elapsed, height, road, night, lampPosts) {
   if (night <= .015) return;
   const clock = Number.isFinite(elapsed) ? elapsed : 0;
-  const lampRows = 5;
-  const spacing = height / lampRows;
+  const defaultPosts = [];
+  if (!Array.isArray(lampPosts)) {
+    for (let row = 0; row < 5; row += 1) {
+      const y = (row + .5) * height / 5;
+      defaultPosts.push({ x: road.left - 18, y }, { x: road.right + 18, y });
+    }
+  }
+  const posts = Array.isArray(lampPosts) ? lampPosts : defaultPosts;
   const radius = 92;
-  const lampXPositions = [road.left - 18, road.right + 18];
 
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
-  for (let row = 0; row < lampRows; row += 1) {
-    const y = Math.round((row + .5) * spacing);
-    for (let side = 0; side < lampXPositions.length; side += 1) {
-      const x = Math.round(lampXPositions[side]);
-      const flicker = .96 + .04 * Math.sin(clock * .0017 + row * 1.31 + side * .73);
-      const pool = ctx.createRadialGradient(x, y, 3, x, y, radius);
-      pool.addColorStop(0, 'rgba(255, 208, 142, .42)');
-      pool.addColorStop(.38, 'rgba(255, 181, 108, .17)');
-      pool.addColorStop(1, 'rgba(255, 166, 89, 0)');
-      ctx.globalAlpha = night * .34 * flicker;
-      ctx.fillStyle = pool;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    }
+  for (let index = 0; index < posts.length; index += 1) {
+    const post = posts[index];
+    if (!post || !Number.isFinite(post.x) || !Number.isFinite(post.y)) continue;
+    const x = Math.round(post.x);
+    const y = Math.round(post.y);
+    const flicker = .96 + .04 * Math.sin(clock * .0017 + index * 1.31);
+    const pool = ctx.createRadialGradient(x, y, 3, x, y, radius);
+    pool.addColorStop(0, 'rgba(255, 208, 142, .42)');
+    pool.addColorStop(.38, 'rgba(255, 181, 108, .17)');
+    pool.addColorStop(1, 'rgba(255, 166, 89, 0)');
+    ctx.globalAlpha = night * .34 * flicker;
+    ctx.fillStyle = pool;
+    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
   }
   ctx.restore();
 }
@@ -109,10 +114,12 @@ export function drawStreetLighting(ctx, elapsed, width, height, road, scene = {}
   ctx.fillRect(road.left, 0, road.right - road.left, height);
 
   const roadCenter = (road.left + road.right) / 2;
-  const reflectedX = roadCenter + (sun.x - roadCenter) * .16;
-  const wetness = .22 + night * .34;
+  const wetness = .22 + night * .34 + clampLight(Number.isFinite(scene.rain) ? scene.rain : 0, 0, 1) * .28;
   for (let index = 0; index < 8; index += 1) {
     const y = (index * 137 + clock * .026) % height;
+    const centerSample = typeof scene.roadCenterAt === 'function' ? scene.roadCenterAt(y) : roadCenter;
+    const localCenter = Number.isFinite(centerSample) ? centerSample : roadCenter;
+    const reflectedX = localCenter + (sun.x - localCenter) * .16;
     const drift = Math.sin(clock * .0007 + index * 1.8) * 27;
     const pulse = .45 + .55 * Math.sin(clock * .002 + index * 1.4) ** 2;
     ctx.globalAlpha = wetness * (.38 + pulse * .42);
@@ -123,7 +130,7 @@ export function drawStreetLighting(ctx, elapsed, width, height, road, scene = {}
 
   // The map artwork already places matching lamp posts along both curbs;
   // these restrained pools make their warm light visible after dusk.
-  drawCurbsideLampPools(ctx, clock, height, road, night);
+  drawCurbsideLampPools(ctx, clock, height, road, night, scene.lampPosts);
 
   const barLight = scene.bar
     ? { x: width * .815, y: height * .555, intensity: .07 + night * .34 }

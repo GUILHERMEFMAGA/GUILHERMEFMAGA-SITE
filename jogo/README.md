@@ -1,6 +1,6 @@
 # Rua Vermelha — protótipo jogável
 
-A cena inicial usa `gta-retro.png` dentro desta pasta como arte de fundo: conserva o enquadramento, a rua, os prédios e o sedã da referência. A cópia original também permanece na raiz do repositório. A imagem não é modificada; o jogo cria uma cópia de trabalho em Canvas para poder mover o carro sem deixar rastro. O sedã usa uma máscara de alpha binário ajustada à silhueta, preservando o contorno sem recortar as laterais ou levar a sombra da rua junto. A Rua Vermelha, o Bairro do Mercado e a Rua do Bar formam três trechos conectados por portais no asfalto, com arquitetura aérea em pixel art, postes alinhados, fachadas e detalhes de calçada. A iluminação dinâmica acompanha o ciclo de dia/noite, com reflexos na rua, luzes quentes dos postes após o anoitecer e o brilho do letreiro do bar.
+A cena inicial usa `gta-retro.png` dentro desta pasta como arte de fundo: conserva o enquadramento, a rua, os prédios e o sedã da referência. A cópia original também permanece na raiz do repositório. A imagem não é modificada; o jogo cria uma cópia de trabalho em Canvas para poder mover o carro sem deixar rastro. O sedã usa uma máscara de alpha binário ajustada à silhueta, preservando o contorno sem recortar as laterais ou levar a sombra da rua junto. A Rua Vermelha, o Bairro do Mercado, a Rua do Bar, o Cruzamento da Estação e as Curvas do Bosque formam cinco trechos ligados em um circuito. A série mantém a arquitetura aérea em pixel art, inclui cruzamento transversal e curvas em S, postes alinhados, bancos, lixeiras e vegetação variada. A luz acompanha o ciclo de dia/noite; chuva, neblina, vento e folhas usam uma segunda camada climática determinística.
 
 ## Acesso direto (recomendado)
 
@@ -17,7 +17,7 @@ Também é possível iniciar um servidor estático na raiz do repositório e abr
 
 ## Versão autocontida
 
-Para gerar um único HTML que funciona sem servidor e inclui os três mapas, CSS e JavaScript:
+Para gerar um único HTML que funciona sem servidor e inclui os cinco mapas, CSS, JavaScript e efeitos climáticos:
 
 ```bash
 python3 jogo/build_offline.py

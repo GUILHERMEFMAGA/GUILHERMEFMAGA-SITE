@@ -1,6 +1,7 @@
 import { drawCarHighlights, drawStreetLighting } from './lighting.js';
 import { resolveVehicleMotion } from './collision.js';
 import { stepVehicle } from './vehicle-physics.js';
+import { drawWeather, getWeatherState } from './weather.js';
 
 const WIDTH = 1568;
 const HEIGHT = 960;
@@ -25,6 +26,9 @@ const CAR_PATCH = { x: 696, y: 340, width: 176, height: 300 };
 const CAR_PATCH_FEATHER = 18;
 const ROAD = { left: 548, right: 1018, center: 784, top: 0, bottom: HEIGHT };
 const ROAD_CLEARANCE = 8;
+const CURVE_ROAD_HALF_WIDTH = (ROAD.right - ROAD.left) / 2;
+const CURVE_SOURCE_HALF_WIDTH = 180;
+const CURVE_SWAY = 54;
 // Bounds follow the opaque hand-traced sedan silhouette, excluding transparent crop margins.
 const CAR_COLLIDER = Object.freeze({ halfWidth: 65, halfLength: 118 });
 const CAR_SPAWN = { x: 784, y: 485 };
@@ -138,7 +142,68 @@ function normalizeScene(image) {
   return reference;
 }
 
-function makeStreet(reference) {
+function widenRoadToReference(reference, centerAtY, sourceHalfWidth = CURVE_SOURCE_HALF_WIDTH) {
+  const expanded = document.createElement('canvas');
+  expanded.width = WIDTH;
+  expanded.height = HEIGHT;
+  const expandedContext = expanded.getContext('2d', { alpha: false });
+  expandedContext.imageSmoothingEnabled = false;
+  const targetHalfWidth = (ROAD.right - ROAD.left) / 2;
+  const sampleEdges = (y) => {
+    const centerSample = centerAtY(y);
+    const requestedCenter = Number.isFinite(centerSample) ? centerSample : ROAD.center;
+    const minCenter = Math.max(sourceHalfWidth, targetHalfWidth) + 1;
+    const center = clamp(requestedCenter, minCenter, WIDTH - minCenter);
+    return {
+      sourceLeft: Math.round(center - sourceHalfWidth),
+      sourceRight: Math.round(center + sourceHalfWidth),
+      targetLeft: Math.round(center - targetHalfWidth),
+      targetRight: Math.round(center + targetHalfWidth),
+    };
+  };
+  const sameEdges = (a, b) => a && b
+    && a.sourceLeft === b.sourceLeft && a.sourceRight === b.sourceRight
+    && a.targetLeft === b.targetLeft && a.targetRight === b.targetRight;
+
+  // Expand only the road band and gently compress the sidewalks. Reuse each
+  // quantized horizontal transform for its full row run to keep loading cheap.
+  let bandY = 0;
+  let bandEdges = sampleEdges(0);
+  for (let y = 1; y <= HEIGHT; y += 1) {
+    const nextEdges = y < HEIGHT ? sampleEdges(y) : null;
+    if (sameEdges(bandEdges, nextEdges)) continue;
+    const bandHeight = y - bandY;
+    expandedContext.drawImage(reference, 0, bandY, bandEdges.sourceLeft, bandHeight, 0, bandY, bandEdges.targetLeft, bandHeight);
+    expandedContext.drawImage(
+      reference,
+      bandEdges.sourceLeft,
+      bandY,
+      bandEdges.sourceRight - bandEdges.sourceLeft,
+      bandHeight,
+      bandEdges.targetLeft,
+      bandY,
+      bandEdges.targetRight - bandEdges.targetLeft,
+      bandHeight,
+    );
+    expandedContext.drawImage(
+      reference,
+      bandEdges.sourceRight,
+      bandY,
+      WIDTH - bandEdges.sourceRight,
+      bandHeight,
+      bandEdges.targetRight,
+      bandY,
+      WIDTH - bandEdges.targetRight,
+      bandHeight,
+    );
+    bandY = y;
+    bandEdges = nextEdges;
+  }
+  return expanded;
+}
+
+function makeStreet(reference, removeReferenceSedan = false) {
+  if (!removeReferenceSedan) return reference;
   const background = document.createElement('canvas');
   background.width = WIDTH;
   background.height = HEIGHT;
@@ -245,17 +310,95 @@ function makeCarSprite(reference) {
   return sprite;
 }
 
+function curveRoadCenterX(y) {
+  const progress = clamp(y / HEIGHT, 0, 1);
+  return ROAD.center - CURVE_SWAY * Math.sin(progress * Math.PI * 2);
+}
+
+function createCurvedLampPosts() {
+  const posts = [];
+  for (let row = 0; row < 5; row += 1) {
+    const y = (row + .5) * HEIGHT / 5;
+    const offset = CURVE_ROAD_HALF_WIDTH + 20;
+    const center = curveRoadCenterX(y);
+    posts.push({ x: center - offset, y }, { x: center + offset, y });
+  }
+  return posts;
+}
+
+function createCurvedRoadCurbs(sectionIndex) {
+  const colliders = [];
+  const slices = 12;
+  const sliceHeight = HEIGHT / slices;
+  for (let slice = 0; slice < slices; slice += 1) {
+    const y = slice * sliceHeight;
+    const nextY = Math.min(HEIGHT, y + sliceHeight);
+    const startCenter = curveRoadCenterX(y);
+    const endCenter = curveRoadCenterX(nextY);
+    const westStart = startCenter - CURVE_ROAD_HALF_WIDTH;
+    const westEnd = endCenter - CURVE_ROAD_HALF_WIDTH;
+    const eastStart = startCenter + CURVE_ROAD_HALF_WIDTH - ROAD_CLEARANCE;
+    const eastEnd = endCenter + CURVE_ROAD_HALF_WIDTH - ROAD_CLEARANCE;
+    colliders.push(
+      {
+        id: `section-${sectionIndex}-west-curb-${slice}`,
+        kind: 'curb',
+        x: Math.min(westStart, westEnd) - ROAD_CLEARANCE / 2,
+        y,
+        width: Math.abs(westEnd - westStart) + ROAD_CLEARANCE,
+        height: nextY - y,
+        stepHeight: 6,
+      },
+      {
+        id: `section-${sectionIndex}-east-curb-${slice}`,
+        kind: 'curb',
+        x: Math.min(eastStart, eastEnd),
+        y,
+        width: Math.abs(eastEnd - eastStart) + ROAD_CLEARANCE,
+        height: nextY - y,
+        stepHeight: 6,
+      },
+    );
+  }
+  return colliders;
+}
+
+function createSectionCurbs(index) {
+  if (index === 4) return createCurvedRoadCurbs(index);
+  if (index === 3) {
+    const crossStreetTop = Math.round(HEIGHT * .39);
+    const crossStreetBottom = Math.round(HEIGHT * .61);
+    const westTop = ROAD.left;
+    const eastTop = ROAD.right;
+    const crosswalkCurbs = [];
+    for (const [row, y] of [['north', crossStreetTop], ['south', crossStreetBottom - ROAD_CLEARANCE]]) {
+      crosswalkCurbs.push(
+        { id: `section-${index}-cross-curb-west-${row}`, kind: 'curb', x: 0, y, width: westTop, height: ROAD_CLEARANCE, stepHeight: 6 },
+        { id: `section-${index}-cross-curb-east-${row}`, kind: 'curb', x: eastTop, y, width: WIDTH - eastTop, height: ROAD_CLEARANCE, stepHeight: 6 },
+      );
+    }
+    return [
+      { id: `section-${index}-west-curb-north`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT + crossStreetTop, stepHeight: 6 },
+      { id: `section-${index}-west-curb-south`, kind: 'curb', x: ROAD.left, y: crossStreetBottom, width: ROAD_CLEARANCE, height: HEIGHT * 2, stepHeight: 6 },
+      { id: `section-${index}-east-curb-north`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT + crossStreetTop, stepHeight: 6 },
+      { id: `section-${index}-east-curb-south`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: crossStreetBottom, width: ROAD_CLEARANCE, height: HEIGHT * 2, stepHeight: 6 },
+      ...crosswalkCurbs,
+    ];
+  }
+  return [
+    { id: `section-${index}-west-curb`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
+    { id: `section-${index}-east-curb`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
+  ];
+}
+
 function createSectionColliders(index) {
   const colliders = [
     { id: `section-${index}-west-world-edge`, kind: 'barrier', x: -32, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
     { id: `section-${index}-east-world-edge`, kind: 'barrier', x: WIDTH, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
-    // A narrow, low curb marks the road lip. The solver reports it as a soft
-    // suspension event so the car can roll onto the sidewalk instead of sticking.
-    { id: `section-${index}-west-curb`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
-    { id: `section-${index}-east-curb`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
+    ...createSectionCurbs(index),
   ];
 
-  // Open north/south portals connect all three streets into a closed route;
+  // Open north/south portals connect all five map tiles into a closed route;
   // solid footprints still protect buildings beside the sidewalk.
   if (index < 2) {
     colliders.push(
@@ -279,18 +422,61 @@ function createSectionColliders(index) {
       { id: 'bar-patio-planter-south', kind: 'prop', x: 1082, y: 567, width: 24, height: 26 },
     );
   }
+
+  if (index === 3) {
+    colliders.push(
+      { id: 'junction-building-northwest', kind: 'building', x: 0, y: 0, width: 468, height: 294 },
+      { id: 'junction-building-northeast', kind: 'building', x: 1115, y: 0, width: 453, height: 292 },
+      { id: 'junction-building-southwest', kind: 'building', x: 0, y: 646, width: 468, height: 314 },
+      { id: 'junction-building-southeast', kind: 'building', x: 1115, y: 646, width: 453, height: 314 },
+      { id: 'junction-bench-northwest', kind: 'prop', x: 274, y: 326, width: 54, height: 18 },
+      { id: 'junction-trash-northwest', kind: 'prop', x: 358, y: 326, width: 22, height: 24 },
+      { id: 'junction-planter-southeast', kind: 'prop', x: 1120, y: 584, width: 32, height: 34 },
+      { id: 'junction-bench-southeast', kind: 'prop', x: 1210, y: 584, width: 54, height: 18 },
+    );
+  }
+
+  if (index === 4) {
+    colliders.push(
+      { id: 'curve-building-northwest', kind: 'building', x: 0, y: 0, width: 418, height: 262 },
+      { id: 'curve-building-northeast', kind: 'building', x: 1160, y: 0, width: WIDTH - 1160, height: 270 },
+      { id: 'curve-building-west-middle', kind: 'building', x: 0, y: 294, width: 408, height: 332 },
+      { id: 'curve-building-east-middle', kind: 'building', x: 1180, y: 288, width: WIDTH - 1180, height: 350 },
+      { id: 'curve-building-southwest', kind: 'building', x: 0, y: 686, width: 438, height: HEIGHT - 686 },
+      { id: 'curve-building-southeast', kind: 'building', x: 1162, y: 678, width: WIDTH - 1162, height: HEIGHT - 678 },
+      { id: 'curve-plaza-bench-1', kind: 'prop', x: 1092, y: 194, width: 52, height: 18 },
+      { id: 'curve-plaza-bin-1', kind: 'prop', x: 1048, y: 186, width: 22, height: 26 },
+      { id: 'curve-plaza-bench-2', kind: 'prop', x: 1092, y: 238, width: 52, height: 18 },
+      { id: 'curve-plaza-bin-2', kind: 'prop', x: 1048, y: 232, width: 22, height: 26 },
+    );
+  }
   return colliders;
 }
 
-function finishLoading(image, marketImage = null, streetThreeImage = null) {
+function finishLoading(image, marketImage = null, barImage = null, junctionImage = null, curveImage = null) {
   const reference = normalizeScene(image);
   const marketReference = normalizeScene(marketImage || fallbackScene());
-  const streetThreeReference = normalizeScene(streetThreeImage || fallbackScene());
+  const barReference = normalizeScene(barImage || fallbackScene());
+  const junctionReference = normalizeScene(junctionImage || fallbackScene());
+  const curveReference = normalizeScene(curveImage || fallbackScene());
   sections.length = 0;
   sections.push(
-    { name: 'RUA VERMELHA', background: makeStreet(reference), colliders: createSectionColliders(0) },
-    { name: 'BAIRRO DO MERCADO', background: makeStreet(marketReference), colliders: createSectionColliders(1) },
-    { name: 'RUA DO BAR', background: makeStreet(streetThreeReference), colliders: createSectionColliders(2) },
+    { name: 'RUA VERMELHA', background: makeStreet(reference, true), colliders: createSectionColliders(0) },
+    { name: 'BAIRRO DO MERCADO', background: marketReference, colliders: createSectionColliders(1) },
+    { name: 'RUA DO BAR', background: barReference, colliders: createSectionColliders(2) },
+    {
+      name: 'CRUZAMENTO DA ESTAÇÃO',
+      background: widenRoadToReference(junctionReference, () => ROAD.center),
+      colliders: createSectionColliders(3),
+    },
+    {
+      name: 'CURVAS DO BOSQUE',
+      background: widenRoadToReference(curveReference, curveRoadCenterX),
+      colliders: createSectionColliders(4),
+      lampPosts: createCurvedLampPosts(),
+      lightingRoad: { ...ROAD, left: ROAD.left - CURVE_SWAY, right: ROAD.right + CURVE_SWAY },
+      roadCenterAt: curveRoadCenterX,
+    },
   );
   state.section = 0;
   streetCanvas = sections[0].background;
@@ -930,6 +1116,23 @@ function drawTarget(target) {
 }
 
 function drawHud() {
+  const weather = getWeatherState(elapsed);
+  const weatherLabel = {
+    breeze: 'VENTO',
+    drizzle: 'GAROA',
+    rain: 'CHUVA',
+    mist: 'NEBLINA',
+  }[weather.kind];
+  if (weatherLabel) {
+    ctx.fillStyle = 'rgba(9, 12, 10, .72)';
+    ctx.fillRect(WIDTH / 2 - 72, 19, 144, 26);
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.fillStyle = weather.kind === 'rain' || weather.kind === 'drizzle' ? '#a8c8d4' : '#c9bd83';
+    ctx.textAlign = 'center';
+    ctx.fillText(`CLIMA · ${weatherLabel}`, WIDTH / 2, 36);
+    ctx.textAlign = 'left';
+  }
+
   if (state.mission) {
     const mission = missions[state.mission.index];
     ctx.fillStyle = 'rgba(9, 12, 10, .72)';
@@ -1029,7 +1232,14 @@ function render(interpolation = 1) {
   ctx.save();
   ctx.translate(shakeX, shakeY);
   ctx.drawImage(streetCanvas, 0, 0);
-  const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, ROAD, { bar: state.section === 2 });
+  const section = sections[state.section];
+  const weather = getWeatherState(elapsed);
+  const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, section?.lightingRoad || ROAD, {
+    bar: state.section === 2,
+    lampPosts: section?.lampPosts,
+    roadCenterAt: section?.roadCenterAt,
+    rain: weather.rain,
+  });
 
   // Atividades e pedestres permanecem no primeiro quarteirão, onde foram posicionados.
   if (state.section === 0 && (!state.driving || state.mission)) {
@@ -1044,6 +1254,7 @@ function render(interpolation = 1) {
   drawPlayerCar(renderCar);
   drawCarHighlights(ctx, renderCar, sunlight);
   if (!state.driving) drawPerson(state.foot, true);
+  drawWeather(ctx, elapsed, WIDTH, HEIGHT, weather);
   drawHud();
   drawInteractionPrompt();
   ctx.restore();
@@ -1222,13 +1433,15 @@ function loadImageAsset(filename) {
 
 async function startLoading() {
   try {
-    const [mainScene, marketScene, streetThreeScene] = await Promise.all([
+    const [mainScene, marketScene, barScene, junctionScene, curveScene] = await Promise.all([
       loadImageAsset('gta-retro.png'),
       loadImageAsset('rua-segmento-02.png'),
       loadImageAsset('rua-segmento-03.png'),
+      loadImageAsset('rua-segmento-04.png'),
+      loadImageAsset('rua-segmento-05.png'),
     ]);
-    finishLoading(mainScene || fallbackScene(), marketScene, streetThreeScene);
-    if (!mainScene || !marketScene || !streetThreeScene) {
+    finishLoading(mainScene || fallbackScene(), marketScene, barScene, junctionScene, curveScene);
+    if (![mainScene, marketScene, barScene, junctionScene, curveScene].every(Boolean)) {
       showToast('UM TRECHO ESTÁ INDISPONÍVEL · USANDO CENA DE CONTINGÊNCIA');
     }
   } catch (error) {

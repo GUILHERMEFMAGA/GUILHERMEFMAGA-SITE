@@ -70,6 +70,35 @@ test('aligned curbside lamps cast warm pools at night and fade out at noon', () 
   assert.equal(dayCtx.stack.length, 0);
 });
 
+test('rain increases the street reflections without changing daytime sun values', () => {
+  const dryContext = new ContextStub();
+  const wetContext = new ContextStub();
+  const dry = drawStreetLighting(dryContext, 75_000, 1568, 960, road);
+  const wet = drawStreetLighting(wetContext, 75_000, 1568, 960, road, { rain: .9 });
+  assert.equal(wet.intensity, dry.intensity);
+  assert.ok(wetContext.fillRects[2].alpha > dryContext.fillRects[2].alpha);
+  assert.equal(wetContext.stack.length, 0);
+});
+
+test('asphalt glints can follow a curved road centerline', () => {
+  const straightContext = new ContextStub();
+  const curveContext = new ContextStub();
+  drawStreetLighting(straightContext, 75_000, 1568, 960, road);
+  drawStreetLighting(curveContext, 75_000, 1568, 960, road, { roadCenterAt: () => 900 });
+  assert.notEqual(curveContext.fillRects[2].rect[0], straightContext.fillRects[2].rect[0]);
+  assert.equal(curveContext.stack.length, 0);
+});
+
+test('streetlamp pools accept map-specific positions for curved sidewalks', () => {
+  const ctx = new ContextStub();
+  const lampPosts = [{ x: 470, y: 180 }, { x: 1090, y: 780 }];
+  drawStreetLighting(ctx, 0, 1568, 960, road, { lampPosts });
+  assert.equal(ctx.fillRects.length, 12);
+  assert.ok(ctx.fillRects.some(({ rect }) => rect[0] === 378 && rect[1] === 88));
+  assert.ok(ctx.fillRects.some(({ rect }) => rect[0] === 998 && rect[1] === 688));
+  assert.equal(ctx.stack.length, 0);
+});
+
 test('bar neon adds warm facade glow and road reflections without leaking canvas state', () => {
   const ctx = new ContextStub();
   const result = drawStreetLighting(ctx, 75_000, 1568, 960, road, { bar: true });
