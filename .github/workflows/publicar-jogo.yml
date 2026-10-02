@@ -1,0 +1,75 @@
+name: Publicar Cidade Dourada
+
+on:
+  push:
+    branches: [arena/01a0fa4c-guilhermefmaga-site]
+    paths: ['jogo/**', '.github/workflows/publicar-jogo.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Montar o site
+        run: |
+          mkdir -p _site
+          cp -r jogo/* _site/
+
+      - name: Publicar no surge.sh (domínio próprio)
+        continue-on-error: true
+        run: |
+          set +e
+          npm i -g surge --silent
+          LOGIN="cidade-dourada-jogo@arena-agent.pub"
+          PASS="cidade-dourada-2026"
+          TOKEN=$(curl -s -m 20 -u "$LOGIN:$PASS" https://surge.surge.sh/token)
+          echo "token obtido: ${TOKEN:0:6}..."
+          SURGE_TOKEN="$TOKEN" surge ./_site cidade-dourada-jogo.surge.sh --quiet || \
+          SURGE_TOKEN="$TOKEN" npx surge ./_site cidade-dourada-jogo.surge.sh
+          echo "SURGE_OK=$?" >> $GITHUB_ENV
+
+      - name: Verificar todos os links públicos
+        env:
+          REPO: GUILHERMEFMAGA/GUILHERMEFMAGA-SITE
+        run: |
+          SHA="${GITHUB_SHA}"
+          OUT="LINKS-DO-JOGO.md"
+          {
+            echo "# 🔗 Links para jogar — CIDADE DOURADA"
+            echo
+            echo "_verificado em $(date -u '+%Y-%m-%d %H:%M UTC') pelo GitHub Actions (commit ${SHA:0:7})_"
+            echo
+            echo "| Link | Status | Tipo | Jogo carrega? |"
+            echo "|---|---|---|---|"
+          } > "$OUT"
+          testar() {
+            local nome="$1" url="$2"
+            local r code tipo tam marca
+            r=$(curl -sS -L -o /tmp/s.html -m 40 -w "%{http_code}|%{content_type}|%{size_download}" "$url" 2>/dev/null || echo "000||0")
+            code=$(echo "$r" | cut -d'|' -f1); tipo=$(echo "$r" | cut -d'|' -f2 | cut -d';' -f1); tam=$(echo "$r" | cut -d'|' -f3)
+            marca="não"
+            grep -qi "CIDADE DOURADA\|CIDADE<span>DOURADA\|CIDADE</span>DOURADA" /tmp/s.html 2>/dev/null && marca="**SIM ✔**"
+            echo "| [$nome]($url) | $code | $tipo | $marca ($tam bytes) |" >> "$OUT"
+          }
+          testar "surge.sh (domínio limpo)"        "https://cidade-dourada-jogo.surge.sh/"
+          testar "jsDelivr (arquivo único)"        "https://cdn.jsdelivr.net/gh/$REPO@$SHA/jogo/dist/cidade-dourada.html"
+          testar "jsDelivr (multi-arquivo)"        "https://cdn.jsdelivr.net/gh/$REPO@$SHA/jogo/index.html"
+          testar "raw.githack (multi-arquivo)"     "https://raw.githack.com/$REPO/$SHA/jogo/index.html"
+          testar "statically.io (multi-arquivo)"   "https://cdn.statically.io/gh/$REPO/$SHA/jogo/index.html"
+          testar "htmlpreview (arquivo único)"     "https://htmlpreview.github.io/?https://github.com/$REPO/blob/$SHA/jogo/dist/cidade-dourada.html"
+          echo >> "$OUT"
+          echo "**Melhor escolha:** o primeiro link da tabela com status 200 e \"Jogo carrega? = SIM\"." >> "$OUT"
+          cat "$OUT"
+
+      - name: Devolver o resultado para o repositório
+        run: |
+          git config user.name "arena-bot"
+          git config user.email "arena-bot@users.noreply.github.com"
+          git add LINKS-DO-JOGO.md
+          git commit -q -m "docs: tabela de links verificados do jogo [skip ci]" || echo "nada para commitar"
+          git push -q origin HEAD:arena/01a0fa4c-guilhermefmaga-site || echo "push falhou"
