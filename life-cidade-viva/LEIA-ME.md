@@ -9,6 +9,18 @@ e a polícia respondendo a ocorrências.
 
 ---
 
+## ▶ Jogar agora (links permanentes)
+
+| Como | Link | Observação |
+|---|---|---|
+| **Jogar no navegador** | https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/1382a02a69c9b8796e43a993384eb1d3376a6a14/LIFE-CIDADE-VIVA.html | Abre e roda direto, sem baixar nada (verificado: `text/html`, 255 KB) |
+| **Baixar o arquivo** | https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html | Baixa o HTML único — dois cliques e joga offline |
+| **Servidor local** | `python serve.py 8137` → http://localhost:8137 | Para desenvolvimento |
+
+> O arquivo `LIFE-CIDADE-VIVA.html` é o jogo **inteiro** em um só arquivo:
+> não precisa de servidor, instalação nem internet.
+
+
 ## ▶ Como jogar
 
 **Do jeito mais simples:** abra `index.html` com dois cliques (Chrome, Edge ou Firefox).
