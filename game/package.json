@@ -1,0 +1,8 @@
+{
+  "name": "the-ashen-way",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

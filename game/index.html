@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090c13" />
+    <meta name="description" content="The Ashen Way — a procedural first-person dark fantasy world rendered in low-resolution WebGL." />
+    <title>The Ashen Way — A First-Person Pixel-Fantasy Prototype</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./src/main.js"></script>
+  </head>
+  <body>
+    <main class="game-shell" id="gameShell">
+      <canvas id="worldCanvas" tabindex="0" aria-label="First-person view of a foggy forest road leading to a gothic castle"></canvas>
+      <div class="atmosphere" aria-hidden="true"></div>
+      <div class="screen-grain" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="The Ashen Way home" id="brandLink">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 38" fill="none">
+              <path d="M16 2 28 7v10c0 8-4.5 14-12 19C8.5 31 4 25 4 17V7L16 2Z" stroke="currentColor" stroke-width="1.3" />
+              <path d="M16 8v17M10.5 13.5h11M12 29l4-4 4 4M9 8l7-3 7 3" stroke="currentColor" stroke-width="1.1" />
+              <path d="M14.3 14h3.4v7h-3.4z" fill="currentColor" opacity=".75" />
+            </svg>
+          </span>
+          <span class="brand-copy">
+            <strong>THE ASHEN WAY</strong>
+            <small>FIELD TEST · 01</small>
+          </span>
+        </a>
+
+        <div class="topbar-status">
+          <span class="status-led" id="statusLed"></span>
+          <span id="engineStatus">WORLD STANDING BY</span>
+          <span class="topbar-divider"></span>
+          <span class="engine-version">PROCEDURAL ENGINE <b>0.1</b></span>
+          <span class="topbar-divider"></span>
+          <span class="engine-version" id="fpsReadout">-- FPS</span>
+        </div>
+      </header>
+
+      <div class="corner-coordinate" aria-hidden="true">
+        <span>ASHEN MARCHES</span>
+        <span>45° 12′ N · 07° 41′ E</span>
+      </div>
+
+      <section class="intro-card" id="introCard" aria-labelledby="gameTitle">
+        <div class="eyebrow"><span></span> A PROCEDURAL FIRST-PERSON WORLD</div>
+        <h1 id="gameTitle">THE<br /><em>ASHEN WAY</em></h1>
+        <div class="intro-rule"><span></span><i>✦</i><span></span></div>
+        <p class="intro-copy">A road without footprints.<br />A keep that remembers every traveler.</p>
+        <button class="enter-button" id="startButton" type="button">
+          <span>STEP INTO THE WOODS</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 10h13M10 4l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+        </button>
+        <div class="intro-foot"><span>NO MAP. NO MERCY.</span><span>EST. IN THE DUSK</span></div>
+      </section>
+
+      <section class="journey-card" id="journeyCard" aria-label="Journey progress" aria-live="polite">
+        <div class="journey-heading"><span class="eyebrow-small">YOUR DESTINATION</span><span class="target-icon" aria-hidden="true">⌖</span></div>
+        <strong class="destination">THE BLACK KEEP</strong>
+        <div class="journey-distance"><span id="distanceReadout">84</span><small>M TO GATE</small></div>
+        <div class="progress-track" role="progressbar" aria-label="Progress to the castle" aria-valuemin="0" aria-valuemax="78" aria-valuenow="0" id="journeyProgress">
+          <span id="progressFill"></span>
+          <i class="progress-marker"></i>
+        </div>
+        <div class="journey-foot"><span id="stageReadout">THE WOODLINE</span><span id="detailReadout">DISTANT SILHOUETTE</span></div>
+      </section>
+
+      <div class="reticle" id="reticle" aria-hidden="true"><i></i><span></span></div>
+
+      <div class="controls-strip" id="controlsStrip">
+        <span class="control-note" id="controlNote"><b>W A S D</b> MOVE <i></i> <b>MOUSE</b> LOOK <i></i> <b>SHIFT</b> RUN</span>
+        <button class="look-button" id="lookButton" type="button" title="Capture mouse look">
+          <span class="look-icon" aria-hidden="true">◎</span><span id="lookLabel">CLICK TO LOOK</span>
+        </button>
+        <button class="reset-button" id="resetButton" type="button" aria-label="Restart the walk" title="Restart the walk">↺</button>
+      </div>
+
+      <nav class="touch-controls" id="touchControls" aria-label="Touch movement controls">
+        <div class="touch-cluster move-cluster">
+          <button type="button" data-action="forward" aria-label="Move forward">↑</button>
+          <div><button type="button" data-action="left" aria-label="Move left">←</button><button type="button" data-action="back" aria-label="Move backward">↓</button><button type="button" data-action="right" aria-label="Move right">→</button></div>
+        </div>
+        <button class="sprint-touch" type="button" data-action="sprint" aria-label="Sprint">RUN</button>
+      </nav>
+
+      <div class="bottom-stamp" aria-hidden="true"><span>AN UNFINISHED KINGDOM</span><span>WORLD SEED · 1907</span></div>
+
+      <section class="pause-screen" id="pauseScreen" aria-labelledby="pauseTitle" hidden>
+        <div class="pause-panel">
+          <div class="eyebrow"><span></span> THE ROAD CAN WAIT</div>
+          <h2 id="pauseTitle">BREATH,<br /><em>KNIGHT.</em></h2>
+          <p>Your place on the road is held. The mist is not.</p>
+          <button class="enter-button" id="resumeButton" type="button"><span>RETURN TO THE ROAD</span><span aria-hidden="true">↗</span></button>
+          <button class="quiet-button" id="pauseResetButton" type="button">BEGIN THE WALK AGAIN</button>
+        </div>
+      </section>
+
+      <section class="error-screen" id="errorScreen" hidden role="alert">
+        <div class="error-panel">
+          <span class="error-glyph">!</span>
+          <p class="eyebrow-small">ENGINE INITIALIZATION FAILED</p>
+          <h2>The gate would not open.</h2>
+          <p id="errorMessage">This prototype needs a browser with WebGL 2 enabled.</p>
+          <p class="error-help">Try a current version of Chrome, Firefox, Edge, or Safari with hardware acceleration enabled.</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
