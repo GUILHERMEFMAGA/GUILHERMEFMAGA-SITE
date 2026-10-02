@@ -74,3 +74,15 @@ test('invalid surfaces are ignored safely', () => {
   assert.equal(drawWeather(null, 0, 1568, 960, weather), weather);
   assert.equal(drawWeather(new ContextStub(), 0, 0, 960, weather), weather);
 });
+
+test('weather overlay restores canvas state when a draw operation throws', () => {
+  const context = new ContextStub();
+  context.fillRect = () => { throw new Error('simulated canvas failure'); };
+  assert.throws(
+    () => drawWeather(context, CYCLE * .51, 1568, 960, getWeatherState(CYCLE * .51)),
+    /simulated canvas failure/,
+  );
+  assert.equal(context.stack.length, 0);
+  assert.equal(context.globalAlpha, 1);
+  assert.equal(context.globalCompositeOperation, 'source-over');
+});

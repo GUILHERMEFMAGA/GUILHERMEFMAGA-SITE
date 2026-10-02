@@ -53,38 +53,41 @@ export function drawWeather(ctx, elapsed, width, height, weather = getWeatherSta
   if (rain < .005 && fog < .005 && wind < .36) return weather;
 
   ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
-  if (fog > .005) {
-    ctx.globalAlpha = fog * .16;
-    ctx.fillStyle = '#c5c8bf';
-    ctx.fillRect(0, 0, width, height);
-  }
-
-  if (rain > .005) {
-    ctx.globalAlpha = .22 + rain * .28;
-    ctx.fillStyle = '#c6d6df';
-    const count = Math.round(200 * rain);
-    const drift = Math.floor(clock * (.012 + wind * .038));
-    const fall = Math.floor(clock * .72);
-    for (let index = 0; index < count; index += 1) {
-      const x = wrap(index * 197 + drift, width);
-      const y = wrap(index * 283 + fall, height);
-      ctx.fillRect(x, y, index % 9 === 0 ? 2 : 1, 4 + (index % 4));
+  try {
+    ctx.globalCompositeOperation = 'source-over';
+    if (fog > .005) {
+      ctx.globalAlpha = fog * .16;
+      ctx.fillStyle = '#c5c8bf';
+      ctx.fillRect(0, 0, width, height);
     }
-  }
 
-  const leafCount = wind < .36 ? 0 : Math.round(18 * ((wind - .36) / .64) * (1 - rain * .72));
-  const leafColors = ['#a3a45d', '#bd8050', '#778c54', '#b6a05d'];
-  ctx.globalAlpha = .72;
-  for (let index = 0; index < leafCount; index += 1) {
-    const drift = Math.floor(clock * (.018 + wind * .09));
-    const fall = Math.floor(clock * (.025 + wind * .035));
-    const x = wrap(index * 113 + drift, width);
-    const y = wrap(index * 157 + fall, height);
-    ctx.fillStyle = leafColors[index % leafColors.length];
-    ctx.fillRect(x, y, 3, 1);
-    ctx.fillRect(wrap(x + 1, width), wrap(y + 1, height), 1, 2);
+    if (rain > .005) {
+      ctx.globalAlpha = .22 + rain * .28;
+      ctx.fillStyle = '#c6d6df';
+      const count = Math.round(200 * rain);
+      const drift = Math.floor(clock * (.012 + wind * .038));
+      const fall = Math.floor(clock * .72);
+      for (let index = 0; index < count; index += 1) {
+        const x = wrap(index * 197 + drift, width);
+        const y = wrap(index * 283 + fall, height);
+        ctx.fillRect(x, y, index % 9 === 0 ? 2 : 1, 4 + (index % 4));
+      }
+    }
+
+    const leafCount = wind < .36 ? 0 : Math.round(18 * ((wind - .36) / .64) * (1 - rain * .72));
+    const leafColors = ['#a3a45d', '#bd8050', '#778c54', '#b6a05d'];
+    ctx.globalAlpha = .72;
+    for (let index = 0; index < leafCount; index += 1) {
+      const drift = Math.floor(clock * (.018 + wind * .09));
+      const fall = Math.floor(clock * (.025 + wind * .035));
+      const x = wrap(index * 113 + drift, width);
+      const y = wrap(index * 157 + fall, height);
+      ctx.fillStyle = leafColors[index % leafColors.length];
+      ctx.fillRect(x, y, 3, 1);
+      ctx.fillRect(wrap(x + 1, width), wrap(y + 1, height), 1, 2);
+    }
+  } finally {
+    ctx.restore();
   }
-  ctx.restore();
   return weather;
 }

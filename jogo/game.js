@@ -37,12 +37,66 @@ const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(maximum, v
 const distance = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 const moneyText = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
 
+let fatalErrorShown = false;
+
+function showFatalError(message, error = null) {
+  if (fatalErrorShown) return;
+  fatalErrorShown = true;
+  console.error(message, error || '');
+  try {
+    const overlay = document.querySelector('#loading');
+    if (overlay) {
+      overlay.classList.remove('is-ready');
+      overlay.classList.add('is-error');
+      overlay.textContent = message;
+    } else if (document.body) {
+      const notice = document.createElement('div');
+      notice.className = 'game-error';
+      notice.textContent = message;
+      notice.style.cssText = 'position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:24px;background:#0d100e;color:#f0b7a3;font:14px/1.6 monospace;text-align:center';
+      document.body.append(notice);
+    }
+  } catch (displayError) {
+    console.error('Não foi possível exibir a mensagem de erro do jogo:', displayError);
+  }
+}
+
+function getCanvasContext(surface, options, label) {
+  let context;
+  try {
+    context = surface?.getContext?.('2d', options) || null;
+  } catch (error) {
+    const wrappedError = new Error(`Falha ao preparar o Canvas 2D (${label}).`);
+    wrappedError.cause = error;
+    throw wrappedError;
+  }
+  if (!context) throw new Error(`Canvas 2D indisponível (${label}).`);
+  return context;
+}
+
+const REQUIRED_GAME_ELEMENTS = ['#game', '#loading', '#hint', '#toast', '#helpPanel', '#helpButton', '#closeHelp', '#resumeButton'];
+const missingElements = REQUIRED_GAME_ELEMENTS.filter((selector) => !document.querySelector(selector));
+if (missingElements.length) {
+  const error = new Error(`Elementos necessários ausentes: ${missingElements.join(', ')}`);
+  showFatalError('NÃO FOI POSSÍVEL INICIAR O JOGO. ATUALIZE A PÁGINA OU USE A VERSÃO MAIS RECENTE.');
+  throw error;
+}
+
 const canvas = document.querySelector('#game');
-const ctx = canvas.getContext('2d', { alpha: false });
+let ctx;
+try {
+  ctx = getCanvasContext(canvas, { alpha: false }, 'canvas principal');
+} catch (error) {
+  showFatalError('SEU NAVEGADOR NÃO DISPONIBILIZOU O CANVAS NECESSÁRIO PARA O JOGO.', error);
+  throw error;
+}
 const loading = document.querySelector('#loading');
 const hint = document.querySelector('#hint');
 const toastElement = document.querySelector('#toast');
 const helpPanel = document.querySelector('#helpPanel');
+const scheduleFrame = typeof window.requestAnimationFrame === 'function'
+  ? window.requestAnimationFrame.bind(window)
+  : (callback) => window.setTimeout(() => callback(Date.now()), 16);
 const keys = new Set();
 const pressed = new Set();
 const policeCars = [];
@@ -57,17 +111,14 @@ let sirenOscillator = null;
 let sirenGain = null;
 let lastFrame = null;
 let simulationAccumulator = 0;
-let hintTimer = 0;
 let toastTimer = 0;
 let radioTimer = 0;
 let radioStep = 0;
-let toastMessage = '';
 let soundEnabled = false;
 let paused = false;
+let runtimeFault = false;
 let elapsed = 0;
 let wantedQuiet = 0;
-let nearPoliceTime = 0;
-let rainDust = [];
 
 const phone = { x: 1100, y: 523 };
 const radioTracks = [
@@ -136,7 +187,7 @@ function normalizeScene(image) {
   const reference = document.createElement('canvas');
   reference.width = WIDTH;
   reference.height = HEIGHT;
-  const referenceContext = reference.getContext('2d', { alpha: false });
+  const referenceContext = getCanvasContext(reference, { alpha: false }, 'cena normalizada');
   referenceContext.imageSmoothingEnabled = false;
   referenceContext.drawImage(image, 0, 0, WIDTH, HEIGHT);
   return reference;
@@ -146,7 +197,7 @@ function widenRoadToReference(reference, centerAtY, sourceHalfWidth = CURVE_SOUR
   const expanded = document.createElement('canvas');
   expanded.width = WIDTH;
   expanded.height = HEIGHT;
-  const expandedContext = expanded.getContext('2d', { alpha: false });
+  const expandedContext = getCanvasContext(expanded, { alpha: false }, 'faixa de rolamento');
   expandedContext.imageSmoothingEnabled = false;
   const targetHalfWidth = (ROAD.right - ROAD.left) / 2;
   const sampleEdges = (y) => {
@@ -207,7 +258,7 @@ function makeStreet(reference, removeReferenceSedan = false) {
   const background = document.createElement('canvas');
   background.width = WIDTH;
   background.height = HEIGHT;
-  const backgroundContext = background.getContext('2d', { alpha: false });
+  const backgroundContext = getCanvasContext(background, { alpha: false }, 'fundo da rua');
   backgroundContext.imageSmoothingEnabled = false;
   backgroundContext.drawImage(reference, 0, 0);
 
@@ -216,7 +267,7 @@ function makeStreet(reference, removeReferenceSedan = false) {
   const patch = document.createElement('canvas');
   patch.width = CAR_PATCH.width;
   patch.height = CAR_PATCH.height;
-  const patchContext = patch.getContext('2d');
+  const patchContext = getCanvasContext(patch, undefined, 'reparo do asfalto');
   patchContext.imageSmoothingEnabled = false;
   const halfPatch = Math.floor(CAR_PATCH.width / 2);
   patchContext.drawImage(reference, CAR_PATCH.x - halfPatch, CAR_PATCH.y, halfPatch, CAR_PATCH.height, 0, 0, halfPatch, CAR_PATCH.height);
@@ -240,7 +291,7 @@ function makeStreet(reference, removeReferenceSedan = false) {
   const mask = document.createElement('canvas');
   mask.width = patch.width;
   mask.height = patch.height;
-  const maskContext = mask.getContext('2d');
+  const maskContext = getCanvasContext(mask, undefined, 'máscara da rua');
   const horizontalFade = maskContext.createLinearGradient(0, 0, patch.width, 0);
   horizontalFade.addColorStop(0, 'rgba(255, 255, 255, 0)');
   horizontalFade.addColorStop(fade / patch.width, 'rgba(255, 255, 255, 1)');
@@ -266,7 +317,7 @@ function makeCarSprite(reference) {
   const sprite = document.createElement('canvas');
   sprite.width = CAR_CROP.width;
   sprite.height = CAR_CROP.height;
-  const spriteContext = sprite.getContext('2d', { willReadFrequently: true });
+  const spriteContext = getCanvasContext(sprite, { willReadFrequently: true }, 'sprite do sedã');
   spriteContext.imageSmoothingEnabled = false;
   spriteContext.drawImage(reference, -CAR_CROP.x, -CAR_CROP.y);
 
@@ -453,14 +504,19 @@ function createSectionColliders(index) {
   return colliders;
 }
 
-function finishLoading(image, marketImage = null, barImage = null, junctionImage = null, curveImage = null) {
-  const reference = normalizeScene(image);
-  const marketReference = normalizeScene(marketImage || fallbackScene());
-  const barReference = normalizeScene(barImage || fallbackScene());
-  const junctionReference = normalizeScene(junctionImage || fallbackScene());
-  const curveReference = normalizeScene(curveImage || fallbackScene());
-  sections.length = 0;
-  sections.push(
+function finishLoading(image = null, marketImage = null, barImage = null, junctionImage = null, curveImage = null) {
+  let sharedFallback = null;
+  const fallbackReference = () => {
+    sharedFallback ||= normalizeScene(fallbackScene());
+    return sharedFallback;
+  };
+  const reference = image ? normalizeScene(image) : normalizeScene(fallbackScene(true));
+  const normalizeOrFallback = (scene) => scene ? normalizeScene(scene) : fallbackReference();
+  const marketReference = normalizeOrFallback(marketImage);
+  const barReference = normalizeOrFallback(barImage);
+  const junctionReference = normalizeOrFallback(junctionImage);
+  const curveReference = normalizeOrFallback(curveImage);
+  const nextSections = [
     { name: 'RUA VERMELHA', background: makeStreet(reference, true), colliders: createSectionColliders(0) },
     { name: 'BAIRRO DO MERCADO', background: marketReference, colliders: createSectionColliders(1) },
     { name: 'RUA DO BAR', background: barReference, colliders: createSectionColliders(2) },
@@ -477,14 +533,18 @@ function finishLoading(image, marketImage = null, barImage = null, junctionImage
       lightingRoad: { ...ROAD, left: ROAD.left - CURVE_SWAY, right: ROAD.right + CURVE_SWAY },
       roadCenterAt: curveRoadCenterX,
     },
-  );
+  ];
+  const nextStreetSprite = makeCarSprite(reference);
+
+  // Prepare the full scene before swapping live state, so a failed asset or
+  // canvas allocation cannot leave the game with only part of its map loaded.
+  sections.splice(0, sections.length, ...nextSections);
   state.section = 0;
-  streetCanvas = sections[0].background;
-  streetSprite = makeCarSprite(reference);
+  streetCanvas = nextSections[0].background;
+  streetSprite = nextStreetSprite;
   state.ready = true;
   loading.classList.add('is-ready');
   hint.classList.add('is-visible');
-  hintTimer = 8;
   window.setTimeout(() => hint.classList.remove('is-visible'), 6500);
   canvas.focus({ preventScroll: true });
 }
@@ -505,11 +565,11 @@ function changeSection(index, x, y) {
   return true;
 }
 
-function fallbackScene() {
+function fallbackScene(includeSedan = false) {
   const fallback = document.createElement('canvas');
   fallback.width = WIDTH;
   fallback.height = HEIGHT;
-  const fallbackContext = fallback.getContext('2d');
+  const fallbackContext = getCanvasContext(fallback, undefined, 'cena de contingência');
   fallbackContext.fillStyle = '#53554e';
   fallbackContext.fillRect(0, 0, WIDTH, HEIGHT);
   fallbackContext.fillStyle = '#555650';
@@ -524,11 +584,22 @@ function fallbackScene() {
     fallbackContext.fillRect(20, row * 330 + 18, 360, 274);
     fallbackContext.fillRect(1188, row * 330 + 18, 360, 274);
   }
+  if (includeSedan) {
+    fallbackContext.fillStyle = '#191b19';
+    fallbackContext.fillRect(CAR_SPAWN.x - 53, CAR_SPAWN.y - 111, 106, 222);
+    fallbackContext.fillStyle = '#a4473e';
+    fallbackContext.fillRect(CAR_SPAWN.x - 45, CAR_SPAWN.y - 103, 90, 206);
+    fallbackContext.fillStyle = '#435757';
+    fallbackContext.fillRect(CAR_SPAWN.x - 32, CAR_SPAWN.y - 75, 64, 39);
+    fallbackContext.fillRect(CAR_SPAWN.x - 32, CAR_SPAWN.y + 36, 64, 40);
+    fallbackContext.fillStyle = '#d9c37c';
+    fallbackContext.fillRect(CAR_SPAWN.x - 40, CAR_SPAWN.y - 98, 13, 7);
+    fallbackContext.fillRect(CAR_SPAWN.x + 27, CAR_SPAWN.y - 98, 13, 7);
+  }
   return fallback;
 }
 
 function showToast(message, duration = 2600) {
-  toastMessage = message;
   state.toast = message;
   state.toastUntil = elapsed + duration;
   toastElement.textContent = message;
@@ -546,11 +617,39 @@ function saveProgress() {
   }
 }
 
+function disableSound(error) {
+  const context = audioContext;
+  soundEnabled = false;
+  console.warn('Áudio desativado; a simulação continua sem som:', error);
+  for (const node of [engineOscillator, sirenOscillator]) {
+    try { node?.stop(); } catch { /* nó já encerrado */ }
+    try { node?.disconnect(); } catch { /* nó já desconectado */ }
+  }
+  for (const node of [engineGain, sirenGain]) {
+    try { node?.disconnect(); } catch { /* nó já desconectado */ }
+  }
+  engineOscillator = null;
+  engineGain = null;
+  sirenOscillator = null;
+  sirenGain = null;
+  audioContext = null;
+  try {
+    const closing = context?.close?.();
+    closing?.catch?.(() => {});
+  } catch { /* fechar áudio é best effort */ }
+}
+
+function resumeAudioIfNeeded() {
+  if (audioContext?.state !== 'suspended') return;
+  const resuming = audioContext.resume();
+  resuming?.catch?.(disableSound);
+}
+
 function playTone(frequency = 440, duration = .08, waveform = 'sine', volume = .03) {
   if (!soundEnabled) return;
   try {
     audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
-    if (audioContext.state === 'suspended') audioContext.resume();
+    resumeAudioIfNeeded();
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
     oscillator.type = waveform;
@@ -561,8 +660,8 @@ function playTone(frequency = 440, duration = .08, waveform = 'sine', volume = .
     gain.connect(audioContext.destination);
     oscillator.start();
     oscillator.stop(audioContext.currentTime + duration);
-  } catch {
-    // Áudio é opcional; nunca bloqueia o jogo.
+  } catch (error) {
+    disableSound(error);
   }
 }
 
@@ -591,30 +690,46 @@ function startSound() {
 }
 
 function updateSound(dt) {
-  if (!soundEnabled || !audioContext || paused) {
-    if (engineGain && audioContext) engineGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
-    if (sirenGain && audioContext) sirenGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
+  if (!soundEnabled) {
+    if (!audioContext) return;
+    try {
+      if (engineGain) engineGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
+      if (sirenGain) sirenGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
+    } catch (error) {
+      disableSound(error);
+    }
     return;
   }
-  startSound();
-  const revs = state.driving ? Math.abs(state.car.speed) : 0;
-  engineOscillator.frequency.setTargetAtTime(48 + revs * .58, audioContext.currentTime, .06);
-  engineGain.gain.setTargetAtTime(state.driving ? .002 + Math.min(revs, 230) * .000035 : .0001, audioContext.currentTime, .08);
-  sirenOscillator.frequency.setTargetAtTime(560 + Math.sin(elapsed * .008) * 230, audioContext.currentTime, .07);
-  sirenGain.gain.setTargetAtTime(state.wanted > 0 ? .005 : .0001, audioContext.currentTime, .12);
+  try {
+    if (!audioContext) throw new Error('Contexto de áudio indisponível.');
+    if (paused) {
+      if (engineGain) engineGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
+      if (sirenGain) sirenGain.gain.setTargetAtTime(.0001, audioContext.currentTime, .08);
+      return;
+    }
+    resumeAudioIfNeeded();
+    startSound();
+    const revs = state.driving ? Math.abs(state.car.speed) : 0;
+    engineOscillator.frequency.setTargetAtTime(48 + revs * .58, audioContext.currentTime, .06);
+    engineGain.gain.setTargetAtTime(state.driving ? .002 + Math.min(revs, 230) * .000035 : .0001, audioContext.currentTime, .08);
+    sirenOscillator.frequency.setTargetAtTime(560 + Math.sin(elapsed * .008) * 230, audioContext.currentTime, .07);
+    sirenGain.gain.setTargetAtTime(state.wanted > 0 ? .005 : .0001, audioContext.currentTime, .12);
 
-  if (state.driving && keys.has('space') && revs > 80 && !state.skidAt) {
-    state.skidAt = elapsed + 480;
-    playTone(145, .08, 'sawtooth', .013);
-  }
-  if (state.skidAt && elapsed > state.skidAt) state.skidAt = 0;
+    if (state.driving && keys.has('space') && revs > 80 && !state.skidAt) {
+      state.skidAt = elapsed + 480;
+      playTone(145, .08, 'sawtooth', .013);
+    }
+    if (state.skidAt && elapsed > state.skidAt) state.skidAt = 0;
 
-  radioTimer -= dt;
-  if (radioTimer <= 0) {
-    const track = radioTracks[state.radioIndex || 0];
-    playTone(track.notes[radioStep % track.notes.length], .15, 'square', .0035);
-    radioStep += 1;
-    radioTimer = .38;
+    radioTimer -= dt;
+    if (radioTimer <= 0) {
+      const track = radioTracks[state.radioIndex] || radioTracks[0];
+      playTone(track.notes[radioStep % track.notes.length], .15, 'square', .0035);
+      radioStep += 1;
+      radioTimer = .38;
+    }
+  } catch (error) {
+    disableSound(error);
   }
 }
 
@@ -1230,34 +1345,37 @@ function render(interpolation = 1) {
   const shakeX = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   const shakeY = state.cameraShake ? (Math.random() - .5) * state.cameraShake : 0;
   ctx.save();
-  ctx.translate(shakeX, shakeY);
-  ctx.drawImage(streetCanvas, 0, 0);
-  const section = sections[state.section];
-  const weather = getWeatherState(elapsed);
-  const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, section?.lightingRoad || ROAD, {
-    bar: state.section === 2,
-    lampPosts: section?.lampPosts,
-    roadCenterAt: section?.roadCenterAt,
-    rain: weather.rain,
-  });
+  try {
+    ctx.translate(shakeX, shakeY);
+    ctx.drawImage(streetCanvas, 0, 0);
+    const section = sections[state.section];
+    const weather = getWeatherState(elapsed);
+    const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, section?.lightingRoad || ROAD, {
+      bar: state.section === 2,
+      lampPosts: section?.lampPosts,
+      roadCenterAt: section?.roadCenterAt,
+      rain: weather.rain,
+    });
 
-  // Atividades e pedestres permanecem no primeiro quarteirão, onde foram posicionados.
-  if (state.section === 0 && (!state.driving || state.mission)) {
-    for (const pedestrian of people) drawPerson(pedestrian);
+    // Atividades e pedestres permanecem no primeiro quarteirão, onde foram posicionados.
+    if (state.section === 0 && (!state.driving || state.mission)) {
+      for (const pedestrian of people) drawPerson(pedestrian);
+    }
+    if (state.section === 0 && (!state.driving || state.mission)) drawPhone();
+
+    const target = getTarget();
+    if (target) drawTarget(target);
+    for (const police of policeCars) drawPoliceCar(police);
+    drawHelicopter();
+    drawPlayerCar(renderCar);
+    drawCarHighlights(ctx, renderCar, sunlight);
+    if (!state.driving) drawPerson(state.foot, true);
+    drawWeather(ctx, elapsed, WIDTH, HEIGHT, weather);
+    drawHud();
+    drawInteractionPrompt();
+  } finally {
+    ctx.restore();
   }
-  if (state.section === 0 && (!state.driving || state.mission)) drawPhone();
-
-  const target = getTarget();
-  if (target) drawTarget(target);
-  for (const police of policeCars) drawPoliceCar(police);
-  drawHelicopter();
-  drawPlayerCar(renderCar);
-  drawCarHighlights(ctx, renderCar, sunlight);
-  if (!state.driving) drawPerson(state.foot, true);
-  drawWeather(ctx, elapsed, WIDTH, HEIGHT, weather);
-  drawHud();
-  drawInteractionPrompt();
-  ctx.restore();
 }
 
 function keyName(key) {
@@ -1288,10 +1406,13 @@ function handleActionKeys() {
     if (soundEnabled) {
       try {
         audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
-        audioContext.resume();
+        resumeAudioIfNeeded();
         startSound();
-      } catch { /* navegador sem áudio */ }
-      showToast('SOM SINTETIZADO LIGADO');
+        showToast('SOM SINTETIZADO LIGADO');
+      } catch (error) {
+        disableSound(error);
+        showToast('ÁUDIO INDISPONÍVEL · JOGO CONTINUA SEM SOM');
+      }
     } else {
       showToast('SOM DESLIGADO');
     }
@@ -1332,35 +1453,72 @@ function update(dt) {
   if (state.toast && elapsed > state.toastUntil) state.toast = '';
 }
 
-function frame(timestamp) {
-  const currentFrame = Number.isFinite(timestamp) ? timestamp : performance.now();
-  const frameDelta = lastFrame === null ? 0 : clamp((currentFrame - lastFrame) / 1000, 0, MAX_FRAME_DELTA);
-  lastFrame = currentFrame;
+function reportRuntimeFailure(error) {
+  if (runtimeFault) return;
+  runtimeFault = true;
+  paused = true;
+  simulationAccumulator = 0;
+  keys.clear();
+  pressed.clear();
+  showFatalError(
+    'O JOGO FOI PAUSADO APÓS UMA FALHA PARA EVITAR TRAVAMENTOS. RECARREGUE A PÁGINA PARA TENTAR NOVAMENTE.',
+    error,
+  );
+}
 
-  if (!paused && state.ready) {
-    handleActionKeys();
-    simulationAccumulator = Math.min(simulationAccumulator + frameDelta, FIXED_STEP * MAX_CATCH_UP_STEPS);
-    let steps = 0;
-    while (simulationAccumulator >= FIXED_STEP && steps < MAX_CATCH_UP_STEPS) {
-      syncPreviousCarPose();
-      elapsed += FIXED_STEP * 1000;
-      update(FIXED_STEP);
-      simulationAccumulator -= FIXED_STEP;
-      steps += 1;
+window.addEventListener('error', (event) => {
+  reportRuntimeFailure(event.error || new Error(event.message || 'Erro inesperado no jogo.'));
+});
+window.addEventListener('unhandledrejection', (event) => {
+  event.preventDefault();
+  const reason = event.reason instanceof Error ? event.reason : new Error(String(event.reason ?? 'Falha assíncrona inesperada.'));
+  reportRuntimeFailure(reason);
+});
+
+function frame(timestamp) {
+  if (runtimeFault) return;
+  try {
+    if (typeof ctx.isContextLost === 'function' && ctx.isContextLost()) {
+      throw new Error('O contexto do Canvas foi perdido.');
     }
-    updateSound(frameDelta);
-  } else {
-    // Do not simulate a burst of stale time after a pause, load, or tab switch.
-    simulationAccumulator = 0;
-    if (paused) {
-      syncPreviousCarPose();
-      updateSound(0);
+    const currentFrame = Number.isFinite(timestamp) ? timestamp : (window.performance?.now?.() ?? Date.now());
+    const frameDelta = lastFrame === null ? 0 : clamp((currentFrame - lastFrame) / 1000, 0, MAX_FRAME_DELTA);
+    lastFrame = currentFrame;
+
+    if (!paused && state.ready) {
+      handleActionKeys();
+      simulationAccumulator = Math.min(simulationAccumulator + frameDelta, FIXED_STEP * MAX_CATCH_UP_STEPS);
+      let steps = 0;
+      while (simulationAccumulator >= FIXED_STEP && steps < MAX_CATCH_UP_STEPS) {
+        syncPreviousCarPose();
+        elapsed += FIXED_STEP * 1000;
+        update(FIXED_STEP);
+        simulationAccumulator -= FIXED_STEP;
+        steps += 1;
+      }
+      updateSound(frameDelta);
+    } else {
+      // Do not simulate a burst of stale time after a pause, load, or tab switch.
+      simulationAccumulator = 0;
+      if (paused) {
+        syncPreviousCarPose();
+        updateSound(0);
+      }
+    }
+
+    render(!state.ready || paused ? 1 : simulationAccumulator / FIXED_STEP);
+  } catch (error) {
+    reportRuntimeFailure(error);
+  } finally {
+    pressed.clear();
+    if (!runtimeFault) {
+      try {
+        scheduleFrame(frame);
+      } catch (error) {
+        reportRuntimeFailure(error);
+      }
     }
   }
-
-  render(!state.ready || paused ? 1 : simulationAccumulator / FIXED_STEP);
-  pressed.clear();
-  requestAnimationFrame(frame);
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -1392,6 +1550,10 @@ window.addEventListener('keydown', (event) => {
 window.addEventListener('keyup', (event) => keys.delete(keyName(event.key)));
 window.addEventListener('blur', () => keys.clear());
 canvas.addEventListener('pointerdown', () => canvas.focus({ preventScroll: true }));
+canvas.addEventListener('contextlost', (event) => {
+  event.preventDefault();
+  reportRuntimeFailure(new Error('O contexto gráfico foi perdido pelo navegador.'));
+});
 
 for (const button of document.querySelectorAll('[data-key]')) {
   const key = button.dataset.key;
@@ -1419,15 +1581,46 @@ helpPanel.addEventListener('pointerdown', (event) => {
   if (event.target === helpPanel) toggleHelp();
 });
 
+const ASSET_LOAD_TIMEOUT_MS = 30_000;
+
 function loadImageAsset(filename) {
   return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => {
-      console.warn(`Não foi possível carregar o asset: ${filename}`);
-      resolve(null);
+    let image = null;
+    let timeoutId = null;
+    let settled = false;
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      if (image) {
+        image.onload = null;
+        image.onerror = null;
+        image.onabort = null;
+      }
+      resolve(result);
     };
-    image.src = new URL(`./${filename}`, import.meta.url).href;
+
+    try {
+      image = new Image();
+      image.onload = () => finish(image);
+      image.onerror = () => {
+        console.warn(`Não foi possível carregar o asset: ${filename}`);
+        finish(null);
+      };
+      image.onabort = () => {
+        console.warn(`O carregamento do asset foi interrompido: ${filename}`);
+        finish(null);
+      };
+      timeoutId = window.setTimeout(() => {
+        console.warn(`Tempo limite ao carregar o asset: ${filename}`);
+        finish(null);
+        try { image.src = ''; } catch { /* cancelamento é best effort */ }
+      }, ASSET_LOAD_TIMEOUT_MS);
+      image.src = new URL(`./${filename}`, import.meta.url).href;
+    } catch (error) {
+      console.warn(`Falha ao iniciar o carregamento do asset: ${filename}`, error);
+      finish(null);
+    }
   });
 }
 
@@ -1440,20 +1633,30 @@ async function startLoading() {
       loadImageAsset('rua-segmento-04.png'),
       loadImageAsset('rua-segmento-05.png'),
     ]);
-    finishLoading(mainScene || fallbackScene(), marketScene, barScene, junctionScene, curveScene);
+    if (runtimeFault) return;
+    finishLoading(mainScene, marketScene, barScene, junctionScene, curveScene);
     if (![mainScene, marketScene, barScene, junctionScene, curveScene].every(Boolean)) {
       showToast('UM TRECHO ESTÁ INDISPONÍVEL · USANDO CENA DE CONTINGÊNCIA');
     }
   } catch (error) {
     console.error('Falha ao preparar a cena do jogo:', error);
-    finishLoading(fallbackScene());
-    showToast('FALHA AO CARREGAR A CENA · USANDO CONTINGÊNCIA');
+    if (runtimeFault) return;
+    try {
+      finishLoading();
+      showToast('FALHA AO CARREGAR A CENA · USANDO CONTINGÊNCIA');
+    } catch (fallbackError) {
+      reportRuntimeFailure(fallbackError);
+    }
   }
 }
 
 void startLoading();
 window.setTimeout(() => {
-  if (!state.ready) showToast('CARREGANDO A CENA DE NOVA AURORA…', 4000);
+  if (!state.ready && !runtimeFault) showToast('CARREGANDO A CENA DE NOVA AURORA…', 4000);
 }, 2400);
 
-requestAnimationFrame(frame);
+try {
+  scheduleFrame(frame);
+} catch (error) {
+  reportRuntimeFailure(error);
+}

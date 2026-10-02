@@ -29,10 +29,19 @@ O comando cria `Rua-Vermelha-offline.html` na raiz do repositório.
 
 A física do sedã fica isolada em `vehicle-physics.js`: aceleração, frenagem, geometria de bicicleta, aderência lateral e derrapagem com freio de mão. `collision.js` trata o veículo como retângulo orientado e usa SAT contínuo varrido contra obstáculos sólidos; as guias baixas são degraus transponíveis que geram um evento de suspensão suave, sem bloquear nem reposicionar o carro. O solver subdivide a rotação, preserva o deslizamento pela tangente e corrige penetrações nos sólidos. O loop simula a 60 Hz fixos, limita o tempo acumulado em travamentos e interpola a pose do carro durante a renderização para reduzir tremulação em telas de alta frequência.
 
-Rode os testes de colisão contínua, física e iluminação com Node.js, sem dependências externas:
+A inicialização verifica os elementos obrigatórios e o Canvas 2D antes de começar. Cada imagem tem limite de espera de 30 segundos; se um mapa falhar, o jogo monta uma cena substituta e continua quando possível. O som é opcional e é desligado isoladamente caso o navegador falhe. Exceções de renderização ou eventos assíncronos pausam a simulação e mostram uma orientação para recarregar, em vez de deixar o ciclo de animação morrer silenciosamente. A geração do HTML offline substitui o arquivo de forma atômica: uma falha de gravação preserva a versão anterior. Essas medidas reduzem falhas previsíveis, sem representar uma garantia de ausência total de bugs.
+
+Valide a simulação, os mapas, o clima e a iluminação com Node.js, sem dependências externas:
 
 ```bash
+python3 jogo/build_offline.py
 node --test jogo/tests/*.test.js
+```
+
+Teste a gravação atômica e os caminhos de falha do gerador offline com Python:
+
+```bash
+python3 -m unittest discover -s jogo/tests -p 'test_*.py' -v
 ```
 
 ## Controles

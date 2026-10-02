@@ -66,6 +66,8 @@ button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
   transition: opacity .45s ease, visibility .45s ease;
 }
 .loading-screen.is-ready { opacity: 0; visibility: hidden; }
+.loading-screen.is-error { opacity: 1; visibility: visible; padding: 28px; color: #f0b7a3; line-height: 1.7; text-align: center; }
+.loading-screen.is-error i { display: none; }
 .loading-mark {
   display: grid;
   width: 47px;

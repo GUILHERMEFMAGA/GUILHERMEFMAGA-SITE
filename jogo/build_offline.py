@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,24 +23,67 @@ ASSETS = {
 }
 
 
+def read_source(filename: str) -> str:
+    path = GAME_DIR / filename
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as error:
+        raise RuntimeError(f"Cannot read required source file: {path}") from error
+
+
 def data_uri(filename: str, media_type: str) -> str:
-    encoded = base64.b64encode((GAME_DIR / filename).read_bytes()).decode("ascii")
+    path = GAME_DIR / filename
+    try:
+        payload = path.read_bytes()
+    except OSError as error:
+        raise RuntimeError(f"Cannot read required game asset: {path}") from error
+    encoded = base64.b64encode(payload).decode("ascii")
     return f"data:{media_type};base64,{encoded}"
 
 
+def write_atomically(path: Path, content: str) -> None:
+    temporary_path: Path | None = None
+    try:
+        try:
+            output_mode = path.stat().st_mode & 0o777
+        except FileNotFoundError:
+            output_mode = 0o644
+        with NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            temporary_file.write(content)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        os.chmod(temporary_path, output_mode)
+        temporary_path.replace(path)
+    except (OSError, UnicodeError) as error:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise RuntimeError(f"Cannot safely write offline game bundle: {path}") from error
+
+
 def main() -> None:
-    html = (GAME_DIR / "index.html").read_text(encoding="utf-8")
-    css = (GAME_DIR / "style.css").read_text(encoding="utf-8")
-    game = (GAME_DIR / "game.js").read_text(encoding="utf-8")
-    lighting = (GAME_DIR / "lighting.js").read_text(encoding="utf-8")
-    collision = (GAME_DIR / "collision.js").read_text(encoding="utf-8")
-    vehicle_physics = (GAME_DIR / "vehicle-physics.js").read_text(encoding="utf-8")
-    weather = (GAME_DIR / "weather.js").read_text(encoding="utf-8")
+    html = read_source("index.html")
+    css = read_source("style.css")
+    game = read_source("game.js")
+    lighting = read_source("lighting.js")
+    collision = read_source("collision.js")
+    vehicle_physics = read_source("vehicle-physics.js")
+    weather = read_source("weather.js")
 
     stylesheet_link = '  <link rel="stylesheet" href="./style.css">'
     module_script = '  <script type="module" src="./game.js"></script>'
-    if stylesheet_link not in html or module_script not in html:
-        raise RuntimeError("index.html no longer has the expected stylesheet or game module references")
+    if html.count(stylesheet_link) != 1 or html.count(module_script) != 1:
+        raise RuntimeError("index.html must contain exactly one stylesheet and one game module reference")
 
     html = html.replace(stylesheet_link, f"  <style>\n{css}\n  </style>")
 
@@ -68,22 +113,23 @@ def main() -> None:
         filename: data_uri(filename, media_type)
         for filename, media_type in ASSETS.items()
     }
+
+    def scoped_module(source: str, exports: tuple[str, ...]) -> str:
+        exported_names = ", ".join(exports)
+        return f"(() => {{\n{source}\nreturn {{ {exported_names} }};\n}})()"
+
     javascript = (
         "const EMBEDDED_ASSETS = Object.freeze("
         + json.dumps(embedded_assets, ensure_ascii=True, separators=(",", ":"))
         + ");\n\n"
-        + bundled_lighting
-        + "\n\n"
-        + bundled_collision
-        + "\n\n"
-        + bundled_vehicle_physics
-        + "\n\n"
-        + bundled_weather
-        + "\n\n"
+        + f"const {{ drawCarHighlights, drawStreetLighting }} = {scoped_module(bundled_lighting, ('drawCarHighlights', 'drawStreetLighting'))};\n"
+        + f"const {{ resolveVehicleMotion }} = {scoped_module(bundled_collision, ('resolveVehicleMotion',))};\n"
+        + f"const {{ stepVehicle }} = {scoped_module(bundled_vehicle_physics, ('stepVehicle',))};\n"
+        + f"const {{ drawWeather, getWeatherState }} = {scoped_module(bundled_weather, ('drawWeather', 'getWeatherState'))};\n\n"
         + game
     )
-    html = html.replace(module_script, f"  <script>\n{javascript}\n  </script>")
-    OUTPUT.write_text(html, encoding="utf-8")
+    html = html.replace(module_script, f"  <script type=\"module\">\n{javascript}\n  </script>")
+    write_atomically(OUTPUT, html)
     print(f"Gerado: {OUTPUT.relative_to(ROOT)} ({OUTPUT.stat().st_size:,} bytes)")
 
 
