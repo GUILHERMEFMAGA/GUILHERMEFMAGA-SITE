@@ -344,6 +344,19 @@ function drawCarHighlights(ctx, car, sun) {
 const WIDTH = 1568;
 const HEIGHT = 960;
 const CAR_CROP = { x: 708, y: 345, width: 154, height: 280 };
+// Silhueta do sedã na imagem normalizada. Cada linha define [y, x inicial, x final];
+// os limites incluem a borda escura do carro, mas excluem a sombra projetada na rua.
+const CAR_SILHOUETTE = [
+  [22, 59, 95], [24, 59, 95], [25, 35, 119], [27, 33, 121], [28, 32, 122],
+  [31, 31, 123], [35, 31, 123], [36, 28, 126], [42, 26, 130], [48, 24, 131],
+  [56, 22, 132], [60, 21, 132], [76, 21, 132], [81, 22, 131], [85, 23, 130],
+  [91, 23, 130], [92, 20, 138], [94, 16, 144], [96, 15, 144], [101, 15, 144],
+  [103, 16, 143], [104, 23, 130], [110, 23, 130], [138, 23, 130], [144, 22, 130],
+  [170, 22, 130], [190, 22, 130], [194, 20, 131], [202, 19, 132], [210, 19, 132],
+  [218, 20, 132], [225, 21, 132], [232, 23, 131], [238, 25, 130], [240, 25, 130],
+  [242, 26, 129], [245, 26, 129], [248, 27, 128], [251, 29, 127], [253, 30, 126],
+  [255, 31, 125],
+];
 const CAR_PATCH = { x: 696, y: 340, width: 176, height: 300 };
 const CAR_PATCH_FEATHER = 18;
 const ROAD = { left: 548, right: 1018, center: 784, top: 0, bottom: HEIGHT };
@@ -517,22 +530,47 @@ function makeCarSprite(reference) {
   const sprite = document.createElement('canvas');
   sprite.width = CAR_CROP.width;
   sprite.height = CAR_CROP.height;
-  const spriteContext = sprite.getContext('2d');
+  const spriteContext = sprite.getContext('2d', { willReadFrequently: true });
   spriteContext.imageSmoothingEnabled = false;
-  spriteContext.save();
-  spriteContext.beginPath();
-  // O recorte termina na linha do para-choque, excluindo a sombra do asfalto.
-  const points = [
-    [37, 24], [112, 24], [125, 30], [133, 47], [135, 76], [129, 87],
-    [138, 98], [138, 234], [132, 246], [119, 255], [33, 255], [20, 247],
-    [12, 234], [12, 99], [21, 87], [15, 76], [17, 47], [24, 30],
-  ];
-  spriteContext.moveTo(points[0][0], points[0][1]);
-  for (let index = 1; index < points.length; index += 1) spriteContext.lineTo(points[index][0], points[index][1]);
-  spriteContext.closePath();
-  spriteContext.clip();
   spriteContext.drawImage(reference, -CAR_CROP.x, -CAR_CROP.y);
-  spriteContext.restore();
+
+  // A clip path antialiases its perimeter, blending road pixels into the car
+  // when the sprite rotates. Apply a one-bit alpha mask instead: car pixels are
+  // fully opaque and everything outside the hand-traced silhouette is cleared.
+  const imageData = spriteContext.getImageData(0, 0, sprite.width, sprite.height);
+  const firstRow = CAR_SILHOUETTE[0][0];
+  const lastRow = CAR_SILHOUETTE[CAR_SILHOUETTE.length - 1][0];
+  let anchorIndex = 0;
+
+  for (let y = 0; y < sprite.height; y += 1) {
+    let left = -1;
+    let right = -1;
+    if (y >= firstRow && y <= lastRow) {
+      while (anchorIndex < CAR_SILHOUETTE.length - 2 && y > CAR_SILHOUETTE[anchorIndex + 1][0]) {
+        anchorIndex += 1;
+      }
+      const [startY, startLeft, startRight] = CAR_SILHOUETTE[anchorIndex];
+      const [endY, endLeft, endRight] = CAR_SILHOUETTE[anchorIndex + 1];
+      const progress = endY === startY ? 0 : (y - startY) / (endY - startY);
+      left = Math.round(startLeft + (endLeft - startLeft) * progress);
+      right = Math.round(startRight + (endRight - startRight) * progress);
+    }
+
+    for (let x = 0; x < sprite.width; x += 1) {
+      const offset = (y * sprite.width + x) * 4;
+      if (x < left || x > right) {
+        // Clear hidden RGB too, so no road-colored fringe can leak at the edge.
+        imageData.data[offset] = 0;
+        imageData.data[offset + 1] = 0;
+        imageData.data[offset + 2] = 0;
+        imageData.data[offset + 3] = 0;
+      } else {
+        imageData.data[offset + 3] = 255;
+      }
+    }
+  }
+
+  spriteContext.putImageData(imageData, 0, 0);
   return sprite;
 }
 

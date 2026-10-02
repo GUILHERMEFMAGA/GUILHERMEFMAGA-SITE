@@ -1,6 +1,6 @@
 # Rua Vermelha — protótipo jogável
 
-A cena inicial usa `gta-retro.png` dentro desta pasta como arte de fundo: conserva o enquadramento, a rua, os prédios e o sedã da referência. A cópia original também permanece na raiz do repositório. A imagem não é modificada; o jogo cria uma cópia de trabalho em Canvas para poder mover o carro sem deixar rastro. Ao dirigir para o topo da primeira tela, a rua continua no Bairro do Mercado; voltar pelo extremo inferior reconecta à Rua Vermelha. A posição aparente do sol percorre um ciclo contínuo e altera reflexos no asfalto e no sedã.
+A cena inicial usa `gta-retro.png` dentro desta pasta como arte de fundo: conserva o enquadramento, a rua, os prédios e o sedã da referência. A cópia original também permanece na raiz do repositório. A imagem não é modificada; o jogo cria uma cópia de trabalho em Canvas para poder mover o carro sem deixar rastro. O sedã usa uma máscara de alpha binário ajustada à silhueta, preservando o contorno sem recortar as laterais ou levar a sombra da rua junto. Ao dirigir para o topo da primeira tela, a rua continua no Bairro do Mercado; voltar pelo extremo inferior reconecta à Rua Vermelha. A posição aparente do sol percorre um ciclo contínuo e altera reflexos no asfalto e no sedã.
 
 ## Acesso direto (recomendado)
 
