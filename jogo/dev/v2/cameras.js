@@ -15,9 +15,13 @@
   // ---------- nomes das ruas (para os relatórios dizerem ONDE as coisas acontecem) ----------
   const AVENIDAS = ['Av. Independência', 'Av. Presidente Vargas', 'Av. João Fiúza', 'Av. do Rio', 'Av. Francisco Junqueira', 'Av. Nove de Julho', 'Av. Costábile Romano', 'Av. Brasil', 'Av. Saudade', 'Av. da Ponte', 'Av. Novo Horizonte', 'Av. das Obras', 'Av. do Progresso', 'Av. Beira-Rio', 'Av. Vale Verde', 'Av. Aeroporto', 'Av. das Palmeiras', 'Av. Final'];
   const RUAS_H = ['Rua Duque de Caxias', 'Rua General Osório', 'Rua Tibiriçá', 'Rua do Pedágio', 'Rua Amador Bueno', 'Rua Barão do Amazonas', 'Rua São Sebastião'];
+  const cap = t => t.toLowerCase().replace(/(^|\s)\S/g, c => c.toUpperCase());
   CM.nomeRua = function (x, y) {
-    const i = clamp(Math.round((x / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.COLS), j = clamp(Math.round((y / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.ROWS);
-    return AVENIDAS[i] + ' × ' + RUAS_H[j];
+    const i = clamp(Math.round((x / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.COLS), j = clamp(Math.round((y / T - W.MG - W.ROAD / 2) / W.PITCH), 0, W.ROWS), r = C.regiaoDe(x, y);
+    const hor = j === W.RODOVIA ? 'Rodovia Transbrasil' : RUAS_H[j % RUAS_H.length] + (j >= RUAS_H.length ? ' ' + (Math.floor(j / RUAS_H.length) + 1) : '');
+    // Ribeirão tem avenidas com nome; as outras cidades numeram as suas; no campo e na mata são estradas
+    const ver = r.id === 'ribeirao' ? AVENIDAS[i % AVENIDAS.length] : r.tipo === 'cidade' ? 'Av. ' + cap(r.nome) + ' ' + (i - r.urb[0] + 1) : 'Estrada ' + cap(r.nome) + ' ' + (i + 1);
+    return ver + ' × ' + hor;
   };
   // texto de localização completo: cidade + rua + quadra
   CM.onde = function (x, y) {
@@ -97,7 +101,7 @@
 
   // ---------- câmeras das ruas (postes) ----------
   // cruzamentos importantes, pedágios, obras grandes, pontes e aeroporto
-  [[1, 1], [4, 3], [6, 2], [8, 5], [2, 5], [5, 0], [2, 7], [5, 7], [18, 2], [19, 5], [25, 3], [26, 6], [32, 2], [33, 5]].forEach(([i, j], k) => {
+  [[1, 1], [4, 3], [6, 2], [8, 5], [2, 5], [5, 0], [2, 7], [5, 7], [36, 3], [37, 5], [51, 3], [52, 6], [62, 3], [63, 5], [24, 5], [45, 5]].forEach(([i, j], k) => {
     const x = W.nodeX(i), y = W.nodeY(j);
     CM.ruas.push({ id: 'rua' + k, cat: 'rua', nome: () => 'RUA · ' + CM.nomeRua(x, y), x, y, px: x + W.ROAD / 2 * T + 18, py: y - W.ROAD / 2 * T - 18, vw: 560 });
   });

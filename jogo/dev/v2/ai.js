@@ -28,6 +28,7 @@
     const cols = { g: '#3dff6a', y: '#ffe23d', r: '#ff3d3d' };
     const sv = lightState('v', time), sh = lightState('h', time);
     for (let i = 0; i <= COLS; i++) for (let j = 0; j <= ROWS; j++) {
+      if (!W.urbano(i, j)) continue;
       const cx = W.nodeX(i), cy = W.nodeY(j);
       if (cx < x0 - 200 || cx > x1 + 200 || cy < y0 - 200 || cy > y1 + 200) continue;
       const d = ROWS && (ROAD_HALF() + 14);
@@ -58,18 +59,20 @@
 
   // rios sem ponte nessa rua: o carro não pode seguir naquele sentido (só as pontes ligam as margens)
   const okH = (i, j, hd) => W.cruzaOk(hd > 0 ? i : i - 1, j);
+  // dentro das florestas gigantes as ruas verticais de dentro NÃO existem (W.viaV): esse trecho é barrado
+  const okV = (i, j, vd) => W.viaV(i, vd > 0 ? j : j - 1);
   // trecho de rua interditado? (axis 'v' = rua vertical idx, trecho a entre os nós a e a+1)
   const fech = (axis, idx, a) => W.fechado.size > 0 && W.fechado.has(axis + idx + ':' + a);
   function chooseManeuver(car) {
     const n = car.nav, i = n.ni, j = n.nj, d = n.dir; let opts = [];
     if (n.axis === 'v') {
-      if (d > 0 ? j < ROWS : j > 0) opts.push({ k: 's', ni: i, nj: j + d });
+      if ((d > 0 ? j < ROWS : j > 0) && okV(i, j, d)) opts.push({ k: 's', ni: i, nj: j + d });
       const rh = d > 0 ? -1 : 1;
       [[rh, 'r'], [-rh, 'l']].forEach(([hd, k]) => { if ((hd > 0 ? i < COLS : i > 0) && okH(i, j, hd)) opts.push({ k, axis: 'h', dir: hd, ni: i + hd, nj: j, trig: W.laneH(j, hd) }); });
     } else {
       if ((d > 0 ? i < COLS : i > 0) && okH(i, j, d)) opts.push({ k: 's', ni: i + d, nj: j });
       const rv = d > 0 ? 1 : -1;
-      [[rv, 'r'], [-rv, 'l']].forEach(([vd, k]) => { if (vd > 0 ? j < ROWS : j > 0) opts.push({ k, axis: 'v', dir: vd, ni: i, nj: j + vd, trig: W.laneV(i, vd) }); });
+      [[rv, 'r'], [-rv, 'l']].forEach(([vd, k]) => { if ((vd > 0 ? j < ROWS : j > 0) && okV(i, j, vd)) opts.push({ k, axis: 'v', dir: vd, ni: i, nj: j + vd, trig: W.laneV(i, vd) }); });
     }
     // ruas interditadas por obra: o motorista escolhe outro caminho
     const todas = opts;
@@ -129,7 +132,7 @@
     let v = car.cruise;
     if (n.m && n.m.k !== 's' && toNode < 260) v = Math.min(v, n.m.k === 'l' ? 105 : 95);
     // semáforo
-    if (!car.ignoreLights) {
+    if (!car.ignoreLights && W.urbano(n.ni, n.nj)) {
       const stopAt = (nc - n.dir * (ROAD_HALF() + 14));
       const rem = (stopAt - pos) * n.dir;
       const st = lightState(n.axis, S.time);
@@ -282,6 +285,8 @@
         if (Math.abs(along - nxx) < 300) along = nxx + (along >= nxx ? 1 : -1) * 320;
         along = clamp(along, W.nodeX(0) + 200, W.nodeX(COLS) - 200);
       }
+      const sg = clamp(Math.floor((along / T - MG - W.ROAD / 2) / PITCH), 0, (axis === 'v' ? ROWS : COLS) - 1);
+      if (axis === 'v' ? !W.viaV(idx, sg) : !W.viaH(idx, sg)) continue;
       const x = axis === 'v' ? W.laneV(idx, dir) : along, y = axis === 'v' ? along : W.laneH(idx, dir);
       const dd = Math.hypot(x - cx, y - cy);
       if (dd < minD * 0.8 || dd > maxD * 1.2) continue;

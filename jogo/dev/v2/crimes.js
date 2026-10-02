@@ -78,7 +78,13 @@
       if (W.isSolid(x, y) || W.treeHit(x, y, 46) || W.tileAt(x, y) === W.TILE.WATER) continue;
       return { x, y, bloco: b.bx + ',' + b.by };
     }
-    return { x: W.nodeX(12), y: W.nodeY(3) + 400, bloco: '' };
+    return { x: W.nodeX(20) + 640, y: W.nodeY(3) + 640, bloco: '' };
+  }
+  // a cabana do assassino é uma das cabanas de verdade escondidas nas clareiras da floresta (world.js: blk.cabana)
+  function cabanaDaMata(semente) {
+    const bl = W.blocks.filter(b => b.cabana); if (!bl.length) return pontoLivre(['floresta'], semente);
+    const b = bl[Math.floor(W.mulberry32(Math.floor(semente))() * bl.length)];
+    return { x: b.cabana.x, y: b.cabana.y, bloco: b.bx + ',' + b.by };
   }
 
   function executa(S, c) {
@@ -124,7 +130,7 @@
     // o assassino da mata
     const sr = s.serial;
     if (!sr.resolvido) {
-      if (!sr.cabana) sr.cabana = pontoLivre(['floresta'], 4242);
+      if (!sr.cabana) sr.cabana = cabanaDaMata(4242);
       if (Math.random() < 0.28) {
         const pt = pontoLivre(['floresta'], Math.random() * 99999); sr.vitimas++; sr.corpos.push({ x: pt.x, y: pt.y, nome: pick(NOMES) + ' ' + pick(SOBRE) });
         if (sr.corpos.length > 6) sr.corpos.shift();

@@ -13,13 +13,13 @@
 
   // ---------- as praças ----------
   const DEFS = [
-    { rio: 9, j: 3, valor: 15, nome: 'PEDÁGIO MATA ESCURA' },
-    { rio: 16, j: 5, valor: 25, nome: 'PEDÁGIO NOVO HORIZONTE' },
-    { rio: 23, j: 4, valor: 30, nome: 'PEDÁGIO VALE VERDE' },
-    { rio: 30, j: 3, valor: 35, nome: 'PEDÁGIO PORTO DO SOL' },
-    { rio: 16, j: 2, valor: 25, nome: 'PEDÁGIO PONTE NOVA ERA', ponteObra: 'PONTE NOVA ERA' },
-    { rio: 9, j: 6, valor: 15, nome: 'PEDÁGIO PONTE DO PROGRESSO', ponteObra: 'PONTE DO PROGRESSO' },
-    { rio: 30, j: 6, valor: 35, nome: 'PEDÁGIO PONTE DO LITORAL', ponteObra: 'PONTE DO LITORAL' }
+    { rio: 9, j: 5, valor: 20, nome: 'PEDÁGIO SANTA RITA' },
+    { rio: 34, j: 5, valor: 30, nome: 'PEDÁGIO NOVO HORIZONTE' },
+    { rio: 49, j: 5, valor: 35, nome: 'PEDÁGIO VALE VERDE' },
+    { rio: 59, j: 5, valor: 40, nome: 'PEDÁGIO PORTO DO SOL' },
+    { rio: 34, j: 2, valor: 30, nome: 'PEDÁGIO PONTE NOVA ERA', ponteObra: 'PONTE NOVA ERA' },
+    { rio: 9, j: 7, valor: 20, nome: 'PEDÁGIO PONTE DO PROGRESSO', ponteObra: 'PONTE DO PROGRESSO' },
+    { rio: 59, j: 7, valor: 40, nome: 'PEDÁGIO PONTE DO LITORAL', ponteObra: 'PONTE DO LITORAL' }
   ];
   DEFS.forEach(d => {
     const rv = W.blocks.find(b => b.kind === 'river' && b.bx === d.rio), top = W.roadTop(d.j);

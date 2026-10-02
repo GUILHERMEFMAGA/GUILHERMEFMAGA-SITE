@@ -111,7 +111,8 @@
     trees.push({ x: blk.x + 1.2 * T, y: blk.y + blk.h - off, r: 15 }, { x: blk.x + blk.w - 1.2 * T, y: blk.y + blk.h - off, r: 15 });
   }
   // monta o objeto "prédio" de uma casa composta (várias partes) já com cores, quintal e porta
-  function montaCasaB(blk, lay, ox, oy, seed, est, rg) {
+  // monta o objeto "prédio" de uma casa composta (várias partes), SEM colocar no mapa
+  function criaCasaB(lay, ox, oy, seed, est, rg) {
     const c3 = AR.casaMontar(lay, ox, oy, seed, est), cp = c3.partes.find(p => p.t === 'corpo');
     const b = mkBuilding(cp.x, cp.y, cp.w, cp.h, 3, rg);
     b.p = { kind: 'tile', base: c3.pal.base, edge: c3.pal.claro, dark: c3.pal.escuro };
@@ -119,8 +120,16 @@
     b.custom = (ctx, bb) => AR.drawCasa(ctx, bb);
     b.rects = c3.partes.map(p => ({ x: p.x, y: p.y, w: p.w, h: p.h, and: p.andares }));
     b.andares = Math.max.apply(null, c3.partes.map(p => p.andares));
-    buildings.push(b);
     return b;
+  }
+  function montaCasaB(blk, lay, ox, oy, seed, est, rg) { const b = criaCasaB(lay, ox, oy, seed, est, rg); buildings.push(b); return b; }
+  // casa de verdade num lote de obra (cidade.js): o corpo encosta na calçada da frente, porque a porta precisa de chão livre
+  function casaNoLote(l, seed, est, riqueza) {
+    const LW = Math.round((l.w + 10) / T), LD = Math.round((l.h + 10) / T), rg = mulberry32(seed);
+    const lay = AR.casaLayout(rg, LW, LD, { riqueza: riqueza == null ? 1 : riqueza, estilo: est, semAvanco: true });
+    const ox = l.x - 5, oy = l.y - 5, b = criaCasaB(lay, ox, oy, seed, est, rg);
+    const q = AR.quintalDe(lay, ox, oy, LW, LD, seed, est); q.cerca = 'nenhuma'; q.carro = null; q.arbustos = []; q.canteiros = []; q.garagem = null; q.caminho = null;
+    return { b, q, lay };
   }
 
   const BUILDERS = {};

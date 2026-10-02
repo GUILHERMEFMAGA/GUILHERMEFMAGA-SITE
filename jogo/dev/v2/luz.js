@@ -155,14 +155,17 @@
     const janelas = [];
     if (noite > 0.05) {
       const vx0 = cam.x - VW / 2 / z, vx1 = cam.x + VW / 2 / z, vy0 = cam.y - VH / 2 / z, vy1 = cam.y + VH / 2 / z;
-      W.buildings.forEach(b => { if (b.x < vx1 && b.x + b.w > vx0 && b.y < vy1 && b.y + b.h > vy0 && ((b.x * 7 + b.y * 3) % 10) < 7) janelas.push(b); });
+      W.buildings.forEach(b => { const bb = b.box || b; if (bb.x < vx1 && bb.x + bb.w > vx0 && bb.y < vy1 && bb.y + bb.h > vy0 && ((b.x * 7 + b.y * 3) % 10) < 8) janelas.push(b); });
     }
     lx.save(); lx.setTransform(z, 0, 0, z, VW / 2 - cam.x * z, VH / 2 - cam.y * z);
     lx.globalCompositeOperation = 'lighter';
     if (noite > 0.03) {
       luzes.forEach(l => gradLuz(lx, l));
       lx.fillStyle = 'rgba(255,190,100,0.42)';
-      janelas.forEach(b => { const fh = W.fachada(b); lx.fillRect(b.x + 4, b.y + b.h - fh + 3, b.w - 8, fh - 6); });
+      janelas.forEach(b => {
+        if (b.jl && b.jl.length) { b.jl.forEach(j => lx.fillRect(j.x, j.y, j.w, j.h)); return; }   // só as janelas que o arte.js deixou acesas
+        const fh = W.fachada(b); lx.fillRect(b.x + 4, b.y + b.h - fh + 3, b.w - 8, fh - 6);
+      });
     }
     lx.restore();
     ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(luzC, 0, 0); ctx.globalCompositeOperation = 'source-over';

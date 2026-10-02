@@ -72,6 +72,6 @@ s = between(s, '  // mapa pequeno (minimapa): pintado direto dos tiles, bem ráp
 # 13) pontos de calçada para missões
 s = sub(s, "    if (b.kind === 'river') return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>", "    if (SEM_PROPS[b.kind]) return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>")
 # 14) exportações
-s = sub(s, "    chunkCount: NCX * NCY,\n  };", "    chunkCount: NCX * NCY,\n    RODOVIA, MEGAS, trilhas, urbano, viaH, viaV, regiaoDe, PUB_DIMS, naTrilha, megaDe,\n  };\n  if (G.rural) G.rural.trilhas = trilhas;")
+s = sub(s, "    chunkCount: NCX * NCY,\n  };", "    chunkCount: NCX * NCY,\n    RODOVIA, MEGAS, trilhas, urbano, viaH, viaV, regiaoDe, PUB_DIMS, naTrilha, megaDe,\n    AR, tex, criaCasaB, casaNoLote, sorteiaParede, estiloDe,\n  };\n  if (G.rural) G.rural.trilhas = trilhas;")
 open(D + '/v2/world.js', 'w', encoding='utf-8').write(s)
 print('world.js:', s.count('\n'), 'linhas')

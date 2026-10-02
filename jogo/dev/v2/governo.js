@@ -25,7 +25,8 @@
   const nota = (g, txt) => { g.hist.unshift('Dia ' + g.dia + ': ' + txt); if (g.hist.length > 10) g.hist.pop(); };
 
   // ---------- as cinco cidades e seus trechos de rua ----------
-  const faixa = k => ({ a: k === 0 ? 0 : W.CIDADES[k - 1].ate, b: Math.min(W.CIDADES[k].ate, W.COLS + 1), nome: W.CIDADES[k].nome });
+  // só as CIDADES têm prefeito, obras e ruas (as fazendas e as florestas ficam de fora)
+  const CID = W.CIDADES.filter(c => c.tipo === 'cidade');
   const regiaoDoLote = l => C.regiaoDe(l.x + l.w / 2, l.y + l.h / 2).nome;
   const esperando = l => !l.ativo && C.estadoDe(l).f < 0 && !l.encomendado && l.tam !== 'a';
 
@@ -115,12 +116,13 @@
   // ---------- ruas interditadas ----------
   GV.recapear = function (S, nomeRegiao, custo) {
     const g = gov(S); if (g.caixa < custo) { G.say('Caixa insuficiente (' + $(g.caixa) + ').', 3); return false; }
-    const cid = nomeRegiao ? W.CIDADES.findIndex(c => c.nome === nomeRegiao) : 0, k = Math.max(0, cid), fx = faixa(k);
+    const cid = (nomeRegiao && CID.find(c => c.nome === nomeRegiao)) || CID[0], u = cid.urb, fx = { nome: cid.nome };
     for (let t = 0; t < 40; t++) {
       const axis = Math.random() < 0.5 ? 'h' : 'v';
       let idx, a;
-      if (axis === 'h') { idx = Math.floor(rand(1, W.ROWS)); a = Math.floor(rand(fx.a, fx.b)); if (a >= W.COLS) continue; if (!W.cruzaOk(a, idx)) continue; }
-      else { idx = Math.floor(rand(Math.max(1, fx.a), Math.min(W.COLS, fx.b))); if (W.RIVERS.includes(idx)) continue; a = Math.floor(rand(0, W.ROWS)); }
+      // u = [coluna0, coluna1, linha0, linha1] da parte urbana da cidade
+      if (axis === 'h') { idx = Math.floor(rand(u[2], u[3] + 2)); a = Math.floor(rand(u[0], u[1] + 1)); if (a >= W.COLS || !W.cruzaOk(a, idx)) continue; }
+      else { idx = Math.floor(rand(Math.max(1, u[0]), Math.min(W.COLS, u[1] + 2))); if (W.RIVERS.includes(idx)) continue; a = Math.floor(rand(u[2], u[3] + 1)); if (!W.viaV(idx, a)) continue; }
       if (GV.fechados.some(f => f.axis === axis && f.idx === idx && f.a === a)) continue;
       g.caixa -= custo; g.ruas.push({ axis, idx, a, ate: C.t + 260, nome: 'RECAPEAMENTO' });
       const r = retTrecho(axis, idx, a); G.say('Obra de recapeamento começou em ' + fx.nome + '. O trecho está interditado por um tempo.', 6); nota(g, 'recapeamento em ' + fx.nome);
@@ -232,7 +234,7 @@
     abre(S, 'OBRAS — O QUE CONSTRUIR?', itens);
   }
   function menuLocal(S, o) {
-    const itens = W.CIDADES.map((c, k) => { const n = W.lotes.filter(l => esperando(l) && l.tam === o.tam && regiaoDoLote(l) === c.nome).length; return { n: c.nome, desc: n ? n + ' terreno(s) livre(s)' : 'sem terreno livre', fn: S2 => construir(S2, o, c.nome) }; });
+    const itens = CID.map((c, k) => { const n = W.lotes.filter(l => esperando(l) && l.tam === o.tam && regiaoDoLote(l) === c.nome).length; return { n: c.nome, desc: n ? n + ' terreno(s) livre(s)' : 'sem terreno livre', fn: S2 => construir(S2, o, c.nome) }; });
     itens.push({ n: '← Voltar', fn: S2 => menuObras(S2) });
     abre(S, o.nome.toUpperCase() + ' — EM QUAL CIDADE?', itens);
   }
@@ -249,7 +251,7 @@
     G.save();
   }
   function menuLocalRua(S) {
-    const itens = W.CIDADES.map(c => ({ n: c.nome, desc: 'recapear um trecho aleatório', fn: S2 => { if (GV.recapear(S2, c.nome, 900)) S2.inside.menu = null; else menuObras(S2); } }));
+    const itens = CID.map(c => ({ n: c.nome, desc: 'recapear um trecho aleatório', fn: S2 => { if (GV.recapear(S2, c.nome, 900)) S2.inside.menu = null; else menuObras(S2); } }));
     itens.push({ n: '← Voltar', fn: S2 => menuObras(S2) }); abre(S, 'RECAPEAMENTO — ONDE?', itens);
   }
   function menuRuas(S) {
