@@ -1,5 +1,13 @@
 <img width="800" height="450" alt="b_deixe_um_pouco_mais_-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/a73e7bcd-c59c-463b-8b60-aae618b7e519" />
  
+## Jogo no navegador — Rua Vermelha 🚗
+
+Protótipo 2D jogável baseado na imagem de referência, com três trechos conectados, colisão contínua contra meios-fios e obstáculos, iluminação dinâmica e um bar pixel art. O jogo usa a própria imagem como cenário inicial e permite dirigir o sedã vermelho, sair do carro e iniciar trabalhos no orelhão.
+
+👉 **[Abrir o jogo](jogo/index.html)** · [Controles e instruções](jogo/README.md)
+
+Para rodar localmente, execute `python3 -m http.server 8000` na raiz e acesse `http://localhost:8000/`.
+
 # Meu agente de IA local 🤖
 
 Este repositório contém o **NÚCLEO**: um agente de IA que roda no meu computador,
