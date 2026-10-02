@@ -2,6 +2,8 @@
 
 A dependency-free WebGL 2 game prototype: walk a fixed, winding road through a dark forest toward a distant gothic keep. The world renders continuously from a stable seed, with a visible armored arm and glowing broadsword, pixel-grid stone surfaces, sunset light, fog, soft ray-marched shadows, and a castle that gains facade detail as you approach.
 
+**Jogar online:** [Abrir The Ashen Way](https://cdn.jsdelivr.net/gh/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE@2e42784c1799ff999cc7b78bc9e5ff24b6746ae6/game/index.html) — link público direto para jogar no navegador.
+
 **Run locally:** `python3 -m http.server 8000 --bind 0.0.0.0` from the repository root, then open <http://localhost:8000/game/>.
 
 **Controls:** WASD to move, mouse to look, Shift to run; touch controls appear on mobile. Press Escape to pause; use ↺ to restart. The game architecture and implementation notes are in [game/README.md](game/README.md). Run the state tests with `npm --prefix game test`.

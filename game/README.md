@@ -2,6 +2,8 @@
 
 A small, dependency-free browser game framework for a dark-fantasy, first-person pixel-art world. The first scene is a winding cobblestone road through a foggy deadwood forest toward the Black Keep; the knight's gauntlet and ember-lit broadsword are rendered as a viewmodel in the lower-right foreground. The selected visual-direction reference is [the generated landscape](../images/dark-fantasy-pixel-landscape.png); the runtime scene itself is rendered procedurally.
 
+**Play online:** [Open The Ashen Way](https://cdn.jsdelivr.net/gh/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE@2e42784c1799ff999cc7b78bc9e5ff24b6746ae6/game/index.html).
+
 ## Run it
 
 From the repository root, start any static HTTP server. For example:
