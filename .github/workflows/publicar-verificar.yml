@@ -73,6 +73,9 @@ jobs:
               --target "${GITHUB_SHA}"
             gh release upload v1.0-cidade-viva LIFE-CIDADE-VIVA.html --clobber
           fi
+          echo "=== REENVIANDO O ANEXO (o Release ja pode existir com a versao antiga) ==="
+          gh release upload v1.0-cidade-viva LIFE-CIDADE-VIVA.html --clobber
+          echo "resultado_upload=$?"
           echo "=== ESTADO FINAL DO RELEASE ==="
           gh release view v1.0-cidade-viva --json name,assets 2>&1 | head -20
 
