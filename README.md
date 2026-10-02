@@ -1,5 +1,17 @@
 <img width="800" height="450" alt="b_deixe_um_pouco_mais_-ezgif com-video-to-gif-converter" src="https://github.com/user-attachments/assets/a73e7bcd-c59c-463b-8b60-aae618b7e519" />
 
+## Jogo — The Ashen Way
+
+Protótipo jogável de fantasia sombria em primeira pessoa, usando a arte escolhida como cena inicial e aproximando a câmera da fortaleza conforme você avança.
+
+```bash
+python3 -m http.server 8080 --bind 0.0.0.0
+```
+
+Abra <http://localhost:8080/game/>. **WASD** move, **Shift** corre, o mouse olha, **Espaço** golpeia, **R** reinicia e **Esc** pausa. A implementação e seus limites estão em [game/README.md](game/README.md).
+
+---
+
 # Meu agente de IA local 🤖
 
 Este repositório contém o **NÚCLEO**: um agente de IA que roda no meu computador,
@@ -31,6 +43,6 @@ python main.py web    # painel no navegador (http://localhost:8000)
 | Painel web sem Flask (servidor HTTP da biblioteca padrão) | ✅ |
 | "Não sei" honesto quando a confiança é baixa (anti-alucinação) | ✅ |
 
-## Referência visual para a próxima configuração
+## Referência visual do jogo
 
-![Paisagem de fantasia sombria em pixel art — referência visual](images/dark-fantasy-pixel-landscape.png)
+![Cena inicial de The Ashen Way em pixel art 3D](images/ashen-way-3d-pixel-game.png)
