@@ -1,3 +1,5 @@
+import { drawCarHighlights, drawStreetLighting } from './lighting.js';
+
 const WIDTH = 1568;
 const HEIGHT = 960;
 const CAR_CROP = { x: 708, y: 345, width: 154, height: 280 };
@@ -20,7 +22,7 @@ const keys = new Set();
 const pressed = new Set();
 const policeCars = [];
 
-let referenceScene = null;
+const sections = [];
 let streetCanvas = null;
 let streetSprite = null;
 let audioContext = null;
@@ -65,6 +67,7 @@ const saved = loadProgress();
 const state = {
   ready: false,
   driving: true,
+  section: 0,
   time: 0,
   money: saved.money,
   reputation: saved.reputation,
@@ -192,16 +195,36 @@ function makeCarSprite(reference) {
   return sprite;
 }
 
-function finishLoading(image) {
-  referenceScene = normalizeScene(image);
-  streetCanvas = makeStreet(referenceScene);
-  streetSprite = makeCarSprite(referenceScene);
+function finishLoading(image, nextSectionImage = null) {
+  const reference = normalizeScene(image);
+  sections.length = 0;
+  sections.push({ name: 'RUA VERMELHA', background: makeStreet(reference) });
+  if (nextSectionImage) {
+    sections.push({ name: 'BAIRRO DO MERCADO', background: normalizeScene(nextSectionImage) });
+  }
+  state.section = 0;
+  streetCanvas = sections[0].background;
+  streetSprite = makeCarSprite(reference);
   state.ready = true;
   loading.classList.add('is-ready');
   hint.classList.add('is-visible');
   hintTimer = 8;
   window.setTimeout(() => hint.classList.remove('is-visible'), 6500);
   canvas.focus({ preventScroll: true });
+}
+
+function changeSection(index, x, y) {
+  const nextSection = sections[index];
+  if (!nextSection) return false;
+  state.section = index;
+  streetCanvas = nextSection.background;
+  state.car.x = x;
+  state.car.y = y;
+  policeCars.length = 0;
+  state.capture = 0;
+  state.cameraShake = Math.max(state.cameraShake, 1.4);
+  showToast(index === 1 ? 'NOVO TRECHO · BAIRRO DO MERCADO' : 'RETORNO · RUA VERMELHA', 3200);
+  return true;
 }
 
 function fallbackScene() {
@@ -353,24 +376,30 @@ function drive(dt) {
   const nextX = car.x + Math.sin(car.angle) * car.speed * dt;
   const nextY = car.y - Math.cos(car.angle) * car.speed * dt;
   const bounds = vehicleHalfExtents(car.angle);
-  const insideRoad = nextX - bounds.x > ROAD.left + 8
-    && nextX + bounds.x < ROAD.right - 8
-    && nextY - bounds.y > 12
-    && nextY + bounds.y < HEIGHT - 12;
+  const insideLane = nextX - bounds.x > ROAD.left + 8 && nextX + bounds.x < ROAD.right - 8;
+  const enteringMarket = state.section === 0 && sections.length > 1 && insideLane && nextY < car.y && nextY - bounds.y <= 12;
+  const returningToMain = state.section === 1 && insideLane && nextY > car.y && nextY + bounds.y >= HEIGHT - 12;
 
-  if (!insideRoad) {
-    car.speed *= -.16;
-    car.health = Math.max(0, car.health - (car.hitCooldown <= 0 ? 6 : 0));
-    car.hitCooldown = .65;
-    state.cameraShake = Math.min(7, state.cameraShake + 3.2);
-    if (elapsed > (state.lastBump || 0) + 850) {
-      state.lastBump = elapsed;
-      showToast('MEIO-FIO · DEVAGAR NA CURVA', 1500);
-      playTone(120, .11, 'triangle', .028);
-    }
+  if (enteringMarket) {
+    changeSection(1, nextX, HEIGHT - bounds.y - 13);
+  } else if (returningToMain) {
+    changeSection(0, nextX, bounds.y + 13);
   } else {
-    car.x = nextX;
-    car.y = nextY;
+    const insideRoad = insideLane && nextY - bounds.y > 12 && nextY + bounds.y < HEIGHT - 12;
+    if (!insideRoad) {
+      car.speed *= -.16;
+      car.health = Math.max(0, car.health - (car.hitCooldown <= 0 ? 6 : 0));
+      car.hitCooldown = .65;
+      state.cameraShake = Math.min(7, state.cameraShake + 3.2);
+      if (elapsed > (state.lastBump || 0) + 850) {
+        state.lastBump = elapsed;
+        showToast('MEIO-FIO · DEVAGAR NA CURVA', 1500);
+        playTone(120, .11, 'triangle', .028);
+      }
+    } else {
+      car.x = nextX;
+      car.y = nextY;
+    }
   }
   car.hitCooldown = Math.max(0, car.hitCooldown - dt);
 }
@@ -399,7 +428,7 @@ function walk(dt) {
 }
 
 function nearPhone() {
-  return !state.driving && distance(state.foot.x, state.foot.y, phone.x, phone.y) < 78;
+  return state.section === 0 && !state.driving && distance(state.foot.x, state.foot.y, phone.x, phone.y) < 78;
 }
 
 function interact() {
@@ -437,7 +466,9 @@ function interact() {
     showToast('CAMPANHA CONCLUÍDA · MODO LIVRE');
     return;
   }
-  const person = people.find((pedestrian) => distance(state.foot.x, state.foot.y, pedestrian.x, pedestrian.baseY) < 40);
+  const person = state.section === 0
+    ? people.find((pedestrian) => distance(state.foot.x, state.foot.y, pedestrian.x, pedestrian.baseY) < 40)
+    : null;
   if (person) {
     showToast('“O trânsito pesa depois das seis.”');
     return;
@@ -451,7 +482,9 @@ function shove() {
     if (Math.abs(state.car.speed) > 65) showToast('FREIO DE MÃO', 900);
     return;
   }
-  const pedestrian = people.find((person) => distance(state.foot.x, state.foot.y, person.x, person.baseY + Math.sin(elapsed * .001 + person.phase) * person.range) < 38);
+  const pedestrian = state.section === 0
+    ? people.find((person) => distance(state.foot.x, state.foot.y, person.x, person.baseY + Math.sin(elapsed * .001 + person.phase) * person.range) < 38)
+    : null;
   if (pedestrian) {
     state.wanted = clamp(state.wanted + 1, 0, 5);
     showToast('EMPURRÃO DE DESENHO ANIMADO · SEM FERIMENTOS');
@@ -829,18 +862,20 @@ function render() {
   ctx.save();
   ctx.translate(shakeX, shakeY);
   ctx.drawImage(streetCanvas, 0, 0);
+  const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, ROAD);
 
-  // Pedestres só aparecem depois que o jogador sai do carro, mantendo a cena inicial igual à referência.
-  if (!state.driving || state.mission) {
+  // Atividades e pedestres permanecem no primeiro quarteirão, onde foram posicionados.
+  if (state.section === 0 && (!state.driving || state.mission)) {
     for (const pedestrian of people) drawPerson(pedestrian);
   }
-  if (!state.driving || state.mission) drawPhone();
+  if (state.section === 0 && (!state.driving || state.mission)) drawPhone();
 
   const target = getTarget();
   if (target) drawTarget(target);
   for (const police of policeCars) drawPoliceCar(police);
   drawHelicopter();
   drawPlayerCar();
+  drawCarHighlights(ctx, state.car, sunlight);
   if (!state.driving) drawPerson(state.foot, true);
   drawHud();
   drawInteractionPrompt();
@@ -889,13 +924,15 @@ function update(dt) {
   if (!state.driving) walk(dt);
   else drive(dt);
 
-  for (const pedestrian of people) {
-    const personY = pedestrian.baseY + Math.sin(elapsed * .001 + pedestrian.phase) * pedestrian.range;
-    if (state.driving && Math.abs(state.car.speed) > 90 && distance(state.car.x, state.car.y, pedestrian.x, personY) < 42 && elapsed > (pedestrian.hitAt || 0)) {
-      pedestrian.hitAt = elapsed + 2600;
-      state.wanted = clamp(state.wanted + 1, 0, 5);
-      state.car.speed *= .65;
-      showToast('O PEDESTRE SE LEVANTOU E SAIU CORRENDO', 2300);
+  if (state.section === 0) {
+    for (const pedestrian of people) {
+      const personY = pedestrian.baseY + Math.sin(elapsed * .001 + pedestrian.phase) * pedestrian.range;
+      if (state.driving && Math.abs(state.car.speed) > 90 && distance(state.car.x, state.car.y, pedestrian.x, personY) < 42 && elapsed > (pedestrian.hitAt || 0)) {
+        pedestrian.hitAt = elapsed + 2600;
+        state.wanted = clamp(state.wanted + 1, 0, 5);
+        state.car.speed *= .65;
+        showToast('O PEDESTRE SE LEVANTOU E SAIU CORRENDO', 2300);
+      }
     }
   }
 
@@ -976,20 +1013,34 @@ helpPanel.addEventListener('pointerdown', (event) => {
   if (event.target === helpPanel) toggleHelp();
 });
 
-const backgroundImage = new Image();
-backgroundImage.onload = () => finishLoading(backgroundImage);
-backgroundImage.onerror = () => {
-  const fallback = fallbackScene();
-  referenceScene = fallback;
-  streetCanvas = makeStreet(fallback);
-  streetSprite = makeCarSprite(fallback);
-  state.ready = true;
-  loading.classList.add('is-ready');
-  hint.classList.add('is-visible');
-  window.setTimeout(() => hint.classList.remove('is-visible'), 6500);
-  showToast('ARTE DE REFERÊNCIA INDISPONÍVEL · USANDO CENA DE CONTINGÊNCIA');
-};
-backgroundImage.src = new URL('./gta-retro.png', import.meta.url).href;
+function loadImageAsset(filename) {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => {
+      console.warn(`Não foi possível carregar o asset: ${filename}`);
+      resolve(null);
+    };
+    image.src = new URL(`./${filename}`, import.meta.url).href;
+  });
+}
+
+async function startLoading() {
+  try {
+    const [mainScene, marketScene] = await Promise.all([
+      loadImageAsset('gta-retro.png'),
+      loadImageAsset('rua-segmento-02.png')
+    ]);
+    finishLoading(mainScene || fallbackScene(), marketScene);
+    if (!mainScene) showToast('ARTE DE REFERÊNCIA INDISPONÍVEL · USANDO CENA DE CONTINGÊNCIA');
+  } catch (error) {
+    console.error('Falha ao preparar a cena do jogo:', error);
+    finishLoading(fallbackScene());
+    showToast('FALHA AO CARREGAR A CENA · USANDO CONTINGÊNCIA');
+  }
+}
+
+void startLoading();
 window.setTimeout(() => {
   if (!state.ready) showToast('CARREGANDO A CENA DE NOVA AURORA…', 4000);
 }, 2400);
