@@ -74,6 +74,15 @@ npx serve .      # ou: npx http-server -p 8000
 
 Nenhuma textura, modelo 3D ou som foi baixado — tudo é gerado por código.
 
+## 🌐 Jogar online (sem instalar nada)
+
+- **Arquivo único** (dá pra baixar e abrir com dois cliques, até offline):
+  `jogo/dist/cidade-dourada.html`
+- Pelo CDN do GitHub (versão publicada):
+  `https://cdn.jsdelivr.net/gh/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE@<COMMIT>/jogo/dist/cidade-dourada.html`
+- Versão multi-arquivo (mesma coisa, separada):
+  `https://cdn.jsdelivr.net/gh/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE@<COMMIT>/jogo/index.html`
+
 ## 📁 Estrutura
 
 ```
@@ -81,6 +90,7 @@ jogo/
 ├─ index.html          telas (menu, pausa, fim) + HUD + import map
 ├─ style.css           interface
 ├─ assets/capa.jpg     imagem de referência (cidade realista)
+├─ dist/cidade-dourada.html  versão ARQUIVO ÚNICO (bundle p/ compartilhar/abrir offline)
 ├─ vendor/three/       Three.js r160 + addons de pós-processamento (offline)
 └─ src/
    ├─ main.js          game loop, câmera, HUD, missões, pontuação
