@@ -57,6 +57,9 @@ jobs:
             echo "| [$nome]($url) | $code | $tipo | $marca ($tam bytes) |" >> "$OUT"
           }
           testar "surge.sh (domínio limpo)"        "https://cidade-dourada-jogo.surge.sh/"
+          testar "githack (ARQUIVO ÚNICO)"         "https://raw.githack.com/$REPO/$SHA/jogo/dist/cidade-dourada.html"
+          testar "githack (sempre atualizado)"     "https://raw.githack.com/$REPO/arena/01a0fa4c-guilhermefmaga-site/jogo/index.html"
+          testar "githack (sempre atualizado, 1 arq)" "https://raw.githack.com/$REPO/arena/01a0fa4c-guilhermefmaga-site/jogo/dist/cidade-dourada.html"
           testar "jsDelivr (arquivo único)"        "https://cdn.jsdelivr.net/gh/$REPO@$SHA/jogo/dist/cidade-dourada.html"
           testar "jsDelivr (multi-arquivo)"        "https://cdn.jsdelivr.net/gh/$REPO@$SHA/jogo/index.html"
           testar "raw.githack (multi-arquivo)"     "https://raw.githack.com/$REPO/$SHA/jogo/index.html"
