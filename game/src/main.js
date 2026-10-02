@@ -23,7 +23,7 @@ let fpsStart = animationStart;
 let fpsFrames = 0;
 let fps = 60;
 
-image.src = '../images/ashen-way-3d-pixel-game.png';
+image.src = new URL('../../images/ashen-way-3d-pixel-game.png', import.meta.url).href;
 image.addEventListener('load', () => {
   imageError.hidden = true;
   resizeCanvas();
