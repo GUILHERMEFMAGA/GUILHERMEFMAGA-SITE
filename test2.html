@@ -1,26 +1,51 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-<title>Titulo Games</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UMBRAFELL — The Ashen Gate</title>
+<style>
+:root{--gold:#f2b35d;--bone:#dacdb2;--ink:#0a0c12;--muted:#89909c}*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#080a10;color:var(--bone);font-family:Georgia,serif}#game{position:fixed;inset:0;image-rendering:pixelated;image-rendering:crisp-edges}canvas{display:block;width:100%;height:100%;image-rendering:pixelated}.vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 43%,rgba(0,0,0,.32) 73%,rgba(0,0,0,.88) 125%);mix-blend-mode:multiply}.hud{position:fixed;inset:0;pointer-events:none;padding:28px 32px;display:flex;flex-direction:column;justify-content:space-between}.brand{letter-spacing:.24em;font-size:11px;color:var(--gold);text-shadow:2px 2px #26140c}.brand b{display:block;font-size:21px;letter-spacing:.14em;color:#efe2c0}.status{display:flex;align-items:center;gap:10px;margin-top:6px;color:#82858d;font:10px monospace;letter-spacing:.09em}.dot{height:7px;width:7px;background:#d68a40;box-shadow:0 0 10px #d68a40}.prompt{align-self:center;text-align:center;margin-bottom:30px;color:#d6cdbb;line-height:1.7;text-shadow:2px 2px #07080c;font-size:13px}.prompt strong{display:block;color:#f0b866;font:11px monospace;letter-spacing:.18em}.location{border-left:2px solid #a96d36;padding-left:12px;font-style:italic;color:#d8c5a0;line-height:1.4}.location small{display:block;font-style:normal;color:#7b7d86;font:10px monospace;letter-spacing:.08em;margin-top:4px}.weapon{position:fixed;right:5%;bottom:-1%;width:min(230px,27vw);height:min(285px,38vh);pointer-events:none;filter:drop-shadow(8px 9px 0 rgba(0,0,0,.35))}.weapon .blade{position:absolute;right:38%;bottom:32%;width:18px;height:70%;background:linear-gradient(90deg,#26282d 0 28%,#b8b5aa 40% 63%,#46464a 75%);clip-path:polygon(39% 0,100% 90%,66% 100%,0 90%);transform:rotate(12deg);box-shadow:8px 0 #11151a}.weapon .guard{position:absolute;right:25%;bottom:30%;width:106px;height:13px;background:#312522;border:3px solid #b47b3d;transform:rotate(12deg);box-shadow:0 4px #100d0c}.weapon .grip{position:absolute;right:42%;bottom:6%;width:20px;height:29%;background:repeating-linear-gradient(0deg,#2c1a18 0 12px,#ae6f38 13px 17px);transform:rotate(12deg);border:2px solid #100d0c}.weapon .hand{position:absolute;right:12%;bottom:0;width:77px;height:73px;border-radius:45% 45% 18% 22%;background:#6b3e2e;border:4px solid #2b1a1c;transform:rotate(-14deg)}.weapon .hand:after{content:'';position:absolute;right:42px;top:-12px;width:48px;height:25px;border-radius:40%;background:#85503b;transform:rotate(20deg)}.crosshair{position:fixed;left:50%;top:50%;width:3px;height:3px;background:#dcb46e;box-shadow:0 0 6px #e0a951;opacity:.7}.help{position:fixed;right:30px;top:29px;color:#737984;font:10px monospace;letter-spacing:.06em;text-align:right}.help span{color:#c9a36a}.start{position:fixed;inset:0;display:grid;place-items:center;background:rgba(4,5,9,.62);backdrop-filter:blur(3px);z-index:5}.card{width:min(460px,calc(100% - 40px));padding:38px 40px 34px;background:linear-gradient(135deg,rgba(21,20,25,.96),rgba(11,13,19,.96));border:1px solid #70502d;box-shadow:0 0 0 5px rgba(7,8,12,.65),inset 0 0 30px rgba(128,73,27,.08);text-align:center}.card h1{font-size:32px;letter-spacing:.17em;color:#e8c58b;margin:0 0 7px}.card h2{font:10px monospace;letter-spacing:.28em;color:#8b8e97;margin:0 0 27px}.card p{font-size:14px;line-height:1.7;color:#b2ac9d;margin:0 0 24px}.enter{display:inline-block;color:#f0b866;border:1px solid #9c6330;padding:12px 22px;font:11px monospace;letter-spacing:.18em;background:rgba(105,55,24,.15);cursor:pointer}.enter:hover{background:rgba(175,96,36,.25)}.mobile-tip{display:none}@media(max-width:600px){.hud{padding:18px}.help{top:auto;right:18px;bottom:18px}.prompt{margin-bottom:40px;font-size:11px}.weapon{width:160px;height:220px}.card{padding:30px 24px}.mobile-tip{display:block;color:#8d9199;font:10px monospace;margin-top:12px}}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
 </head>
 <body>
-
-<h1>Sobre a Ctrl+Play</h1>
-<p>Somos uma escola de programação e robótica para crianças e adolescentes. <u><b>Acreditamos</b></u> que, em um mundo movido pela tecnologia, é importante que os nossos jovens compreendam essas inovações e mais que isso, contribuam com a produção dessas tecnologias.</p>
-
-<h2>O quê ensinamos?</h2>
-<p>Nosso curso ensina <u>programação</u> por meio de ferramentas lúdicas e educativas. Através de <b>nossa metodologia</b>, nossos alunos aprendem a criar <u>games, aplicativos, sites  e até robôs!</u> O objetivo é dar o poder para as crianças se tornarem criadoras de <i>tecnologias</i>, preparando-as para o sucesso em um futuro digital.
-</p>
-
-<h2>Futuro Emprego</h2>
-<p><u><b>Independentemente da profissão</b></u> que uma criança <b>escolha</b> seguir no futuro, conhecer as <b>lógicas de programação</b> sempre irá ajudá-la, pois ela conseguirá compreender <b>inovações digitais</b> a fundo, desenvolverá forte raciocínio lógico, além de criatividade para elaborar novas tecnologias.</p>
-
-<h2>Método Ctrl+Play</h2>
-<p>Nosso método de ensino de <b>programação</b> e robótica utiliza ferramentas de aprendizado desenvolvidas por instituições de renome como <a href="https://pt.wikipedia.org/wiki/Instituto_de_Tecnologia_de_Massachusetts"><b>MIT</b></a>(Massachussets Institute of Technology), <a href="https://pt.wikipedia.org/wiki/Microsoft"><u>Microsoft</u></a>, <a href="https://pt.wikipedia.org/wiki/Google"><b>Google</b></a>, entre outras. Por meio de métodos interativos, como aplicativos, jogos e atividades unplugged (fora do computador) ensinamos programação aos nossos alunos de forma divertida, despertando interesse no aprendizado.</p>
-
-<h1>Matricule seu filho(a) na Ctrl+Play</h1>
-<p>E o ajude a fazer parte de uma nova geração capaz de empreender e usar a tecnologia para transformar o mundo e torná-lo um lugar melhor!</p>
-<p><a href="https://ctrlplay.com.br/"><u><b>Cadastre-se aqui!</b></u></a></p>
-
-</body>
-</html>
+<div id="game"></div><div class="vignette"></div>
+<div class="hud"><div><div class="brand">UMBRAFELL <b>THE ASHEN GATE</b></div><div class="status"><i class="dot"></i> THE LONG NIGHT · 02:17</div></div><div class="location">The road remembers your footsteps<small>ASHEN MARCHES // OUTER PERIMETER</small></div></div>
+<div class="help"><span>W A S D</span> move &nbsp; <span>DRAG</span> look<br><span>ESC</span> release cursor</div>
+<div class="prompt"><strong>CLICK TO ENTER THE MARCHES</strong>Walk the old road. Find the light beyond the gate.<div class="mobile-tip">Drag anywhere to look · tap the road to walk</div></div>
+<div class="crosshair"></div>
+<div class="weapon" aria-label="A gloved hand holding a sword"><div class="blade"></div><div class="guard"></div><div class="grip"></div><div class="hand"></div></div>
+<div class="start" id="start"><div class="card"><h1>UMBRAFELL</h1><h2>THE ASHEN GATE</h2><p>A pixel-dark pilgrimage through the drowned woods.<br>The castle has been waiting since the last bell.</p><button class="enter" id="enter">ENTER THE MARCHES</button></div></div>
+<script type="module">
+import * as THREE from 'three';
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x090d18); scene.fog=new THREE.FogExp2(0x111726,.014);
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,500); camera.position.set(0,1.72,23); camera.rotation.order='YXZ';
+const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'high-performance'}); renderer.setPixelRatio(1); renderer.setSize(Math.floor(innerWidth*.78),Math.floor(innerHeight*.78),false); renderer.domElement.style.width='100%';renderer.domElement.style.height='100%'; renderer.outputColorSpace=THREE.SRGBColorSpace; document.querySelector('#game').appendChild(renderer.domElement);
+const ambient=new THREE.HemisphereLight(0x293852,0x100c0b,1.35);scene.add(ambient); const moon=new THREE.DirectionalLight(0x7587b7,1.2);moon.position.set(-30,50,20);scene.add(moon);
+function tex(base,accent,seed=1){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,64,64);let n=seed*97;for(let i=0;i<170;i++){n=(n*1664525+1013904223)>>>0;const col=(n%7<2)?accent:(n%5<2?'#1a1b24':'#282931');x.fillStyle=col;x.fillRect(n%64,(n>>>8)%64,2+(n%5),2+(n%4))}return new THREE.CanvasTexture(c)}
+const groundMat=new THREE.MeshStandardMaterial({map:tex('#191a1f','#343238',5),roughness:1}); const stoneMat=new THREE.MeshStandardMaterial({map:tex('#252630','#4a4850',8),roughness:1}); const darkMat=new THREE.MeshStandardMaterial({map:tex('#10151a','#26312b',4),roughness:1}); const woodMat=new THREE.MeshStandardMaterial({map:tex('#211713','#553327',7),roughness:1});
+function box(x,y,z,sx,sy,sz,mat=stoneMat){const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat);m.position.set(x,y,z);scene.add(m);return m}
+// Ground and raised, bounded road
+box(0,-.22,-58,56,.4,160,groundMat); box(-6,.01,-58,1,.35,160,stoneMat);box(6,.01,-58,1,.35,160,stoneMat);
+for(let z=16;z>-110;z-=2.7){const w=5.6+Math.sin(z*.17)*.35;const p=box(0,.02,z,w,.12,1.8,stoneMat);p.rotation.y=(Math.sin(z*8)*.08)}
+// castle silhouette, towers, gate
+function tower(x,z){box(x,8,z,7,16,7,stoneMat);box(x,17,z,7.8,2,7.8,stoneMat);for(let i=0;i<4;i++){const a=i*Math.PI/2;box(x+Math.cos(a)*2.9,18,z+Math.sin(a)*2.9,1.3,2.8,1.3,stoneMat)}for(let y=7;y<15;y+=3)for(let side of [-1,1]){const w=box(x+side*3.56,y,z,0.25,1.2,.7,new THREE.MeshStandardMaterial({color:0xffa43b,emissive:0xff7b19,emissiveIntensity:2}));}}
+tower(-11,-74);tower(11,-74);box(0,8,-74,16,16,5,stoneMat);box(0,2.5,-71.1,6,5,1.2,new THREE.MeshStandardMaterial({color:0x100e11}));box(0,17,-74,21,2,5,stoneMat);
+// battlements
+for(let x=-9;x<=9;x+=3)box(x,19,-74,1.8,2,5,stoneMat);
+// trees with collision trunks
+const colliders=[]; function tree(x,z,scale=1){const trunk=box(x,2.5*scale,z,.9*scale,5*scale,.9*scale,woodMat);colliders.push({x,z,r:1.3*scale});for(let i=0;i<5;i++){const a=i*1.25+.4;const c=new THREE.Mesh(new THREE.ConeGeometry((3.2-i*.42)*scale,(4.8-i*.5)*scale,7),darkMat);c.position.set(x+Math.cos(a)*.6*scale,5.2*scale-i*1.1*scale,z+Math.sin(a)*.6*scale);scene.add(c)}}
+for(let z=13;z>-102;z-=8){tree(-10-Math.sin(z)*2,z,1+((z*-3)%3)/5);tree(10+Math.cos(z*1.4)*2,z-3,1.2)}
+// rocks as peripheral blockers
+for(let i=0;i<18;i++){const z=10-i*6.3,x=(i%2?-1:1)*(7.2+(i%3));const r=new THREE.Mesh(new THREE.DodecahedronGeometry(1.1+(i%3)*.35,0),stoneMat);r.position.set(x,.8,z);r.scale.y=.7;scene.add(r);colliders.push({x,z,r:1.8})}
+// torches
+function torch(x,z){box(x,1.7,z,.28,3.4,.28,woodMat);const flame=new THREE.Mesh(new THREE.ConeGeometry(.5,1.15,5),new THREE.MeshStandardMaterial({color:0xff9e38,emissive:0xf05c12,emissiveIntensity:4}));flame.position.set(x,3.6,z);scene.add(flame);const light=new THREE.PointLight(0xff8a32,3.4,12,2);light.position.set(x,3.5,z);scene.add(light)}torch(-4,9);torch(4,-7);torch(-4,-28);torch(4,-49);
+// moon / stars
+const moonMesh=new THREE.Mesh(new THREE.SphereGeometry(5,12,8),new THREE.MeshBasicMaterial({color:0xb4c1d2}));moonMesh.position.set(-35,37,-100);scene.add(moonMesh);for(let i=0;i<80;i++){const s=new THREE.Mesh(new THREE.BoxGeometry(.08,.08,.08),new THREE.MeshBasicMaterial({color:0x9aabc3}));s.position.set((Math.random()-.5)*120,18+Math.random()*35,-20-Math.random()*130);scene.add(s)}
+// controls
+const keys={};let yaw=0,pitch=0,drag=false,lastX=0,lastY=0;const start=document.querySelector('#start');
+function lock(){start.style.display='none';renderer.domElement.requestPointerLock?.()}document.querySelector('#enter').onclick=lock;renderer.domElement.onclick=()=>{if(innerWidth>700)lock()};addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Escape')start.style.display='grid'});addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement||drag){yaw-=e.movementX*.0022||((e.clientX-lastX)*.004);pitch-=e.movementY*.0022||((e.clientY-lastY)*.004);pitch=Math.max(-1.35,Math.min(1.35,pitch));lastX=e.clientX;lastY=e.clientY}});addEventListener('mousedown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY});addEventListener('mouseup',()=>drag=false);addEventListener('touchstart',e=>{drag=true;lastX=e.touches[0].clientX;lastY=e.touches[0].clientY},{passive:true});addEventListener('touchmove',e=>{const t=e.touches[0];yaw-=(t.clientX-lastX)*.006;pitch-=(t.clientY-lastY)*.006;pitch=Math.max(-1.35,Math.min(1.35,pitch));lastX=t.clientX;lastY=t.clientY},{passive:true});addEventListener('touchend',()=>drag=false);
+const clock=new THREE.Clock();function loop(){requestAnimationFrame(loop);const dt=Math.min(clock.getDelta(),.05),speed=keys.shift?8:4.4;let f=(keys.w?1:0)-(keys.s?1:0),r=(keys.d?1:0)-(keys.a?1:0);const len=Math.hypot(f,r)||1;f/=len;r/=len;const nx=camera.position.x+(Math.sin(yaw)*f+Math.cos(yaw)*r)*speed*dt,nz=camera.position.z+(Math.cos(yaw)*f-Math.sin(yaw)*r)*speed*dt;let safe=Math.abs(nx)<5.1;for(const c of colliders)if((nx-c.x)**2+(nz-c.z)**2<c.r*c.r)safe=false;if(safe&&nx>-5.25&&nx<5.25&&nz<27&&nz>-105){camera.position.x=nx;camera.position.z=nz}camera.rotation.set(pitch,yaw,0);renderer.render(scene,camera)}loop();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(Math.floor(innerWidth*.78),Math.floor(innerHeight*.78),false)});
+</script></body></html>
