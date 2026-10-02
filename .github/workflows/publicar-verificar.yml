@@ -1,0 +1,128 @@
+name: Publicar jogo e verificar links
+
+# Este workflow roda dentro do GitHub e faz duas coisas:
+#   1. testa quais endereços públicos conseguem servir o jogo para o navegador;
+#   2. publica o arquivo único LIFE-CIDADE-VIVA.html como anexo de um Release,
+#      criando um link de download permanente que não depende de servidor local.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publicar-verificar.yml'
+      - 'LIFE-CIDADE-VIVA.html'
+      - 'life-cidade-viva/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+
+      - name: Verificar quais endereços servem o jogo
+        run: |
+          echo "=== VERIFICACAO DE LINKS ==="
+          SHA="${GITHUB_SHA}"
+          REPO="GUILHERMEFMAGA/GUILHERMEFMAGA-SITE"
+          ARQ="LIFE-CIDADE-VIVA.html"
+          testar() {
+            local url="$1"
+            local resposta
+            resposta=$(curl -sS -L -o /tmp/saida.html -m 30 -w "%{http_code}|%{content_type}|%{size_download}" "$url" 2>/dev/null || echo "erro||0")
+            local codigo=$(echo "$resposta" | cut -d'|' -f1)
+            local tipo=$(echo "$resposta" | cut -d'|' -f2)
+            local tam=$(echo "$resposta" | cut -d'|' -f3)
+            local marca="nao"
+            if grep -qi "LIFE: CIDADE VIVA" /tmp/saida.html 2>/dev/null; then marca="SIM"; fi
+            echo "LINK|$codigo|$tipo|$tam bytes|jogo_presente=$marca|$url"
+          }
+          exec > >(tee /tmp/links.txt) 2>&1
+          echo "=== VERIFICACAO DE LINKS (qual serve o jogo ao navegador?) ==="
+          testar "https://raw.githubusercontent.com/$REPO/arena/01a0f9be-guilhermefmaga-site/$ARQ"
+          testar "https://cdn.jsdelivr.net/gh/$REPO@$SHA/$ARQ"
+          testar "https://raw.githack.com/$REPO/$SHA/$ARQ"
+          testar "https://cdn.statically.io/gh/$REPO/$SHA/$ARQ"
+          testar "https://htmlpreview.github.io/?https://github.com/$REPO/blob/$SHA/$ARQ"
+          echo "=== FIM DA VERIFICACAO ==="
+
+      - name: Publicar o jogo como anexo de Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          echo "=== TENTANDO CRIAR O RELEASE ==="
+          gh release create v1.0-cidade-viva LIFE-CIDADE-VIVA.html \
+            --title "LIFE: CIDADE VIVA — jogo completo em um arquivo" \
+            --notes "Baixe o arquivo LIFE-CIDADE-VIVA.html e abra com dois cliques.
+
+          O jogo roda offline, sem servidor e sem instalação: cidade procedural com mais de 1.000 imóveis,
+          2.200 moradores com rotina própria, trânsito com semáforos, ciclo de 24 horas, clima
+          dinâmico, interiores exploráveis, empregos e economia viva.
+
+          Controles: WASD para andar, E para interagir, TAB para o celular." \
+            --target "${GITHUB_SHA}"
+          echo "resultado_create=$?"
+          if ! gh release view v1.0-cidade-viva >/dev/null 2>&1; then
+            echo "=== RELEASE NAO EXISTE, CRIANDO SEM ANEXO E ENVIANDO ==="
+            gh release create v1.0-cidade-viva --title "LIFE: CIDADE VIVA" \
+              --notes "Jogo completo em um arquivo HTML." \
+              --target "${GITHUB_SHA}"
+            gh release upload v1.0-cidade-viva LIFE-CIDADE-VIVA.html --clobber
+          fi
+          echo "=== REENVIANDO O ANEXO (o Release ja pode existir com a versao antiga) ==="
+          gh release upload v1.0-cidade-viva LIFE-CIDADE-VIVA.html --clobber
+          echo "resultado_upload=$?"
+          echo "=== ESTADO FINAL DO RELEASE ==="
+          gh release view v1.0-cidade-viva --json name,assets 2>&1 | head -20
+
+      - name: Testar o link de download do Release e montar o relatório
+        run: |
+          {
+            echo "=== TESTE DO LINK DE DOWNLOAD DO RELEASE ==="
+            curl -sS -L -o /tmp/release.html -m 90 \
+              -w "RELEASE|%{http_code}|%{content_type}|%{size_download} bytes\n" \
+              "https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html" || true
+            if grep -qi "LIFE: CIDADE VIVA" /tmp/release.html 2>/dev/null; then
+              echo "RELEASE|jogo_presente=SIM"
+            else
+              echo "RELEASE|jogo_presente=nao"
+            fi
+            echo ""
+            cat /tmp/links.txt 2>/dev/null
+            echo ""
+            echo "=== CABECALHOS FINAIS (o navegador renderiza ou baixa?) ==="
+            curl -sIL -m 60 "https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/releases/download/v1.0-cidade-viva/LIFE-CIDADE-VIVA.html" \
+              | grep -i -E "^(HTTP/|content-type|content-disposition|content-length)" | tail -8
+          } > /tmp/relatorio.txt 2>&1
+          cat /tmp/relatorio.txt
+
+      - name: Publicar o relatório nas notas do Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          {
+            echo "## Como jogar"
+            echo ""
+            echo "1. Clique em **LIFE-CIDADE-VIVA.html** (em Assets, abaixo) para baixar o jogo."
+            echo "2. Dê dois cliques no arquivo baixado. Ele abre no navegador e roda offline."
+            echo "3. Se o Windows avisar que o arquivo veio da internet: clique em **Manter** / **Executar mesmo assim**."
+            echo ""
+            echo "**Jogar no navegador (um clique):** https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/${GITHUB_SHA}/LIFE-CIDADE-VIVA.html"
+            echo ""
+            echo "O jogo é um único arquivo HTML ($(du -h LIFE-CIDADE-VIVA.html | cut -f1)) — não precisa de servidor, instalação nem internet."
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Relatório de verificação automática"
+            echo ""
+            echo "\`\`\`"
+            cat /tmp/relatorio.txt 2>/dev/null
+            echo "\`\`\`"
+          } > /tmp/notas.md
+          gh release edit v1.0-cidade-viva --notes-file /tmp/notas.md
+          echo "notas_atualizadas=$?"

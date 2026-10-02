@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>LIFE: CIDADE VIVA</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="hud-left">
+      <div class="panel" id="panel-clock">
+        <div class="clock-line"><span id="clock-time">07:00</span><span id="clock-day">Seg · Dia 1</span></div>
+        <div class="weather-line"><span id="weather-icon">☀</span><span id="weather-name">Céu limpo</span></div>
+      </div>
+      <div class="panel" id="panel-needs">
+        <div class="need"><span class="need-lbl">🍔 Fome</span><div class="need-bar"><i id="bar-hunger"></i></div></div>
+        <div class="need"><span class="need-lbl">⚡ Energia</span><div class="need-bar"><i id="bar-energy"></i></div></div>
+        <div class="need"><span class="need-lbl">🚿 Higiene</span><div class="need-bar"><i id="bar-hygiene"></i></div></div>
+        <div class="need"><span class="need-lbl">😄 Humor</span><div class="need-bar"><i id="bar-fun"></i></div></div>
+      </div>
+    </div>
+
+    <div id="hud-right">
+      <div class="panel" id="panel-wallet">
+        <span class="wallet-lbl">CARTEIRA</span>
+        <span id="money-value">R$ 0,00</span>
+        <span class="wallet-sub" id="money-sub">Sem emprego</span>
+      </div>
+      <div class="panel" id="panel-minimap"><canvas id="minimap" width="208" height="208"></canvas><div id="minimap-label">Centro</div></div>
+    </div>
+
+    <div id="hud-vehicle" class="panel hidden">
+      <div class="vh-line"><b id="vh-name">Carro</b><span id="vh-speed">0 km/h</span></div>
+      <div class="vh-gauge"><span>⛽</span><div class="vbar"><i id="vh-fuel"></i></div></div>
+      <div class="vh-gauge"><span>🔧</span><div class="vbar"><i id="vh-dmg"></i></div></div>
+      <div class="vh-hint" id="vh-hint">E para sair · L faróis</div>
+    </div>
+
+    <div id="hud-center">
+      <div id="prompt" class="hidden"></div>
+      <div id="notifs"></div>
+    </div>
+
+    <div id="hud-bottom">
+      <div id="news-bar"><span id="news-tag">CIDADE VIVA · JORNAL</span><div id="news-track"><span id="news-text"></span></div></div>
+      <div id="controls-strip">
+        <span><b>WASD</b> andar</span><span><b>Shift</b> correr</span><span><b>E</b> interagir/entrar</span>
+        <span><b>Espaço</b> freio de mão</span><span><b>L</b> faróis</span><span><b>TAB</b> celular</span>
+        <span><b>C</b> câmera</span><span><b>P</b> pausa</span><span><b>+/-</b> velocidade</span><span><b>M</b> som</span>
+      </div>
+    </div>
+
+    <div id="speed-controls" class="panel">
+      <button data-speed="0">⏸</button>
+      <button data-speed="1" class="on">1×</button>
+      <button data-speed="6">6×</button>
+      <button data-speed="30">30×</button>
+      <button id="btn-camera" title="Modo câmera (observar a cidade)">🎥</button>
+    </div>
+
+    <div id="zone-banner" class="hidden"></div>
+  </div>
+
+  <!-- ===================== CELULAR ===================== -->
+  <div id="phone" class="hidden">
+    <div id="phone-body">
+      <div id="phone-head">
+        <span id="phone-title">📱 LIFE OS</span>
+        <span id="phone-clock">07:00</span>
+      </div>
+      <div id="phone-tabs">
+        <button data-tab="jobs" class="on">Empregos</button>
+        <button data-tab="map">Mapa</button>
+        <button data-tab="bank">Banco</button>
+        <button data-tab="bag">Mochila</button>
+        <button data-tab="stats">Vida</button>
+      </div>
+      <div id="phone-view"></div>
+    </div>
+  </div>
+
+  <!-- ===================== PAINEL DE INTERAÇÃO (loja/restaurante/posto) ===================== -->
+  <div id="shop" class="hidden">
+    <div id="shop-head"><span id="shop-title">Loja</span><button id="shop-close">✕</button></div>
+    <div id="shop-sub"></div>
+    <div id="shop-list"></div>
+    <div id="shop-foot"></div>
+  </div>
+
+  <div id="dialog" class="hidden">
+    <div id="dialog-text"></div>
+    <div id="dialog-opts"></div>
+  </div>
+
+  <!-- ===================== MENU INICIAL ===================== -->
+  <div id="menu">
+    <div id="menu-inner">
+      <h1>LIFE<span>: CIDADE VIVA</span></h1>
+      <p class="tag">Um simulador de vida em mundo aberto — a cidade vive com ou sem você.</p>
+      <div id="menu-gen">
+        <label>Semente da cidade <input id="seed-input" value="20261001" maxlength="12"></label>
+        <div id="seed-hint">A mesma semente gera exatamente a mesma cidade.</div>
+      </div>
+      <div class="menu-btns">
+        <button id="btn-new" class="big">▶ NOVO JOGO</button>
+        <button id="btn-continue" class="big ghost" disabled>CONTINUAR</button>
+        <button id="btn-spectator" class="ghost">👁 MODO OBSERVADOR</button>
+        <button id="btn-help" class="ghost">? COMO JOGAR</button>
+      </div>
+      <div id="menu-features">
+        <span>🏙 Cidade procedural 212×212</span><span>🚦 Trânsito com semáforos</span><span>🧑‍🤝‍🧑 2.200 moradores com rotina</span>
+        <span>🌗 Ciclo de 24h</span><span>🌧 Clima dinâmico</span><span>🏪 Interiores exploráveis</span>
+        <span>💰 Economia viva</span><span>🚑 Eventos espontâneos</span>
+      </div>
+      <div id="menu-loading" class="hidden"><div class="spinner"></div><span id="menu-loading-txt">Construindo a cidade…</span></div>
+    </div>
+  </div>
+
+  <!-- ===================== AJUDA ===================== -->
+  <div id="help" class="hidden">
+    <div id="help-inner">
+      <h2>Como jogar</h2>
+      <div class="help-cols">
+        <div>
+          <h3>Movimento</h3>
+          <ul>
+            <li><b>W A S D</b> — andar (dentro de veículos: dirigir)</li>
+            <li><b>Shift</b> — correr / acelerar</li>
+            <li><b>E</b> — entrar em veículo, prédio, conversar, trabalhar</li>
+            <li><b>Espaço</b> — freio de mão</li>
+            <li><b>L</b> — faróis · <b>Buzina</b>: <b>H</b></li>
+          </ul>
+          <h3>Interface</h3>
+          <ul>
+            <li><b>TAB</b> — celular (empregos, mapa, banco, mochila)</li>
+            <li><b>P</b> — pausar · <b>+ / -</b> — velocidade do tempo</li>
+            <li><b>C</b> — alternar câmera (seguir / livre / alta)</li>
+            <li><b>M</b> — som ligado/desligado</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Primeiros passos sugeridos</h3>
+          <ol>
+            <li>Abra o celular (<b>TAB</b>) → <b>Empregos</b> e aceite um bico de <i>entrega</i>.</li>
+            <li>Siga a seta amarela até o ponto de coleta e depois até o destino.</li>
+            <li>Ganhe dinheiro, compre comida no supermercado e abasteça o carro no posto.</li>
+            <li>Alugue um kitnet no celular → <b>Banco</b> para dormir e recuperar energia.</li>
+            <li>Fique parado num cruzamento e apenas <i>observe</i>: o mundo continua.</li>
+          </ol>
+          <h3>Sobrevivência</h3>
+          <ul>
+            <li>Fome, energia, higiene e humor caem com o tempo.</li>
+            <li>Sem energia, você anda devagar. Sem fome, os batimentos aparecem.</li>
+            <li>Dormir em casa/hotel recupera energia. Banho recupera higiene.</li>
+          </ul>
+        </div>
+      </div>
+      <button id="help-close" class="big">ENTENDI</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="js/core.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>

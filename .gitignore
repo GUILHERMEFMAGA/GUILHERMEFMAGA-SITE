@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Ambiente e editores
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+
+# Dados gerados pelo agente (podem ser recriados)
+agente-ia/dados/memoria.db
+agente-ia/dados/cerebro_rede.json
+agente-ia/dados/cerebro_vocabulario.json
+agente-ia/dados/estado_fluxos.json
+agente-ia/dados/log_execucoes.jsonl
+agente-ia/dados/saidas/*
+!agente-ia/dados/saidas/.gitkeep
+
+# Arquivos de teste locais
+agente-ia/meu_teste.py

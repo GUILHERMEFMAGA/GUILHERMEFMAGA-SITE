@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guilherme F. Maga — projetos</title>
+<style>
+  :root{--bg:#080d13;--panel:#111a24;--line:#22303f;--txt:#e8f1f8;--dim:#93a7ba;--acc:#ffd23f;--acc2:#4cc9f0;--green:#37d67a}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(ellipse at 50% -10%,#16283c 0%,#080d13 60%);color:var(--txt);
+       font-family:ui-monospace,"Courier New",Menlo,Consolas,monospace;min-height:100vh;padding:40px 20px}
+  .wrap{max-width:960px;margin:0 auto}
+  header{text-align:center;margin-bottom:44px}
+  h1{font-size:40px;letter-spacing:3px;line-height:1.1}
+  h1 span{color:var(--acc)}
+  .sub{color:var(--dim);font-size:13px;margin-top:12px;line-height:1.7}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}h1{font-size:28px}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;
+        display:flex;flex-direction:column;gap:12px;transition:.18s}
+  .card:hover{border-color:var(--acc);transform:translateY(-2px)}
+  .card h2{font-size:19px;letter-spacing:1px}
+  .card h2 small{display:block;font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:4px}
+  .card p{font-size:12.5px;color:var(--dim);line-height:1.75;flex:1}
+  .tags{display:flex;flex-wrap:wrap;gap:6px}
+  .tag{font-size:10px;border:1px solid var(--line);border-radius:20px;padding:3px 9px;color:#a9bccd}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  a.btn{background:var(--acc);color:#141007;text-decoration:none;font-weight:bold;font-size:12.5px;
+        padding:10px 16px;border-radius:5px;letter-spacing:.5px}
+  a.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+  a.btn.ghost:hover{border-color:var(--acc2)}
+  a.btn:hover{filter:brightness(1.08)}
+  footer{text-align:center;color:#6c7f92;font-size:11px;margin-top:40px;line-height:1.9}
+  footer a{color:var(--acc2);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>GUILHERME F. MAGA<br><span>PROJETOS</span></h1>
+    <p class="sub">Dois projetos pessoais: um agente de IA que roda no seu computador, escrito em Python puro,<br>
+    e um simulador de vida em mundo aberto que roda no navegador, em JavaScript puro.</p>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2><small>JOGO · JAVASCRIPT PURO</small>LIFE: CIDADE VIVA 🏙</h2>
+      <p>Simulador de vida em mundo aberto visto de cima. A cidade é gerada por semente e continua
+      vivendo sem você: <b>2.200 moradores</b> com casa, emprego e rotina, trânsito com semáforos,
+      ciclo de 24 h, clima, eventos espontâneos com bombeiros e ambulâncias, interiores
+      exploráveis, empregos, economia com preços e estoques, e a sensação de que o mundo
+      existiria mesmo se você nunca tivesse aberto o jogo.</p>
+      <div class="tags">
+        <span class="tag">mundo procedural</span><span class="tag">NPCs autônomos</span>
+        <span class="tag">trânsito</span><span class="tag">dia/noite</span>
+        <span class="tag">clima</span><span class="tag">interiores</span>
+        <span class="tag">empregos</span><span class="tag">economia</span>
+      </div>
+      <div class="btns">
+        <a class="btn" href="life-cidade-viva/index.html">▶ JOGAR AGORA</a>
+        <a class="btn ghost" href="life-cidade-viva/LEIA-ME.md">Documentação</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><small>IA · PYTHON PURO</small>NÚCLEO — agente de IA local 🤖</h2>
+      <p>Agente de IA que roda no seu computador <b>sem API paga</b>, sem Ollama e sem instalar
+      nenhum pacote: rede neural MLP treinada do zero com backpropagation, memória curta e longa
+      em SQLite, 11 ferramentas (cálculo seguro, arquivos, resumo, análise de texto, sistema),
+      automações no estilo n8n com gatilhos e variáveis, painel web e um "não sei" honesto quando
+      a confiança é baixa.</p>
+      <div class="tags">
+        <span class="tag">rede neural do zero</span><span class="tag">backpropagation</span>
+        <span class="tag">SQLite</span><span class="tag">automações</span>
+        <span class="tag">anti-alucinação</span><span class="tag">sem dependências</span>
+      </div>
+      <div class="btns">
+        <a class="btn ghost" href="https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/blob/main/agente-ia/GUIA-DO-INICIADOR.md">Guia do iniciador</a>
+        <a class="btn ghost" href="https://github.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/blob/main/agente-ia/LEIA-ME.md">Documentação técnica</a>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Feito com JavaScript e Python puros · <a href="https://github.com/GUILHERMEFMAGA">github.com/GUILHERMEFMAGA</a><br>
+    Nenhuma biblioteca, nenhuma conta, nenhuma nuvem.
+  </footer>
+</div>
+</body>
+</html>
