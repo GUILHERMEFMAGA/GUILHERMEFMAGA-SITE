@@ -2,7 +2,7 @@
 
 ## Jogo — The Ashen Way
 
-🎮 **[Jogar agora no navegador](https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/fde4dd8/game/index.html)**
+🎮 **[Jogar agora no navegador](https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/d6b4d14/game/index.html)**
 
 Protótipo jogável de fantasia sombria em primeira pessoa, usando a arte escolhida como cena inicial e aproximando a câmera da fortaleza conforme você avança.
 
