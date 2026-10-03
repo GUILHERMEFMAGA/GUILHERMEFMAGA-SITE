@@ -10,6 +10,6 @@ test('offline HTML contains one self-contained JavaScript module that parses cle
   const embeddedModules = [...html.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)];
 
   assert.equal(embeddedModules.length, 1);
-  assert.doesNotMatch(html, /(?:src|href)="\.\/(?:game|lighting|collision|vehicle-physics|weather)\.js"/);
+  assert.doesNotMatch(html, /(?:src|href)="\.\/(?:game|lighting|collision|vehicle-physics|weather|procedural-city)\.js"/);
   assert.doesNotThrow(() => new Script(embeddedModules[0][1]));
 });

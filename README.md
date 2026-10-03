@@ -2,7 +2,7 @@
  
 ## Jogo no navegador — Rua Vermelha 🚗
 
-Protótipo 2D jogável baseado na imagem de referência, agora com cinco trechos conectados, incluindo cruzamento e curvas para os dois lados. Mantém a arquitetura pixel art aérea, guias transponíveis, obstáculos sólidos, postes alinhados, iluminação dinâmica e os primeiros efeitos de chuva, neblina e folhas ao vento.
+Protótipo 2D jogável baseado na imagem de referência: preserva duas ruas iniciais e continua em bairros procedurais sem fim, com prédios e curvas diferentes. Mantém a arquitetura pixel art aérea, colisões, iluminação dinâmica e efeitos de chuva, neblina e vento.
 
 👉 **[Abrir o jogo](jogo/index.html)** · [Controles e instruções](jogo/README.md)
 

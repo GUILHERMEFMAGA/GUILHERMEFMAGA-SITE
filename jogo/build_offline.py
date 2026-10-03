@@ -17,9 +17,6 @@ OUTPUT = ROOT / "Rua-Vermelha-offline.html"
 ASSETS = {
     "gta-retro.png": "image/png",
     "rua-segmento-02.png": "image/png",
-    "rua-segmento-03.png": "image/png",
-    "rua-segmento-04.png": "image/png",
-    "rua-segmento-05.png": "image/png",
 }
 
 
@@ -79,6 +76,7 @@ def main() -> None:
     collision = read_source("collision.js")
     vehicle_physics = read_source("vehicle-physics.js")
     weather = read_source("weather.js")
+    procedural_city = read_source("procedural-city.js")
 
     stylesheet_link = '  <link rel="stylesheet" href="./style.css">'
     module_script = '  <script type="module" src="./game.js"></script>'
@@ -92,6 +90,7 @@ def main() -> None:
         r"^import\s+\{\s*resolveVehicleMotion\s*\}\s+from\s+['\"]\./collision\.js['\"];\s*\n",
         r"^import\s+\{\s*stepVehicle\s*\}\s+from\s+['\"]\./vehicle-physics\.js['\"];\s*\n",
         r"^import\s+\{\s*drawWeather\s*,\s*getWeatherState\s*\}\s+from\s+['\"]\./weather\.js['\"];\s*\n",
+        r"^import\s+\{\s*advanceSectionWindow\s*,\s*createStreetLayout\s*,\s*drawProceduralStreet\s*,\s*PROCEDURAL_CITY_LIMITS\s*\}\s+from\s+['\"]\./procedural-city\.js['\"];\s*\n",
     )
     for import_pattern in module_imports:
         game, replacements = re.subn(import_pattern, "", game, count=1)
@@ -109,6 +108,7 @@ def main() -> None:
     bundled_collision = re.sub(r"^export\s+", "", collision, flags=re.MULTILINE)
     bundled_vehicle_physics = re.sub(r"^export\s+", "", vehicle_physics, flags=re.MULTILINE)
     bundled_weather = re.sub(r"^export\s+", "", weather, flags=re.MULTILINE)
+    bundled_procedural_city = re.sub(r"^export\s+", "", procedural_city, flags=re.MULTILINE)
     embedded_assets = {
         filename: data_uri(filename, media_type)
         for filename, media_type in ASSETS.items()
@@ -125,7 +125,8 @@ def main() -> None:
         + f"const {{ drawCarHighlights, drawStreetLighting }} = {scoped_module(bundled_lighting, ('drawCarHighlights', 'drawStreetLighting'))};\n"
         + f"const {{ resolveVehicleMotion }} = {scoped_module(bundled_collision, ('resolveVehicleMotion',))};\n"
         + f"const {{ stepVehicle }} = {scoped_module(bundled_vehicle_physics, ('stepVehicle',))};\n"
-        + f"const {{ drawWeather, getWeatherState }} = {scoped_module(bundled_weather, ('drawWeather', 'getWeatherState'))};\n\n"
+        + f"const {{ drawWeather, getWeatherState }} = {scoped_module(bundled_weather, ('drawWeather', 'getWeatherState'))};\n"
+        + f"const {{ advanceSectionWindow, createStreetLayout, drawProceduralStreet, PROCEDURAL_CITY_LIMITS }} = {scoped_module(bundled_procedural_city, ('advanceSectionWindow', 'createStreetLayout', 'drawProceduralStreet', 'PROCEDURAL_CITY_LIMITS'))};\n\n"
         + game
     )
     html = html.replace(module_script, f"  <script type=\"module\">\n{javascript}\n  </script>")

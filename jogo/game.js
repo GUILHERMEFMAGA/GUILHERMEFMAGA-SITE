@@ -2,6 +2,7 @@ import { drawCarHighlights, drawStreetLighting } from './lighting.js';
 import { resolveVehicleMotion } from './collision.js';
 import { stepVehicle } from './vehicle-physics.js';
 import { drawWeather, getWeatherState } from './weather.js';
+import { advanceSectionWindow, createStreetLayout, drawProceduralStreet, PROCEDURAL_CITY_LIMITS } from './procedural-city.js';
 
 const WIDTH = 1568;
 const HEIGHT = 960;
@@ -26,9 +27,7 @@ const CAR_PATCH = { x: 696, y: 340, width: 176, height: 300 };
 const CAR_PATCH_FEATHER = 18;
 const ROAD = { left: 548, right: 1018, center: 784, top: 0, bottom: HEIGHT };
 const ROAD_CLEARANCE = 8;
-const CURVE_ROAD_HALF_WIDTH = (ROAD.right - ROAD.left) / 2;
-const CURVE_SOURCE_HALF_WIDTH = 180;
-const CURVE_SWAY = 54;
+const ROAD_HALF_WIDTH = (ROAD.right - ROAD.left) / 2;
 // Bounds follow the opaque hand-traced sedan silhouette, excluding transparent crop margins.
 const CAR_COLLIDER = Object.freeze({ halfWidth: 65, halfLength: 118 });
 const CAR_SPAWN = { x: 784, y: 485 };
@@ -102,6 +101,7 @@ const pressed = new Set();
 const policeCars = [];
 
 const sections = [];
+let firstWorldSection = 0;
 let streetCanvas = null;
 let streetSprite = null;
 let audioContext = null;
@@ -191,66 +191,6 @@ function normalizeScene(image) {
   referenceContext.imageSmoothingEnabled = false;
   referenceContext.drawImage(image, 0, 0, WIDTH, HEIGHT);
   return reference;
-}
-
-function widenRoadToReference(reference, centerAtY, sourceHalfWidth = CURVE_SOURCE_HALF_WIDTH) {
-  const expanded = document.createElement('canvas');
-  expanded.width = WIDTH;
-  expanded.height = HEIGHT;
-  const expandedContext = getCanvasContext(expanded, { alpha: false }, 'faixa de rolamento');
-  expandedContext.imageSmoothingEnabled = false;
-  const targetHalfWidth = (ROAD.right - ROAD.left) / 2;
-  const sampleEdges = (y) => {
-    const centerSample = centerAtY(y);
-    const requestedCenter = Number.isFinite(centerSample) ? centerSample : ROAD.center;
-    const minCenter = Math.max(sourceHalfWidth, targetHalfWidth) + 1;
-    const center = clamp(requestedCenter, minCenter, WIDTH - minCenter);
-    return {
-      sourceLeft: Math.round(center - sourceHalfWidth),
-      sourceRight: Math.round(center + sourceHalfWidth),
-      targetLeft: Math.round(center - targetHalfWidth),
-      targetRight: Math.round(center + targetHalfWidth),
-    };
-  };
-  const sameEdges = (a, b) => a && b
-    && a.sourceLeft === b.sourceLeft && a.sourceRight === b.sourceRight
-    && a.targetLeft === b.targetLeft && a.targetRight === b.targetRight;
-
-  // Expand only the road band and gently compress the sidewalks. Reuse each
-  // quantized horizontal transform for its full row run to keep loading cheap.
-  let bandY = 0;
-  let bandEdges = sampleEdges(0);
-  for (let y = 1; y <= HEIGHT; y += 1) {
-    const nextEdges = y < HEIGHT ? sampleEdges(y) : null;
-    if (sameEdges(bandEdges, nextEdges)) continue;
-    const bandHeight = y - bandY;
-    expandedContext.drawImage(reference, 0, bandY, bandEdges.sourceLeft, bandHeight, 0, bandY, bandEdges.targetLeft, bandHeight);
-    expandedContext.drawImage(
-      reference,
-      bandEdges.sourceLeft,
-      bandY,
-      bandEdges.sourceRight - bandEdges.sourceLeft,
-      bandHeight,
-      bandEdges.targetLeft,
-      bandY,
-      bandEdges.targetRight - bandEdges.targetLeft,
-      bandHeight,
-    );
-    expandedContext.drawImage(
-      reference,
-      bandEdges.sourceRight,
-      bandY,
-      WIDTH - bandEdges.sourceRight,
-      bandHeight,
-      bandEdges.targetRight,
-      bandY,
-      WIDTH - bandEdges.targetRight,
-      bandHeight,
-    );
-    bandY = y;
-    bandEdges = nextEdges;
-  }
-  return expanded;
 }
 
 function makeStreet(reference, removeReferenceSedan = false) {
@@ -361,35 +301,19 @@ function makeCarSprite(reference) {
   return sprite;
 }
 
-function curveRoadCenterX(y) {
-  const progress = clamp(y / HEIGHT, 0, 1);
-  return ROAD.center - CURVE_SWAY * Math.sin(progress * Math.PI * 2);
-}
-
-function createCurvedLampPosts() {
-  const posts = [];
-  for (let row = 0; row < 5; row += 1) {
-    const y = (row + .5) * HEIGHT / 5;
-    const offset = CURVE_ROAD_HALF_WIDTH + 20;
-    const center = curveRoadCenterX(y);
-    posts.push({ x: center - offset, y }, { x: center + offset, y });
-  }
-  return posts;
-}
-
-function createCurvedRoadCurbs(sectionIndex) {
+function createRoadCurbs(sectionIndex, roadCenterAt = () => ROAD.center) {
   const colliders = [];
   const slices = 12;
   const sliceHeight = HEIGHT / slices;
   for (let slice = 0; slice < slices; slice += 1) {
     const y = slice * sliceHeight;
     const nextY = Math.min(HEIGHT, y + sliceHeight);
-    const startCenter = curveRoadCenterX(y);
-    const endCenter = curveRoadCenterX(nextY);
-    const westStart = startCenter - CURVE_ROAD_HALF_WIDTH;
-    const westEnd = endCenter - CURVE_ROAD_HALF_WIDTH;
-    const eastStart = startCenter + CURVE_ROAD_HALF_WIDTH - ROAD_CLEARANCE;
-    const eastEnd = endCenter + CURVE_ROAD_HALF_WIDTH - ROAD_CLEARANCE;
+    const startCenter = roadCenterAt(y);
+    const endCenter = roadCenterAt(nextY);
+    const westStart = startCenter - ROAD_HALF_WIDTH;
+    const westEnd = endCenter - ROAD_HALF_WIDTH;
+    const eastStart = startCenter + ROAD_HALF_WIDTH - ROAD_CLEARANCE;
+    const eastEnd = endCenter + ROAD_HALF_WIDTH - ROAD_CLEARANCE;
     colliders.push(
       {
         id: `section-${sectionIndex}-west-curb-${slice}`,
@@ -415,27 +339,6 @@ function createCurvedRoadCurbs(sectionIndex) {
 }
 
 function createSectionCurbs(index) {
-  if (index === 4) return createCurvedRoadCurbs(index);
-  if (index === 3) {
-    const crossStreetTop = Math.round(HEIGHT * .39);
-    const crossStreetBottom = Math.round(HEIGHT * .61);
-    const westTop = ROAD.left;
-    const eastTop = ROAD.right;
-    const crosswalkCurbs = [];
-    for (const [row, y] of [['north', crossStreetTop], ['south', crossStreetBottom - ROAD_CLEARANCE]]) {
-      crosswalkCurbs.push(
-        { id: `section-${index}-cross-curb-west-${row}`, kind: 'curb', x: 0, y, width: westTop, height: ROAD_CLEARANCE, stepHeight: 6 },
-        { id: `section-${index}-cross-curb-east-${row}`, kind: 'curb', x: eastTop, y, width: WIDTH - eastTop, height: ROAD_CLEARANCE, stepHeight: 6 },
-      );
-    }
-    return [
-      { id: `section-${index}-west-curb-north`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT + crossStreetTop, stepHeight: 6 },
-      { id: `section-${index}-west-curb-south`, kind: 'curb', x: ROAD.left, y: crossStreetBottom, width: ROAD_CLEARANCE, height: HEIGHT * 2, stepHeight: 6 },
-      { id: `section-${index}-east-curb-north`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT + crossStreetTop, stepHeight: 6 },
-      { id: `section-${index}-east-curb-south`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: crossStreetBottom, width: ROAD_CLEARANCE, height: HEIGHT * 2, stepHeight: 6 },
-      ...crosswalkCurbs,
-    ];
-  }
   return [
     { id: `section-${index}-west-curb`, kind: 'curb', x: ROAD.left, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
     { id: `section-${index}-east-curb`, kind: 'curb', x: ROAD.right - ROAD_CLEARANCE, y: -HEIGHT, width: ROAD_CLEARANCE, height: HEIGHT * 3, stepHeight: 6 },
@@ -448,97 +351,112 @@ function createSectionColliders(index) {
     { id: `section-${index}-east-world-edge`, kind: 'barrier', x: WIDTH, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
     ...createSectionCurbs(index),
   ];
-
-  // Open north/south portals connect all five map tiles into a closed route;
-  // solid footprints still protect buildings beside the sidewalk.
-  if (index < 2) {
-    colliders.push(
-      { id: `section-${index}-building-west-1`, kind: 'building', x: 0, y: 0, width: 356, height: 303 },
-      { id: `section-${index}-building-west-2`, kind: 'building', x: 0, y: 335, width: 352, height: 232 },
-      { id: `section-${index}-building-west-3`, kind: 'building', x: 0, y: 697, width: 352, height: 227 },
-      { id: `section-${index}-building-east-1`, kind: 'building', x: 1200, y: 34, width: 350, height: 299 },
-      { id: `section-${index}-building-east-2`, kind: 'building', x: 1199, y: 368, width: 351, height: 298 },
-      { id: `section-${index}-building-east-3`, kind: 'building', x: 1205, y: 704, width: 345, height: 225 },
-    );
-  }
-
-  if (index === 2) {
-    // Building footprint and patio props remain solid after the traversable curb.
-    colliders.push(
-      { id: 'bar-building', kind: 'building', x: 1130, y: 332, width: 410, height: 342 },
-      { id: 'bar-patio-planter-north', kind: 'prop', x: 1082, y: 395, width: 24, height: 26 },
-      { id: 'bar-patio-stool-1', kind: 'prop', x: 1085, y: 440, width: 20, height: 20 },
-      { id: 'bar-patio-stool-2', kind: 'prop', x: 1085, y: 482, width: 20, height: 20 },
-      { id: 'bar-patio-stool-3', kind: 'prop', x: 1085, y: 524, width: 20, height: 20 },
-      { id: 'bar-patio-planter-south', kind: 'prop', x: 1082, y: 567, width: 24, height: 26 },
-    );
-  }
-
-  if (index === 3) {
-    colliders.push(
-      { id: 'junction-building-northwest', kind: 'building', x: 0, y: 0, width: 468, height: 294 },
-      { id: 'junction-building-northeast', kind: 'building', x: 1115, y: 0, width: 453, height: 292 },
-      { id: 'junction-building-southwest', kind: 'building', x: 0, y: 646, width: 468, height: 314 },
-      { id: 'junction-building-southeast', kind: 'building', x: 1115, y: 646, width: 453, height: 314 },
-      { id: 'junction-bench-northwest', kind: 'prop', x: 274, y: 326, width: 54, height: 18 },
-      { id: 'junction-trash-northwest', kind: 'prop', x: 358, y: 326, width: 22, height: 24 },
-      { id: 'junction-planter-southeast', kind: 'prop', x: 1120, y: 584, width: 32, height: 34 },
-      { id: 'junction-bench-southeast', kind: 'prop', x: 1210, y: 584, width: 54, height: 18 },
-    );
-  }
-
-  if (index === 4) {
-    colliders.push(
-      { id: 'curve-building-northwest', kind: 'building', x: 0, y: 0, width: 418, height: 262 },
-      { id: 'curve-building-northeast', kind: 'building', x: 1160, y: 0, width: WIDTH - 1160, height: 270 },
-      { id: 'curve-building-west-middle', kind: 'building', x: 0, y: 294, width: 408, height: 332 },
-      { id: 'curve-building-east-middle', kind: 'building', x: 1180, y: 288, width: WIDTH - 1180, height: 350 },
-      { id: 'curve-building-southwest', kind: 'building', x: 0, y: 686, width: 438, height: HEIGHT - 686 },
-      { id: 'curve-building-southeast', kind: 'building', x: 1162, y: 678, width: WIDTH - 1162, height: HEIGHT - 678 },
-      { id: 'curve-plaza-bench-1', kind: 'prop', x: 1092, y: 194, width: 52, height: 18 },
-      { id: 'curve-plaza-bin-1', kind: 'prop', x: 1048, y: 186, width: 22, height: 26 },
-      { id: 'curve-plaza-bench-2', kind: 'prop', x: 1092, y: 238, width: 52, height: 18 },
-      { id: 'curve-plaza-bin-2', kind: 'prop', x: 1048, y: 232, width: 22, height: 26 },
-    );
-  }
+  colliders.push(
+    { id: `section-${index}-building-west-1`, kind: 'building', x: 0, y: 0, width: 356, height: 303 },
+    { id: `section-${index}-building-west-2`, kind: 'building', x: 0, y: 335, width: 352, height: 232 },
+    { id: `section-${index}-building-west-3`, kind: 'building', x: 0, y: 697, width: 352, height: 227 },
+    { id: `section-${index}-building-east-1`, kind: 'building', x: 1200, y: 34, width: 350, height: 299 },
+    { id: `section-${index}-building-east-2`, kind: 'building', x: 1199, y: 368, width: 351, height: 298 },
+    { id: `section-${index}-building-east-3`, kind: 'building', x: 1205, y: 704, width: 345, height: 225 },
+  );
   return colliders;
 }
 
-function finishLoading(image = null, marketImage = null, barImage = null, junctionImage = null, curveImage = null) {
-  let sharedFallback = null;
-  const fallbackReference = () => {
-    sharedFallback ||= normalizeScene(fallbackScene());
-    return sharedFallback;
-  };
+function createProceduralSection(worldIndex) {
+  try {
+    const layout = createStreetLayout(worldIndex, {
+      width: WIDTH,
+      height: HEIGHT,
+      roadLeft: ROAD.left,
+      roadRight: ROAD.right,
+    });
+    const background = document.createElement('canvas');
+    background.width = WIDTH;
+    background.height = HEIGHT;
+    drawProceduralStreet(getCanvasContext(background, undefined, `trecho ${worldIndex}`), layout);
+    const colliders = [
+      { id: `city-${worldIndex}-west-edge`, kind: 'barrier', x: -32, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+      { id: `city-${worldIndex}-east-edge`, kind: 'barrier', x: WIDTH, y: -HEIGHT, width: 32, height: HEIGHT * 3 },
+      ...createRoadCurbs(worldIndex, layout.roadCenterAt),
+      ...layout.buildings.map((building) => ({
+        id: building.id,
+        kind: 'building',
+        x: building.x,
+        y: building.y,
+        width: building.width,
+        height: building.height,
+      })),
+      ...layout.props.filter((prop) => prop.solid).map((prop) => ({
+        id: prop.id,
+        kind: 'prop',
+        x: prop.x - prop.size / 2,
+        y: prop.y - prop.size / 2,
+        width: prop.size,
+        height: prop.size,
+      })),
+    ];
+    return {
+      worldIndex,
+      name: layout.name,
+      background,
+      colliders,
+      lampPosts: layout.lampPosts,
+      lightingRoad: ROAD,
+      roadCenterAt: layout.roadCenterAt,
+    };
+  } catch (error) {
+    console.warn(`Falha ao gerar o trecho ${worldIndex}; usando uma rua de contingência.`, error);
+    return {
+      worldIndex,
+      name: 'RUA DE CONTINGÊNCIA',
+      background: fallbackScene(),
+      colliders: createSectionColliders(0),
+      lampPosts: [],
+      lightingRoad: ROAD,
+      roadCenterAt: null,
+    };
+  }
+}
+
+function adjacentSectionIndex(direction) {
+  const nextWindow = advanceSectionWindow(
+    sections,
+    state.section,
+    firstWorldSection,
+    direction,
+    createProceduralSection,
+    PROCEDURAL_CITY_LIMITS.maxLoadedSections,
+  );
+  sections.splice(0, sections.length, ...nextWindow.sections);
+  firstWorldSection = nextWindow.firstWorldIndex;
+  state.section = nextWindow.currentIndex;
+  return state.section;
+}
+
+function finishLoading(image = null, marketImage = null) {
   const reference = image ? normalizeScene(image) : normalizeScene(fallbackScene(true));
-  const normalizeOrFallback = (scene) => scene ? normalizeScene(scene) : fallbackReference();
-  const marketReference = normalizeOrFallback(marketImage);
-  const barReference = normalizeOrFallback(barImage);
-  const junctionReference = normalizeOrFallback(junctionImage);
-  const curveReference = normalizeOrFallback(curveImage);
+  const marketReference = marketImage ? normalizeScene(marketImage) : normalizeScene(fallbackScene());
   const nextSections = [
-    { name: 'RUA VERMELHA', background: makeStreet(reference, true), colliders: createSectionColliders(0) },
-    { name: 'BAIRRO DO MERCADO', background: marketReference, colliders: createSectionColliders(1) },
-    { name: 'RUA DO BAR', background: barReference, colliders: createSectionColliders(2) },
     {
-      name: 'CRUZAMENTO DA ESTAÇÃO',
-      background: widenRoadToReference(junctionReference, () => ROAD.center),
-      colliders: createSectionColliders(3),
+      worldIndex: 0,
+      hasStreetActivities: true,
+      name: 'RUA VERMELHA',
+      background: makeStreet(reference, true),
+      colliders: createSectionColliders(0),
     },
     {
-      name: 'CURVAS DO BOSQUE',
-      background: widenRoadToReference(curveReference, curveRoadCenterX),
-      colliders: createSectionColliders(4),
-      lampPosts: createCurvedLampPosts(),
-      lightingRoad: { ...ROAD, left: ROAD.left - CURVE_SWAY, right: ROAD.right + CURVE_SWAY },
-      roadCenterAt: curveRoadCenterX,
+      worldIndex: 1,
+      name: 'BAIRRO DO MERCADO',
+      background: marketReference,
+      colliders: createSectionColliders(1),
     },
   ];
   const nextStreetSprite = makeCarSprite(reference);
 
-  // Prepare the full scene before swapping live state, so a failed asset or
-  // canvas allocation cannot leave the game with only part of its map loaded.
+  // Keep the two hand-painted reference streets, then generate an endless,
+  // deterministic neighborhood in both directions with a bounded canvas cache.
   sections.splice(0, sections.length, ...nextSections);
+  firstWorldSection = 0;
   state.section = 0;
   streetCanvas = nextSections[0].background;
   streetSprite = nextStreetSprite;
@@ -563,6 +481,14 @@ function changeSection(index, x, y) {
   state.cameraShake = Math.max(state.cameraShake, 1.4);
   showToast(`TRECHO · ${nextSection.name}`, 3200);
   return true;
+}
+
+function activeSection() {
+  return sections[state.section] || null;
+}
+
+function isOriginalStreet() {
+  return activeSection()?.hasStreetActivities === true;
 }
 
 function fallbackScene(includeSedan = false) {
@@ -772,25 +698,19 @@ function drive(dt) {
   const nextX = startX + movement.dx;
   const nextY = startY + movement.dy;
   const bounds = vehicleHalfExtents(car.angle);
-  const fitsPortal = nextX - bounds.x >= 0 && nextX + bounds.x <= WIDTH;
   const movingNorth = movement.dy < 0;
   const movingSouth = movement.dy > 0;
-  const routeLength = sections.length;
-  const nextSection = routeLength ? (state.section + 1) % routeLength : state.section;
-  const previousSection = routeLength ? (state.section - 1 + routeLength) % routeLength : state.section;
-  const enteringNextStreet = routeLength > 1
-    && movingNorth
-    && fitsPortal
-    && nextY - bounds.y <= 12;
-  const returningToPreviousStreet = routeLength > 1
-    && movingSouth
-    && fitsPortal
-    && nextY + bounds.y >= HEIGHT - 12;
+  const portalY = movingNorth ? 0 : HEIGHT;
+  const portalCenter = activeSection()?.roadCenterAt?.(portalY) ?? ROAD.center;
+  const fitsPortal = nextX - bounds.x >= portalCenter - ROAD_HALF_WIDTH + ROAD_CLEARANCE
+    && nextX + bounds.x <= portalCenter + ROAD_HALF_WIDTH - ROAD_CLEARANCE;
+  const enteringNextStreet = movingNorth && fitsPortal && nextY - bounds.y <= 12;
+  const returningToPreviousStreet = movingSouth && fitsPortal && nextY + bounds.y >= HEIGHT - 12;
 
   if (enteringNextStreet) {
-    changeSection(nextSection, nextX, HEIGHT - bounds.y - 13);
+    changeSection(adjacentSectionIndex(1), nextX, HEIGHT - bounds.y - 13);
   } else if (returningToPreviousStreet) {
-    changeSection(previousSection, nextX, bounds.y + 13);
+    changeSection(adjacentSectionIndex(-1), nextX, bounds.y + 13);
   } else {
     const motion = resolveVehicleMotion({
       x: startX,
@@ -802,7 +722,7 @@ function drive(dt) {
       dt,
       halfWidth: CAR_COLLIDER.halfWidth,
       halfLength: CAR_COLLIDER.halfLength,
-      colliders: sections[state.section]?.colliders || [],
+      colliders: activeSection()?.colliders || [],
     });
     car.x = motion.x;
     car.y = motion.y;
@@ -849,7 +769,7 @@ function drive(dt) {
 }
 
 function blockedOnFoot(x, y) {
-  const colliders = sections[state.section]?.colliders || [];
+  const colliders = activeSection()?.colliders || [];
   return colliders.some((obstacle) => ['building', 'prop', 'barrier'].includes(obstacle.kind)
     && x > obstacle.x && x < obstacle.x + obstacle.width
     && y > obstacle.y && y < obstacle.y + obstacle.height);
@@ -871,7 +791,7 @@ function walk(dt) {
 }
 
 function nearPhone() {
-  return state.section === 0 && !state.driving && distance(state.foot.x, state.foot.y, phone.x, phone.y) < 78;
+  return isOriginalStreet() && !state.driving && distance(state.foot.x, state.foot.y, phone.x, phone.y) < 78;
 }
 
 function interact() {
@@ -912,7 +832,7 @@ function interact() {
     showToast('CAMPANHA CONCLUÍDA · MODO LIVRE');
     return;
   }
-  const person = state.section === 0
+  const person = isOriginalStreet()
     ? people.find((pedestrian) => distance(state.foot.x, state.foot.y, pedestrian.x, pedestrian.baseY) < 40)
     : null;
   if (person) {
@@ -929,7 +849,7 @@ function shove() {
     if (vehicleSpeedMagnitude() > 65) showToast('FREIO DE MÃO', 900);
     return;
   }
-  const pedestrian = state.section === 0
+  const pedestrian = isOriginalStreet()
     ? people.find((person) => distance(state.foot.x, state.foot.y, person.x, person.baseY + Math.sin(elapsed * .001 + person.phase) * person.range) < 38)
     : null;
   if (pedestrian) {
@@ -1348,20 +1268,20 @@ function render(interpolation = 1) {
   try {
     ctx.translate(shakeX, shakeY);
     ctx.drawImage(streetCanvas, 0, 0);
-    const section = sections[state.section];
+    const section = activeSection();
     const weather = getWeatherState(elapsed);
     const sunlight = drawStreetLighting(ctx, elapsed, WIDTH, HEIGHT, section?.lightingRoad || ROAD, {
-      bar: state.section === 2,
+      bar: section?.bar === true,
       lampPosts: section?.lampPosts,
       roadCenterAt: section?.roadCenterAt,
       rain: weather.rain,
     });
 
     // Atividades e pedestres permanecem no primeiro quarteirão, onde foram posicionados.
-    if (state.section === 0 && (!state.driving || state.mission)) {
+    if (isOriginalStreet() && (!state.driving || state.mission)) {
       for (const pedestrian of people) drawPerson(pedestrian);
     }
-    if (state.section === 0 && (!state.driving || state.mission)) drawPhone();
+    if (isOriginalStreet() && (!state.driving || state.mission)) drawPhone();
 
     const target = getTarget();
     if (target) drawTarget(target);
@@ -1423,7 +1343,7 @@ function update(dt) {
   if (!state.driving) walk(dt);
   else drive(dt);
 
-  if (state.section === 0) {
+  if (isOriginalStreet()) {
     for (const pedestrian of people) {
       const personY = pedestrian.baseY + Math.sin(elapsed * .001 + pedestrian.phase) * pedestrian.range;
       if (state.driving && vehicleSpeedMagnitude() > 90 && distance(state.car.x, state.car.y, pedestrian.x, personY) < 42 && elapsed > (pedestrian.hitAt || 0)) {
@@ -1626,16 +1546,13 @@ function loadImageAsset(filename) {
 
 async function startLoading() {
   try {
-    const [mainScene, marketScene, barScene, junctionScene, curveScene] = await Promise.all([
+    const [mainScene, marketScene] = await Promise.all([
       loadImageAsset('gta-retro.png'),
       loadImageAsset('rua-segmento-02.png'),
-      loadImageAsset('rua-segmento-03.png'),
-      loadImageAsset('rua-segmento-04.png'),
-      loadImageAsset('rua-segmento-05.png'),
     ]);
     if (runtimeFault) return;
-    finishLoading(mainScene, marketScene, barScene, junctionScene, curveScene);
-    if (![mainScene, marketScene, barScene, junctionScene, curveScene].every(Boolean)) {
+    finishLoading(mainScene, marketScene);
+    if (![mainScene, marketScene].every(Boolean)) {
       showToast('UM TRECHO ESTÁ INDISPONÍVEL · USANDO CENA DE CONTINGÊNCIA');
     }
   } catch (error) {
