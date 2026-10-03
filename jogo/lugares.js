@@ -257,7 +257,9 @@
   const copo = (ctx, x, y, cheio) => { ctx.fillStyle = 'rgba(225,238,248,0.75)'; ctx.fillRect(x - 3, y - 9, 6, 9); if (cheio) { ctx.fillStyle = '#e8b830'; ctx.fillRect(x - 2.4, y - 7, 4.8, 6.4); ctx.fillStyle = '#fff'; ctx.fillRect(x - 2.4, y - 8.8, 4.8, 2); } ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.8; ctx.strokeRect(x - 3, y - 9, 6, 9); };
   const prato = (ctx, x, y, c) => { ctx.fillStyle = '#f2f2ee'; ctx.beginPath(); ctx.ellipse(x, y, 9, 4.5, 0, 0, TAU); ctx.fill(); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y - 8); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.8; ctx.stroke(); };
 
+  const novos = {};          // móveis do kit novo (interiores.js / mobilia*.js): têm prioridade sobre os desenhos abaixo
   function drawObj(ctx, o, t) {
+    if (novos[o.t]) { novos[o.t](ctx, o, t); return; }
     const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 0, ty = y - e;
     switch (o.t) {
       case 'balcao': {
@@ -453,6 +455,7 @@
 
   function fundo(R) {
     usa(R);
+    if (L.casca) return L.casca(R);   // paredes grossas, chão com textura, janelas (interiores.js)
     const c = document.createElement('canvas'); c.width = R.W; c.height = R.H; const x = c.getContext('2d');
     x.fillStyle = '#08060e'; x.fillRect(0, 0, R.W, R.H);
     // parede de trás
@@ -970,5 +973,5 @@
   }
 
   // ---------- peças que os outros arquivos usam ----------
-  L.kit = { O, caixa, gente, gasta, compra, cura, bolha, pick, rand, clamp, shade, tipos, armado, sentar, falaDe, ameacar, chamaPolicia, desenhaCarrinho, janela, cartaz, neon, prateleiraParede, garrafa, copo, prato, hh, TAU, VW, VH, salvar: () => G.save() };
+  L.kit = { novos, desenharObj: drawObj, O, caixa, gente, gasta, compra, cura, bolha, pick, rand, clamp, shade, tipos, armado, sentar, falaDe, ameacar, chamaPolicia, desenhaCarrinho, janela, cartaz, neon, prateleiraParede, garrafa, copo, prato, hh, TAU, VW, VH, salvar: () => G.save() };
 })(window.G = window.G || {});

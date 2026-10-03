@@ -43,11 +43,14 @@
   });
 
   // ---------- família: cria, sincroniza com a hora ----------
-  const BED = [{ x: 150, y: 232 }, { x: 205, y: 232 }, { x: 328, y: 232 }, { x: 418, y: 232 }, { x: 508, y: 232 }];
-  const SOFA = [{ x: 190, y: 392 }, { x: 250, y: 392 }, { x: 310, y: 392 }];
-  const COZ = [{ x: 535, y: 226 }, { x: 472, y: 226 }];
-  const PASSEIO = [{ x: 300, y: 270 }, { x: 420, y: 285 }, { x: 250, y: 320 }, { x: 380, y: 345 }, { x: 330, y: 250 }];
-  const PASSEIO_Q = [{ x: 330, y: 320 }, { x: 400, y: 345 }, { x: 270, y: 330 }];
+  // pontos onde a família fica (cada nível de casa tem os seus: veja casas_salas.js)
+  const SPOTS_ANTIGOS = {
+    bed: [{ x: 150, y: 232 }, { x: 205, y: 232 }, { x: 328, y: 232 }, { x: 418, y: 232 }, { x: 508, y: 232 }],
+    sofa: [{ x: 190, y: 392 }, { x: 250, y: 392 }, { x: 310, y: 392 }], coz: [{ x: 535, y: 226 }, { x: 472, y: 226 }],
+    passeio: [{ x: 300, y: 270 }, { x: 420, y: 285 }, { x: 250, y: 320 }, { x: 380, y: 345 }, { x: 330, y: 250 }],
+    passeioQ: [{ x: 330, y: 320 }, { x: 400, y: 345 }, { x: 270, y: 330 }], laneSala: 250, laneQuarto: 312
+  };
+  const spotsDe = c => (L.casaLay && L.casaLay.spots(nivel(c))) || SPOTS_ANTIGOS;
 
   function iniciaFamilia(S, lg) {
     const c = lg.casa;
@@ -59,14 +62,15 @@
     c.fam.membros.forEach(m => { m.sala = null; m.n = null; m.at = null; });
     sincroniza(S, lg, true);
   }
-  function destino(m, at) {
+  function destino(m, at, c) {
+    const SP = spotsDe(c);
     switch (at) {
       case 'fora': return null;
-      case 'dorme': return Object.assign({ sala: 'quartos', dorme: true, h: 1.57 }, BED[m.cama]);
-      case 'cozinha': return Object.assign({ sala: 'entrada', h: 0 }, COZ[m.i % 2]);
-      case 'tv': return Object.assign({ sala: 'entrada', sentado: true, h: 0 }, SOFA[m.i % 3]);
-      case 'brinca': return Object.assign({ sala: 'quartos', corre: m.i % 2 === 0 }, PASSEIO_Q[m.i % 3]);
-      default: return Object.assign({ sala: m.papel === 'filho' ? 'quartos' : 'entrada' }, (m.papel === 'filho' ? PASSEIO_Q : PASSEIO)[Math.floor(Math.random() * 3)]);
+      case 'dorme': return Object.assign({ sala: 'quartos', dorme: true, h: 1.57 }, SP.bed[m.cama % SP.bed.length]);
+      case 'cozinha': return Object.assign({ sala: 'entrada', h: 0 }, SP.coz[m.i % SP.coz.length]);
+      case 'tv': return Object.assign({ sala: 'entrada', sentado: true, h: 0 }, SP.sofa[m.i % SP.sofa.length]);
+      case 'brinca': return Object.assign({ sala: 'quartos', corre: m.i % 2 === 0 }, SP.passeioQ[m.i % SP.passeioQ.length]);
+      default: { const lista = m.papel === 'filho' ? SP.passeioQ : SP.passeio; return Object.assign({ sala: m.papel === 'filho' ? 'quartos' : 'entrada' }, lista[Math.floor(Math.random() * lista.length)]); }
     }
   }
   function falasDe(m) {
@@ -90,7 +94,7 @@
     fam.membros.forEach(m => {
       const at = V.atividade(m, h); if (m.at === at && !(at === 'casa' && m.n && m.n.parado && Math.random() < 0.01)) return;
       if (m.at !== at) m.acordou = false;
-      m.at = at; const d = destino(m, at); m.dest = d;
+      m.at = at; const d = destino(m, at, c); m.dest = d;
       const antes = m.sala; m.sala = d ? d.sala : null;
       if (m.n) m.n.falas = falasDe(m);
       if (!R || snap) { if (!snap) m.n = null; return; }
@@ -99,7 +103,7 @@
       if (m.sala === R.id) {
         let n = m.n;
         if (!n || idxAntiga < 0) { n = gente(m, R.portaX, R.y1 - 50, d); if (antes === null) { n.x = R.portaX; n.y = R.y1 - 20; } R.npcs.push(n); n.dorme = false; }
-        const lane = R.id === 'entrada' ? 250 : 312;
+        const SPc = spotsDe(c), lane = R.id === 'entrada' ? SPc.laneSala : SPc.laneQuarto;
         n.dorme = false; n.sentado = false; n.act = undefined; n.label = undefined;
         K.rota(n, [{ x: n.x, y: lane }, { x: d.x, y: lane }, { x: d.x, y: d.y }], nn => poeNoFim(nn, d));
       }
@@ -248,11 +252,14 @@
     criar(id, lg) {
       const S = G.S, c = lg.place.casa; lg.casa = c;
       if (!lg.ini) { lg.ini = true; iniciaFamilia(S, lg); }
-      const R = id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c);
+      const R = L.casaLay ? L.casaLay.criar(id, S, lg, c) : (id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c));
       R.objs.forEach(o => { if (o.t === 'placa_venda') o.preco = c.preco; });
       return R;
     }
   };
+
+  // peças que o casas_salas.js (as salas novas) usa
+  L.casaApi = { dono, aVenda, nivel, nomeCasa, loot, ruido, povoar, onUpdate, comprar, money };
 
   // usado pelo save: casas compradas aparecem no minimapa
   G.casasDoJogador = S => W.casas.filter(c => dono(S, c));
