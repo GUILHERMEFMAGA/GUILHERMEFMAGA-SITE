@@ -1,6 +1,6 @@
 # The Ashen Way — protótipo jogável
 
-O protótipo usa a arte escolhida em [`images/ashen-way-3d-pixel-game.png`](../images/ashen-way-3d-pixel-game.png) como a primeira cena, mantendo a composição da referência. É uma experiência jogável 2.5D baseada na imagem: avançar aproxima a vista da fortaleza, enquanto olhar e deslocar-se alteram o enquadramento. Não reconstrói a arte como uma malha 3D, então a tela inicial permanece fiel ao screenshot.
+O protótipo usa a arte escolhida em [`images/ashen-way-3d-pixel-game.png`](../images/ashen-way-3d-pixel-game.png) como a cena inicial, preservando a composição da referência. Ao dar o primeiro passo, um cavaleiro pixelado aparece e percorre o caminho: W/S movem o personagem para frente e para trás, A/D mudam sua posição lateral, e a caminhada anima pernas e braços. A aproximação também altera escala e balanço da cena. É um protótipo 2.5D baseado na imagem, não uma reconstrução como malha 3D.
 
 ## Executar
 

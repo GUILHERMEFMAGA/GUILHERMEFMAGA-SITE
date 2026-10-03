@@ -123,6 +123,57 @@ function drawSwordArc(time, width, height) {
   context.restore();
 }
 
+function drawWalkingKnight(frame, width, height) {
+  const player = frame.player;
+  if (!player.visible) return;
+
+  const cell = Math.max(2, Math.round(Math.min(width, height) * 0.0046 * player.scale));
+  const centerX = Math.round(player.x * width / cell) * cell;
+  const feetY = Math.round(player.y * height / cell) * cell;
+  const gait = Math.sin(player.phase);
+  const leftStep = Math.round(gait * 1.4);
+  const rightStep = -leftStep;
+  const leftArm = Math.round(gait * 0.8);
+  const rightArm = -leftArm;
+  const pixel = (x, y, w, h, color) => {
+    context.fillStyle = color;
+    context.fillRect(centerX + x * cell, feetY + y * cell, w * cell, h * cell);
+  };
+
+  context.save();
+  context.fillStyle = 'rgba(4, 6, 10, 0.58)';
+  context.fillRect(centerX - cell * 5, feetY - cell, cell * 10, cell * 2);
+
+  // Cape and legs: the alternating feet make each held movement input visible.
+  pixel(-4, -17, 8, 8, '#211920');
+  pixel(-5, -12, 10, 4, '#39242d');
+  pixel(-4, -9, 8, 2, '#211920');
+  pixel(-3 + leftStep, -9, 2, 7, '#252b36');
+  pixel(1 + rightStep, -9, 2, 7, '#252b36');
+  pixel(-4 + leftStep, -2, 3, 2, '#11151c');
+  pixel(rightStep, -2, 3, 2, '#11151c');
+
+  // Steel plates and swinging arms, drawn as chunky pixel-art blocks.
+  pixel(-5, -18, 10, 4, '#343b47');
+  pixel(-4, -17, 8, 8, '#59616c');
+  pixel(-3, -16, 6, 6, '#77808a');
+  pixel(-2, -16, 2, 5, '#a4a7a6');
+  pixel(-3, -10, 6, 2, '#574532');
+  pixel(-1, -10, 2, 2, '#dab46b');
+  pixel(-6, -14 - leftArm, 2, 5, '#303844');
+  pixel(-6, -13 - leftArm, 1, 3, '#7d8286');
+  pixel(4, -14 - rightArm, 2, 5, '#303844');
+  pixel(5, -13 - rightArm, 1, 3, '#7d8286');
+
+  // Closed helm, viewed from behind.
+  pixel(-2, -24, 4, 2, '#171c25');
+  pixel(-4, -22, 8, 4, '#333b47');
+  pixel(-3, -21, 6, 3, '#858a8e');
+  pixel(-2, -20, 4, 2, '#565e69');
+  pixel(-1, -22, 2, 1, '#d0b778');
+  context.restore();
+}
+
 function draw(time) {
   const width = canvas.width;
   const height = canvas.height;
@@ -148,6 +199,9 @@ function draw(time) {
     drawEmbers(time, width, height, frame.progress);
     drawSwordArc(time, width, height);
   }
+
+  // Keep the controllable knight visible even if the backdrop fails to load.
+  drawWalkingKnight(frame, width, height);
 }
 
 function frame(now) {

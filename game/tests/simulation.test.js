@@ -27,6 +27,26 @@ test('walking visibly advances the camera and adds a first-person step bob', () 
   assert.equal(stopped.bobY, 0);
 });
 
+test('the knight avatar visibly walks forward, backward, and sideways', () => {
+  const game = new GameState();
+  const opening = game.snapshot();
+  assert.equal(opening.player.visible, false);
+
+  const forward = game.update({ ...neutral, forward: 1 }, 0.05);
+  assert.equal(forward.player.visible, true);
+  assert.ok(forward.player.y < opening.player.y);
+  assert.ok(forward.player.scale < opening.player.scale);
+  assert.notEqual(forward.player.phase, opening.player.phase);
+
+  const backward = game.update({ ...neutral, forward: -1 }, 0.05);
+  assert.ok(backward.player.y > forward.player.y);
+  const sideways = game.update({ ...neutral, side: 1 }, 0.05);
+  assert.ok(sideways.player.x > backward.player.x);
+
+  game.reset();
+  assert.equal(game.snapshot().player.visible, false);
+});
+
 test('forward movement approaches the keep and stops at the gate', () => {
   const game = new GameState();
   for (let i = 0; i < 500; i++) game.update({ ...neutral, forward: 1 }, 0.05);

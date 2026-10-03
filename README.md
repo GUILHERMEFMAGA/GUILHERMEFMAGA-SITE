@@ -4,7 +4,7 @@
 
 🎮 **[Jogar agora no navegador](https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/d6b4d14/game/index.html)**
 
-Protótipo jogável de fantasia sombria em primeira pessoa, usando a arte escolhida como cena inicial e aproximando a câmera da fortaleza conforme você avança.
+Protótipo jogável de fantasia sombria em pixel art: a arte escolhida abre o jogo, e um cavaleiro controlável caminha pelo caminho com WASD enquanto a cena se aproxima da fortaleza.
 
 ```bash
 python3 -m http.server 8080 --bind 0.0.0.0

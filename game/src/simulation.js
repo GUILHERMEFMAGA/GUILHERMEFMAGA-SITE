@@ -15,6 +15,7 @@ export class GameState {
     this.pitch = 0;
     this.stride = 0;
     this.moving = false;
+    this.started = false;
   }
 
   update(controls, deltaSeconds) {
@@ -32,7 +33,10 @@ export class GameState {
     this.progress = clamp(this.progress + forward * step, 0, 1);
     this.strafe = clamp(this.strafe + side * 0.34 * dt, -0.42, 0.42);
     this.moving = length > 0;
-    if (this.moving) this.stride += dt * (controls.run ? 13 : 8.5);
+    if (this.moving) {
+      this.started = true;
+      this.stride += dt * (controls.run ? 13 : 8.5);
+    }
     return this.snapshot();
   }
 
@@ -53,6 +57,13 @@ export class GameState {
       panY: clamp(this.pitch * 0.055, -0.02, 0.02),
       bobX: this.moving ? Math.sin(this.stride) * 0.0055 : 0,
       bobY: this.moving ? Math.abs(Math.sin(this.stride * 2)) * 0.012 : 0,
+      player: {
+        visible: this.started,
+        x: clamp(0.5 + this.strafe * 0.32, 0.36, 0.64),
+        y: 0.86 - this.progress * 0.30,
+        scale: 1 - this.progress * 0.58,
+        phase: this.stride,
+      },
       moving: this.moving,
       stride: this.stride,
     };
