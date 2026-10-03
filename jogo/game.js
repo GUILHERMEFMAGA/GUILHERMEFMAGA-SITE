@@ -21,7 +21,11 @@
 
   // ---------- Salvar / carregar ----------
   G.save = function () { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.save)); } catch (e) { } };
-  function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j && typeof j.money === 'number') S.save = Object.assign({ money: 0, done: 0, paint: 0, king: false, look: {}, forca: 0 }, j); } catch (e) { } }
+  function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j && typeof j.money === 'number') S.save = Object.assign({ money: 0, done: 0, paint: 0, king: false, look: {}, forca: 0 }, j); } catch (e) { }
+    // o mapa foi refeito (gigante): casas compradas, quartos, obras do governo e crimes do save antigo apontam para lugares que não existem mais.
+    // dinheiro, armas e missões continuam
+    if (S.save.mapaV !== 2) { ['casas', 'quartos', 'gov', 'casos', 'noticias', 'crimeDia', 'serial'].forEach(k => { delete S.save[k]; }); S.save.mapaV = 2; }
+  }
   const hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
 
   // ---------- Mensagens ----------
@@ -561,7 +565,7 @@
 
   let last = 0, titleCam = 0;
   function startGame(fresh) {
-    if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
+    if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, mapaV: 2, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
     G.snd.init(); newWorld(); S.mode = 'play';
     G.cidade.carregar(S);   // a cidade continua de onde parou
   }

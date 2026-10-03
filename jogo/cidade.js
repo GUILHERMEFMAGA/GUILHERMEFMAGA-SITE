@@ -46,7 +46,7 @@
     if (forca) tipo = forca;            // encomenda do prefeito (governo.js)
     const df = TIPOS[tipo];
     const dur = Math.round(df.dur[0] + r() * (df.dur[1] - df.dur[0]));
-    const interior = l.bx >= 17 && l.bx <= 22;
+    const interior = W.regiaoDe(l.bx).id === 'interior';
     // quando a obra começa (em segundos do relógio da obra; negativo = já começou antes de você chegar)
     const u = r(), q1 = interior ? 0.30 : 0.14, q2 = interior ? 0.66 : 0.48;
     let inicio = u < q1 ? -dur * (1.05 + r() * 0.8) : u < q2 ? -dur * (0.08 + r() * 0.85) : 20 + r() * (interior ? 700 : 1500);
@@ -58,9 +58,16 @@
     const p = { tipo, dur, inicio, nome, cor: df.cor, and: df.and, roof: ROOF_P[tipo][Math.floor(r() * ROOF_P[tipo].length)], seed: 9100 + idx * 131 };
     l.proj = p; l.fase = -2; l.ativo = false; l.cx = l.x + l.w / 2; l.cy = l.y + l.h / 2;
     // objeto do prédio pronto (para o telhado e a fachada de verdade)
-    l.b = W.mkBuilding(l.x, l.y, l.w, l.h, p.roof, rg(p.seed + 7));
+    const est = W.estiloDe(l);
     if (tipo === 'casa') {
-      const area = Math.round(l.w * l.h / (T * T));
+      // casa de verdade (várias partes, telhados, janelas e quintal) no lote da obra
+      const cs = W.casaNoLote(l, p.seed, est, 1); l.b = cs.b; l.q = cs.q;
+    } else {
+      l.q = null; l.b = W.mkBuilding(l.x, l.y, l.w, l.h, p.roof, rg(p.seed + 7));
+      l.b.andares = df.and; l.b.est = est; l.b.wall = W.sorteiaParede(est, rg(p.seed + 9));
+    }
+    if (tipo === 'casa') {
+      const area = 20 + Math.floor(rg(p.seed + 5)() * 8);
       const c = { id: 'cn' + (nCasa++), tipo: 'casa', nome: 'CASA', b: l.b, x: l.b.x + l.b.w / 2, y: l.b.y + l.b.h + 24, r: 30, seed: p.seed, area, venda: true, preco: Math.round((1200 + area * 26) / 100) * 100, nova: true };
       l.b.casa = c; l.casa = c; p.nome = 'CASA NOVA ' + (nCasa);
     } else if (tipo === 'comercio') {
@@ -90,9 +97,9 @@
 
   // ---------- pontes que estão sendo construídas ----------
   C.pontes = [
-    { rio: 16, j: 2, inicio: -380, dur: 1500, nome: 'PONTE NOVA ERA', fase: -1, pronta: false },
-    { rio: 9, j: 6, inicio: 520, dur: 1500, nome: 'PONTE DO PROGRESSO', fase: -1, pronta: false },
-    { rio: 30, j: 6, inicio: 900, dur: 1600, nome: 'PONTE DO LITORAL', fase: -1, pronta: false }
+    { rio: 34, j: 2, inicio: -380, dur: 1500, nome: 'PONTE NOVA ERA', fase: -1, pronta: false },
+    { rio: 9, j: 7, inicio: 520, dur: 1500, nome: 'PONTE DO PROGRESSO', fase: -1, pronta: false },
+    { rio: 59, j: 7, inicio: 900, dur: 1600, nome: 'PONTE DO LITORAL', fase: -1, pronta: false }
   ];
   C.pontes.forEach(pt => {
     const rv = W.blocks.find(b => b.kind === 'river' && b.bx === pt.rio);
@@ -116,14 +123,19 @@
   // ---------- prédio pronto: desenho guardado numa imagem ----------
   function fin(l) {
     if (l.img) return l.img;
-    const pad = 44, b = l.b, c = document.createElement('canvas');
-    c.width = Math.ceil(b.w + pad * 2); c.height = Math.ceil(b.h + pad * 2);
-    const x = c.getContext('2d'); x.translate(pad - b.x, pad - b.y);
-    x.save(); x.beginPath(); x.rect(b.x - 60, b.y - 60, b.w + 160, b.h + 160); x.clip();
-    x.shadowColor = 'rgba(0,0,12,0.55)'; x.shadowBlur = 16; x.shadowOffsetX = 16; x.shadowOffsetY = 18; x.fillStyle = '#000'; x.fillRect(b.x + 4, b.y + 4, b.w - 4, b.h - 4); x.restore();
+    const pad = 44, b = l.b, bb = b.box || b;
+    // casa com quintal: a imagem cobre o lote inteiro; prédio comum: só o prédio
+    const R = l.q ? { x: l.x - 5, y: l.y - 5, w: l.w + 10, h: l.h + 10 } : { x: bb.x, y: bb.y, w: bb.w, h: bb.h };
+    const c = document.createElement('canvas'); c.width = Math.ceil(R.w + pad * 2); c.height = Math.ceil(R.h + pad * 2);
+    const x = c.getContext('2d'); x.translate(pad - R.x, pad - R.y);
+    if (l.q) W.AR.drawQuintal(x, l.q, W.tex, l.proj.seed);
+    // sombra de cada parte do prédio
+    x.save(); x.beginPath(); x.rect(R.x - 60, R.y - 60, R.w + 160, R.h + 160); x.clip();
+    x.shadowColor = 'rgba(0,0,12,0.55)'; x.shadowBlur = 16; x.shadowOffsetX = 16; x.shadowOffsetY = 18; x.fillStyle = '#000';
+    (b.rects || [b]).forEach(r => x.fillRect(r.x + 4, r.y + 4, r.w - 4, r.h - 4)); x.restore();
     W.drawRoof(x, b);
     roofExtra(x, l);
-    l.img = c; l.imgPad = pad; return c;
+    l.img = c; l.imgX = R.x - pad; l.imgY = R.y - pad; return c;
   }
   function roofExtra(x, l) {
     const b = l.b, p = l.proj, fh = W.fachada(b), rx = b.x + 8, ry = b.y + 8, rw = b.w - 16, rh = b.h - fh - 16, cx = b.x + b.w / 2, cy = b.y + (b.h - fh) / 2;
@@ -181,14 +193,14 @@
     ctx.restore();
   }
   function placa(ctx, l, e) {
-    const w = 94, h = 22, x = l.cx - w / 2, y = l.y + l.h - 4;
+    const w = 132, h = 32, x = l.cx - w / 2, y = l.y + l.h - 4;
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + 3, y + 4, w, h);
-    ctx.fillStyle = '#4a321a'; ctx.fillRect(x + 8, y + h, 3, 6); ctx.fillRect(x + w - 11, y + h, 3, 6);
+    ctx.fillStyle = '#4a321a'; ctx.fillRect(x + 10, y + h, 4, 8); ctx.fillRect(x + w - 14, y + h, 4, 8);
     ctx.fillStyle = e.f < 0 ? '#c9a21a' : '#1f7a3a'; ctx.fillRect(x, y, w, h); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; let nm = (e.f < 0 ? 'EM BREVE: ' : '') + (l.proj.nome || ''), fs = 7; ctx.font = 'bold 7px Arial'; while (fs > 4 && ctx.measureText(nm).width > w - 6) { fs -= 0.5; ctx.font = 'bold ' + fs + 'px Arial'; }
-    ctx.fillText(nm, x + w / 2, y + 8.5);
-    ctx.font = 'bold 6px Arial'; ctx.fillStyle = '#ffe9a0'; ctx.fillText(e.f < 0 ? 'AGUARDANDO LICENÇA' : FASES[e.f] + ' ' + Math.round(e.p * 100) + '%', x + w / 2, y + 14.5);
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 6, y + 16.5, w - 12, 3); ctx.fillStyle = '#7dff8a'; ctx.fillRect(x + 6, y + 16.5, (w - 12) * e.g, 3);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; let nm = (e.f < 0 ? 'EM BREVE: ' : '') + (l.proj.nome || ''), fs = 10; ctx.font = 'bold 10px Arial'; while (fs > 5 && ctx.measureText(nm).width > w - 8) { fs -= 0.5; ctx.font = 'bold ' + fs + 'px Arial'; }
+    ctx.fillText(nm, x + w / 2, y + 13);
+    ctx.font = 'bold 8px Arial'; ctx.fillStyle = '#ffe9a0'; ctx.fillText(e.f < 0 ? 'AGUARDANDO LICENÇA' : FASES[e.f] + ' ' + Math.round(e.p * 100) + '%', x + w / 2, y + 22.5);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x + 8, y + 25, w - 16, 4); ctx.fillStyle = '#7dff8a'; ctx.fillRect(x + 8, y + 25, (w - 16) * e.g, 4);
     ctx.textAlign = 'left';
   }
   function andaime(ctx, r, alt, a) {
@@ -245,7 +257,7 @@
       if (e.f === 2) { ctx.strokeStyle = '#b05a2a'; ctx.lineWidth = 1; for (let k = 0; k < 8; k++) { const px = corpo.x + 12 + (k * 23) % (corpo.w - 24), py = corpo.y + 12 + (k * 31) % (corpo.h - 24) - andares * 2.2; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 7); ctx.stroke(); } }
       if (e.f >= 3) { // paredes e telhado de verdade aparecendo
         const a = e.f === 3 ? clamp((e.p - 0.15) / 0.8, 0, 1) : 1;
-        ctx.globalAlpha = a; ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad); ctx.globalAlpha = 1;
+        ctx.globalAlpha = a; ctx.drawImage(fin(l), l.imgX, l.imgY); ctx.globalAlpha = 1;
       }
       if (e.f <= 3) andaime(ctx, { x: corpo.x, y: corpo.y + corpo.h - fh - 4, w: corpo.w, h: fh + 4 }, e.f === 2 ? 0.3 + e.p * 0.7 : 1, 1);
       else andaime(ctx, { x: corpo.x, y: corpo.y + corpo.h - fh - 4, w: corpo.w, h: fh + 4 }, 1, 1 - e.p);
@@ -330,7 +342,7 @@
     } else if (e.f <= 1) { cerca(ctx, { x: l.x - 6, y: l.y - 6, w: l.w + 12, h: l.h + 12 }); pilha(ctx, l.x + 20, l.y + 16, 9, '#7a5f3d'); placa(ctx, l, e); }
     if (e.f >= 3) { ctx.fillStyle = '#c8c8d0'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h); ctx.fillStyle = '#7ec8ee'; ctx.fillRect(tr.x - 4, tr.y - 6, tr.w + 8, 14); ctx.strokeStyle = '#fff'; ctx.strokeRect(tr.x - 3.5, tr.y - 5.5, tr.w + 7, 13); }
     if (e.f === 5) {
-      ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad);
+      ctx.drawImage(fin(l), l.imgX, l.imgY);
       ctx.fillStyle = '#c8c8d0'; ctx.fillRect(tr.x, tr.y, tr.w, tr.h); ctx.fillStyle = '#7ec8ee'; ctx.fillRect(tr.x - 4, tr.y - 6, tr.w + 8, 14); ctx.strokeStyle = '#fff'; ctx.strokeRect(tr.x - 3.5, tr.y - 5.5, tr.w + 7, 13);
       voo(l, t).forEach(v => { if (!v.voando) aviao(ctx, v.x, v.y, v.ang, v.esc, v.cor, v.alt); });
       // cones e luzes da pista
@@ -388,7 +400,7 @@
       if (!vis(box, v)) return;
       const e = l.est || estadoDe(l, C.t);
       if (l.tam === 'a') { desenhaAero(ctx, l, e, t); return; }
-      if (e.f === 5) { ctx.drawImage(fin(l), l.b.x - l.imgPad, l.b.y - l.imgPad); return; }
+      if (e.f === 5) { ctx.drawImage(fin(l), l.imgX, l.imgY); return; }
       desenhaObra(ctx, l, e, t);
     });
     if (G.governo) G.governo.desenhar(ctx, S, x0, y0, x1, y1, t);
@@ -410,7 +422,9 @@
   C.atualizar = function (S, dt) {
     C.t += dt * C.vel; S.save.cidadeT = C.t;
     acc += dt; if (acc < 0.5) return; acc = 0;
+    const ref = S.player.car || S.player;
     W.lotes.forEach(l => {
+      if (l.img && Math.hypot(l.cx - ref.x, l.cy - ref.y) > 3600) l.img = null;   // solta a imagem pesada de lotes longe
       const e = estadoDe(l, C.t), ant = l.fase; l.est = e; l.fase = e.f;
       if (ant !== -2 && e.f !== ant) C.evento('fase', l, e);
       if (e.f === 5 && !l.ativo) ativar(S, l);

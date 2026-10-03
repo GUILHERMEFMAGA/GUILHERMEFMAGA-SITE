@@ -679,7 +679,8 @@
     o = o || {};
     const rq = o.riqueza == null ? 1 : o.riqueza, est = o.estilo || 'classica';
     const bd = LD >= 7 ? 4 : 3;           // profundidade do corpo
-    const yb = Math.max(bd, LD - 2);      // base (sul) do corpo: sobram 2 tiles de quintal na frente
+    const yb = o.semAvanco ? LD : Math.max(bd, LD - 2);      // base (sul) do corpo: sobram 2 tiles de quintal na frente (semAvanco: encostada na calçada)
+    const av = o.semAvanco ? 0 : 1, lim = o.semAvanco ? LD : LD - 1;   // quanto as alas avançam para a frente
     const yt = yb - bd;
     const partes = [];
     let tipo = o.tipo;
@@ -718,24 +719,24 @@
       const cx = lado === 'e' ? x0 + aw : x0, ax = lado === 'e' ? x0 : x0 + cw;
       const and = rq === 2 ? 2 : 1;
       P('corpo', cx, yt, cw, bd, and, teto(), 'h');
-      P('ala', ax, yt, aw, Math.min(bd + 1, LD - 1 - yt), and, 'duas', 'v');   // a ala avança 1 tile para a frente
+      P('ala', ax, yt, aw, Math.min(bd + av, lim - yt), and, 'duas', 'v');   // a ala avança 1 tile para a frente
       porta = cx + cw / 2;
     } else if (tipo === 'ume') {
       const aw = 3, cw = Math.max(4, Math.min(LW - aw * 2, 6)), tot = cw + aw * 2, x0 = Math.floor((LW - tot) / 2);
       const and = rq === 2 ? 2 : 1;
       P('corpo', x0 + aw, yt, cw, bd, and, 'duas', 'h');
-      P('ala', x0, yt, aw, Math.min(bd + 1, LD - 1 - yt), and, 'duas', 'v');
-      P('ala', x0 + aw + cw, yt, aw, Math.min(bd + 1, LD - 1 - yt), and, 'duas', 'v');
+      P('ala', x0, yt, aw, Math.min(bd + av, lim - yt), and, 'duas', 'v');
+      P('ala', x0 + aw + cw, yt, aw, Math.min(bd + av, lim - yt), and, 'duas', 'v');
       porta = x0 + aw + cw / 2;
     } else if (tipo === 'mansao') {
       const aw = 3, cw = Math.max(6, Math.min(LW - aw * 2 - 4, 8)), tot = cw + aw * 2, x0 = lado === 'e' ? 0 : LW - tot;
       const tm = est === 'moderna' ? 'plano' : 'quatro';
       P('corpo', x0 + aw, yt, cw, bd, 2, tm, 'h');
-      P('ala', x0, yt, aw, Math.min(bd + 1, LD - 1 - yt), 2, tm, 'v');
-      P('ala', x0 + aw + cw, yt, aw, Math.min(bd + 1, LD - 1 - yt), 2, tm, 'v');
+      P('ala', x0, yt, aw, Math.min(bd + av, lim - yt), 2, tm, 'v');
+      P('ala', x0 + aw + cw, yt, aw, Math.min(bd + av, lim - yt), 2, tm, 'v');
       porta = x0 + aw + cw / 2; varanda = false;
     }
-    corpo = partes.find(p => p.t === 'corpo'); corpo.varanda = varanda;
+    corpo = partes.find(p => p.t === 'corpo'); corpo.varanda = varanda && !o.semAvanco;
     // caixa que envolve tudo (em tiles)
     let bx0 = 1e9, by0 = 1e9, bx1 = -1, by1 = -1; partes.forEach(p => { bx0 = Math.min(bx0, p.x); by0 = Math.min(by0, p.y); bx1 = Math.max(bx1, p.x + p.w); by1 = Math.max(by1, p.y + p.h); });
     return { tipo, partes, porta, box: { x: bx0, y: by0, w: bx1 - bx0, h: by1 - by0 }, corpo, riqueza: rq, estilo: est, lado, garagem: partes.find(p => p.t === 'garagem') || null };

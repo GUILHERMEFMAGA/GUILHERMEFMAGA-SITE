@@ -17,10 +17,12 @@
   const REGIOES = [
     { b0: 0, b1: 2, nome: 'Agente Cruz', id: 'F1', setor: 'Ribeirão Oeste' },
     { b0: 4, b1: 8, nome: 'Agente Lima', id: 'F2', setor: 'Ribeirão Leste' },
-    { b0: 10, b1: 15, nome: 'Agente Dias', id: 'F5', setor: 'Mata Escura' },
-    { b0: 17, b1: 22, nome: 'Agente Rocha', id: 'F3', setor: 'Novo Horizonte' },
-    { b0: 24, b1: 29, nome: 'Agente Duarte', id: 'F4', setor: 'Vale Verde' },
-    { b0: 31, b1: 33, nome: 'Agente Sá', id: 'F6', setor: 'Porto do Sol' }
+    { b0: 10, b1: 13, nome: 'Agente Dias', id: 'F5', setor: 'Fazendas Santa Rita' },
+    { b0: 14, b1: 33, nome: 'Agente Melo', id: 'F7', setor: 'Mata Escura' },
+    { b0: 35, b1: 40, nome: 'Agente Rocha', id: 'F3', setor: 'Novo Horizonte' },
+    { b0: 41, b1: 48, nome: 'Agente Pires', id: 'F8', setor: 'Mata do Gavião' },
+    { b0: 50, b1: 56, nome: 'Agente Duarte', id: 'F4', setor: 'Vale Verde' },
+    { b0: 60, b1: 64, nome: 'Agente Sá', id: 'F6', setor: 'Porto do Sol' }
   ];
   const caminhavel = (tx, ty) => { if (tx < 0 || ty < 0 || tx >= W.TW || ty >= W.TH) return false; const t = W.tiles[ty * W.TW + tx]; return t === TILE.SIDE || t === TILE.CROSS || t === TILE.GRASS || t === TILE.LOT; };
 
@@ -63,7 +65,7 @@
     };
     // começa numa calçada da região
     const sp = W.spots.filter(p => p.x / T >= x0 + 2 && p.x / T <= x1 - 2 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T)));
-    const p0 = sp.length ? sp[Math.floor(sp.length * 0.4)] : { x: W.nodeX(rg.b0 + 1), y: W.nodeY(1) };
+    const p0 = sp.length ? sp[Math.floor(sp.length * 0.4)] : (alvosDe(ag)[0] || { x: W.nodeX(rg.b0 + 1), y: W.nodeY(1) });
     ag.ped.x = ag.x = p0.x; ag.ped.y = ag.y = p0.y;
     return ag;
   }
@@ -76,6 +78,9 @@
     G.cidade.lotes.forEach(l => { if (dentro(l.cx) && l.tam !== 'p') lista.push({ tipo: 'obra', id: 'o:' + l.id, x: l.tam === 'a' ? l.x + l.w / 2 : l.cx, y: l.y + l.h + 26, lote: l }); });
     // pontos de calçada: vigilância de rua em todos os cantos da região
     W.spots.forEach((p, i) => { if (dentro(p.x) && i % 3 === 0 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T))) lista.push({ tipo: 'rua', id: 's:' + i, x: p.x, y: p.y }); });
+    // campo e mata: o agente confere as cabanas escondidas na floresta e as sedes das fazendas
+    W.blocks.forEach(blk => { if (blk.cabana && dentro(blk.x + blk.w / 2)) lista.push({ tipo: 'rua', id: 'cb:' + blk.bx + ',' + blk.by, x: blk.cabana.x, y: blk.cabana.y }); });
+    W.casas.forEach(c => { if (c.rica && dentro(c.x)) lista.push({ tipo: 'rua', id: 'mn:' + c.id, x: c.x, y: c.y + 6 }); });
     return lista;
   }
   function escolheAlvo(ag) {
