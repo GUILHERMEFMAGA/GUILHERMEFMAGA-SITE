@@ -5650,7 +5650,9 @@
   const copo = (ctx, x, y, cheio) => { ctx.fillStyle = 'rgba(225,238,248,0.75)'; ctx.fillRect(x - 3, y - 9, 6, 9); if (cheio) { ctx.fillStyle = '#e8b830'; ctx.fillRect(x - 2.4, y - 7, 4.8, 6.4); ctx.fillStyle = '#fff'; ctx.fillRect(x - 2.4, y - 8.8, 4.8, 2); } ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 0.8; ctx.strokeRect(x - 3, y - 9, 6, 9); };
   const prato = (ctx, x, y, c) => { ctx.fillStyle = '#f2f2ee'; ctx.beginPath(); ctx.ellipse(x, y, 9, 4.5, 0, 0, TAU); ctx.fill(); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y - 8); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 0.8; ctx.stroke(); };
 
+  const novos = {};          // móveis do kit novo (interiores.js / mobilia*.js): têm prioridade sobre os desenhos abaixo
   function drawObj(ctx, o, t) {
+    if (novos[o.t]) { novos[o.t](ctx, o, t); return; }
     const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 0, ty = y - e;
     switch (o.t) {
       case 'balcao': {
@@ -5846,6 +5848,7 @@
 
   function fundo(R) {
     usa(R);
+    if (L.casca) return L.casca(R);   // paredes grossas, chão com textura, janelas (interiores.js)
     const c = document.createElement('canvas'); c.width = R.W; c.height = R.H; const x = c.getContext('2d');
     x.fillStyle = '#08060e'; x.fillRect(0, 0, R.W, R.H);
     // parede de trás
@@ -6363,7 +6366,7 @@
   }
 
   // ---------- peças que os outros arquivos usam ----------
-  L.kit = { O, caixa, gente, gasta, compra, cura, bolha, pick, rand, clamp, shade, tipos, armado, sentar, falaDe, ameacar, chamaPolicia, desenhaCarrinho, janela, cartaz, neon, prateleiraParede, garrafa, copo, prato, hh, TAU, VW, VH, salvar: () => G.save() };
+  L.kit = { novos, desenharObj: drawObj, O, caixa, gente, gasta, compra, cura, bolha, pick, rand, clamp, shade, tipos, armado, sentar, falaDe, ameacar, chamaPolicia, desenhaCarrinho, janela, cartaz, neon, prateleiraParede, garrafa, copo, prato, hh, TAU, VW, VH, salvar: () => G.save() };
 })(window.G = window.G || {});
 
 </script>
@@ -6510,6 +6513,1019 @@
 </script>
 <script>
 /* =====================================================================
+   INTERIORES.JS — o "kit de decoração" das salas por dentro
+     • chão com textura de verdade (tábua, cerâmica, porcelanato, carpete, cimento...)
+     • paredes grossas com rodapé, sanca, lambri e sombra no canto
+     • janelas com moldura, cortina, paisagem e feixe de luz no chão
+     • quadros, relógio, prateleira, ar-condicionado...
+     • D.est(): desenha o móvel UMA vez e guarda numa tela (cache) — fica rápido
+   Os móveis em si ficam em mobilia.js e mobilia2.js.
+   Tudo aqui é só visual: não mexe nas regras do jogo.
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, W = G.world, TAU = Math.PI * 2;
+  const shade = K.shade, hh = K.hh;
+  const D = G.deco = {};
+
+  // ---------- ferramentas pequenas ----------
+  // cor entre duas (só hex de 6 dígitos, ex.: '#aabbcc')
+  const rgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+  const hex = (r, g, b) => '#' + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+  const mix = (a, b, t) => { const p = rgb(a), q = rgb(b); return hex(p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t); };
+  const rgba = (h, a) => { const p = rgb(h); return 'rgba(' + p[0] + ',' + p[1] + ',' + p[2] + ',' + a + ')'; };
+  // sorteio com semente (mesma casa = mesmo desenho)
+  const rng = s => { let a = (s | 0) + 0x6D2B79F5; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  const rr = (c, x, y, w, h, r) => W.rrect(c, x, y, w, h, Math.max(0, Math.min(r, w / 2, h / 2)));
+  const semente = s => { let h = 7; String(s).split('').forEach(ch => { h = (h * 31 + ch.charCodeAt(0)) | 0; }); return Math.abs(h); };
+  Object.assign(D, { rgb, hex, mix, rgba, rng, rr, semente });
+
+  // sombra macia no chão (várias camadas de pouca opacidade, sem blur)
+  D.sombra = function (c, x, y, w, h, o) {
+    o = o || {}; const dx = o.dx != null ? o.dx : 5, dy = o.dy != null ? o.dy : 7, n = 5, r = o.r != null ? o.r : 4, a = o.a || 0.08;
+    c.save();
+    for (let i = 0; i < n; i++) { const g = (n - i) * 1.5 - 1; c.fillStyle = 'rgba(10,5,16,' + a + ')'; if (o.oval) { c.beginPath(); c.ellipse(x + w / 2 + dx, y + h / 2 + dy, w / 2 + g, h / 2 + g, 0, 0, TAU); c.fill(); } else { rr(c, x + dx - g, y + dy - g, w + 2 * g, h + 2 * g, r + g); c.fill(); } }
+    c.restore();
+  };
+
+  // caixa em perspectiva (topo + frente) com cantos arredondados, brilho e contorno
+  // cTop = cor do topo, cFr = cor da frente (vertical), e = altura
+  D.caixa = function (c, x, y, w, h, e, cTop, cFr, o) {
+    o = o || {}; const r = o.r != null ? o.r : 3;
+    if (!o.semSombra) D.sombra(c, x, y, w, h, { dx: 3 + e * 0.1, dy: 4 + e * 0.24, r: r + 1 });
+    if (e > 0) {
+      const g = c.createLinearGradient(0, y + h - e, 0, y + h); g.addColorStop(0, shade(cFr, 0.1)); g.addColorStop(0.6, cFr); g.addColorStop(1, shade(cFr, -0.36));
+      c.fillStyle = g; rr(c, x, y - e, w, h + e, r); c.fill();
+    }
+    const g2 = c.createLinearGradient(x, y - e, x + w, y - e + h); g2.addColorStop(0, shade(cTop, 0.16)); g2.addColorStop(1, shade(cTop, -0.14));
+    c.fillStyle = g2; rr(c, x, y - e, w, h, r); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.42)'; c.lineWidth = 1; rr(c, x + 0.5, y - e + 0.5, w - 1, h + e - 1, r); c.stroke();
+    if (e > 0) { c.fillStyle = 'rgba(0,0,0,0.28)'; c.fillRect(x + 1, y - e + h - 0.5, w - 2, 1.4); }
+    c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + r, y - e + 1, w - 2 * r, 1.4);
+  };
+
+  // ---------- cache dos móveis (desenha uma vez, depois só copia) ----------
+  // fn(ctx, o, t) desenha o móvel; opt.din(ctx, o, t) desenha só o que se mexe (chama, tela da TV...)
+  const ASS = ['x', 'y', 'w', 'h', 'e', 'cor', 'top', 'front', 'variante', 'aberto', 'ligado', 'estilo', 'itens', 'toalha', 'prato', 'dir', 'nome', 'texto', 'n', 'padrao', 'forma', 'cor2', 'seed', 'vaso', 'espelho', 'alt', 'luz', 'parte', 'manta', 'almofadas'];
+  const assina = o => { let s = o.t; for (let i = 0; i < ASS.length; i++) { const v = o[ASS[i]]; if (v !== undefined) s += '|' + v; } if (o.cores) s += o.cores.join(); return s; };
+  D.est = function (fn, opt) {
+    opt = opt || {};
+    const f = function (ctx, o, t) {
+      const sg = assina(o); let c = o._cv;
+      if (!c || c.sg !== sg) {
+        const pad = opt.pad || 30, alto = opt.alto != null ? opt.alto : 40, e = o.e || 0;
+        const L0 = o.x - pad, T0 = o.y - e - alto - pad, w = Math.ceil(o.w + pad * 2 + 12), h = Math.ceil(o.h + e + alto + pad * 2 + 12);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d');
+        g.translate(-L0, -T0); fn(g, o, 0);
+        c = o._cv = { cv, sg, dx: L0 - o.x, dy: T0 - o.y };
+      }
+      ctx.drawImage(c.cv, o.x + c.dx, o.y + c.dy);
+      if (opt.din) opt.din(ctx, o, t);
+    };
+    return f;
+  };
+  D.reg = (nome, fn, opt) => { K.novos[nome] = D.est(fn, opt); };
+
+  // =====================================================================
+  //  CHÃOS
+  // =====================================================================
+  const PISOS = {
+    // tábuas de madeira com veios, nós e emendas deslocadas
+    madeira(c, X, Y, w, h, cs, sd) {
+      const ph = 22, r = rng(sd);
+      for (let j = 0; j * ph < h + ph; j++) {
+        let x = X - r() * 170; const y = Y + j * ph;
+        while (x < X + w) {
+          const len = 110 + r() * 110, cor = shade(mix(cs[0], cs[1], r()), (r() - 0.5) * 0.13);
+          const g = c.createLinearGradient(0, y, 0, y + ph); g.addColorStop(0, shade(cor, 0.08)); g.addColorStop(0.5, cor); g.addColorStop(1, shade(cor, -0.1));
+          c.fillStyle = g; c.fillRect(x, y, len, ph);
+          c.strokeStyle = 'rgba(35,16,4,0.14)'; c.lineWidth = 1;
+          for (let v = 0; v < 3; v++) { const yy = y + 4 + v * 6 + r() * 3, ph0 = r() * 20; c.beginPath(); c.moveTo(x + 1, yy); for (let xx = 0; xx <= len; xx += 12) c.lineTo(x + xx, yy + Math.sin((xx + ph0) * 0.08 + v) * 1.2); c.stroke(); }
+          if (r() < 0.14) { const kx = x + 20 + r() * (len - 40), ky = y + 6 + r() * 10; c.strokeStyle = 'rgba(30,12,2,0.3)'; c.beginPath(); c.ellipse(kx, ky, 5, 2.4, 0, 0, TAU); c.stroke(); c.beginPath(); c.ellipse(kx, ky, 2.4, 1.1, 0, 0, TAU); c.stroke(); }
+          c.fillStyle = 'rgba(12,6,0,0.55)'; c.fillRect(x + len - 1, y, 1.5, ph);
+          c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(x + len + 0.5, y, 1, ph);
+          x += len;
+        }
+        c.fillStyle = 'rgba(12,6,0,0.5)'; c.fillRect(X, y + ph - 1, w, 1.3);
+        c.fillStyle = 'rgba(255,255,255,0.09)'; c.fillRect(X, y, w, 1);
+      }
+    },
+    // taco: quadrados de tábuas alternando a direção
+    taco(c, X, Y, w, h, cs, sd) {
+      const S = 42, n = 4, r = rng(sd);
+      for (let j = 0; j * S < h + S; j++) for (let i = 0; i * S < w + S; i++) {
+        const px = X + i * S, py = Y + j * S, hor = (i + j) % 2 === 0;
+        for (let k = 0; k < n; k++) {
+          const cor = shade(mix(cs[0], cs[1], r()), (r() - 0.5) * 0.1), a = S / n;
+          const bx = hor ? px : px + k * a, by = hor ? py + k * a : py, bw = hor ? S : a, bh = hor ? a : S;
+          const g = hor ? c.createLinearGradient(0, by, 0, by + bh) : c.createLinearGradient(bx, 0, bx + bw, 0);
+          g.addColorStop(0, shade(cor, 0.1)); g.addColorStop(1, shade(cor, -0.1)); c.fillStyle = g; c.fillRect(bx, by, bw, bh);
+          c.strokeStyle = 'rgba(15,7,0,0.5)'; c.lineWidth = 1; c.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+        }
+      }
+    },
+    // cerâmica quadrada com rejunte, reflexo e chanfro
+    ladrilho(c, X, Y, w, h, cs, sd, T) {
+      T = T || 44;
+      for (let j = 0; j * T < h + T; j++) for (let i = 0; i * T < w + T; i++) {
+        const px = X + i * T, py = Y + j * T, k = hh(i + sd, j);
+        c.fillStyle = shade(cs[0], (k - 0.5) * 0.08); c.fillRect(px, py, T, T);
+        const g = c.createLinearGradient(px, py, px + T, py + T); g.addColorStop(0, 'rgba(255,255,255,0.16)'); g.addColorStop(0.5, 'rgba(255,255,255,0.02)'); g.addColorStop(1, 'rgba(0,0,0,0.08)'); c.fillStyle = g; c.fillRect(px, py, T, T);
+        c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(px + 1, py + 1, T - 2, 1); c.fillRect(px + 1, py + 1, 1, T - 2);
+      }
+      c.strokeStyle = cs[1]; c.lineWidth = 2; c.beginPath();
+      for (let i = 0; i * T <= w + T; i++) { c.moveTo(X + i * T, Y); c.lineTo(X + i * T, Y + h); }
+      for (let j = 0; j * T <= h + T; j++) { c.moveTo(X, Y + j * T); c.lineTo(X + w, Y + j * T); }
+      c.stroke();
+    },
+    // porcelanato grande, polido, com veios de mármore
+    porcelanato(c, X, Y, w, h, cs, sd) {
+      const T = 76, r = rng(sd);
+      for (let j = 0; j * T < h + T; j++) for (let i = 0; i * T < w + T; i++) {
+        const px = X + i * T, py = Y + j * T;
+        const g = c.createLinearGradient(px, py, px + T, py + T); g.addColorStop(0, shade(cs[0], 0.06)); g.addColorStop(1, shade(cs[0], -0.05)); c.fillStyle = g; c.fillRect(px, py, T, T);
+        c.save(); c.beginPath(); c.rect(px, py, T, T); c.clip();
+        for (let v = 0; v < 3; v++) {
+          c.strokeStyle = v % 2 ? 'rgba(255,255,255,0.22)' : 'rgba(70,70,86,0.14)'; c.lineWidth = v === 0 ? 1.6 : 1; c.beginPath();
+          let vx = px + r() * T, vy = py - 4; c.moveTo(vx, vy);
+          for (let s = 0; s < 7; s++) { vx += (r() - 0.5) * 22; vy += T / 6; c.lineTo(vx, vy); } c.stroke();
+        }
+        const g2 = c.createLinearGradient(px, py + T, px + T, py); g2.addColorStop(0, 'rgba(255,255,255,0)'); g2.addColorStop(0.5, 'rgba(255,255,255,0.1)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g2; c.fillRect(px, py, T, T);
+        c.restore();
+      }
+      c.strokeStyle = cs[1]; c.lineWidth = 1.4; c.beginPath();
+      for (let i = 0; i * T <= w + T; i++) { c.moveTo(X + i * T, Y); c.lineTo(X + i * T, Y + h); }
+      for (let j = 0; j * T <= h + T; j++) { c.moveTo(X, Y + j * T); c.lineTo(X + w, Y + j * T); }
+      c.stroke();
+    },
+    // xadrez brilhante (lojas, bares)
+    xadrez(c, X, Y, w, h, cs, sd) {
+      const T = 44;
+      for (let j = 0; j * T < h + T; j++) for (let i = 0; i * T < w + T; i++) {
+        const px = X + i * T, py = Y + j * T; c.fillStyle = (i + j) % 2 ? cs[0] : cs[1]; c.fillRect(px, py, T, T);
+        const g = c.createLinearGradient(px, py, px + T, py + T); g.addColorStop(0, 'rgba(255,255,255,0.14)'); g.addColorStop(0.55, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.1)'); c.fillStyle = g; c.fillRect(px, py, T, T);
+      }
+      c.strokeStyle = 'rgba(0,0,0,0.22)'; c.lineWidth = 1; c.beginPath();
+      for (let i = 0; i * T <= w + T; i++) { c.moveTo(X + i * T, Y); c.lineTo(X + i * T, Y + h); }
+      for (let j = 0; j * T <= h + T; j++) { c.moveTo(X, Y + j * T); c.lineTo(X + w, Y + j * T); }
+      c.stroke();
+    },
+    // carpete: fibra, grãos e leve escovado
+    carpete(c, X, Y, w, h, cs, sd) {
+      const r = rng(sd); c.fillStyle = cs[0]; c.fillRect(X, Y, w, h);
+      const n = Math.floor(w * h / 38);
+      for (let k = 0; k < n; k++) { const t = r(); c.fillStyle = t < 0.5 ? rgba(cs[1], 0.35) : 'rgba(255,255,255,0.05)'; c.fillRect(X + r() * w, Y + r() * h, 2, 2); }
+      c.strokeStyle = 'rgba(0,0,0,0.05)'; c.lineWidth = 1; c.beginPath(); for (let k = 0; k < h; k += 5) { c.moveTo(X, Y + k); c.lineTo(X + w, Y + k); } c.stroke();
+    },
+    // cimento queimado (casa simples): manchas, riscos e juntas de dilatação
+    cimento(c, X, Y, w, h, cs, sd) {
+      const r = rng(sd); c.fillStyle = cs[0]; c.fillRect(X, Y, w, h);
+      for (let k = 0; k < 40; k++) { const px = X + r() * w, py = Y + r() * h, rad = 30 + r() * 70, lg = c.createRadialGradient(px, py, 2, px, py, rad); const cl = r() < 0.5 ? '255,255,255' : '0,0,0'; lg.addColorStop(0, 'rgba(' + cl + ',0.07)'); lg.addColorStop(1, 'rgba(' + cl + ',0)'); c.fillStyle = lg; c.fillRect(px - rad, py - rad, rad * 2, rad * 2); }
+      for (let k = 0; k < w * h / 60; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; c.fillRect(X + r() * w, Y + r() * h, 1.5, 1.5); }
+      c.strokeStyle = cs[1]; c.lineWidth = 2; c.beginPath();
+      for (let i = 1; i * 150 < w; i++) { c.moveTo(X + i * 150, Y); c.lineTo(X + i * 150, Y + h); }
+      for (let j = 1; j * 130 < h; j++) { c.moveTo(X, Y + j * 130); c.lineTo(X + w, Y + j * 130); }
+      c.stroke();
+      c.strokeStyle = 'rgba(0,0,0,0.22)'; c.lineWidth = 1; for (let k = 0; k < 4; k++) { let px = X + r() * w, py = Y + r() * h; c.beginPath(); c.moveTo(px, py); for (let s = 0; s < 5; s++) { px += (r() - 0.5) * 26; py += (r() - 0.3) * 18; c.lineTo(px, py); } c.stroke(); }
+    },
+    // azulejo pequeno (cozinha, banheiro)
+    azulejo(c, X, Y, w, h, cs, sd) {
+      const T = 22;
+      for (let j = 0; j * T < h + T; j++) for (let i = 0; i * T < w + T; i++) {
+        const px = X + i * T, py = Y + j * T, k = hh(i + sd, j);
+        c.fillStyle = (i % 4 === 2 && j % 4 === 2) ? cs[2] || '#4a8ac8' : shade(cs[0], (k - 0.5) * 0.06); c.fillRect(px, py, T, T);
+        const g = c.createLinearGradient(px, py, px + T, py + T); g.addColorStop(0, 'rgba(255,255,255,0.28)'); g.addColorStop(1, 'rgba(0,0,0,0.06)'); c.fillStyle = g; c.fillRect(px, py, T, T);
+      }
+      c.strokeStyle = cs[1]; c.lineWidth = 1.4; c.beginPath();
+      for (let i = 0; i * T <= w + T; i++) { c.moveTo(X + i * T, Y); c.lineTo(X + i * T, Y + h); }
+      for (let j = 0; j * T <= h + T; j++) { c.moveTo(X, Y + j * T); c.lineTo(X + w, Y + j * T); }
+      c.stroke();
+    },
+    // borracha (academia)
+    borracha(c, X, Y, w, h, cs, sd) {
+      const r = rng(sd); c.fillStyle = cs[0]; c.fillRect(X, Y, w, h);
+      for (let k = 0; k < w * h / 70; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.12)'; c.fillRect(X + r() * w, Y + r() * h, 2, 2); }
+      c.strokeStyle = cs[1]; c.lineWidth = 2; c.beginPath();
+      for (let i = 0; i * 60 <= w; i++) { c.moveTo(X + i * 60, Y); c.lineTo(X + i * 60, Y + h); }
+      for (let j = 0; j * 60 <= h; j++) { c.moveTo(X, Y + j * 60); c.lineTo(X + w, Y + j * 60); }
+      c.stroke();
+    },
+    // pedra portuguesa / pedrisco (varandas, pizzaria)
+    pedra(c, X, Y, w, h, cs, sd) {
+      const r = rng(sd); c.fillStyle = cs[1]; c.fillRect(X, Y, w, h);
+      for (let j = 0; j * 26 < h + 26; j++) for (let i = -1; i * 34 < w + 34; i++) {
+        const px = X + i * 34 + (j % 2) * 17 + r() * 3, py = Y + j * 26 + r() * 3;
+        c.fillStyle = shade(cs[0], (r() - 0.5) * 0.18); rr(c, px, py, 30, 22, 8); c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(px + 4, py + 3, 12, 2);
+      }
+    }
+  };
+  PISOS.ladrilho_g = (c, X, Y, w, h, cs, sd) => PISOS.ladrilho(c, X, Y, w, h, cs, sd, 64);
+  D.piso = function (c, tipo, X, Y, w, h, cs, sd) { (PISOS[tipo] || PISOS.ladrilho)(c, X, Y, w, h, cs || ['#dddddd', '#aaaaaa'], sd || 1); };
+  D.PISOS = PISOS;
+
+  // =====================================================================
+  //  PAREDES
+  // =====================================================================
+  // a "cara" da parede de trás: tinta, desenho, lambri, sanca e rodapé
+  function paredeFace(c, x0, x1, y0, y1, R) {
+    const base = R.parede || '#d8cdb0', est = R.estiloParede || 'liso', w = x1 - x0, hgt = y1 - y0, r = rng(R.seed || 3);
+    const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, shade(base, 0.12)); g.addColorStop(0.6, base); g.addColorStop(1, shade(base, -0.22));
+    c.fillStyle = g; c.fillRect(x0, y0, w, hgt);
+    c.save(); c.beginPath(); c.rect(x0, y0, w, hgt); c.clip();
+    if (est === 'listras') { for (let k = 0; k * 26 < w; k++) { c.fillStyle = k % 2 ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'; c.fillRect(x0 + k * 26, y0, 13, hgt); } }
+    else if (est === 'papel') {
+      c.fillStyle = 'rgba(255,255,255,0.12)';
+      for (let j = 0; j * 20 < hgt + 20; j++) for (let i = 0; i * 24 < w + 24; i++) { const px = x0 + i * 24 + (j % 2) * 12, py = y0 + j * 20; c.beginPath(); c.moveTo(px, py - 5); c.lineTo(px + 4, py); c.lineTo(px, py + 5); c.lineTo(px - 4, py); c.closePath(); c.fill(); c.fillRect(px - 1, py + 7, 2, 2); }
+    } else if (est === 'tijolo') {
+      for (let j = 0; j * 11 < hgt + 11; j++) for (let i = -1; i * 30 < w + 30; i++) { const px = x0 + i * 30 + (j % 2) * 15, py = y0 + j * 11; c.fillStyle = shade(base, (hh(i, j + 5) - 0.5) * 0.22); c.fillRect(px, py, 28, 9); c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(px, py, 28, 1.5); c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(px, py + 8, 28, 1); }
+    } else if (est === 'azulejo') {
+      c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1; c.beginPath(); for (let i = 0; i * 20 <= w; i++) { c.moveTo(x0 + i * 20, y0); c.lineTo(x0 + i * 20, y1); } for (let j = 0; j * 20 <= hgt; j++) { c.moveTo(x0, y0 + j * 20); c.lineTo(x1, y0 + j * 20); } c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.14)'; for (let j = 0; j * 20 < hgt; j++) for (let i = 0; i * 20 < w; i++) c.fillRect(x0 + i * 20 + 2, y0 + j * 20 + 2, 7, 2);
+    } else if (est === 'concreto') {
+      for (let k = 0; k < w * hgt / 90; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'; c.fillRect(x0 + r() * w, y0 + r() * hgt, 2, 2); }
+      c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1; for (let i = 1; i * 120 < w; i++) { c.beginPath(); c.moveTo(x0 + i * 120, y0); c.lineTo(x0 + i * 120, y1); c.stroke(); }
+    } else if (est === 'madeira') {
+      for (let i = 0; i * 14 < w; i++) { c.fillStyle = shade(base, (hh(i, 9) - 0.5) * 0.16); c.fillRect(x0 + i * 14, y0, 13, hgt); c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(x0 + i * 14 + 13, y0, 1, hgt); }
+    } else {
+      for (let k = 0; k < w * hgt / 120; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.04)'; c.fillRect(x0 + r() * w, y0 + r() * hgt, 2, 2); }
+      if (R.velha) { for (let k = 0; k < 7; k++) { const px = x0 + r() * w, py = y0 + hgt - r() * 30, rad = 18 + r() * 30, lg = c.createRadialGradient(px, py, 2, px, py, rad); lg.addColorStop(0, 'rgba(60,70,40,0.22)'); lg.addColorStop(1, 'rgba(60,70,40,0)'); c.fillStyle = lg; c.fillRect(px - rad, py - rad, rad * 2, rad * 2); } }
+    }
+    // lambri / rodameio
+    const lamb = R.lambri;
+    if (lamb) {
+      const lh = R.lambriAlt || 32, ly = y1 - lh, cl = typeof lamb === 'string' ? lamb : shade(base, -0.14);
+      c.fillStyle = cl; c.fillRect(x0, ly, w, lh);
+      for (let i = 0; i * 54 < w; i++) { const px = x0 + 10 + i * 54; c.fillStyle = shade(cl, -0.12); rr(c, px, ly + 7, 40, lh - 13, 2); c.fill(); c.strokeStyle = shade(cl, 0.2); c.lineWidth = 1; rr(c, px + 0.5, ly + 7.5, 39, lh - 14, 2); c.stroke(); }
+      c.fillStyle = shade(cl, 0.28); c.fillRect(x0, ly, w, 3); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x0, ly + 3, w, 1.5);
+    }
+    // sanca (moldura do teto)
+    const sg = c.createLinearGradient(0, y0, 0, y0 + 9); sg.addColorStop(0, shade(base, 0.4)); sg.addColorStop(1, shade(base, 0.14)); c.fillStyle = sg; c.fillRect(x0, y0, w, 9);
+    c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(x0, y0 + 9, w, 2); c.fillStyle = 'rgba(0,0,0,0.1)'; c.fillRect(x0, y0 + 11, w, 4);
+    // rodapé
+    const rp = R.rodape || shade(base, 0.45);
+    c.fillStyle = rp; c.fillRect(x0, y1 - 8, w, 8); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x0, y1 - 8, w, 1.5); c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x0, y1 - 1.5, w, 1.5);
+    c.restore();
+  }
+
+  // quanto de luz do dia entra (0 = noite, 1 = dia): usado nas janelas
+  function claridade() {
+    const S = G.S; if (!S) return 1; const h = L.hora(S);
+    if (h >= 7 && h < 17) return 1; if (h >= 17 && h < 19) return 0.55; if (h >= 5.5 && h < 7) return 0.5; return 0;
+  }
+  D.claridade = claridade;
+  const ESTADO = { x0: 70, x1: 730, y0: 150, y1: 545, cl: 1 };    // sala que está sendo montada (para as janelas)
+
+  // ---------- janela: moldura, vidro com paisagem, cortina, parapeito e luz no chão ----------
+  // o: { cor: moldura, cortina: cor ('#...') ou null, persiana, grade, arco, flores, vista: 'rua'|'jardim'|'cidade'|'mar' }
+  D.janela = function (c, px, py, w, h, o) {
+    o = o || {}; const cl = ESTADO.cl, fr = o.cor || '#f2eee4', S0 = G.S;
+    // abertura (sombra da parede grossa)
+    c.fillStyle = 'rgba(0,0,0,0.38)'; rr(c, px - 7, py - 6, w + 14, h + 15, 3); c.fill();
+    // vidro com céu
+    c.save(); rr(c, px, py, w, h, o.arco ? Math.min(w / 2, 22) : 2); c.clip();
+    const noite = cl < 0.2, tarde = cl > 0.2 && cl < 0.8;
+    const sk = c.createLinearGradient(0, py, 0, py + h);
+    if (noite) { sk.addColorStop(0, '#0a1230'); sk.addColorStop(1, '#25386a'); } else if (tarde) { sk.addColorStop(0, '#6a8ac8'); sk.addColorStop(0.6, '#f0b070'); sk.addColorStop(1, '#f8d8a0'); } else { sk.addColorStop(0, '#6cb8f0'); sk.addColorStop(1, '#dff2ff'); }
+    c.fillStyle = sk; c.fillRect(px, py, w, h);
+    if (noite) { c.fillStyle = '#fff'; for (let k = 0; k < 7; k++) c.fillRect(px + hh(k, px) * w, py + hh(px, k) * h * 0.6, 1.4, 1.4); c.fillStyle = '#f4efd0'; c.beginPath(); c.arc(px + w * 0.78, py + h * 0.25, 4, 0, TAU); c.fill(); }
+    else { c.fillStyle = 'rgba(255,255,255,0.85)'; [[0.2, 0.22, 11], [0.34, 0.2, 8], [0.7, 0.3, 9], [0.82, 0.28, 6]].forEach(([a, b, r]) => { c.beginPath(); c.ellipse(px + w * a, py + h * b, r * 1.5, r * 0.7, 0, 0, TAU); c.fill(); }); }
+    // paisagem lá fora (silhuetas)
+    const vista = o.vista || 'jardim', fy = py + h * 0.62;
+    if (vista === 'cidade') { for (let k = 0; k < 7; k++) { const bw = 7 + hh(k, 2) * 9, bh = 10 + hh(k, 3) * 24; c.fillStyle = noite ? '#0c1224' : '#7f90ac'; c.fillRect(px + k * (w / 6.4), py + h - bh - 6, bw, bh + 6); if (noite) { c.fillStyle = '#ffd86a'; for (let q = 0; q < 3; q++) c.fillRect(px + k * (w / 6.4) + 2, py + h - bh - 2 + q * 7, 2, 2); } } }
+    else if (vista === 'mar') { c.fillStyle = noite ? '#0e2a50' : '#3a8ad0'; c.fillRect(px, fy, w, h); c.fillStyle = 'rgba(255,255,255,0.5)'; for (let k = 0; k < 5; k++) c.fillRect(px + 6 + k * 14, fy + 6 + (k % 2) * 7, 8, 1.4); }
+    else {
+      c.fillStyle = noite ? '#0a2012' : '#58a850'; c.beginPath(); c.moveTo(px, py + h); c.lineTo(px, fy + 2); c.quadraticCurveTo(px + w * 0.5, fy - 8, px + w, fy + 4); c.lineTo(px + w, py + h); c.fill();
+      [[0.18, 0.55, 12], [0.78, 0.5, 14]].forEach(([a, b, r]) => { c.fillStyle = noite ? '#06150a' : '#2f7a3a'; c.beginPath(); c.arc(px + w * a, py + h * b, r, 0, TAU); c.fill(); c.fillStyle = noite ? '#3a2412' : '#6a4a2a'; c.fillRect(px + w * a - 1.5, py + h * b + r - 3, 3, 9); });
+    }
+    // reflexo no vidro
+    const gl = c.createLinearGradient(px, py, px + w, py + h); gl.addColorStop(0, 'rgba(255,255,255,0.34)'); gl.addColorStop(0.4, 'rgba(255,255,255,0.04)'); gl.addColorStop(0.55, 'rgba(255,255,255,0.14)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = gl; c.fillRect(px, py, w, h);
+    c.restore();
+    // moldura e divisões
+    c.strokeStyle = fr; c.lineWidth = 4; rr(c, px - 1, py - 1, w + 2, h + 2, o.arco ? Math.min(w / 2, 22) : 2); c.stroke();
+    c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; rr(c, px - 3.5, py - 3.5, w + 7, h + 7, 3); c.stroke();
+    c.fillStyle = fr; if (!o.semDivisao) { c.fillRect(px + w / 2 - 1.5, py, 3, h); c.fillRect(px, py + h * 0.46, w, 3); }
+    if (o.grade) { c.strokeStyle = '#2a2a30'; c.lineWidth = 2; c.beginPath(); for (let k = 1; k < 5; k++) { c.moveTo(px + k * w / 5, py); c.lineTo(px + k * w / 5, py + h); } c.stroke(); }
+    if (o.persiana) { c.fillStyle = 'rgba(235,230,215,0.96)'; c.fillRect(px, py, w, h * o.persiana); c.fillStyle = 'rgba(0,0,0,0.18)'; for (let k = 3; k < h * o.persiana; k += 5) c.fillRect(px, py + k, w, 1); c.fillStyle = '#b8b0a0'; c.fillRect(px, py + h * o.persiana - 2, w, 3); }
+    // parapeito
+    c.fillStyle = shade(fr, 0.1); c.fillRect(px - 6, py + h + 2, w + 12, 5); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px - 6, py + h + 7, w + 12, 2); c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(px - 6, py + h + 2, w + 12, 1);
+    if (o.flores) { c.fillStyle = '#8a4a32'; c.fillRect(px + w * 0.2, py + h - 3, 14, 7); c.fillStyle = '#2f8a3c'; c.beginPath(); c.arc(px + w * 0.2 + 7, py + h - 7, 7, Math.PI, 0); c.fill(); [['#e84a6a', -4], ['#f2d84a', 1], ['#fff', 5]].forEach(([cc, dx]) => { c.fillStyle = cc; c.beginPath(); c.arc(px + w * 0.2 + 7 + dx, py + h - 10 + (dx % 3), 2.3, 0, TAU); c.fill(); }); }
+    // cortina com dobras
+    if (o.cortina) {
+      const cc = o.cortina, cw = Math.max(14, w * 0.28);
+      c.fillStyle = '#5a4026'; c.fillRect(px - 12, py - 9, w + 24, 3); c.fillStyle = '#c8a24a'; c.beginPath(); c.arc(px - 12, py - 7.5, 3, 0, TAU); c.arc(px + w + 12, py - 7.5, 3, 0, TAU); c.fill();
+      [[px - 8, 1], [px + w + 8 - cw, -1]].forEach(([cx0, sg]) => {
+        const g = c.createLinearGradient(cx0, 0, cx0 + cw, 0); g.addColorStop(0, shade(cc, -0.2)); g.addColorStop(0.3, shade(cc, 0.14)); g.addColorStop(0.55, shade(cc, -0.12)); g.addColorStop(0.8, shade(cc, 0.12)); g.addColorStop(1, shade(cc, -0.22));
+        c.fillStyle = g; c.beginPath(); c.moveTo(cx0, py - 6); c.lineTo(cx0 + cw, py - 6); c.lineTo(cx0 + cw - (sg > 0 ? 3 : 0), py + h + 4); c.quadraticCurveTo(cx0 + cw / 2, py + h + 10, cx0 + (sg > 0 ? 0 : 3), py + h + 4); c.closePath(); c.fill();
+        c.strokeStyle = 'rgba(0,0,0,0.22)'; c.lineWidth = 1; c.beginPath(); for (let k = 1; k < 5; k++) { c.moveTo(cx0 + k * cw / 5, py - 5); c.lineTo(cx0 + k * cw / 5, py + h + 3); } c.stroke();
+        c.fillStyle = shade(cc, -0.3); c.fillRect(cx0 + (sg > 0 ? cw - 4 : 0), py + h * 0.55, 4, 3);   // laço
+      });
+    }
+    // feixe de luz no chão (só de dia)
+    if (cl > 0.05 && !o.semLuz) {
+      const E = ESTADO, y0 = E.y0, len = 120 + h, sx = 38;
+      c.save(); c.beginPath(); c.rect(E.x0, E.y0, E.x1 - E.x0, E.y1 - E.y0); c.clip();
+      const lg = c.createLinearGradient(0, y0, 0, y0 + len); lg.addColorStop(0, 'rgba(255,244,205,' + 0.3 * cl + ')'); lg.addColorStop(1, 'rgba(255,244,205,0)');
+      c.fillStyle = lg; c.beginPath(); c.moveTo(px, y0); c.lineTo(px + w, y0); c.lineTo(px + w + sx * 2, y0 + len); c.lineTo(px + sx * 2, y0 + len); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(255,244,205,' + 0.2 * cl + ')'; c.lineWidth = 2; c.beginPath(); c.moveTo(px + w / 2, y0); c.lineTo(px + w / 2 + sx * 2, y0 + len); c.moveTo(px, y0 + 2); c.lineTo(px + sx * 2, y0 + len); c.stroke();
+      c.restore();
+    }
+  };
+  K.janela = D.janela;
+
+  // ---------- peças de parede ----------
+  // quadro com moldura: estilo 'paisagem' | 'abstrato' | 'retrato' | 'flor' | 'mapa' | 'santo' | 'time'
+  D.quadro = function (c, px, py, w, h, estilo, cor) {
+    const mold = cor || '#6a4a2a', s = semente(px * 7 + py);
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px + 3, py + 4, w, h);
+    c.fillStyle = mold; c.fillRect(px - 3, py - 3, w + 6, h + 6); c.fillStyle = shade(mold, 0.25); c.fillRect(px - 3, py - 3, w + 6, 1.5); c.fillStyle = shade(mold, -0.3); c.fillRect(px - 3, py + h + 1.5, w + 6, 1.5);
+    c.save(); c.beginPath(); c.rect(px, py, w, h); c.clip();
+    c.fillStyle = '#f4efe2'; c.fillRect(px, py, w, h);
+    const ix = px + 3, iy = py + 3, iw = w - 6, ih = h - 6;
+    if (estilo === 'abstrato') { const r = rng(s); c.fillStyle = '#e8e0cc'; c.fillRect(ix, iy, iw, ih); ['#c8402a', '#2a58b8', '#e0b32a', '#2f8a6a', '#222'].forEach(cc => { c.fillStyle = cc; c.globalAlpha = 0.85; if (r() < 0.5) c.fillRect(ix + r() * iw * 0.6, iy + r() * ih * 0.6, 6 + r() * iw * 0.4, 5 + r() * ih * 0.4); else { c.beginPath(); c.arc(ix + r() * iw, iy + r() * ih, 4 + r() * 9, 0, TAU); c.fill(); } }); c.globalAlpha = 1; }
+    else if (estilo === 'retrato') { c.fillStyle = '#5a6a7a'; c.fillRect(ix, iy, iw, ih); c.fillStyle = '#e8c8a0'; c.beginPath(); c.ellipse(ix + iw / 2, iy + ih * 0.42, iw * 0.2, ih * 0.22, 0, 0, TAU); c.fill(); c.fillStyle = '#2a1a10'; c.beginPath(); c.ellipse(ix + iw / 2, iy + ih * 0.3, iw * 0.22, ih * 0.14, 0, Math.PI, 0); c.fill(); c.fillStyle = '#7a3a3a'; c.beginPath(); c.ellipse(ix + iw / 2, iy + ih * 1.02, iw * 0.38, ih * 0.3, 0, Math.PI, 0); c.fill(); }
+    else if (estilo === 'flor') { c.fillStyle = '#e8dcc0'; c.fillRect(ix, iy, iw, ih); c.strokeStyle = '#3a7a3a'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(ix + iw / 2, iy + ih); c.lineTo(ix + iw / 2, iy + ih * 0.4); c.stroke(); ['#d8402a', '#e8a02a', '#c83a8a'].forEach((cc, k) => { c.fillStyle = cc; c.beginPath(); c.arc(ix + iw * (0.34 + k * 0.16), iy + ih * (0.36 + (k % 2) * 0.08), Math.min(iw, ih) * 0.14, 0, TAU); c.fill(); }); }
+    else if (estilo === 'mapa') { c.fillStyle = '#e8d8a8'; c.fillRect(ix, iy, iw, ih); c.fillStyle = '#9aa860'; c.beginPath(); c.moveTo(ix + 3, iy + ih * 0.5); c.lineTo(ix + iw * 0.35, iy + 3); c.lineTo(ix + iw * 0.7, iy + ih * 0.3); c.lineTo(ix + iw - 3, iy + ih * 0.8); c.lineTo(ix + iw * 0.3, iy + ih - 3); c.closePath(); c.fill(); c.strokeStyle = '#a82a2a'; c.setLineDash([2, 2]); c.beginPath(); c.moveTo(ix + 6, iy + ih * 0.7); c.lineTo(ix + iw - 8, iy + ih * 0.3); c.stroke(); c.setLineDash([]); }
+    else if (estilo === 'santo') { c.fillStyle = '#e8c860'; c.fillRect(ix, iy, iw, ih); c.fillStyle = '#c8302a'; c.beginPath(); c.ellipse(ix + iw / 2, iy + ih * 0.78, iw * 0.3, ih * 0.3, 0, Math.PI, 0); c.fill(); c.fillStyle = '#e8c8a0'; c.beginPath(); c.arc(ix + iw / 2, iy + ih * 0.38, iw * 0.15, 0, TAU); c.fill(); c.strokeStyle = '#fff8c0'; c.lineWidth = 1.5; c.beginPath(); c.arc(ix + iw / 2, iy + ih * 0.38, iw * 0.24, 0, TAU); c.stroke(); }
+    else if (estilo === 'time') { c.fillStyle = '#1f7a3c'; c.fillRect(ix, iy, iw, ih); c.strokeStyle = '#fff'; c.lineWidth = 1; c.strokeRect(ix + 3, iy + 3, iw - 6, ih - 6); c.beginPath(); c.moveTo(ix + iw / 2, iy + 3); c.lineTo(ix + iw / 2, iy + ih - 3); c.stroke(); c.beginPath(); c.arc(ix + iw / 2, iy + ih / 2, ih * 0.16, 0, TAU); c.stroke(); }
+    else { const g = c.createLinearGradient(0, iy, 0, iy + ih); g.addColorStop(0, '#8ac4f0'); g.addColorStop(0.55, '#d8ecf8'); g.addColorStop(0.56, '#6aa860'); g.addColorStop(1, '#3a7a40'); c.fillStyle = g; c.fillRect(ix, iy, iw, ih); c.fillStyle = '#8a9ab0'; c.beginPath(); c.moveTo(ix, iy + ih * 0.56); c.lineTo(ix + iw * 0.3, iy + ih * 0.3); c.lineTo(ix + iw * 0.55, iy + ih * 0.56); c.fill(); c.beginPath(); c.moveTo(ix + iw * 0.4, iy + ih * 0.56); c.lineTo(ix + iw * 0.72, iy + ih * 0.24); c.lineTo(ix + iw, iy + ih * 0.56); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,0.22)'; c.beginPath(); c.moveTo(px, py); c.lineTo(px + w * 0.5, py); c.lineTo(px, py + h * 0.6); c.fill();
+    c.restore();
+  };
+  D.relogio = function (c, cx, cy, r, cor) {
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(cx + 2, cy + 3, r + 2, 0, TAU); c.fill();
+    c.fillStyle = cor || '#5a3a22'; c.beginPath(); c.arc(cx, cy, r + 2, 0, TAU); c.fill(); c.fillStyle = '#f6f0e0'; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill();
+    c.strokeStyle = '#222'; c.lineWidth = 1; for (let k = 0; k < 12; k++) { const a = k * TAU / 12; c.beginPath(); c.moveTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3)); c.lineTo(cx + Math.cos(a) * (r - 1), cy + Math.sin(a) * (r - 1)); c.stroke(); }
+    const S = G.S, h = S ? L.hora(S) : 10, a1 = (h % 12) / 12 * TAU - Math.PI / 2, a2 = (h % 1) * TAU - Math.PI / 2;
+    c.lineWidth = 1.6; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a1) * r * 0.5, cy + Math.sin(a1) * r * 0.5); c.stroke(); c.lineWidth = 1; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a2) * r * 0.8, cy + Math.sin(a2) * r * 0.8); c.stroke();
+  };
+  // prateleira de parede com objetos: itens = lista de 'livro','vaso','foto','planta','troféu','garrafa','caixa'
+  D.prateleira = function (c, px, py, w, itens, cor) {
+    const r = rng(semente(px + py * 3)); cor = cor || '#7a5a3a';
+    let x = px + 6;
+    (itens || ['livro', 'livro', 'vaso', 'foto', 'livro']).forEach(it => {
+      if (x > px + w - 8) return;
+      if (it === 'livro') { const n = 2 + (r() * 3 | 0); for (let k = 0; k < n && x < px + w - 6; k++) { const bh = 12 + r() * 8, bw = 4 + r() * 3; c.fillStyle = ['#c8402a', '#2a58b8', '#e0b32a', '#2f8a6a', '#7a3a8a', '#e8e0cc'][(r() * 6) | 0]; c.fillRect(x, py + 20 - bh, bw, bh); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 1, py + 20 - bh + 1, 1, bh - 3); x += bw + 0.6; } x += 3; }
+      else if (it === 'vaso') { c.fillStyle = '#e8e0d0'; c.beginPath(); c.moveTo(x, py + 20); c.lineTo(x + 10, py + 20); c.quadraticCurveTo(x + 13, py + 12, x + 7, py + 8); c.lineTo(x + 3, py + 8); c.quadraticCurveTo(x - 3, py + 12, x, py + 20); c.fill(); c.fillStyle = '#2f8a3c'; c.beginPath(); c.arc(x + 5, py + 5, 4, 0, TAU); c.arc(x + 8, py + 8, 3, 0, TAU); c.fill(); x += 16; }
+      else if (it === 'foto') { c.fillStyle = '#5a3a22'; c.fillRect(x, py + 6, 12, 14); c.fillStyle = '#d8e8f0'; c.fillRect(x + 2, py + 8, 8, 10); c.fillStyle = '#e8c8a0'; c.beginPath(); c.arc(x + 6, py + 12, 2.2, 0, TAU); c.fill(); x += 16; }
+      else if (it === 'planta') { c.fillStyle = '#b8683a'; c.fillRect(x, py + 14, 9, 6); c.fillStyle = '#2f8a3c'; for (let k = 0; k < 5; k++) { c.beginPath(); c.ellipse(x + 4.5 + (k - 2) * 2, py + 9 - Math.abs(k - 2), 2, 6, (k - 2) * 0.4, 0, TAU); c.fill(); } x += 14; }
+      else if (it === 'troféu') { c.fillStyle = '#e8c850'; c.fillRect(x + 3, py + 15, 6, 5); c.beginPath(); c.moveTo(x, py + 6); c.lineTo(x + 12, py + 6); c.quadraticCurveTo(x + 11, py + 15, x + 6, py + 15); c.quadraticCurveTo(x + 1, py + 15, x, py + 6); c.fill(); x += 17; }
+      else if (it === 'garrafa') { c.fillStyle = ['#2f8a3c', '#8a3a1a', '#d8a82a'][(r() * 3) | 0]; c.fillRect(x, py + 8, 5, 12); c.fillRect(x + 1.5, py + 2, 2, 7); c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(x + 1, py + 10, 1, 7); x += 9; }
+      else { c.fillStyle = '#c8a060'; c.fillRect(x, py + 10, 14, 10); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, py + 14, 14, 1); x += 18; }
+    });
+    c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(px + 2, py + 24, w, 5);
+    c.fillStyle = cor; c.fillRect(px, py + 20, w, 4); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(px, py + 20, w, 1);
+  };
+  // ar-condicionado split
+  D.arCond = function (c, px, py, w) {
+    c.fillStyle = 'rgba(0,0,0,0.28)'; c.fillRect(px + 2, py + 4, w, 18);
+    const g = c.createLinearGradient(0, py, 0, py + 18); g.addColorStop(0, '#f4f6f8'); g.addColorStop(1, '#c8ced4'); c.fillStyle = g; rr(c, px, py, w, 18, 4); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1; rr(c, px + 0.5, py + 0.5, w - 1, 17, 4); c.stroke();
+    c.fillStyle = '#8a929a'; c.fillRect(px + 6, py + 12, w - 12, 3); c.fillStyle = '#3ad86a'; c.beginPath(); c.arc(px + w - 9, py + 6, 1.8, 0, TAU); c.fill();
+  };
+  // interruptor e tomada
+  D.interruptor = function (c, px, py) { c.fillStyle = '#f2efe6'; c.fillRect(px, py, 8, 12); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.strokeRect(px + 0.5, py + 0.5, 7, 11); c.fillStyle = '#c8c4b8'; c.fillRect(px + 2, py + 2, 4, 3); c.fillRect(px + 2, py + 7, 4, 3); };
+
+  // armário de cozinha pendurado na parede
+  D.armarioParede = function (c, px, py, w, h, cor) {
+    cor = cor || '#8a5e3a';
+    c.fillStyle = 'rgba(0,0,0,0.32)'; rr(c, px + 3, py + 6, w, h, 3); c.fill();
+    const g = c.createLinearGradient(0, py, 0, py + h); g.addColorStop(0, shade(cor, 0.14)); g.addColorStop(1, shade(cor, -0.2)); c.fillStyle = g; rr(c, px, py, w, h, 3); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1; rr(c, px + 0.5, py + 0.5, w - 1, h - 1, 3); c.stroke();
+    const n = Math.max(1, Math.round(w / 34)), dw = (w - 6) / n;
+    for (let i = 0; i < n; i++) { const dx = px + 3 + i * dw; c.fillStyle = shade(cor, 0.05); rr(c, dx + 1, py + 4, dw - 3, h - 9, 2); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; rr(c, dx + 1.5, py + 4.5, dw - 4, h - 10, 2); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.2)'; c.fillRect(dx + 3, py + 5.5, dw - 7, 1); c.fillStyle = '#e8d8a0'; c.fillRect(dx + (i % 2 ? 3 : dw - 7), py + h - 14, 2.2, 7); }
+    c.fillStyle = shade(cor, 0.3); c.fillRect(px - 1, py - 2, w + 2, 3); c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(px, py + h, w, 2);
+  };
+  // revestimento de azulejo atrás da bancada
+  D.azulejoParede = function (c, px, py, w, h, cor, cor2) {
+    cor = cor || '#e8f0f2'; const T = 14;
+    c.save(); c.beginPath(); c.rect(px, py, w, h); c.clip();
+    for (let j = 0; j * T < h; j++) for (let i = 0; i * T < w; i++) { c.fillStyle = (cor2 && (i + j) % 4 === 0) ? cor2 : shade(cor, (hh(i, j + px) - 0.5) * 0.05); c.fillRect(px + i * T, py + j * T, T, T); const g = c.createLinearGradient(px + i * T, py + j * T, px + i * T + T, py + j * T + T); g.addColorStop(0, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(0,0,0,0.05)'); c.fillStyle = g; c.fillRect(px + i * T, py + j * T, T, T); }
+    c.strokeStyle = 'rgba(90,110,120,0.45)'; c.lineWidth = 1; c.beginPath(); for (let i = 0; i * T <= w; i++) { c.moveTo(px + i * T, py); c.lineTo(px + i * T, py + h); } for (let j = 0; j * T <= h; j++) { c.moveTo(px, py + j * T); c.lineTo(px + w, py + j * T); } c.stroke();
+    c.restore();
+  };
+  // espelho de parede com moldura
+  D.espelhoParede = function (c, px, py, w, h, cor) {
+    cor = cor || '#c8a24a';
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, px + 3, py + 4, w, h, 4); c.fill();
+    c.fillStyle = cor; rr(c, px - 3, py - 3, w + 6, h + 6, 4); c.fill(); c.fillStyle = shade(cor, 0.3); c.fillRect(px - 3, py - 3, w + 6, 1.5);
+    const g = c.createLinearGradient(px, py, px + w, py + h); g.addColorStop(0, '#dcebf4'); g.addColorStop(0.5, '#a8c0d0'); g.addColorStop(1, '#c8dce8'); c.fillStyle = g; c.fillRect(px, py, w, h);
+    c.fillStyle = 'rgba(255,255,255,0.55)'; c.beginPath(); c.moveTo(px + w * 0.15, py); c.lineTo(px + w * 0.4, py); c.lineTo(px, py + h * 0.5); c.lineTo(px, py + h * 0.28); c.fill(); c.beginPath(); c.moveTo(px + w * 0.6, py); c.lineTo(px + w * 0.72, py); c.lineTo(px, py + h * 0.95); c.lineTo(px, py + h * 0.78); c.fill();
+  };
+  // toalheiro com toalhas
+  D.toalheiro = function (c, px, py, w) {
+    c.fillStyle = '#b8bec6'; c.fillRect(px, py, w, 3); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px + 2, py + 4, w, 2);
+    [['#4a90c8', 0.0], ['#f2f2ee', 0.5]].forEach(([cc, a], i) => { const tx = px + 4 + a * (w - 8); c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(tx + 2, py + 3, w * 0.4, 24); c.fillStyle = cc; c.fillRect(tx, py + 2, w * 0.4, 24); c.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 4; k++) c.fillRect(tx, py + 6 + k * 5, w * 0.4, 1); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(tx, py + 2, w * 0.4, 2); });
+  };
+
+  // =====================================================================
+  //  A CASCA DA SALA (substitui o fundo antigo)
+  // =====================================================================
+  L.casca = function (R) {
+    const FX0 = R.x0, FX1 = R.x1, FY0 = R.y0, FY1 = R.y1, PX = R.portaX, w = FX1 - FX0, h = FY1 - FY0;
+    const c = document.createElement('canvas'); c.width = R.W; c.height = R.H; const x = c.getContext('2d');
+    R.seed = R.seed || semente((R.nome || '') + (R.piso || ''));
+    Object.assign(ESTADO, { x0: FX0, x1: FX1, y0: FY0, y1: FY1, cl: claridade() });
+    x.fillStyle = '#07050c'; x.fillRect(0, 0, R.W, R.H);
+    // parede de trás
+    paredeFace(x, FX0 - 24, FX1 + 24, 62, FY0, R);
+    // chão
+    x.save(); x.beginPath(); x.rect(FX0, FY0, w, h); x.clip();
+    D.piso(x, R.piso, FX0, FY0, w, h, R.pisoCores, R.seed);
+    if (R.pisoExtra) R.pisoExtra(x);          // pedaços de outro chão (cozinha, banheiro...)
+    // brilho do verniz (faixa diagonal) e sombra no pé das paredes
+    if (R.piso !== 'carpete' && R.piso !== 'cimento' && R.piso !== 'borracha') {
+      for (let k = 0; k < Math.ceil(w / 380); k++) { const bx = FX0 + k * 380 - 40, g = x.createLinearGradient(bx, FY0, bx + 180, FY0 + 180); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,0.06)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.beginPath(); x.moveTo(bx, FY0); x.lineTo(bx + 120, FY0); x.lineTo(bx + 120 + h * 0.8, FY1); x.lineTo(bx + h * 0.8, FY1); x.closePath(); x.fill(); }
+    }
+    let g = x.createLinearGradient(0, FY0, 0, FY0 + 46); g.addColorStop(0, 'rgba(8,4,12,0.55)'); g.addColorStop(1, 'rgba(8,4,12,0)'); x.fillStyle = g; x.fillRect(FX0, FY0, w, 46);
+    g = x.createLinearGradient(FX0, 0, FX0 + 30, 0); g.addColorStop(0, 'rgba(8,4,12,0.45)'); g.addColorStop(1, 'rgba(8,4,12,0)'); x.fillStyle = g; x.fillRect(FX0, FY0, 30, h);
+    g = x.createLinearGradient(FX1 - 30, 0, FX1, 0); g.addColorStop(0, 'rgba(8,4,12,0)'); g.addColorStop(1, 'rgba(8,4,12,0.45)'); x.fillStyle = g; x.fillRect(FX1 - 30, FY0, 30, h);
+    g = x.createLinearGradient(0, FY1 - 26, 0, FY1); g.addColorStop(0, 'rgba(8,4,12,0)'); g.addColorStop(1, 'rgba(8,4,12,0.4)'); x.fillStyle = g; x.fillRect(FX0, FY1 - 26, w, 26);
+    // capacho na porta
+    const mw = 70, mh = 20, mx = PX - mw / 2, my = FY1 - mh - 6;
+    x.fillStyle = 'rgba(0,0,0,0.3)'; rr(x, mx + 2, my + 3, mw, mh, 3); x.fill();
+    x.fillStyle = R.capacho || '#7a4a2a'; rr(x, mx, my, mw, mh, 3); x.fill(); x.strokeStyle = 'rgba(255,255,255,0.18)'; x.lineWidth = 1; x.strokeRect(mx + 3.5, my + 3.5, mw - 7, mh - 7);
+    x.fillStyle = 'rgba(255,255,255,0.12)'; for (let k = 0; k < mw; k += 3) x.fillRect(mx + k, my + 2, 1, mh - 4);
+    x.restore();
+    if (R.deco) R.deco(x);
+    // paredes grossas dos lados (vista de cima): tampa clara + quina escura
+    const cap = shade(R.parede || '#d8cdb0', 0.38), capE = shade(R.parede || '#d8cdb0', -0.15), capD = shade(R.parede || '#d8cdb0', -0.5);
+    [[FX0 - 24, 24, -1], [FX1, 24, 1]].forEach(([px, ww, sg]) => {
+      const gg = x.createLinearGradient(px, 0, px + ww, 0); gg.addColorStop(0, sg < 0 ? capD : capE); gg.addColorStop(0.18, cap); gg.addColorStop(0.82, cap); gg.addColorStop(1, sg < 0 ? capE : capD);
+      x.fillStyle = gg; x.fillRect(px, 44, ww, FY1 - 44 + 36);
+      x.fillStyle = 'rgba(0,0,0,0.18)'; x.fillRect(px + (sg < 0 ? ww - 3 : 0), 62, 3, FY1 - 62 + 36);
+      x.fillStyle = 'rgba(255,255,255,0.3)'; x.fillRect(px + (sg < 0 ? 4 : 5), 46, 1.5, FY1 - 46 + 34);
+    });
+    // topo da parede de trás (grossura)
+    let gt = x.createLinearGradient(0, 44, 0, 62); gt.addColorStop(0, shade(R.parede || '#d8cdb0', 0.5)); gt.addColorStop(1, shade(R.parede || '#d8cdb0', 0.18)); x.fillStyle = gt; x.fillRect(FX0 - 24, 44, FX1 - FX0 + 48, 18);
+    x.fillStyle = 'rgba(0,0,0,0.28)'; x.fillRect(FX0 - 24, 61, FX1 - FX0 + 48, 1.5);
+    // parede da frente (tampa + cara) com vão da porta
+    const fy = FY1; const lado = (xa, xb) => {
+      if (xb <= xa) return;
+      let gf = x.createLinearGradient(0, fy, 0, fy + 36); gf.addColorStop(0, shade(R.parede || '#d8cdb0', 0.34)); gf.addColorStop(0.4, shade(R.parede || '#d8cdb0', 0.2)); gf.addColorStop(0.42, shade(R.parede || '#d8cdb0', -0.3)); gf.addColorStop(1, shade(R.parede || '#d8cdb0', -0.55));
+      x.fillStyle = gf; x.fillRect(xa, fy, xb - xa, 36); x.fillStyle = 'rgba(255,255,255,0.3)'; x.fillRect(xa, fy, xb - xa, 1.5);
+      x.fillStyle = 'rgba(0,0,0,0.4)'; x.fillRect(xa, fy + 14.5, xb - xa, 1.5);
+    };
+    lado(FX0 - 24, PX - 46); lado(PX + 46, FX1 + 24);
+    // porta de saída: batente, luz de fora, placa
+    x.fillStyle = '#2a1c12'; x.fillRect(PX - 46, fy - 4, 92, 46); x.fillStyle = '#4a3220'; x.fillRect(PX - 46, fy - 4, 92, 3);
+    const lg = x.createLinearGradient(0, fy, 0, fy + 40); lg.addColorStop(0, 'rgba(255,244,210,0.98)'); lg.addColorStop(1, 'rgba(255,255,255,0.7)'); x.fillStyle = lg; x.fillRect(PX - 39, fy + 2, 78, 38);
+    x.fillStyle = 'rgba(255,230,160,0.2)'; x.beginPath(); x.moveTo(PX - 39, fy); x.lineTo(PX + 39, fy); x.lineTo(PX + 74, fy - 84); x.lineTo(PX - 74, fy - 84); x.closePath(); x.fill();
+    x.fillStyle = '#e8d8b0'; x.fillRect(PX - 26, fy - 12, 52, 10); x.strokeStyle = 'rgba(0,0,0,0.5)'; x.lineWidth = 1; x.strokeRect(PX - 25.5, fy - 11.5, 51, 9);
+    x.fillStyle = '#5a2a1a'; x.font = 'bold 8px Arial'; x.textAlign = 'center'; x.fillText(R.porta ? R.porta.rotulo || 'SAÍDA' : 'SAÍDA', PX, fy - 4.2); x.textAlign = 'left';
+    // quinas
+    [[FX0 - 24, 44], [FX1, 44]].forEach(([px, py]) => { x.fillStyle = shade(R.parede || '#d8cdb0', 0.52); x.fillRect(px, py, 24, 18); x.strokeStyle = 'rgba(0,0,0,0.3)'; x.strokeRect(px + 0.5, py + 0.5, 23, 17); });
+    return c;
+  };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   MOBILIA.JS — móveis de CASA com formas de verdade (nada de caixa lisa!)
+   Sofá com almofadas, cama com travesseiros e cobertor, TV com brilho,
+   geladeira, fogão com panela, pia, armário, plantas, tapetes, banheiro...
+   Mesmos nomes de objeto de sempre (sofa, tv, cama2...): o jogo não muda,
+   só o desenho. Cada móvel é pintado uma vez e guardado (veja D.est).
+   Convenção: o.x,o.y,o.w,o.h = pegada no chão; o.e = altura.
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, D = G.deco, TAU = Math.PI * 2;
+  const shade = K.shade, hh = K.hh, rr = D.rr, mix = D.mix, rgba = D.rgba, rng = D.rng;
+  const reg = D.reg, caixa = D.caixa, sombra = D.sombra;
+
+  // ---------- peças pequenas ----------
+  const puxador = (c, x, y, w, h, cor) => { c.fillStyle = 'rgba(0,0,0,0.35)'; rr(c, x + 1, y + 1.5, w, h, 1.5); c.fill(); c.fillStyle = cor || '#d8c890'; rr(c, x, y, w, h, 1.5); c.fill(); c.fillStyle = 'rgba(255,255,255,0.6)'; c.fillRect(x + 0.5, y + 0.5, Math.max(1, w - 1), 1); };
+  const painel = (c, x, y, w, h, cor, r) => { const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, shade(cor, 0.1)); g.addColorStop(1, shade(cor, -0.12)); c.fillStyle = g; rr(c, x, y, w, h, r == null ? 2 : r); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.38)'; c.lineWidth = 1; rr(c, x + 0.5, y + 0.5, w - 1, h - 1, r == null ? 2 : r); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.22)'; c.fillRect(x + 2, y + 1, w - 4, 1); };
+  const folha = (c, x, y, rx, ry, ang, cor) => {
+    c.save(); c.translate(x, y); c.rotate(ang);
+    const g = c.createLinearGradient(-rx, 0, rx, 0); g.addColorStop(0, shade(cor, -0.18)); g.addColorStop(0.5, shade(cor, 0.1)); g.addColorStop(1, shade(cor, -0.28));
+    c.fillStyle = g; c.beginPath(); c.moveTo(0, ry); c.quadraticCurveTo(rx * 1.5, 0, 0, -ry); c.quadraticCurveTo(-rx * 1.5, 0, 0, ry); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.28)'; c.lineWidth = 0.8; c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.moveTo(0, ry * 0.85); c.lineTo(0, -ry * 0.8); c.stroke();
+    c.restore();
+  };
+
+  // ======================= SOFÁ e POLTRONA =======================
+  // dir 'n' = olha para o norte (vemos as costas), 's' = olha para o sul (vemos a frente)
+  function sofa(c, o) {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 18, cor = o.cor || '#a8483a', cor2 = o.cor2 || '#e8c870', solo = w < 80;
+    const A = solo ? 11 : Math.min(15, w * 0.1), db = Math.max(13, h * 0.3), hs = 10, ha = hs + 10, hb = Math.max(e + 8, 26);
+    const top = shade(cor, 0.12), fr = cor, opc = { r: 6, semSombra: true };
+    const frente = o.dir === 's';
+    const parte = o.parte;   // 'base' (sem o encosto da frente) | 'costas' (só o encosto da frente): assim quem senta aparece ENTRE os dois
+    if (parte !== 'costas') sombra(c, x, y, w, h, { dx: 4, dy: 8, r: 9 });
+    const n = Math.max(1, Math.round((w - 2 * A) / 48)), cw = (w - 2 * A) / n;
+    const encosto = () => {
+      const by = frente ? y : y + h - db;
+      caixa(c, x + A - 2, by, w - 2 * A + 4, db, hb, shade(cor, 0.18), shade(cor, -0.04), opc);
+      c.strokeStyle = 'rgba(0,0,0,0.26)'; c.lineWidth = 1;
+      const fy0 = by + db - hb + 2, fy1 = by + db - 1;
+      for (let i = 1; i < n; i++) { const sx = x + A + i * cw; c.beginPath(); c.moveTo(sx, fy0); c.lineTo(sx, fy1); c.stroke(); }
+      if (!frente) { c.fillStyle = 'rgba(255,255,255,0.1)'; for (let i = 0; i < n; i++) { rr(c, x + A + i * cw + 4, fy0 + 4, cw - 8, hb * 0.34, 5); c.fill(); } }
+    };
+    const assento = () => {
+      for (let i = 0; i < n; i++) {
+        const sx = x + A + i * cw + 0.5, sy = frente ? y + db : y, sh = h - db;
+        caixa(c, sx, sy, cw - 1, sh, hs, shade(top, 0.06), fr, opc);
+        const cy0 = sy - hs;   // topo da almofada
+        c.strokeStyle = 'rgba(0,0,0,0.16)'; c.lineWidth = 1; rr(c, sx + 3, cy0 + 3, cw - 7, sh - 6, 5); c.stroke();
+        c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.arc(sx + cw / 2, cy0 + sh / 2, 1.3, 0, TAU); c.fill();   // botão
+      }
+    };
+    const bracos = () => { caixa(c, x, y, A, h, ha, shade(cor, 0.2), cor, opc); caixa(c, x + w - A, y, A, h, ha, shade(cor, 0.2), cor, opc); };
+    if (parte === 'costas') { encosto(); return; }
+    if (frente) { encosto(); assento(); bracos(); } else if (parte === 'base') { assento(); bracos(); } else { assento(); bracos(); encosto(); }
+    // almofadas de enfeite
+    const almofada = (px, py, ang, cc) => { c.save(); c.translate(px, py); c.rotate(ang); c.fillStyle = 'rgba(0,0,0,0.25)'; rr(c, -8, -6, 17, 17, 5); c.fill(); const g = c.createLinearGradient(-9, -9, 9, 9); g.addColorStop(0, shade(cc, 0.22)); g.addColorStop(1, shade(cc, -0.15)); c.fillStyle = g; rr(c, -9, -9, 18, 18, 5); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; rr(c, -8.5, -8.5, 17, 17, 5); c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.moveTo(-6, -6); c.lineTo(6, 6); c.stroke(); c.restore(); };
+    if (!solo && o.almofadas !== false) { const py = frente ? y + db + 6 - hs : y + 6 - hs + 4; almofada(x + A + 12, py, -0.25, cor2); almofada(x + w - A - 12, py, 0.3, shade(cor2, -0.2)); }
+    else if (solo) almofada(x + w / 2, (frente ? y + db + 6 : y + 6) - hs, 0.2, cor2);
+    // cobertor jogado (só em sofás grandes e quando pedir)
+    if (o.manta) { c.fillStyle = o.manta; c.beginPath(); c.moveTo(x + w - A - 38, y + (frente ? db : 0) - hs + 2); c.lineTo(x + w - A - 4, y + (frente ? db : 0) - hs + 2); c.quadraticCurveTo(x + w - A + 2, y + h - hs, x + w - A - 8, y + h - hs + 2); c.lineTo(x + w - A - 30, y + h - hs - 4); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.stroke(); }
+  }
+  reg('sofa', sofa, { alto: 30 });
+  reg('poltrona', (c, o) => sofa(c, Object.assign({}, o, { almofadas: false })), { alto: 30 });
+
+  // ======================= TV com móvel =======================
+  reg('tv', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, hc = 18, madeira = o.top || '#7a5a3c', fr = o.front || '#4a3220';
+    caixa(c, x, y, w, h, hc, shade(madeira, 0.05), fr, { r: 3 });
+    const fy = y + h - hc, sec = w > 150 ? 4 : 3, sw = (w - 8) / sec;
+    for (let i = 0; i < sec; i++) { painel(c, x + 4 + i * sw, fy + 3, sw - 3, hc - 7, shade(fr, 0.1), 2); puxador(c, x + 4 + i * sw + (sw - 3) / 2 - 3, fy + hc / 2 - 1, 6, 2.4, '#d8c890'); }
+    // objetos em cima do móvel
+    const ty = y - hc;
+    c.fillStyle = '#16181e'; rr(c, x + 8, ty + h * 0.55, 22, 6, 1.5); c.fill(); c.fillStyle = '#4ae08a'; c.fillRect(x + 24, ty + h * 0.55 + 2, 3, 2);
+    c.fillStyle = '#b8683a'; c.fillRect(x + w - 24, ty + h * 0.45, 11, 9); c.fillStyle = '#2f8a3c'; c.beginPath(); c.arc(x + w - 18.5, ty + h * 0.45 - 1, 7, Math.PI, 0); c.fill(); c.beginPath(); c.arc(x + w - 22, ty + h * 0.45 - 3, 4, Math.PI, 0); c.fill();
+    // a TV (de frente, em pé sobre o móvel)
+    const sw2 = Math.min(w * 0.7, 120), sx = x + (w - sw2) / 2, yb = ty + h * 0.62, sh = Math.round(sw2 * 0.5);
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, sx + 3, yb - sh + 4, sw2, sh, 3); c.fill();
+    c.fillStyle = '#2a2d36'; rr(c, sx + w * 0.0, yb - 3, sw2 * 0.34, 3, 1); c.fill();
+    c.fillStyle = '#1a1c22'; c.fillRect(x + w / 2 - 14, yb - 4, 28, 4);
+    c.fillStyle = '#0c0d12'; rr(c, sx - 1, yb - sh - 1, sw2 + 2, sh + 2, 3); c.fill(); c.strokeStyle = '#3a3e48'; c.lineWidth = 1; rr(c, sx - 0.5, yb - sh - 0.5, sw2 + 1, sh + 1, 3); c.stroke();
+  }, {
+    alto: 80, din(ctx, o, t) {
+      const w = o.w, hc = 18, ty = o.y - hc, sw2 = Math.min(w * 0.7, 120), sx = o.x + (w - sw2) / 2, yb = ty + o.h * 0.62, sh = Math.round(sw2 * 0.5);
+      const hue = (t * 22 + o.x) % 360, f = 0.5 + 0.5 * Math.sin(t * 3 + o.x);
+      ctx.save(); ctx.beginPath(); rr(ctx, sx + 2, yb - sh + 2, sw2 - 4, sh - 4, 2); ctx.clip();
+      const g = ctx.createLinearGradient(sx, yb - sh, sx + sw2, yb); g.addColorStop(0, 'hsl(' + hue + ',62%,48%)'); g.addColorStop(1, 'hsl(' + ((hue + 80) % 360) + ',60%,28%)'); ctx.fillStyle = g; ctx.fillRect(sx, yb - sh, sw2, sh);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(sx + sw2 * 0.12, yb - sh * 0.42, sw2 * 0.34, 3); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(sx, yb - 9, sw2, 9);
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.1 + 0.05 * f) + ')'; ctx.beginPath(); ctx.moveTo(sx, yb - sh); ctx.lineTo(sx + sw2 * 0.5, yb - sh); ctx.lineTo(sx, yb - sh * 0.3); ctx.fill();
+      ctx.restore();
+      // brilho no chão
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(o.x + w / 2, o.y + o.h + 40, 6, o.x + w / 2, o.y + o.h + 40, 120); gr.addColorStop(0, 'hsla(' + hue + ',70%,60%,' + (0.13 + 0.04 * f) + ')'); gr.addColorStop(1, 'hsla(' + hue + ',70%,50%,0)'); ctx.fillStyle = gr; ctx.fillRect(o.x + w / 2 - 130, o.y + o.h - 20, 260, 170); ctx.restore();
+    }
+  });
+
+  // ======================= COZINHA =======================
+  reg('geladeira', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 56, cor = o.cor || '#dfe4ea';
+    caixa(c, x, y, w, h, e, shade(cor, 0.12), cor, { r: 4 });
+    const fy = y + h - e, fz = e * 0.34;
+    const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, 'rgba(255,255,255,0.22)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,0.16)'); c.fillStyle = g; c.fillRect(x + 1, fy, w - 2, e - 1);
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 1, fy + fz, w - 2, 1.8); c.fillStyle = 'rgba(255,255,255,0.55)'; c.fillRect(x + 1, fy + fz + 1.8, w - 2, 1);
+    c.fillStyle = '#7a8088'; rr(c, x + w - 9, fy + 5, 3, fz - 9, 1.5); c.fill(); rr(c, x + w - 9, fy + fz + 7, 3, e - fz - 18, 1.5); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(x + w - 8.5, fy + 6, 1, fz - 11);
+    // ímãs e bilhete
+    c.fillStyle = '#f4efe0'; c.fillRect(x + 7, fy + fz + 10, 11, 14); c.fillStyle = 'rgba(0,0,0,0.3)'; for (let k = 0; k < 4; k++) c.fillRect(x + 9, fy + fz + 13 + k * 3, 7, 1);
+    c.fillStyle = '#e8505a'; c.beginPath(); c.arc(x + 12.5, fy + fz + 10, 2.4, 0, TAU); c.fill(); c.fillStyle = '#4aa0e0'; c.fillRect(x + 22, fy + fz + 20, 6, 6); c.fillStyle = '#f2d84a'; c.beginPath(); c.arc(x + 25, fy + fz + 32, 2.6, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 4, y + h - 5, w - 8, 3);
+    // coisas em cima
+    c.fillStyle = '#c8a060'; rr(c, x + 6, y - e + 8, 20, 14, 3); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.stroke(); c.fillStyle = '#e8402a'; c.beginPath(); c.arc(x + 14, y - e + 14, 4, 0, TAU); c.fill();
+  }, { alto: 20 });
+
+  reg('fogao', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e;
+    caixa(c, x, y, w, h, e, '#d4d8de', '#b4b9c1', { r: 3 });
+    // bocas com grelha
+    [[0.27, 0.3], [0.73, 0.3], [0.27, 0.72], [0.73, 0.72]].forEach(([a, b], i) => {
+      const bx = x + w * a, by = ty + h * b;
+      c.fillStyle = '#16181e'; c.beginPath(); c.arc(bx, by, 7, 0, TAU); c.fill(); c.strokeStyle = '#6a707a'; c.lineWidth = 1.2; c.beginPath(); c.arc(bx, by, 5, 0, TAU); c.stroke();
+      c.strokeStyle = '#2a2d36'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(bx - 7, by); c.lineTo(bx + 7, by); c.moveTo(bx, by - 7); c.lineTo(bx, by + 7); c.stroke();
+    });
+    // panela com tampa
+    const px = x + w * 0.27, py = ty + h * 0.3;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(px + 3, py + 5, 10, 6, 0, 0, TAU); c.fill();
+    c.fillStyle = '#7a8088'; rr(c, px - 9, py - 8, 18, 14, 3); c.fill(); const gp = c.createLinearGradient(px - 9, 0, px + 9, 0); gp.addColorStop(0, 'rgba(255,255,255,0.4)'); gp.addColorStop(1, 'rgba(0,0,0,0.25)'); c.fillStyle = gp; rr(c, px - 9, py - 8, 18, 14, 3); c.fill();
+    c.fillStyle = '#b8bec6'; c.beginPath(); c.ellipse(px, py - 9, 9.5, 5, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.stroke(); c.fillStyle = '#2a2d36'; c.beginPath(); c.arc(px, py - 10, 2, 0, TAU); c.fill(); c.fillRect(px + 9, py - 6, 8, 3);
+    // frente: botões e porta do forno
+    const fy = y + h - e;
+    [0.18, 0.39, 0.61, 0.82].forEach(a => { c.fillStyle = '#16181e'; c.beginPath(); c.arc(x + w * a, fy + 4.5, 2.6, 0, TAU); c.fill(); c.fillStyle = '#d0d4da'; c.fillRect(x + w * a - 0.5, fy + 2, 1, 2.5); });
+    painel(c, x + 4, fy + 10, w - 8, e - 15, '#2a2d36', 2);
+    const og = c.createLinearGradient(0, fy + 13, 0, fy + e - 8); og.addColorStop(0, '#0e1016'); og.addColorStop(1, '#2a3040'); c.fillStyle = og; rr(c, x + 8, fy + 15, w - 16, e - 24, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.14)'; c.beginPath(); c.moveTo(x + 8, fy + 15); c.lineTo(x + w * 0.5, fy + 15); c.lineTo(x + 8, fy + e * 0.65); c.fill();
+    puxador(c, x + 8, fy + 11.5, w - 16, 2.6, '#c8ccd4');
+  }, {
+    alto: 30, din(ctx, o, t) {
+      const x = o.x, ty = o.y - (o.e || 30), w = o.w, h = o.h;
+      if (o.ligado) { [[0.73, 0.3], [0.27, 0.72], [0.73, 0.72]].forEach(([a, b], i) => { ctx.fillStyle = 'rgba(90,170,255,' + (0.7 + 0.3 * Math.sin(t * 10 + i * 2)) + ')'; ctx.beginPath(); ctx.arc(x + w * a, ty + h * b, 3.2, 0, TAU); ctx.fill(); }); }
+      const px = x + w * 0.27, py = ty + h * 0.3 - 12;
+      ctx.save(); ctx.globalAlpha = 0.4; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; for (let k = 0; k < 3; k++) { const ph = (t * 0.8 + k * 0.33) % 1; ctx.globalAlpha = 0.4 * (1 - ph); ctx.beginPath(); ctx.moveTo(px - 3 + k * 3, py - ph * 18); ctx.quadraticCurveTo(px + 3 + k * 3, py - ph * 18 - 5, px - 1 + k * 3, py - ph * 18 - 10); ctx.stroke(); } ctx.restore();
+    }
+  });
+
+  reg('pia', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e, madeira = o.front || '#8a6a4a';
+    caixa(c, x, y, w, h, e, o.top || '#dcd8d0', madeira, { r: 3 });
+    // granito
+    const r = rng(x * 3 + y); for (let k = 0; k < 40; k++) { c.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.3)'; c.fillRect(x + 3 + r() * (w - 6), ty + 2 + r() * (h - 4), 1.5, 1.5); }
+    // cubas
+    const bw = w * 0.34;
+    [[x + 7, bw], [x + 7 + bw + 5, bw * 0.7]].forEach(([bx, ww], i) => { c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, bx, ty + 5, ww, h - 10, 5); c.fill(); const g = c.createLinearGradient(bx, ty, bx + ww, ty + h); g.addColorStop(0, '#d4dae0'); g.addColorStop(1, '#8a929c'); c.fillStyle = g; rr(c, bx + 1, ty + 6, ww - 2, h - 13, 4); c.fill(); c.fillStyle = '#4a5058'; c.beginPath(); c.arc(bx + ww / 2, ty + h / 2 + 1, 2, 0, TAU); c.fill(); });
+    // torneira
+    const tx = x + 7 + bw + 2.5; c.fillStyle = '#c8ccd4'; c.beginPath(); c.arc(tx, ty + 4, 3.4, 0, TAU); c.fill(); c.strokeStyle = '#8a9099'; c.lineWidth = 2; c.beginPath(); c.moveTo(tx, ty + 4); c.quadraticCurveTo(tx, ty + 14, tx - 6, ty + 12); c.stroke();
+    // escorredor de louça
+    const ex = x + w - 22; c.fillStyle = '#b8bec6'; rr(c, ex, ty + 5, 16, h - 10, 2); c.fill(); for (let k = 0; k < 3; k++) { c.fillStyle = '#f4f4f0'; c.beginPath(); c.ellipse(ex + 4 + k * 4, ty + 15, 1.8, 7, 0, 0, TAU); c.fill(); }
+    // portas do armário
+    const fy = y + h - e, n = Math.max(2, Math.round(w / 34)), dw = (w - 8) / n;
+    for (let i = 0; i < n; i++) { painel(c, x + 4 + i * dw, fy + 4, dw - 2.5, e - 9, shade(madeira, 0.08), 2); puxador(c, x + 4 + i * dw + dw - 9, fy + 6, 2.4, 7, '#d8c890'); }
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 2, y + h - 3, w - 4, 3);
+  }, { alto: 20 });
+
+  // ======================= QUARTO =======================
+  reg('cama2', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#4a78c8', solteiro = w < 100;
+    const hs = 10, hm = 12;   // altura da base e do colchão
+    sombra(c, x - 2, y - 6, w + 4, h + 6, { dx: 5, dy: 8, r: 6 });
+    // cabeceira (alta, junto à parede)
+    const hc = 34; const g0 = c.createLinearGradient(0, y - hc - 6, 0, y); g0.addColorStop(0, shade('#6a4a2a', 0.2)); g0.addColorStop(1, shade('#6a4a2a', -0.15));
+    c.fillStyle = g0; rr(c, x - 3, y - hc - 6, w + 6, hc + 10, 5); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1; rr(c, x - 2.5, y - hc - 5.5, w + 5, hc + 9, 5); c.stroke();
+    c.strokeStyle = 'rgba(0,0,0,0.2)'; rr(c, x + 3, y - hc, w - 6, hc - 6, 4); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(x, y - hc - 5, w, 1.6);
+    // base e colchão
+    caixa(c, x, y, w, h, hs, '#5a3e24', '#3a2814', { r: 3, semSombra: true });
+    const my = y - hs;
+    const gm = c.createLinearGradient(0, my, 0, my + h); gm.addColorStop(0, '#f6f2ea'); gm.addColorStop(1, '#ddd6c8'); c.fillStyle = gm; rr(c, x + 1, my - 2, w - 2, h + 2, 5); c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(x + 1, my + h - 2, w - 2, 2);
+    // cobertor
+    const cy0 = my + h * 0.34;
+    const gc = c.createLinearGradient(0, cy0, 0, my + h + 2); gc.addColorStop(0, shade(cor, 0.1)); gc.addColorStop(1, shade(cor, -0.18));
+    c.fillStyle = gc; c.beginPath(); c.moveTo(x - 1, cy0 + 3); c.quadraticCurveTo(x + w / 2, cy0 - 4, x + w + 1, cy0 + 3); c.lineTo(x + w + 1, my + h + 5); c.quadraticCurveTo(x + w / 2, my + h + 9, x - 1, my + h + 5); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.stroke();
+    // dobra do lençol
+    c.fillStyle = '#fbf8f0'; c.beginPath(); c.moveTo(x - 1, cy0 + 3); c.quadraticCurveTo(x + w / 2, cy0 - 4, x + w + 1, cy0 + 3); c.lineTo(x + w + 1, cy0 + 11); c.quadraticCurveTo(x + w / 2, cy0 + 3, x - 1, cy0 + 11); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.stroke();
+    // padrão do cobertor
+    c.save(); c.beginPath(); c.moveTo(x, cy0 + 12); c.lineTo(x + w, cy0 + 12); c.lineTo(x + w, my + h + 4); c.lineTo(x, my + h + 4); c.closePath(); c.clip();
+    if (o.padrao === 'listras') { c.fillStyle = 'rgba(255,255,255,0.22)'; for (let k = x + 6; k < x + w; k += 14) c.fillRect(k, cy0, 6, h); }
+    else { c.fillStyle = 'rgba(255,255,255,0.14)'; for (let j = cy0 + 18; j < my + h; j += 12) for (let i = x + 8 + ((j / 12) % 2) * 7; i < x + w; i += 14) { c.beginPath(); c.moveTo(i, j - 3); c.lineTo(i + 3, j); c.lineTo(i, j + 3); c.lineTo(i - 3, j); c.fill(); } }
+    c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x + w * 0.2, cy0 + 14); c.quadraticCurveTo(x + w * 0.3, cy0 + 28, x + w * 0.18, cy0 + 42); c.moveTo(x + w * 0.7, cy0 + 16); c.quadraticCurveTo(x + w * 0.62, cy0 + 30, x + w * 0.76, cy0 + 44); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.1)'; c.beginPath(); c.ellipse(x + w * 0.4, cy0 + 24, w * 0.18, 9, -0.3, 0, TAU); c.fill();
+    c.restore();
+    // travesseiros
+    const trav = (px, py, pw) => { c.fillStyle = 'rgba(0,0,0,0.2)'; rr(c, px + 1.5, py + 3, pw, 20, 8); c.fill(); const g = c.createLinearGradient(px, py, px + pw, py + 20); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#d8d2c4'); c.fillStyle = g; rr(c, px, py, pw, 20, 8); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1; rr(c, px + 0.5, py + 0.5, pw - 1, 19, 8); c.stroke(); c.strokeStyle = 'rgba(0,0,0,0.1)'; c.beginPath(); c.moveTo(px + 6, py + 10); c.quadraticCurveTo(px + pw / 2, py + 14, px + pw - 6, py + 10); c.stroke(); };
+    if (solteiro) trav(x + 6, my - 1, w - 12); else { trav(x + 6, my - 1, w / 2 - 9); trav(x + w / 2 + 3, my - 1, w / 2 - 9); }
+    // pés/frente da base
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x + 3, y + h - 2, w - 6, 2);
+  }, { alto: 50 });
+
+  // mesa de cabeceira / cômoda / aparador genérico (o antigo 'bloco')
+  reg('bloco', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 20, madeira = o.front || '#5a3a22', ty = y - e;
+    caixa(c, x, y, w, h, e, o.top || '#7a5230', madeira, { r: 2 });
+    const fy = y + h - e, n = w > 60 ? 3 : w > 44 ? 2 : 1, dw = (w - 4) / n, gav = e > 24 && w > 40;
+    for (let i = 0; i < n; i++) { painel(c, x + 2 + i * dw, fy + 2, dw - 2, e - 5, shade(madeira, 0.1), 1.5); puxador(c, x + 2 + i * dw + (dw - 2) / 2 - 3, fy + e / 2 - 1, 6, 2.2, '#d8c890'); }
+    // objeto em cima: abajur, foto ou planta
+    const v = o.variante || ['abajur', 'foto', 'vaso'][(hh(x, y) * 3) | 0];
+    if (v === 'abajur') { c.fillStyle = '#3a2a1c'; c.fillRect(x + w / 2 - 1.5, ty + h / 2 - 8, 3, 8); c.fillStyle = '#f4e4b8'; c.beginPath(); c.moveTo(x + w / 2 - 6, ty + h / 2 - 8); c.lineTo(x + w / 2 + 6, ty + h / 2 - 8); c.lineTo(x + w / 2 + 4, ty + h / 2 - 17); c.lineTo(x + w / 2 - 4, ty + h / 2 - 17); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.stroke(); }
+    else if (v === 'foto') { c.fillStyle = '#d8b878'; c.fillRect(x + w / 2 - 6, ty + h / 2 - 12, 12, 14); c.fillStyle = '#cfe2f0'; c.fillRect(x + w / 2 - 4, ty + h / 2 - 10, 8, 10); c.fillStyle = '#e8c8a0'; c.beginPath(); c.arc(x + w / 2, ty + h / 2 - 6, 2, 0, TAU); c.fill(); }
+    else { c.fillStyle = '#e8e2d6'; c.fillRect(x + w / 2 - 4, ty + h / 2 - 5, 8, 7); c.fillStyle = '#2f8a3c'; c.beginPath(); c.arc(x + w / 2, ty + h / 2 - 9, 6, 0, TAU); c.fill(); c.fillStyle = '#e84a6a'; c.beginPath(); c.arc(x + w / 2 + 2, ty + h / 2 - 11, 2, 0, TAU); c.fill(); }
+  }, { alto: 24 });
+  K.novos.criado = K.novos.bloco;
+
+  reg('armario', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 64, porta = o.front || '#8a5e3a';
+    caixa(c, x, y, w, h, e, o.top || '#6a4a2e', shade(porta, -0.12), { r: 2 });
+    const fy = y + h - e, n = Math.max(2, Math.round(w / 40)), dw = (w - 6) / n;
+    for (let i = 0; i < n; i++) {
+      const px = x + 3 + i * dw;
+      painel(c, px, fy + 4, dw - 2, e - 9, porta, 2);
+      painel(c, px + 4, fy + 9, dw - 10, (e - 20) * 0.5, shade(porta, -0.06), 1.5); painel(c, px + 4, fy + 12 + (e - 20) * 0.5, dw - 10, (e - 20) * 0.5 - 4, shade(porta, -0.06), 1.5);
+      puxador(c, px + (i % 2 ? 3 : dw - 9), fy + e * 0.45, 3, 10, '#e8d8a0');
+    }
+    if (o.espelho) { const g = c.createLinearGradient(x, fy, x + w, fy + e); g.addColorStop(0, '#cfe2ee'); g.addColorStop(1, '#8aa4b8'); c.fillStyle = g; rr(c, x + 6 + (n - 1) * dw, fy + 8, dw - 12, e - 18, 2); c.fill(); }
+    c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x, y - e + 1, w, 1.6); c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 2, y + h - 4, w - 4, 3);
+    // mala em cima
+    const ty = y - e; c.fillStyle = '#3a4a6a'; rr(c, x + 8, ty + h * 0.2, Math.min(40, w * 0.35), h * 0.55, 3); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.stroke(); c.fillStyle = '#c8ccd4'; c.fillRect(x + 12, ty + h * 0.2 + 2, Math.min(32, w * 0.35 - 8), 2);
+    c.fillStyle = '#c8a060'; rr(c, x + w - 34, ty + h * 0.25, 24, h * 0.45, 2); c.fill(); c.stroke();
+  }, { alto: 30 });
+
+  reg('cofre', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 40, fy = y + h - e;
+    caixa(c, x, y, w, h, e, '#4a4e58', '#2c2f38', { r: 3 });
+    // porta do cofre
+    const px = x + 4, pw = w - 8, ph = e - 8;
+    const g = c.createLinearGradient(px, fy, px + pw, fy + ph); g.addColorStop(0, '#5a5e68'); g.addColorStop(1, '#2a2d36'); c.fillStyle = g; rr(c, px, fy + 4, pw, ph, 3); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.6)'; c.lineWidth = 1.5; c.stroke();
+    if (o.aberto) { c.fillStyle = '#0a0a0e'; rr(c, px + 3, fy + 7, pw - 6, ph - 6, 2); c.fill(); c.fillStyle = '#4a9a4a'; for (let k = 0; k < 3; k++) { c.fillRect(px + 6 + k * 11, fy + 14 + (k % 2) * 3, 9, 6); c.fillStyle = '#6ac86a'; c.fillRect(px + 6 + k * 11, fy + 14 + (k % 2) * 3, 9, 1.5); c.fillStyle = '#4a9a4a'; } }
+    else {
+      const cx = x + w / 2, cy = fy + 4 + ph / 2;
+      c.fillStyle = '#8a8e98'; c.beginPath(); c.arc(cx, cy, 9, 0, TAU); c.fill(); c.strokeStyle = '#16181e'; c.lineWidth = 1.5; c.stroke();
+      c.fillStyle = '#c8ccd4'; c.beginPath(); c.arc(cx, cy, 6.4, 0, TAU); c.fill(); c.strokeStyle = '#555'; c.lineWidth = 0.8; for (let k = 0; k < 12; k++) { const a = k * TAU / 12; c.beginPath(); c.moveTo(cx + Math.cos(a) * 5, cy + Math.sin(a) * 5); c.lineTo(cx + Math.cos(a) * 6.4, cy + Math.sin(a) * 6.4); c.stroke(); }
+      c.fillStyle = '#16181e'; c.fillRect(cx - 1, cy - 5.5, 2, 5.5); c.fillStyle = '#c8302a'; c.fillRect(px + 5, fy + 9, 4, 2);
+    }
+    c.fillStyle = '#16181e'; [[px + 3, fy + 8], [px + pw - 3, fy + 8], [px + 3, fy + ph], [px + pw - 3, fy + ph]].forEach(([a, b]) => { c.beginPath(); c.arc(a, b, 1.2, 0, TAU); c.fill(); });
+  }, { alto: 10 });
+
+  // ======================= SALA =======================
+  reg('estante', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 44, v = o.variante || '', madeira = o.front || '#5a3c24';
+    caixa(c, x, y, w, h, e, o.top || '#7a5a3a', madeira, { r: 2 });
+    const fy = y + h - e, nr = e > 50 ? 3 : 2, rh = (e - 6) / nr, r = rng(x * 5 + y * 3);
+    c.fillStyle = '#1a120c'; c.fillRect(x + 3, fy + 3, w - 6, e - 6);
+    for (let q = 0; q < nr; q++) {
+      const ry = fy + 3 + q * rh, base = ry + rh - 2;
+      let px = x + 5;
+      while (px < x + w - 8) {
+        if (v === 'frutas') { const cc = ['#e8801a', '#c8302a', '#e8d02a', '#4aa02a'][(r() * 4) | 0]; c.fillStyle = cc; c.beginPath(); c.arc(px + 4, base - 4, 4.2, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.45)'; c.fillRect(px + 2, base - 7, 2, 2); px += 9; }
+        else if (v === 'remedios') { const cc = ['#ffffff', '#e8505a', '#4aa0e0', '#e8d02a'][(r() * 4) | 0]; c.fillStyle = cc; c.fillRect(px, base - 10, 8, 10); c.fillStyle = '#2f9a4a'; c.fillRect(px + 3.4, base - 8, 1.4, 5); c.fillRect(px + 1.7, base - 6.3, 4.8, 1.4); px += 10; }
+        else if (v === 'tenis') { const cc = ['#f2f2f2', '#d33a3a', '#2a5ac8', '#e0b32a'][(r() * 4) | 0]; c.fillStyle = cc; rr(c, px, base - 7, 13, 7, 3); c.fill(); c.fillStyle = '#f2f2f2'; c.fillRect(px, base - 2.6, 13, 2.6); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px + 8, base - 6, 3, 2); px += 16; }
+        else { const t = r(); if (t < 0.7) { const bh = rh * (0.5 + r() * 0.4), bw = 4 + r() * 4; c.fillStyle = ['#c8402a', '#2a58b8', '#e0b32a', '#2f8a6a', '#7a3a8a', '#e8e0cc', '#3a2a22'][(r() * 7) | 0]; c.fillRect(px, base - bh, bw, bh); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(px + 1, base - bh + 1, 1, bh - 3); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px, base - bh + 3, bw, 1); px += bw + 0.6; } else if (t < 0.85) { c.fillStyle = '#b8683a'; c.fillRect(px, base - 6, 8, 6); c.fillStyle = '#2f8a3c'; c.beginPath(); c.arc(px + 4, base - 9, 4.5, 0, TAU); c.fill(); px += 12; } else { c.fillStyle = '#e8c850'; c.beginPath(); c.arc(px + 5, base - 6, 5.5, 0, TAU); c.fill(); c.strokeStyle = '#a88a30'; c.stroke(); px += 13; } }
+      }
+      c.fillStyle = shade(madeira, 0.1); c.fillRect(x + 3, base, w - 6, 2.5); c.fillStyle = 'rgba(0,0,0,0.45)'; c.fillRect(x + 3, base + 2.5, w - 6, 1);
+    }
+    c.fillStyle = madeira; c.fillRect(x, fy, 3, e); c.fillRect(x + w - 3, fy, 3, e);
+  }, { alto: 10 });
+
+  reg('mesa_centro', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 12;
+    caixa(c, x, y, w, h, e, o.top || '#c8a070', '#5a3a22', { r: 4 });
+    const ty = y - e; c.fillStyle = 'rgba(180,210,230,0.28)'; rr(c, x + 3, ty + 3, w - 6, h - 6, 3); c.fill();
+    c.fillStyle = '#f4efe0'; rr(c, x + 8, ty + 6, 16, 11, 1); c.fill(); c.fillStyle = '#c8402a'; c.fillRect(x + 8, ty + 6, 16, 3); c.fillStyle = '#e8e8f0'; c.beginPath(); c.arc(x + w - 14, ty + h / 2, 5, 0, TAU); c.fill(); c.fillStyle = '#6a3a1a'; c.beginPath(); c.arc(x + w - 14, ty + h / 2, 3.2, 0, TAU); c.fill(); c.fillStyle = '#1a1c22'; rr(c, x + w * 0.45, ty + h - 12, 10, 4, 1); c.fill();
+  }, { alto: 14 });
+
+  reg('luminaria', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h;
+    sombra(c, cx - 9, by - 8, 18, 8, { oval: true, dx: 5, dy: 3, a: 0.1 });
+    c.fillStyle = '#2a2018'; c.beginPath(); c.ellipse(cx, by - 3, 8, 3.4, 0, 0, TAU); c.fill(); c.fillRect(cx - 1.4, by - 52, 2.8, 50);
+    const g = c.createLinearGradient(cx - 13, 0, cx + 13, 0); g.addColorStop(0, '#d8c898'); g.addColorStop(0.5, '#fff4d0'); g.addColorStop(1, '#c8b888'); c.fillStyle = g; c.beginPath(); c.moveTo(cx - 8, by - 52); c.lineTo(cx + 8, by - 52); c.lineTo(cx + 13, by - 36); c.lineTo(cx - 13, by - 36); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.stroke();
+  }, {
+    alto: 50, din(ctx, o, t) { const cx = o.x + o.w / 2, by = o.y + o.h; ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(cx, by - 30, 4, cx, by - 20, 90); g.addColorStop(0, 'rgba(255,214,140,0.22)'); g.addColorStop(1, 'rgba(255,214,140,0)'); ctx.fillStyle = g; ctx.fillRect(cx - 95, by - 120, 190, 190); ctx.restore(); }
+  });
+
+  // mesa de jantar redonda ou retangular, com louça
+  reg('mesa_rest', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 16, cx = x + w / 2, cy = y + h / 2, cor = o.cor || '#c8302a', toalha = o.toalha || '#f4f0e8', redonda = o.forma ? o.forma === 'redonda' : w < h * 1.3;
+    const ty = e;
+    sombra(c, x, y, w, h, { oval: redonda, dx: 5, dy: 8, a: 0.08 });
+    if (redonda) {
+      c.fillStyle = '#3a2a1c'; c.fillRect(cx - 3, cy - 2, 6, e); c.beginPath(); c.ellipse(cx, cy + e - 2, 12, 4, 0, 0, TAU); c.fill();
+      const g = c.createRadialGradient(cx - w * 0.15, cy - e - h * 0.1, 3, cx, cy - e, w / 2); g.addColorStop(0, shade(toalha, 0.1)); g.addColorStop(1, shade(toalha, -0.14));
+      c.fillStyle = g; c.beginPath(); c.ellipse(cx, cy - e, w / 2, h / 2.1, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.stroke();
+      c.strokeStyle = shade(toalha, -0.2); c.lineWidth = 3; c.beginPath(); c.ellipse(cx, cy - e + 2, w / 2 - 3, h / 2.1 - 3, 0, 0.1 * Math.PI, 0.9 * Math.PI); c.stroke();
+    } else {
+      caixa(c, x, y, w, h, e, toalha, shade(toalha, -0.15), { r: 5, semSombra: true });
+      c.fillStyle = cor; c.fillRect(x + w * 0.18, y - e + 1, w * 0.64, h - 2); c.fillStyle = 'rgba(255,255,255,0.2)'; c.fillRect(x + w * 0.18, y - e + 1, w * 0.64, 2);
+    }
+    const ey = redonda ? cy - e : y - e + h / 2;
+    // pratos, talheres e copos
+    const lugares = redonda ? [[-0.3, 0.2], [0.3, 0.2], [0, -0.32], [0, 0.34]] : [[-0.32, -0.24], [0.32, -0.24], [-0.32, 0.26], [0.32, 0.26]];
+    lugares.forEach(([a, b]) => { const px = cx + a * w, py = ey + b * h; c.fillStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); c.ellipse(px + 1.5, py + 2, 8, 4.4, 0, 0, TAU); c.fill(); c.fillStyle = '#fbfaf6'; c.beginPath(); c.ellipse(px, py, 8, 4.4, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 0.8; c.stroke(); c.fillStyle = o.prato || '#d8a040'; c.beginPath(); c.ellipse(px, py - 0.4, 4.4, 2.2, 0, 0, TAU); c.fill(); c.fillStyle = '#c8ccd4'; c.fillRect(px - 12, py - 4, 1.2, 8); c.fillRect(px + 10.6, py - 4, 1.2, 8); c.fillStyle = 'rgba(210,230,245,0.8)'; c.beginPath(); c.arc(px + 10, py - 8, 2.4, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.stroke(); });
+    // centro: vaso de flores
+    c.fillStyle = '#e8e2d6'; c.beginPath(); c.moveTo(cx - 4, ey + 3); c.lineTo(cx + 4, ey + 3); c.lineTo(cx + 3, ey - 4); c.lineTo(cx - 3, ey - 4); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.stroke();
+    [['#e84a6a', -3, -9], ['#f2d84a', 2, -11], ['#ffffff', 4, -7], ['#e8801a', -1, -8]].forEach(([cc, dx, dy]) => { c.fillStyle = '#2f8a3c'; c.fillRect(cx + dx - 0.5, ey + dy, 1, 6); c.fillStyle = cc; c.beginPath(); c.arc(cx + dx, ey + dy, 3, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(cx + dx - 1.2, ey + dy - 1.4, 1.2, 1.2); });
+  }, { alto: 20 });
+
+  // cadeira de jantar vista de cima: assento acolchoado + encosto do lado dir (n/s/e/w)
+  reg('cadeira_rest', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#7a2a3a', dir = o.dir || 'n', madeira = '#5a3a22';
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 6, a: 0.09 });
+    const cx = x + w / 2, cy = y + h / 2 - 4;
+    // pernas
+    c.fillStyle = madeira; [[x + 2, y + h - 3], [x + w - 4, y + h - 3], [x + 2, y + 4], [x + w - 4, y + 4]].forEach(([a, b]) => c.fillRect(a, b, 2, 4));
+    // encosto atrás do assento
+    const enc = () => {
+      let ex = x, ey = y - 14, ew = w, eh = 8;
+      if (dir === 's') { ey = y + h - 8; }
+      if (dir === 'e') { ex = x + w - 5; ey = y - 12; ew = 6; eh = h + 6; }
+      if (dir === 'w') { ex = x - 1; ey = y - 12; ew = 6; eh = h + 6; }
+      c.fillStyle = madeira; rr(c, ex, ey, ew, eh, 3); c.fill(); c.fillStyle = shade(madeira, 0.25); c.fillRect(ex + 1, ey + 1, ew - 2, 1.4); c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1; rr(c, ex + 0.5, ey + 0.5, ew - 1, eh - 1, 3); c.stroke();
+      c.fillStyle = shade(cor, -0.1); rr(c, ex + 2, ey + 2, Math.max(2, ew - 4), Math.max(2, eh - 4), 2); c.fill();
+    };
+    if (dir === 'n' || dir === 'e' || dir === 'w') enc();
+    const g = c.createLinearGradient(x, cy - h / 2, x + w, cy + h / 2); g.addColorStop(0, shade(cor, 0.22)); g.addColorStop(1, shade(cor, -0.2));
+    c.fillStyle = g; rr(c, x + 1, y - 6, w - 2, h - 2, 6); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1; rr(c, x + 1.5, y - 5.5, w - 3, h - 3, 6); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.25)'; c.fillRect(x + 5, y - 4, w - 10, 1.6); c.strokeStyle = 'rgba(0,0,0,0.15)'; rr(c, x + 5, y - 2, w - 10, h - 9, 4); c.stroke();
+    if (dir === 's') enc();
+  }, { alto: 20 });
+
+  // ======================= PLANTAS =======================
+  reg('planta', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cx = x + w / 2, by = y + h - 3;
+    const v = o.variante || ['folhagem', 'samambaia', 'palmeira', 'espada', 'folhagem', 'suculenta'][(hh(x * 0.37, y * 0.51) * 6) | 0];
+    const vc = o.vaso || ['#b8683a', '#e8e2d6', '#3a4a5a', '#8a5a3a', '#c8a070'][(hh(y * 0.3, x * 0.7) * 5) | 0];
+    sombra(c, cx - 13, by - 7, 26, 9, { oval: true, dx: 5, dy: 3, a: 0.1 });
+    // folhas de trás
+    const fo = ['#2f7a2c', '#3a8a34', '#276a28', '#4a9a3a'], topo = by - 20;
+    const rn = rng(((x * 31 + y * 17) | 0) + 3);
+    if (v === 'folhagem') { for (let k = 0; k < 8; k++) { const a = -1.2 + k * 0.34 + (rn() - 0.5) * 0.2; folha(c, cx + Math.sin(a) * 11, topo - 14 - Math.cos(a) * 9 + (k % 2) * 3, 5.5, 11, a * 0.9, fo[k % 4]); } }
+    else if (v === 'samambaia') { for (let k = 0; k < 7; k++) { const a = -1.3 + k * 0.43; const ex = cx + Math.sin(a) * 24, ey = topo - 6 - Math.cos(a) * 18; c.strokeStyle = '#2a6a2a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(cx, topo); c.quadraticCurveTo(cx + Math.sin(a) * 12, topo - 22, ex, ey + 6); c.stroke(); for (let q = 0; q < 8; q++) { const tq = q / 7, px = (1 - tq) * (1 - tq) * cx + 2 * tq * (1 - tq) * (cx + Math.sin(a) * 12) + tq * tq * ex, py = (1 - tq) * (1 - tq) * topo + 2 * tq * (1 - tq) * (topo - 22) + tq * tq * (ey + 6); c.fillStyle = fo[(q + k) % 4]; c.beginPath(); c.ellipse(px - 2.5, py, 3.4, 1.4, 0.6, 0, TAU); c.ellipse(px + 2.5, py, 3.4, 1.4, -0.6, 0, TAU); c.fill(); } } }
+    else if (v === 'palmeira') { for (let k = 0; k < 7; k++) { const a = -1.4 + k * 0.47; const ex = cx + Math.sin(a) * 26, ey = topo - 26 - Math.cos(a) * 6 + Math.abs(a) * 8; c.strokeStyle = '#3a8a34'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx, topo); c.quadraticCurveTo(cx + Math.sin(a) * 8, topo - 34, ex, ey); c.stroke(); for (let q = 1; q < 9; q++) { const tq = q / 9, px = (1 - tq) * (1 - tq) * cx + 2 * tq * (1 - tq) * (cx + Math.sin(a) * 8) + tq * tq * ex, py = (1 - tq) * (1 - tq) * topo + 2 * tq * (1 - tq) * (topo - 34) + tq * tq * ey; c.fillStyle = fo[(q + k) % 4]; c.beginPath(); c.ellipse(px, py, 1.4, 5 * (1 - tq * 0.4), 0.9 * Math.sign(a || 1), 0, TAU); c.fill(); } } }
+    else if (v === 'espada') { for (let k = 0; k < 7; k++) { const a = (k - 3) * 0.16, hgt = 30 + (k % 3) * 8; c.save(); c.translate(cx + (k - 3) * 2.4, topo); c.rotate(a); const g = c.createLinearGradient(-4, 0, 4, 0); g.addColorStop(0, '#1f5a2a'); g.addColorStop(0.5, '#4a9a4a'); g.addColorStop(1, '#2a6a30'); c.fillStyle = g; c.beginPath(); c.moveTo(-4, 0); c.quadraticCurveTo(-5, -hgt * 0.6, 0, -hgt); c.quadraticCurveTo(5, -hgt * 0.6, 4, 0); c.fill(); c.strokeStyle = '#d8d060'; c.lineWidth = 0.9; c.beginPath(); c.moveTo(-4, 0); c.quadraticCurveTo(-5, -hgt * 0.6, 0, -hgt); c.stroke(); c.restore(); } }
+    else { for (let k = 0; k < 9; k++) { const a = k * 0.7; folha(c, cx + Math.cos(a) * 6, topo - 6 + Math.sin(a) * 2.5, 3.6, 7, a, ['#6aa86a', '#4a9a5a', '#8ab870'][k % 3]); } }
+    // vaso (de frente)
+    const g = c.createLinearGradient(cx - 11, 0, cx + 11, 0); g.addColorStop(0, shade(vc, 0.2)); g.addColorStop(0.45, vc); g.addColorStop(1, shade(vc, -0.35));
+    c.fillStyle = g; c.beginPath(); c.moveTo(cx - 11, topo); c.lineTo(cx + 11, topo); c.lineTo(cx + 8, by); c.quadraticCurveTo(cx, by + 3, cx - 8, by); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.45)'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = shade(vc, 0.12); c.beginPath(); c.ellipse(cx, topo, 11.5, 4.4, 0, 0, TAU); c.fill(); c.stroke(); c.fillStyle = '#3a2412'; c.beginPath(); c.ellipse(cx, topo + 0.4, 9.5, 3.3, 0, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(cx - 8, topo + 4, 2, 9);
+    // frente das folhas (sobre a terra)
+    if (v === 'folhagem') { for (let k = 0; k < 4; k++) { const a = -0.8 + k * 0.5; folha(c, cx + Math.sin(a) * 9, topo - 6 - Math.cos(a) * 3, 5, 9, a * 1.1, fo[(k + 1) % 4]); } }
+    if (o.flor || (v === 'folhagem' && hh(x, y) > 0.7)) { [['#e84a6a', -8, -34], ['#f2d84a', 6, -38], ['#ffffff', 0, -42]].forEach(([cc, dx, dy]) => { c.fillStyle = cc; c.beginPath(); c.arc(cx + dx, topo + dy + 14, 3, 0, TAU); c.fill(); c.fillStyle = '#f2d84a'; c.beginPath(); c.arc(cx + dx, topo + dy + 14, 1, 0, TAU); c.fill(); }); }
+  }, { alto: 50, pad: 20 });
+  K.novos.vaso = K.novos.planta;
+
+  // ======================= TAPETES =======================
+  reg('tapete', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#7a2a3a', cor2 = o.cor2 || '#d8b878', forma = o.forma || 'ret', pad = o.padrao || 'persa';
+    const caminho = (ix, iy, iw, ih, r) => { if (forma === 'redondo' || forma === 'oval') { c.beginPath(); c.ellipse(ix + iw / 2, iy + ih / 2, iw / 2, ih / 2, 0, 0, TAU); } else rr(c, ix, iy, iw, ih, r); };
+    // franjas
+    if (forma === 'ret') { c.strokeStyle = shade(cor2, 0.1); c.lineWidth = 1; c.beginPath(); for (let k = 0; k < h; k += 3) { c.moveTo(x - 6, y + k); c.lineTo(x, y + k); c.moveTo(x + w, y + k); c.lineTo(x + w + 6, y + k); } c.stroke(); }
+    c.fillStyle = 'rgba(0,0,0,0.22)'; caminho(x + 2, y + 3, w, h, 6); c.fill();
+    const g = c.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, shade(cor, 0.1)); g.addColorStop(1, shade(cor, -0.14)); c.fillStyle = g; caminho(x, y, w, h, 6); c.fill();
+    c.save(); caminho(x, y, w, h, 6); c.clip();
+    c.strokeStyle = cor2; c.lineWidth = 4; caminho(x + 4, y + 4, w - 8, h - 8, 4); c.stroke();
+    c.strokeStyle = rgba(cor2, 0.55); c.lineWidth = 1.2; caminho(x + 11, y + 11, w - 22, h - 22, 3); c.stroke();
+    const cx = x + w / 2, cy = y + h / 2;
+    if (pad === 'persa') {
+      c.fillStyle = rgba(cor2, 0.9); c.beginPath(); c.moveTo(cx, cy - h * 0.3); c.lineTo(cx + w * 0.22, cy); c.lineTo(cx, cy + h * 0.3); c.lineTo(cx - w * 0.22, cy); c.closePath(); c.fill();
+      c.fillStyle = shade(cor, -0.1); c.beginPath(); c.moveTo(cx, cy - h * 0.19); c.lineTo(cx + w * 0.13, cy); c.lineTo(cx, cy + h * 0.19); c.lineTo(cx - w * 0.13, cy); c.closePath(); c.fill();
+      c.fillStyle = cor2; c.beginPath(); c.arc(cx, cy, Math.min(w, h) * 0.05, 0, TAU); c.fill();
+      c.fillStyle = rgba(cor2, 0.7); for (let k = 0; k < Math.floor((w - 40) / 22); k++) { const px = x + 20 + k * 22 + 5; c.beginPath(); c.moveTo(px, y + 15); c.lineTo(px + 4, y + 19); c.lineTo(px, y + 23); c.lineTo(px - 4, y + 19); c.fill(); c.beginPath(); c.moveTo(px, y + h - 15); c.lineTo(px + 4, y + h - 19); c.lineTo(px, y + h - 23); c.lineTo(px - 4, y + h - 19); c.fill(); }
+    } else if (pad === 'geometrico') { c.fillStyle = rgba(cor2, 0.5); for (let j = 0; j * 18 < h; j++) for (let i = 0; i * 18 < w; i++) if ((i + j) % 2 === 0) { const px = x + i * 18 + 9, py = y + j * 18 + 9; c.beginPath(); c.moveTo(px, py - 6); c.lineTo(px + 6, py); c.lineTo(px, py + 6); c.lineTo(px - 6, py); c.fill(); } }
+    else if (pad === 'listras') { c.fillStyle = rgba(cor2, 0.5); for (let k = 0; k < w; k += 16) c.fillRect(x + k, y, 7, h); }
+    else if (pad === 'pelo') { const r = rng(x + y); for (let k = 0; k < w * h / 18; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'; c.fillRect(x + r() * w, y + r() * h, 2, 2); } }
+    // trama do tecido
+    c.fillStyle = 'rgba(0,0,0,0.05)'; for (let k = 0; k < h; k += 3) c.fillRect(x, y + k, w, 1);
+    c.restore();
+  }, { alto: 0, pad: 14 });
+
+  // ======================= CAIXAS DE PAPELÃO =======================
+  reg('pilha_caixas', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, r = rng(x * 7 + y);
+    sombra(c, x, y, w, h, { dx: 5, dy: 7, r: 3 });
+    const caixaPapelao = (bx, by, bw, bh, be) => {
+      caixa(c, bx, by, bw, bh, be, '#d8b472', '#b08a4a', { r: 1.5, semSombra: true });
+      c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(bx + bw / 2 - 3, by - be, 6, bh); c.fillStyle = 'rgba(0,0,0,0.22)'; c.fillRect(bx + bw / 2 - 3, by + bh - be, 6, be);
+      c.fillStyle = '#f4f0e6'; c.fillRect(bx + 4, by + bh - be + 4, Math.min(12, bw - 8), 7); c.fillStyle = '#c8302a'; c.fillRect(bx + 5, by + bh - be + 5, 4, 2);
+    };
+    const n = Math.max(1, Math.round(w / 34));
+    for (let i = 0; i < n; i++) { const bw = w / n - 2, bh = h * (0.8 + r() * 0.2), be = e * (0.55 + r() * 0.3); caixaPapelao(x + i * (w / n) + 1, y + h - bh, bw, bh, be); }
+    if (e > 24) caixaPapelao(x + w * 0.2, y + h * 0.15, w * 0.5, h * 0.6, e * 0.5 + e * 0.55 - e * 0.5);
+  }, { alto: 20 });
+
+  // ======================= PORTAS =======================
+  reg('porta', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#6a4a2a';
+    c.fillStyle = 'rgba(0,0,0,0.4)'; rr(c, x - 6, y - 5, w + 12, h + 9, 3); c.fill();
+    if (o.estilo === 'elevador') {
+      c.fillStyle = '#9aa0aa'; rr(c, x - 3, y - 3, w + 6, h + 4, 2); c.fill(); const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#c8ccd4'); g.addColorStop(0.5, '#eef0f4'); g.addColorStop(1, '#b0b6be'); c.fillStyle = g; c.fillRect(x, y, w, h);
+      const ab = o.aberta ? 10 : 0; c.fillStyle = '#a8aeb8'; c.fillRect(x + 2, y + 2, w / 2 - 3 - ab, h - 3); c.fillRect(x + w / 2 + 1 + ab, y + 2, w / 2 - 3 - ab, h - 3); c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + w / 2 - 1, y, 2, h);
+      c.fillStyle = '#16181e'; rr(c, x + w / 2 - 12, y - 18, 24, 11, 2); c.fill(); c.fillStyle = '#ffd24a'; c.beginPath(); c.moveTo(x + w / 2, y - 16); c.lineTo(x + w / 2 + 4, y - 10); c.lineTo(x + w / 2 - 4, y - 10); c.fill();
+    } else if (o.estilo === 'vai-vem') {
+      c.fillStyle = '#7a808a'; rr(c, x - 3, y - 3, w + 6, h + 4, 2); c.fill();
+      [[x + 2, w / 2 - 3], [x + w / 2 + 1, w / 2 - 3]].forEach(([px, pw]) => { const g = c.createLinearGradient(px, y, px + pw, y + h); g.addColorStop(0, '#d8dce4'); g.addColorStop(1, '#9aa0aa'); c.fillStyle = g; rr(c, px, y + 3, pw, h - 3, 2); c.fill(); c.fillStyle = '#5a7a9a'; rr(c, px + 4, y + 9, pw - 8, 13, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(px + 5, y + 10, pw - 10, 2); c.fillStyle = '#c8ccd4'; c.fillRect(px + pw * 0.5, y + h * 0.55, pw * 0.4, 4); });
+    } else {
+      c.fillStyle = shade(cor, -0.35); rr(c, x - 3, y - 3, w + 6, h + 5, 2); c.fill();
+      const g = c.createLinearGradient(x, y, x + w, y); g.addColorStop(0, shade(cor, 0.12)); g.addColorStop(1, shade(cor, -0.14)); c.fillStyle = g; c.fillRect(x, y, w, h);
+      painel(c, x + 4, y + 4, w - 8, h * 0.42, shade(cor, 0.04), 1.5); painel(c, x + 4, y + h * 0.5, w - 8, h * 0.44, shade(cor, 0.04), 1.5);
+      c.fillStyle = '#e8d070'; c.beginPath(); c.arc(x + w - 8, y + h * 0.52, 3, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.7)'; c.fillRect(x + w - 9.4, y + h * 0.52 - 1.6, 1.4, 1.4); c.fillStyle = '#3a2a1c'; c.fillRect(x + w - 10, y + h * 0.52 + 3.4, 4, 1.2);
+    }
+    if (o.placa) { c.fillStyle = '#c8a24a'; rr(c, x + w / 2 - 17, y - 22, 34, 13, 2); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.5)'; c.stroke(); c.fillStyle = '#2a1a0a'; c.font = 'bold 8px Arial'; c.textAlign = 'center'; c.fillText(o.placa, x + w / 2, y - 12.2); c.textAlign = 'left'; }
+  }, { alto: 30 });
+
+  // ======================= BANHEIRO =======================
+  reg('vaso_sanitario', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cx = x + w / 2;
+    sombra(c, x, y - 4, w, h, { dx: 4, dy: 6, r: 8, a: 0.08 });
+    // caixa acoplada
+    caixa(c, x + 2, y - 4, w - 4, 12, 14, '#f6f6f2', '#d8dad8', { r: 4, semSombra: true });
+    c.fillStyle = '#c8ccd4'; c.beginPath(); c.arc(cx, y - 20, 2.6, 0, TAU); c.fill();
+    // bacia
+    const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#cfd2d4'); c.fillStyle = g; c.beginPath(); c.ellipse(cx, y + h * 0.52, w * 0.46, h * 0.5, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = '#e8eaec'; c.beginPath(); c.ellipse(cx, y + h * 0.5, w * 0.34, h * 0.37, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.stroke(); c.fillStyle = '#7ab0d0'; c.beginPath(); c.ellipse(cx, y + h * 0.56, w * 0.18, h * 0.2, 0, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.6)'; c.fillRect(x + 4, y + h * 0.3, 2, 8);
+  }, { alto: 24 });
+  reg('lavatorio', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 26, ty = y - e, madeira = o.front || '#8a6a4a';
+    caixa(c, x, y, w, h, e, '#e8e4dc', madeira, { r: 3 });
+    const g = c.createLinearGradient(x, ty, x + w, ty + h); g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c8ccd0'); c.fillStyle = g; c.beginPath(); c.ellipse(x + w / 2, ty + h / 2 + 1, w * 0.36, h * 0.38, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = '#9aa4ae'; c.beginPath(); c.arc(x + w / 2, ty + h / 2 + 1, 2.2, 0, TAU); c.fill(); c.fillStyle = '#c8ccd4'; c.fillRect(x + w / 2 - 2, ty + 2, 4, 6); c.fillRect(x + w / 2 - 5, ty + 1, 10, 2);
+    const fy = y + h - e; painel(c, x + 3, fy + 3, w - 6, e - 7, shade(madeira, 0.08), 2); puxador(c, x + w / 2 - 5, fy + 6, 10, 2.4, '#d8c890');
+  }, { alto: 12 });
+  reg('chuveiro', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    // box de azulejo com vidro
+    c.fillStyle = 'rgba(0,0,0,0.25)'; rr(c, x + 3, y + 4, w, h, 3); c.fill();
+    const r = rng(x + y); for (let j = 0; j * 14 < h; j++) for (let i = 0; i * 14 < w; i++) { c.fillStyle = shade('#d4ecf4', (r() - 0.5) * 0.06); c.fillRect(x + i * 14, y + j * 14, 14, 14); }
+    c.strokeStyle = 'rgba(80,120,140,0.5)'; c.lineWidth = 1; c.beginPath(); for (let i = 0; i * 14 <= w; i++) { c.moveTo(x + i * 14, y); c.lineTo(x + i * 14, y + h); } for (let j = 0; j * 14 <= h; j++) { c.moveTo(x, y + j * 14); c.lineTo(x + w, y + j * 14); } c.stroke();
+    c.fillStyle = '#9aa4ae'; c.beginPath(); c.arc(x + w / 2, y + h / 2, 3, 0, TAU); c.fill(); c.strokeStyle = '#6a747e'; c.stroke();
+    c.fillStyle = 'rgba(180,220,240,0.3)'; c.fillRect(x, y + h - 22, w, 22); c.strokeStyle = '#c8ccd4'; c.lineWidth = 2.5; c.strokeRect(x + 1, y + 1, w - 2, h - 2); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(x + 3, y + h - 20, 2, 16);
+    // chuveiro no alto
+    c.strokeStyle = '#b8bec6'; c.lineWidth = 3; c.beginPath(); c.moveTo(x + w - 8, y + 3); c.lineTo(x + w - 8, y - 12); c.lineTo(x + w - 20, y - 12); c.stroke(); c.fillStyle = '#c8ccd4'; c.beginPath(); c.ellipse(x + w - 21, y - 11, 7, 3.4, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; c.stroke();
+  }, { alto: 20 });
+  reg('banheira', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    caixa(c, x, y, w, h, 14, '#f6f6f2', '#d2d6d8', { r: 12 });
+    const ty = y - 14; c.fillStyle = '#e4e8ea'; rr(c, x + 6, ty + 6, w - 12, h - 12, 10); c.fill(); const g = c.createLinearGradient(x, ty, x + w, ty + h); g.addColorStop(0, '#7ac8f0'); g.addColorStop(1, '#4a98d0'); c.fillStyle = g; rr(c, x + 8, ty + 8, w - 16, h - 16, 9); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x + 18, ty + h * 0.4); c.quadraticCurveTo(x + w * 0.4, ty + h * 0.3, x + w * 0.6, ty + h * 0.45); c.stroke(); c.fillStyle = '#fff'; for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(x + 16 + hh(k, x) * (w - 40), ty + 12 + hh(x, k) * (h - 24), 3 + hh(k, k) * 3, 0, TAU); c.fill(); }
+    c.fillStyle = '#c8ccd4'; c.beginPath(); c.arc(x + w - 12, ty + 2, 3, 0, TAU); c.fill(); c.fillRect(x + w - 15, ty - 6, 6, 5);
+  }, { alto: 14 });
+  reg('cesto', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h; sombra(c, o.x, o.y + 4, o.w, o.h - 4, { oval: true, dx: 4, dy: 3, a: 0.1 });
+    const g = c.createLinearGradient(o.x, 0, o.x + o.w, 0); g.addColorStop(0, '#d8b878'); g.addColorStop(1, '#8a6a3a'); c.fillStyle = g; c.beginPath(); c.moveTo(o.x + 1, by - 22); c.lineTo(o.x + o.w - 1, by - 22); c.lineTo(o.x + o.w - 4, by); c.lineTo(o.x + 4, by); c.closePath(); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.stroke();
+    c.strokeStyle = 'rgba(0,0,0,0.2)'; c.beginPath(); for (let k = 6; k < 22; k += 5) { c.moveTo(o.x + 2, by - k); c.lineTo(o.x + o.w - 2, by - k); } c.stroke(); c.fillStyle = '#e8e2d6'; c.beginPath(); c.ellipse(cx, by - 22, o.w / 2, 5, 0, 0, TAU); c.fill(); c.fillStyle = '#4a78c8'; c.beginPath(); c.ellipse(cx - 3, by - 24, 6, 3, 0.3, 0, TAU); c.fill(); c.fillStyle = '#e8805a'; c.beginPath(); c.ellipse(cx + 5, by - 22, 5, 2.6, -0.2, 0, TAU); c.fill();
+  }, { alto: 14 });
+  reg('lavadora', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 34, fy = y + h - e;
+    caixa(c, x, y, w, h, e, '#f0f2f4', '#dfe3e6', { r: 3 });
+    const cx = x + w / 2, cy = fy + e * 0.58; c.fillStyle = '#9aa4ae'; c.beginPath(); c.arc(cx, cy, e * 0.34, 0, TAU); c.fill(); const g = c.createRadialGradient(cx - 3, cy - 3, 2, cx, cy, e * 0.3); g.addColorStop(0, '#6a90b0'); g.addColorStop(1, '#1a2430'); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, e * 0.28, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.arc(cx - 4, cy - 4, 3, 0, TAU); c.fill();
+    c.fillStyle = '#2a2d36'; rr(c, x + 5, fy + 3, w * 0.4, 6, 1); c.fill(); c.fillStyle = '#4ae08a'; c.fillRect(x + 8, fy + 5, 5, 2); c.fillStyle = '#c8ccd4'; c.beginPath(); c.arc(x + w - 9, fy + 6, 3, 0, TAU); c.fill();
+  }, { alto: 14 });
+
+  // ======================= ESCRITÓRIO =======================
+  reg('escrivaninha', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 22, ty = y - e;
+    caixa(c, x, y, w, h, e, o.top || '#b08a5a', o.front || '#6a4a2e', { r: 2 });
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + 2, ty + 2, w - 4, 2);
+    // monitor + teclado + mouse + papel + caneca
+    const mx = x + w / 2 - 20;
+    c.fillStyle = '#2a2d36'; c.fillRect(mx + 16, ty + h * 0.45, 8, 4); c.fillStyle = '#0c0d12'; rr(c, mx, ty + h * 0.45 - 28, 40, 28, 2); c.fill(); const g = c.createLinearGradient(mx, ty - 6, mx + 40, ty + 22); g.addColorStop(0, '#3a8ae0'); g.addColorStop(1, '#2a4a9a'); c.fillStyle = g; c.fillRect(mx + 2, ty + h * 0.45 - 26, 36, 22); c.fillStyle = 'rgba(255,255,255,0.75)'; for (let k = 0; k < 4; k++) c.fillRect(mx + 5, ty + h * 0.45 - 22 + k * 4.4, 12 + (k % 2) * 12, 1.8);
+    c.fillStyle = '#c8ccd4'; rr(c, mx + 4, ty + h - 11, 30, 7, 1.5); c.fill(); c.fillStyle = '#8a9099'; for (let k = 0; k < 3; k++) c.fillRect(mx + 6, ty + h - 9.6 + k * 2, 26, 0.8);
+    c.fillStyle = '#e8e8ee'; c.beginPath(); c.ellipse(mx + 44, ty + h - 8, 3, 4, 0, 0, TAU); c.fill(); c.fillStyle = '#f4efe0'; c.fillRect(x + 6, ty + h * 0.3, 16, 12); c.fillStyle = 'rgba(0,0,0,0.25)'; for (let k = 0; k < 3; k++) c.fillRect(x + 8, ty + h * 0.3 + 3 + k * 3, 12, 0.9); c.fillStyle = '#c8302a'; rr(c, x + w - 16, ty + h * 0.35, 8, 9, 1.5); c.fill();
+  }, { alto: 32 });
+  reg('cadeira_esc', (c, o) => {
+    const cx = o.x + o.w / 2, cy = o.y + o.h / 2;
+    sombra(c, o.x, o.y, o.w, o.h, { oval: true, dx: 4, dy: 5, a: 0.1 });
+    c.fillStyle = '#2a2d36'; c.beginPath(); c.ellipse(cx, cy + 5, 11, 4.4, 0, 0, TAU); c.fill(); c.fillRect(cx - 1.4, cy - 4, 2.8, 9);
+    const g = c.createLinearGradient(cx - 11, 0, cx + 11, 0); g.addColorStop(0, '#3a3e48'); g.addColorStop(1, '#16181e'); c.fillStyle = g; rr(c, cx - 11, cy - 8, 22, 14, 6); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.6)'; c.stroke();
+    c.fillStyle = '#2a2d36'; rr(c, cx - 10, cy - 24, 20, 14, 5); c.fill(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(cx - 8, cy - 22, 16, 2);
+  }, { alto: 30 });
+
+  // ======================= EXTRAS (cozinha, sala grande, quarto) =======================
+  reg('banqueta', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h, cor = o.cor || '#7a2a3a';
+    sombra(c, o.x + 3, o.y + 8, o.w - 6, o.h - 8, { oval: true, dx: 4, dy: 3, a: 0.1 });
+    c.strokeStyle = '#8a9099'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx - 6, by - 14); c.lineTo(cx - 8, by - 1); c.moveTo(cx + 6, by - 14); c.lineTo(cx + 8, by - 1); c.moveTo(cx, by - 14); c.lineTo(cx, by - 3); c.stroke();
+    c.strokeStyle = '#6a707a'; c.lineWidth = 1.2; c.beginPath(); c.ellipse(cx, by - 6, 7, 2.6, 0, 0, TAU); c.stroke();
+    const g = c.createRadialGradient(cx - 3, by - 20, 2, cx, by - 17, 11); g.addColorStop(0, shade(cor, 0.25)); g.addColorStop(1, shade(cor, -0.2)); c.fillStyle = g; c.beginPath(); c.ellipse(cx, by - 17, 10, 6.4, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.5)'; c.lineWidth = 1; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.ellipse(cx - 3, by - 19, 4, 1.8, -0.3, 0, TAU); c.fill();
+  }, { alto: 22, pad: 18 });
+
+  reg('ilha', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e, madeira = o.front || '#6a4a2e';
+    caixa(c, x, y, w, h, e, '#ece8e0', madeira, { r: 4 });
+    const r = rng(x + y); for (let k = 0; k < 60; k++) { c.fillStyle = r() < 0.5 ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.4)'; c.fillRect(x + 3 + r() * (w - 6), ty + 2 + r() * (h - 4), 1.5, 1.5); }
+    c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(x + 2, ty + h - 4, w - 4, 3);
+    // fruteira, tábua e vinho
+    c.fillStyle = '#c8a060'; c.beginPath(); c.ellipse(x + 24, ty + h / 2, 13, 8, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.stroke(); [['#e8402a', -5, -2], ['#f2c82a', 2, -3], ['#6aa83a', 6, 1], ['#e8801a', -2, 2]].forEach(([cc, dx, dy]) => { c.fillStyle = cc; c.beginPath(); c.arc(x + 24 + dx, ty + h / 2 + dy, 4, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(x + 22 + dx, ty + h / 2 + dy - 3, 1.6, 1.6); });
+    c.fillStyle = '#d8b878'; rr(c, x + w * 0.5, ty + 9, 30, 14, 2); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.stroke(); c.fillStyle = '#c8302a'; c.beginPath(); c.arc(x + w * 0.5 + 10, ty + 16, 4, 0, TAU); c.fill();
+    c.fillStyle = '#2a4a2a'; c.fillRect(x + w - 24, ty + 8, 5, 14); c.fillRect(x + w - 22.5, ty + 3, 2, 6);
+    const fy = y + h - e, n = Math.max(2, Math.round(w / 40)), dw = (w - 8) / n; for (let i = 0; i < n; i++) { painel(c, x + 4 + i * dw, fy + 4, dw - 3, e - 9, shade(madeira, 0.1), 2); puxador(c, x + 4 + i * dw + (dw - 3) / 2 - 4, fy + 6, 8, 2.4, '#d8c890'); }
+  }, { alto: 20 });
+
+  reg('lareira', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 68;
+    caixa(c, x, y, w, h, e, '#d8d0c0', '#b8a888', { r: 3 });
+    const fy = y + h - e, r = rng(x);
+    // tijolos aparentes
+    for (let j = 0; j < 7; j++) for (let i = 0; i < 9; i++) { const bx = x + 3 + i * (w - 6) / 9 + (j % 2) * 5, by = fy + 10 + j * 8; if (bx + 11 > x + w) continue; c.fillStyle = shade('#a8603a', (r() - 0.5) * 0.25); c.fillRect(bx, by, (w - 6) / 9 - 1.5, 6.5); }
+    // boca da lareira
+    const bx = x + w * 0.2, bw = w * 0.6, by = fy + e * 0.34, bh = e * 0.58;
+    c.fillStyle = '#0e0a08'; rr(c, bx, by, bw, bh, 4); c.fill(); c.strokeStyle = '#3a2a22'; c.lineWidth = 3; rr(c, bx, by, bw, bh, 4); c.stroke();
+    c.fillStyle = '#4a2a14'; rr(c, bx + 8, by + bh - 12, bw - 16, 7, 3); c.fill(); rr(c, bx + 14, by + bh - 18, bw - 28, 7, 3); c.fill();
+    // consolo (prateleira) com enfeites
+    c.fillStyle = '#6a4a2a'; c.fillRect(x - 3, fy + 2, w + 6, 6); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x - 3, fy + 2, w + 6, 1.4);
+    const ty = y - e; c.fillStyle = '#e8c850'; c.beginPath(); c.arc(x + w / 2, ty + h / 2, 7, 0, TAU); c.fill(); c.strokeStyle = '#8a6a1a'; c.stroke(); c.fillStyle = '#e8e2d6'; c.fillRect(x + 10, ty + h / 2 - 5, 7, 10); c.fillRect(x + w - 17, ty + h / 2 - 5, 7, 10);
+  }, {
+    alto: 20, din(ctx, o, t) {
+      const x = o.x, e = o.e || 68, fy = o.y + o.h - e, bx = x + o.w * 0.2, bw = o.w * 0.6, by = fy + e * 0.34, bh = e * 0.58;
+      ctx.save(); ctx.beginPath(); rr(ctx, bx + 2, by + 2, bw - 4, bh - 4, 3); ctx.clip();
+      for (let k = 0; k < 6; k++) { const ph = (t * 1.6 + k * 0.7) % 1, fx = bx + bw * (0.18 + k * 0.13) + Math.sin(t * 5 + k) * 3, fh = bh * (0.42 + 0.18 * Math.sin(t * 7 + k * 2)); ctx.fillStyle = ['#e8501a', '#f08a1a', '#f8c82a'][k % 3]; ctx.beginPath(); ctx.moveTo(fx - 7, by + bh - 6); ctx.quadraticCurveTo(fx - 3, by + bh - fh * 0.6, fx + Math.sin(t * 6 + k) * 3, by + bh - fh); ctx.quadraticCurveTo(fx + 3, by + bh - fh * 0.6, fx + 7, by + bh - 6); ctx.fill(); }
+      ctx.restore();
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x + o.w / 2, o.y + o.h + 20, 6, x + o.w / 2, o.y + o.h + 30, 130); g.addColorStop(0, 'rgba(255,140,50,' + (0.2 + 0.05 * Math.sin(t * 8)) + ')'); g.addColorStop(1, 'rgba(255,120,40,0)'); ctx.fillStyle = g; ctx.fillRect(x - 100, o.y + o.h - 30, o.w + 200, 190); ctx.restore();
+    }
+  });
+
+  reg('ventilador', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h;
+    sombra(c, cx - 11, by - 8, 22, 8, { oval: true, dx: 4, dy: 3, a: 0.1 });
+    c.fillStyle = '#3a3e48'; c.beginPath(); c.ellipse(cx, by - 3, 10, 4, 0, 0, TAU); c.fill(); c.fillStyle = '#8a9099'; c.fillRect(cx - 1.6, by - 30, 3.2, 28);
+  }, {
+    alto: 40, din(ctx, o, t) {
+      const cx = o.x + o.w / 2, by = o.y + o.h, hy = by - 36;
+      ctx.fillStyle = '#4a4e58'; ctx.beginPath(); ctx.arc(cx, hy, 4, 0, TAU); ctx.fill();
+      ctx.save(); ctx.translate(cx, hy); ctx.rotate(t * 16); for (let k = 0; k < 3; k++) { ctx.rotate(TAU / 3); ctx.fillStyle = 'rgba(120,170,220,0.55)'; ctx.beginPath(); ctx.ellipse(0, -9, 4.4, 9, 0, 0, TAU); ctx.fill(); } ctx.restore();
+      ctx.strokeStyle = 'rgba(40,44,52,0.85)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, hy, 15, 0, TAU); ctx.stroke(); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(cx, hy, 8, 0, TAU); ctx.moveTo(cx - 15, hy); ctx.lineTo(cx + 15, hy); ctx.moveTo(cx, hy - 15); ctx.lineTo(cx, hy + 15); ctx.stroke();
+    }
+  });
+
+  // parede baixa (divisória): tampa clara + frente pintada
+  reg('parede_int', (c, o) => {
+    const e = o.e || 28, cor = o.cor || '#e6dcc4';
+    caixa(c, o.x, o.y, o.w, o.h, e, shade(cor, 0.4), cor, { r: 1.5 });
+    if (o.w > o.h) { c.fillStyle = shade(cor, 0.45); c.fillRect(o.x + 1, o.y + o.h - 5, o.w - 2, 4); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(o.x + 1, o.y + o.h - 6, o.w - 2, 1); }
+  }, { alto: 4 });
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
    VIDA.JS — as pessoas da cidade têm FAMÍLIA, NOME e ROTINA
      • cada casa tem uma família (pai, mãe, filhos, às vezes um avô ou avó)
      • a rotina muda com a HORA do jogo: dormir, café, trabalho, escola, TV...
@@ -6628,11 +7644,14 @@
   });
 
   // ---------- família: cria, sincroniza com a hora ----------
-  const BED = [{ x: 150, y: 232 }, { x: 205, y: 232 }, { x: 328, y: 232 }, { x: 418, y: 232 }, { x: 508, y: 232 }];
-  const SOFA = [{ x: 190, y: 392 }, { x: 250, y: 392 }, { x: 310, y: 392 }];
-  const COZ = [{ x: 535, y: 226 }, { x: 472, y: 226 }];
-  const PASSEIO = [{ x: 300, y: 270 }, { x: 420, y: 285 }, { x: 250, y: 320 }, { x: 380, y: 345 }, { x: 330, y: 250 }];
-  const PASSEIO_Q = [{ x: 330, y: 320 }, { x: 400, y: 345 }, { x: 270, y: 330 }];
+  // pontos onde a família fica (cada nível de casa tem os seus: veja casas_salas.js)
+  const SPOTS_ANTIGOS = {
+    bed: [{ x: 150, y: 232 }, { x: 205, y: 232 }, { x: 328, y: 232 }, { x: 418, y: 232 }, { x: 508, y: 232 }],
+    sofa: [{ x: 190, y: 392 }, { x: 250, y: 392 }, { x: 310, y: 392 }], coz: [{ x: 535, y: 226 }, { x: 472, y: 226 }],
+    passeio: [{ x: 300, y: 270 }, { x: 420, y: 285 }, { x: 250, y: 320 }, { x: 380, y: 345 }, { x: 330, y: 250 }],
+    passeioQ: [{ x: 330, y: 320 }, { x: 400, y: 345 }, { x: 270, y: 330 }], laneSala: 250, laneQuarto: 312
+  };
+  const spotsDe = c => (L.casaLay && L.casaLay.spots(nivel(c))) || SPOTS_ANTIGOS;
 
   function iniciaFamilia(S, lg) {
     const c = lg.casa;
@@ -6644,14 +7663,15 @@
     c.fam.membros.forEach(m => { m.sala = null; m.n = null; m.at = null; });
     sincroniza(S, lg, true);
   }
-  function destino(m, at) {
+  function destino(m, at, c) {
+    const SP = spotsDe(c);
     switch (at) {
       case 'fora': return null;
-      case 'dorme': return Object.assign({ sala: 'quartos', dorme: true, h: 1.57 }, BED[m.cama]);
-      case 'cozinha': return Object.assign({ sala: 'entrada', h: 0 }, COZ[m.i % 2]);
-      case 'tv': return Object.assign({ sala: 'entrada', sentado: true, h: 0 }, SOFA[m.i % 3]);
-      case 'brinca': return Object.assign({ sala: 'quartos', corre: m.i % 2 === 0 }, PASSEIO_Q[m.i % 3]);
-      default: return Object.assign({ sala: m.papel === 'filho' ? 'quartos' : 'entrada' }, (m.papel === 'filho' ? PASSEIO_Q : PASSEIO)[Math.floor(Math.random() * 3)]);
+      case 'dorme': return Object.assign({ sala: 'quartos', dorme: true, h: 1.57 }, SP.bed[m.cama % SP.bed.length]);
+      case 'cozinha': return Object.assign({ sala: 'entrada', h: 0 }, SP.coz[m.i % SP.coz.length]);
+      case 'tv': return Object.assign({ sala: 'entrada', sentado: true, h: 0 }, SP.sofa[m.i % SP.sofa.length]);
+      case 'brinca': return Object.assign({ sala: 'quartos', corre: m.i % 2 === 0 }, SP.passeioQ[m.i % SP.passeioQ.length]);
+      default: { const lista = m.papel === 'filho' ? SP.passeioQ : SP.passeio; return Object.assign({ sala: m.papel === 'filho' ? 'quartos' : 'entrada' }, lista[Math.floor(Math.random() * lista.length)]); }
     }
   }
   function falasDe(m) {
@@ -6675,7 +7695,7 @@
     fam.membros.forEach(m => {
       const at = V.atividade(m, h); if (m.at === at && !(at === 'casa' && m.n && m.n.parado && Math.random() < 0.01)) return;
       if (m.at !== at) m.acordou = false;
-      m.at = at; const d = destino(m, at); m.dest = d;
+      m.at = at; const d = destino(m, at, c); m.dest = d;
       const antes = m.sala; m.sala = d ? d.sala : null;
       if (m.n) m.n.falas = falasDe(m);
       if (!R || snap) { if (!snap) m.n = null; return; }
@@ -6684,7 +7704,7 @@
       if (m.sala === R.id) {
         let n = m.n;
         if (!n || idxAntiga < 0) { n = gente(m, R.portaX, R.y1 - 50, d); if (antes === null) { n.x = R.portaX; n.y = R.y1 - 20; } R.npcs.push(n); n.dorme = false; }
-        const lane = R.id === 'entrada' ? 250 : 312;
+        const SPc = spotsDe(c), lane = R.id === 'entrada' ? SPc.laneSala : SPc.laneQuarto;
         n.dorme = false; n.sentado = false; n.act = undefined; n.label = undefined;
         K.rota(n, [{ x: n.x, y: lane }, { x: d.x, y: lane }, { x: d.x, y: d.y }], nn => poeNoFim(nn, d));
       }
@@ -6833,14 +7853,340 @@
     criar(id, lg) {
       const S = G.S, c = lg.place.casa; lg.casa = c;
       if (!lg.ini) { lg.ini = true; iniciaFamilia(S, lg); }
-      const R = id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c);
+      const R = L.casaLay ? L.casaLay.criar(id, S, lg, c) : (id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c));
       R.objs.forEach(o => { if (o.t === 'placa_venda') o.preco = c.preco; });
       return R;
     }
   };
 
+  // peças que o casas_salas.js (as salas novas) usa
+  L.casaApi = { dono, aVenda, nivel, nomeCasa, loot, ruido, povoar, onUpdate, comprar, money };
+
   // usado pelo save: casas compradas aparecem no minimapa
   G.casasDoJogador = S => W.casas.filter(c => dono(S, c));
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   CASAS_SALAS.JS — por dentro, cada casa é uma CASA DE VERDADE:
+     • SALA com cozinha (sofá, TV, mesa de jantar, geladeira, fogão, pia...)
+     • QUARTOS (camas com travesseiro, guarda-roupa, escrivaninha...)
+     • BANHEIRO (vaso, pia com espelho, chuveiro, banheira nas ricas)
+   O tamanho e o luxo seguem o dinheiro da casa:
+     simples = cimento queimado, grade na janela, móveis velhos
+     média   = piso de madeira, sofá e jantar, cozinha completa
+     rica    = porcelanato e tábua corrida, lareira, ilha de cozinha, suíte
+   Cada casa tem cores próprias (sorteadas pelo número dela).
+   Mesmas regras de sempre: roubar, dormir para salvar, cofre, família...
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, D = G.deco, A = L.casaApi;
+  const O = K.O, pick = K.pick, rand = K.rand, shade = K.shade, TAU = Math.PI * 2;
+  // sorteio com semente (a mesma casa sempre sai com as mesmas cores)
+  const rng = s => { let a = (s | 0) + 0x6D2B79F5; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+  const semente = id => { let h = 2166136261; const t = String(id); for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 16777619); return h >>> 0; };
+  const { dono, aVenda, nivel, nomeCasa, loot, ruido, povoar, onUpdate, comprar, money } = A;
+
+  // ---------- as medidas de cada nível ----------
+  const DIM = {
+    // dx = canto esquerdo da porta dos quartos (na sala), dw = largura dela
+    // px = porta de saída (embaixo) · bx/bw = porta do banheiro (nos quartos)
+    simples: { sala: { w: 520, h: 340, dx: 290, dw: 52 }, quartos: { w: 440, h: 300, px: 290, bx: 228, bw: 48 }, banho: { w: 220, h: 230, px: 180 } },
+    media: { sala: { w: 640, h: 400, dx: 342, dw: 56 }, quartos: { w: 560, h: 360, px: 350, bx: 540, bw: 56 }, banho: { w: 270, h: 250, px: 205 } },
+    rica: { sala: { w: 820, h: 440, dx: 484, dw: 60 }, quartos: { w: 700, h: 420, px: 420, bx: 676, bw: 60 }, banho: { w: 380, h: 300, px: 260 } }
+  };
+  const portaSalaCx = nv => DIM[nv].sala.dx + DIM[nv].sala.dw / 2;       // centro da porta dos quartos
+  const portaBanhoCx = nv => DIM[nv].quartos.bx + DIM[nv].quartos.bw / 2;  // centro da porta do banheiro
+  // lugares onde a família fica (casas.js usa)
+  const SPOTS = {
+    simples: {
+      bed: [{ x: 118, y: 238 }, { x: 166, y: 238 }, { x: 316, y: 232 }, { x: 390, y: 232 }, { x: 464, y: 232 }],
+      sofa: [{ x: 176, y: 381 }, { x: 203, y: 381 }, { x: 230, y: 381 }, { x: 257, y: 381 }], coz: [{ x: 505, y: 224 }, { x: 446, y: 224 }],
+      passeio: [{ x: 330, y: 300 }, { x: 300, y: 440 }, { x: 440, y: 430 }, { x: 200, y: 300 }, { x: 372, y: 250 }],
+      passeioQ: [{ x: 250, y: 330 }, { x: 330, y: 350 }, { x: 180, y: 340 }], laneSala: 252, laneQuarto: 322
+    },
+    media: {
+      bed: [{ x: 128, y: 242 }, { x: 184, y: 242 }, { x: 293, y: 236 }, { x: 381, y: 236 }, { x: 469, y: 236 }],
+      sofa: [{ x: 205, y: 383 }, { x: 245, y: 383 }, { x: 285, y: 383 }, { x: 325, y: 383 }, { x: 437, y: 332, h: Math.PI }], coz: [{ x: 606, y: 224 }, { x: 540, y: 224 }],
+      passeio: [{ x: 340, y: 266 }, { x: 470, y: 290 }, { x: 300, y: 470 }, { x: 430, y: 500 }, { x: 250, y: 250 }],
+      passeioQ: [{ x: 300, y: 390 }, { x: 400, y: 410 }, { x: 260, y: 370 }], laneSala: 250, laneQuarto: 332
+    },
+    rica: {
+      bed: [{ x: 160, y: 246 }, { x: 232, y: 246 }, { x: 398, y: 240 }, { x: 492, y: 240 }, { x: 586, y: 240 }],
+      sofa: [{ x: 222, y: 397 }, { x: 275, y: 397 }, { x: 328, y: 397 }, { x: 381, y: 397 }, { x: 141, y: 336, h: Math.PI }, { x: 465, y: 336, h: Math.PI }], coz: [{ x: 800, y: 226 }, { x: 716, y: 226 }],
+      passeio: [{ x: 330, y: 260 }, { x: 560, y: 300 }, { x: 330, y: 500 }, { x: 560, y: 520 }, { x: 440, y: 260 }],
+      passeioQ: [{ x: 300, y: 400 }, { x: 440, y: 420 }, { x: 560, y: 400 }], laneSala: 252, laneQuarto: 340
+    }
+  };
+
+  // ---------- cores de cada casa (sorteadas pelo número da casa) ----------
+  const PAREDES = { simples: ['#c8c0a8', '#d8c8a0', '#b8c8b0', '#d0b8a0'], media: ['#d8cdb0', '#e6d8a8', '#bccdd8', '#bccaa8', '#e0bca8', '#d8c0d0'], rica: ['#e6dcc4', '#e8e0d0', '#d8dcc8', '#e0d0c0'] };
+  const MADEIRAS = [['#9a7650', '#7e5c3a'], ['#b89468', '#9c7a52'], ['#6a4a30', '#573a24'], ['#a8845a', '#8a6a44']];
+  const SOFAS = { simples: ['#8a6a4a', '#6a7a8a', '#7a5a5a'], media: ['#a8483a', '#2f4a7a', '#6a7a8a', '#4f7a5a', '#8a6a4a', '#7a4a6a'], rica: ['#2f3a4a', '#6a2a3a', '#c9b79a', '#3a5a4a', '#e0d8c8'] };
+  const TAPETES = [['#7a2a3a', '#d8b878'], ['#2f5a7a', '#e8e0c8'], ['#5a6a3a', '#e8d8a0'], ['#6a3a6a', '#e8c8d8'], ['#8a4a2a', '#e8d0a0']];
+  const CORTINAS = ['#b8503a', '#e8e0c8', '#4a6a9a', '#6a9a6a', '#8a2a3a', null];
+  function estilo(c) {
+    const nv = nivel(c), r = rng(semente(c.id) + 11), pk = a => a[(r() * a.length) | 0], E = { nv, seed: semente(c.id) + 5 };
+    E.parede = pk(PAREDES[nv]); E.sofa = pk(SOFAS[nv]); E.sofa2 = pk(SOFAS[nv]); E.tap = pk(TAPETES); E.cortina = pk(CORTINAS); E.vista = pk(['jardim', 'jardim', 'cidade', 'mar']);
+    E.cor2 = pk(['#e8c870', '#e8e0c8', '#d8a85a', '#c8d8e8']);
+    if (nv === 'simples') {
+      const t = r();
+      if (t < 0.4) { E.piso = 'cimento'; E.pc = ['#b5645a', '#8a463c']; } else if (t < 0.7) { E.piso = 'cimento'; E.pc = ['#a8a8a0', '#85857f']; } else { E.piso = 'ladrilho'; E.pc = ['#d8d0bc', '#bdb49e']; }
+      E.estiloParede = 'liso'; E.velha = true; E.lambri = r() < 0.55 ? pk(['#6a8a7a', '#7a8aa8', '#a0584a']) : false; E.lambriAlt = 34; E.capacho = '#6a4a3a';
+      E.pq = r() < 0.5 ? ['#d8d0bc', '#bdb49e'] : ['#c8c0b0', '#aaa290']; E.pqTipo = 'ladrilho';
+    } else if (nv === 'media') {
+      const m = pk(MADEIRAS); E.piso = 'madeira'; E.pc = m; E.estiloParede = r() < 0.3 ? 'listras' : 'liso'; E.lambri = r() < 0.4 ? shade(E.parede, -0.22) : false; E.lambriAlt = 30; E.capacho = '#7a4a2a';
+      E.pq = r() < 0.5 ? ['#8a9ab8', '#7a8aa8'] : ['#b8a888', '#9a8a6a']; E.pqTipo = 'carpete';
+    } else {
+      E.piso = 'madeira'; E.pc = r() < 0.5 ? ['#5a3a24', '#47301c'] : ['#6a4a30', '#573a24']; E.estiloParede = r() < 0.55 ? 'papel' : 'liso'; E.lambri = '#5a3c26'; E.lambriAlt = 34; E.capacho = '#4a2a3a';
+      E.pq = r() < 0.5 ? ['#7a2a3a', '#6a2232'] : ['#8a8478', '#6a6458']; E.pqTipo = 'carpete';
+    }
+    return E;
+  }
+  const aplicaEstilo = (R, E) => { R.estiloParede = E.estiloParede; R.lambri = E.lambri; R.lambriAlt = E.lambriAlt; R.velha = E.velha; R.seed = E.seed; R.capacho = E.capacho; };
+
+  // ---------- objetos com as regras do jogo (roubar, relaxar, dormir...) ----------
+  function fabrica(S, R, c) {
+    const d = dono(S, c), K2 = K;
+    return {
+      tv(x, y, w, h, e, o) { return O('tv', x, y, w, h, Object.assign({ e, label: d ? 'LIGAR A TV' : 'ROUBAR A TV', act: (S2, R2, ob) => { if (d) { G.say(pick(['Noticiário: a polícia procura um motorista de fuga vermelho...', 'Novela das 8: ela descobriu tudo!']), 4); return; } loot(S2, R2, ob, 'tv', 70, 200, 'Você levou a TV nos braços e vendeu na hora: $$.', 0.85); } }, o)); },
+      // o sofá de costas para nós é desenhado em 2 partes: quem senta aparece ENTRE a almofada e o encosto
+      sofa(x, y, w, h, e, o) {
+        const dir = (o && o.dir) || 'n', op = Object.assign({ e, r: 30, label: 'SENTAR NO SOFÁ', act: S2 => { K2.cura(S2, 8); G.say('Você relaxou no sofá. (+8 vida)', 2.5); }, k: y + 1 }, o);
+        if (dir === 'n') { op.parte = 'base'; R.objs.push(O('sofa', x, y, w, h, Object.assign({}, o, { e, solid: false, parte: 'costas', k: y + h }))); }
+        return O('sofa', x, y, w, h, op);
+      },
+      poltrona(x, y, w, h, e, o) { return O('poltrona', x, y, w, h, Object.assign({ e, r: 28, k: y + 12, label: 'SENTAR NA POLTRONA', act: S2 => { K2.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }, o)); },
+      geladeira(x, y, w, h, e, o) {
+        return O('geladeira', x, y, w, h, Object.assign({ e, label: d ? 'ABRIR A GELADEIRA' : 'MEXER NA GELADEIRA', act: (S2, R2) => {
+          const st = c.est = c.est || {}; const dia = Math.floor(S2.dayT);
+          if (d) { if (st.dia === dia) { G.say('Você já pegou comida hoje. Volte amanhã!', 2.8); return; } st.dia = dia; const a = pick(['marmita', 'pao', 'maca', 'guarana', 'linguica']); L.dar(S2, a, 2); G.save(); G.say('Você pegou ' + L.ALIM[a].n + ' (x2) na geladeira. Aperte X para comer.', 3.5); return; }
+          if (st.lootDia === dia) { G.say('A geladeira já foi esvaziada.', 2.2); return; } st.lootDia = dia; const a = pick(['pao', 'maca', 'banana', 'marmita', 'coxinha', 'guarana', 'cerveja']); L.dar(S2, a, 1); G.save(); G.say('Você roubou: ' + L.ALIM[a].n + '. (X para comer)', 3); ruido(S2, R2, 0.2);
+        } }, o));
+      },
+      aparador(x, y, w, h, e, o) { return O('bloco', x, y, w, h, Object.assign({ e, top: '#7a5230', front: '#5a3a22', label: 'VASCULHAR O APARADOR', r: 36, act: (S2, R2, ob) => loot(S2, R2, ob, 'aparador', 8, nivel(c) === 'rica' ? 140 : 70, 'Achou trocados na gaveta: $$.', 0.3) }, o)); }
+    };
+  }
+
+  // =====================================================================
+  //  SALA (com cozinha)
+  // =====================================================================
+  function salaCasa(S, lg, c) {
+    const nv = nivel(c), v = aVenda(S, c), d = dono(S, c), E = estilo(c), M = DIM[nv].sala;
+    const R = L.novaSala({ w: M.w, h: M.h, nome: nomeCasa(S, c), cor: d ? '#2e8b3e' : v ? '#d9242a' : '#c8a060', piso: E.piso, pisoCores: E.pc, parede: E.parede });
+    aplicaEstilo(R, E); R.porta = null; R.casa = c; R.spots = {};
+    const x0 = R.x0, y0 = R.y0, x1 = R.x1, y1 = R.y1;
+    const add = (...a) => R.objs.push(...a), F = fabrica(S, R, c);
+    add(O('porta', M.dx, 96, M.dw, 54, { solid: false, k: 10, label: d || !v ? 'IR PARA OS QUARTOS' : 'VER OS QUARTOS', r: 50, placa: 'QUARTOS', act: S2 => L.irSala(S2, 'quartos', DIM[nv].quartos.px, 150 + DIM[nv].quartos.h - 40, Math.PI) }));
+    const cz = E.cortina, ap = nv === 'rica' ? 1 : 0;
+    if (v) {
+      // casa vazia, à venda
+      add(O('placa_venda', x0 + (M.w - 120) / 2, y0 + M.h * 0.45, 120, 50, { e: 0, solid: true, label: 'COMPRAR ESTA CASA — $' + c.preco, r: 56, act: (S2, R2) => comprar(S2, R2) }));
+      add(O('pilha_caixas', x1 - 90, 180, 56, 40, { e: 24 }), O('pilha_caixas', x0 + 60, y1 - 100, 50, 36, { e: 22 }));
+      R.deco = x => {
+        K.janela(x, x0 + 70, 84, 60, 46, { vista: E.vista, grade: nv === 'simples' }); K.janela(x, x1 - 160, 84, 60, 46, { vista: E.vista, grade: nv === 'simples' });
+        D.quadro(x, x0 + M.w * 0.4, 88, 30, 34, 'paisagem', '#6a4a2a');
+      };
+    } else if (nv === 'simples') {
+      const sofaC = E.sofa;
+      add(O('tapete', 150, 262, 190, 104, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'listras' }));
+      add(F.tv(176, 172, 92, 30, 28, { top: '#a88a5a', front: '#7a5a3a' }));
+      add(F.sofa(150, 376, 134, 44, 18, { dir: 'n', cor: sofaC, cor2: E.cor2 }));
+      add(F.aparador(352, 176, 56, 24, 24, { variante: 'foto' }));
+      add(O('pia', 414, 170, 62, 38, { e: 28 }), O('fogao', 480, 170, 50, 38, { e: 28, ligado: true }), F.geladeira(534, 164, 52, 42, 52, { cor: '#ece8dc' }));
+      add(O('mesa_rest', 404, 296, 84, 62, { e: 14, forma: 'ret', toalha: '#e8d88a', cor: '#c85a3a', prato: '#d8a040' }));
+      add(O('cadeira_rest', 372, 310, 24, 26, { dir: 'w', cor: '#c8503a' }), O('cadeira_rest', 494, 310, 24, 26, { dir: 'e', cor: '#c8503a' }), O('cadeira_rest', 432, 366, 24, 26, { dir: 's', cor: '#c8503a' }));
+      add(O('planta', 74, 172, 40, 50, { vaso: '#a8a8a0', variante: 'espada' }), O('planta', 548, 426, 40, 50, { vaso: '#a8a8a0', variante: 'folhagem' }), O('ventilador', 100, 336, 26, 26));
+      R.deco = x => {
+        D.azulejoParede(x, 410, 104, 126, 46, '#e8f0f2', '#7ab0d0');
+        K.janela(x, 96, 84, 60, 46, { vista: E.vista, grade: true, cor: '#c8c0b0', cortina: cz && E.nv === 'simples' ? '#d8d0a8' : null });
+        K.janela(x, 424, 90, 44, 38, { vista: 'jardim', grade: true, cor: '#c8c0b0', semLuz: true });
+        D.quadro(x, 198, 82, 48, 30, 'time', '#5a4a3a'); D.quadro(x, 366, 84, 24, 32, 'santo', '#8a6a3a');
+        D.interruptor(x, 350, 112);
+      };
+      R.luzes.push({ x: 250, y: 330, r: 240 }, { x: 480, y: 240, r: 210 });
+    } else if (nv === 'media') {
+      add(O('tapete', 150, 262, 260, 134, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'persa' }));
+      add(O('estante', 78, 166, 56, 26, { e: 66, variante: '' }));
+      add(F.tv(196, 170, 124, 34, 34));
+      add(F.aparador(412, 172, 70, 26, 26, { variante: 'abajur' }));
+      add(O('pia', 498, 172, 76, 40, { e: 30 }), O('fogao', 578, 172, 56, 40, { e: 30, ligado: true }), F.geladeira(648, 164, 60, 44, 56));
+      add(O('mesa_centro', 208, 304, 84, 46, { e: 12 }));
+      add(F.sofa(170, 378, 190, 48, 20, { dir: 'n', cor: E.sofa, cor2: E.cor2 }));
+      add(F.poltrona(410, 306, 54, 52, 20, { dir: 's', cor: E.sofa2, almofadas: false }));
+      add(O('luminaria', 376, 392, 20, 16));
+      add(O('mesa_rest', 500, 332, 110, 86, { e: 16, forma: 'redonda', toalha: '#f4ecd8', cor: '#c8302a', prato: '#d8a040' }));
+      add(O('cadeira_rest', 541, 298, 28, 30, { dir: 'n' }), O('cadeira_rest', 466, 358, 28, 30, { dir: 'w' }), O('cadeira_rest', 616, 358, 28, 30, { dir: 'e' }), O('cadeira_rest', 541, 424, 28, 30, { dir: 's' }));
+      add(O('planta', 74, 436, 40, 50, {}), O('planta', 664, 470, 40, 50, {}), O('planta', 92, 262, 40, 50, {}));
+      R.deco = x => {
+        D.azulejoParede(x, 494, 100, 220, 50, '#eef2f2', '#6a9ac8');
+        D.armarioParede(x, 498, 70, 76, 46, '#8a5e3a'); D.armarioParede(x, 580, 70, 58, 46, '#8a5e3a');
+        K.janela(x, 142, 84, 50, 46, { vista: E.vista, cortina: cz });
+        K.janela(x, 508, 82, 60, 38, { vista: 'jardim', semLuz: false, cortina: null, flores: true });
+        D.quadro(x, 424, 84, 46, 34, pick(['paisagem', 'abstrato', 'flor']), '#5a3a22');
+        D.prateleira(x, 214, 84, 90, ['livro', 'vaso', 'foto', 'livro']); D.relogio(x, 356, 80, 11);
+        D.interruptor(x, 406, 114);
+      };
+      R.luzes.push({ x: 260, y: 340, r: 300 }, { x: 560, y: 260, r: 250 });
+    } else {
+      add(O('tapete', 160, 262, 340, 160, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'persa' }));
+      add(O('estante', 80, 166, 60, 26, { e: 72 }));
+      add(F.tv(222, 172, 170, 36, 36, { top: '#3a2a1c', front: '#2a1e14' }));
+      add(F.aparador(398, 174, 74, 26, 26, { variante: 'foto' }));
+      add(O('lareira', 556, 166, 100, 30, { e: 68 }));
+      add(O('pia', 676, 172, 92, 40, { e: 30 }), O('fogao', 770, 172, 56, 40, { e: 30, ligado: true }), F.geladeira(830, 164, 60, 46, 60, { cor: '#c3c8cf' }));
+      add(O('ilha', 664, 296, 150, 48, { e: 30 }));
+      [676, 720, 764].forEach(bx => add(O('banqueta', bx, 350, 28, 30, { cor: '#2a2d36' })));
+      add(O('mesa_centro', 236, 314, 112, 58, { e: 12 }));
+      add(F.sofa(180, 392, 244, 52, 22, { dir: 'n', cor: E.sofa, cor2: E.cor2, manta: E.sofa2 }));
+      add(F.poltrona(112, 312, 58, 58, 22, { dir: 's', cor: E.sofa2, almofadas: false }), F.poltrona(436, 312, 58, 58, 22, { dir: 's', cor: E.sofa2, almofadas: false }));
+      add(O('luminaria', 150, 440, 20, 16), O('luminaria', 456, 440, 20, 16));
+      add(O('mesa_rest', 560, 404, 230, 92, { e: 16, forma: 'ret', toalha: '#f4ecd8', cor: '#7a1a2a', prato: '#d8a040' }));
+      [582, 640, 706].forEach(cx => add(O('cadeira_rest', cx, 366, 28, 30, { dir: 'n', cor: '#5a1a2a' }), O('cadeira_rest', cx, 504, 28, 30, { dir: 's', cor: '#5a1a2a' })));
+      add(O('cadeira_rest', 526, 428, 28, 30, { dir: 'w', cor: '#5a1a2a' }), O('cadeira_rest', 796, 428, 28, 30, { dir: 'e', cor: '#5a1a2a' }));
+      add(O('planta', 76, 440, 42, 56, {}), O('planta', 836, 520, 42, 56, {}), O('planta', 520, 250, 40, 52, {}), O('planta', 76, 270, 42, 56, {}));
+      R.pisoExtra = x => { D.piso(x, 'porcelanato', 640, 150, 250, 190, ['#e8e2d6', '#bdb6a6'], 9); x.fillStyle = '#c8ccd4'; x.fillRect(640, 150, 3, 190); D.piso(x, 'taco', 520, 350, 340, 240, ['#7a5230', '#5a3a22'], 4); };
+      R.deco = x => {
+        D.azulejoParede(x, 672, 100, 218, 50, '#f2f2ee', '#c8a24a');
+        D.armarioParede(x, 676, 72, 90, 48, '#4a3220'); D.armarioParede(x, 770, 72, 58, 48, '#4a3220');
+        K.janela(x, 156, 76, 56, 58, { vista: E.vista, cortina: cz || '#8a2a3a', arco: true });
+        K.janela(x, 420, 76, 56, 58, { vista: E.vista, cortina: cz || '#8a2a3a', arco: true });
+        D.quadro(x, 240, 84, 130, 34, 'paisagem', '#c8a24a'); D.quadro(x, 498, 82, 40, 52, 'retrato', '#c8a24a');
+        D.relogio(x, 520, 100, 12, '#c8a24a');
+        D.prateleira(x, 560, 80, 100, ['troféu', 'livro', 'vaso', 'foto']);
+      };
+      R.luzes.push({ x: 300, y: 360, r: 340 }, { x: 560, y: 250, r: 260 }, { x: 680, y: 450, r: 280 });
+    }
+    R.luzes.push({ x: x0 + M.w * 0.45, y: y0 + M.h * 0.55, r: Math.max(260, M.w * 0.42) });
+    R.aoEntrar = (S2, R2) => {
+      povoar(S2, R2);
+      const lg2 = R2.lugar; if (lg2.avisou || v || d) return; lg2.avisou = true;
+      lg2.avisoT = K.armado(S2) ? 1.5 : 4.5;
+    };
+    R.onUpdate = onUpdate;
+    return R;
+  }
+
+  // =====================================================================
+  //  QUARTOS
+  // =====================================================================
+  function quartosCasa(S, lg, c) {
+    const nv = nivel(c), v = aVenda(S, c), d = dono(S, c), E = estilo(c), M = DIM[nv].quartos, SM = DIM[nv].sala;
+    const R = L.novaSala({ w: M.w, h: M.h, nome: nomeCasa(S, c) + ' — QUARTOS', cor: d ? '#2e8b3e' : '#c8a060', piso: E.pqTipo, pisoCores: E.pq, parede: shade(E.parede, 0.04), portaX: M.px });
+    aplicaEstilo(R, E); R.seed += 7; R.casa = c; R.porta = { para: 'entrada', px: portaSalaCx(nv), py: 200, ph: Math.PI, label: 'VOLTAR PARA A SALA', rotulo: 'SALA' };
+    const x0 = R.x0, y0 = R.y0, x1 = R.x1, y1 = R.y1, add = (...a) => R.objs.push(...a), F = fabrica(S, R, c);
+    const cama = (x, y, w, h, o) => O('cama2', x, y, w, h, Object.assign({ e: 0 }, o));
+    const portaBanho = () => add(O('porta', M.bx, 96, M.bw, 54, { solid: false, k: 10, label: 'IR AO BANHEIRO', r: 50, placa: 'BANHEIRO', act: S2 => L.irSala(S2, 'banheiro', DIM[nv].banho.px, 150 + DIM[nv].banho.h - 40, Math.PI) }));
+    const bedAct = (S2, R2) => {
+      if (!d) { K.cura(S2, 5); G.say('Você deitou na cama dos outros. Que sem-vergonha! (+5 vida)', 3); ruido(S2, R2, 0.5); return; }
+      L.trans(S2, () => { S2.dayT = Math.floor(S2.dayT) + 1.02; S2.player.hp = 100; S2.heat = 0; S2.heatLevel = 0; G.save(); G.say('Bom dia! Você dormiu na SUA casa. Vida cheia e jogo salvo.', 5); });
+    };
+    const cofre = (x, y) => add(O('cofre', x, y, 52, 40, { e: 40, label: 'ARROMBAR O COFRE (TIMING)', r: 40, act: (S2, R2, o) => {
+      if (c.achados && c.achados.cofre) { G.say('O cofre já foi arrombado.', 2.2); return; }
+      L.miniTiming(S2, { titulo: 'ARROMBANDO O COFRE', reps: 3, v: 1.3, zona: 0.16, cb: (S3, R3, ok) => {
+        if (ok >= 2) { c.achados = c.achados || {}; c.achados.cofre = true; o.aberto = true; const v2 = money(nv === 'rica' ? rand(300, 900) : rand(120, 380)); S3.save.money += v2; G.save(); G.snd.cash(); G.say('COFRE ABERTO! Você levou $' + v2 + '.', 4); ruido(S3, R3, 0.6); }
+        else { G.say('Você errou a combinação. O alarme do cofre disparou!', 3.5); G.snd.beep(); K.chamaPolicia(S3, R3, 8); }
+      } });
+    } }));
+    const armario = (x, y, w, o) => O('armario', x, y, w, 44, Object.assign({ e: 64, label: d ? 'ABRIR O GUARDA-ROUPA' : 'VASCULHAR O GUARDA-ROUPA', r: 40, front: nv === 'rica' ? '#6a4a30' : nv === 'simples' ? '#b8a888' : '#8a5e3a', act: d ? (S2) => G.say('Suas roupas estão aqui. (Mude o visual na barbearia ou no shopping.)', 3.5) : (S2, R2, ob) => loot(S2, R2, ob, 'armario', 10, nv === 'rica' ? 160 : 70, 'Escondido entre as roupas: $$.', 0.5) }, o));
+    const carteira = (x, y, w) => add(O('bloco', x, y, w || 30, 30, { e: 18, top: '#7a5230', front: '#5a3a22', variante: 'abajur', label: d ? undefined : 'PEGAR A CARTEIRA', r: 36, act: d ? undefined : (S2, R2, ob) => loot(S2, R2, ob, 'carteira', 15, 90, 'Você pegou uma carteira: $$.', 0.4) }));
+    const corCama = d ? '#2e8b5e' : '#4a78c8';
+    if (nv === 'simples') {
+      if (v) add(O('pilha_caixas', 120, 190, 60, 44, { e: 26 }));
+      else {
+        add(O('tapete', 200, 300, 150, 80, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'listras' }));
+        add(cama(84, 188, 112, 88, { cor: corCama, label: d ? 'DORMIR ATÉ AMANHECER (SALVA O JOGO)' : 'DESCANSAR NA CAMA', r: 40, act: bedAct }));
+        carteira(198, 198, 26);
+        if (!d) add(cama(286, 192, 60, 78, { cor: '#e8a040' }), cama(360, 192, 60, 78, { cor: '#40b8a0' }), cama(434, 192, 60, 78, { cor: '#b84a8a' }));
+        add(armario(84, 372, 86, {}), O('cesto', 250, 392, 26, 26, {}), O('planta', 440, 380, 40, 50, { vaso: '#a8a8a0', variante: 'folhagem' }));
+        add(O('ventilador', 420, 320, 26, 26));
+      }
+      portaBanho();
+      R.deco = x => {
+        K.janela(x, 108, 84, 50, 44, { vista: E.vista, grade: true, cor: '#c8c0b0' }); K.janela(x, 330, 84, 50, 44, { vista: E.vista, grade: true, cor: '#c8c0b0' });
+        D.quadro(x, 400, 86, 54, 32, 'flor', '#8a6a3a'); D.interruptor(x, 300, 112);
+      };
+      R.luzes.push({ x: 290, y: 320, r: 240 });
+    } else if (nv === 'media') {
+      if (v) add(O('pilha_caixas', 120, 190, 60, 44, { e: 26 }), O('pilha_caixas', 450, 420, 56, 40, { e: 24 }));
+      else {
+        add(O('tapete', 250, 322, 230, 100, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'geometrico' }));
+        add(cama(90, 190, 130, 92, { cor: corCama, label: d ? 'DORMIR ATÉ AMANHECER (SALVA O JOGO)' : 'DESCANSAR NA CAMA', r: 40, act: bedAct }));
+        carteira(224, 196, 28);
+        if (!d) add(cama(258, 190, 70, 82, { cor: '#e8a040' }), cama(346, 190, 70, 82, { cor: '#40b8a0', padrao: 'listras' }), cama(434, 190, 70, 82, { cor: '#b84a8a' }));
+        add(armario(90, 432, 120, {}));
+        add(O('escrivaninha', 250, 440, 120, 54, { e: 22 }), O('cadeira_esc', 296, 496, 28, 28, {}));
+        if (!d) cofre(566, 440);
+        add(O('cesto', 224, 300, 26, 26, {}), O('planta', 584, 330, 40, 50, {}), O('luminaria', 500, 470, 20, 16));
+      }
+      portaBanho();
+      R.deco = x => {
+        D.quadro(x, 112, 86, 70, 34, pick(['paisagem', 'abstrato']), '#5a3a22');
+        K.janela(x, 270, 82, 60, 46, { vista: E.vista, cortina: E.cortina }); K.janela(x, 436, 82, 60, 46, { vista: E.vista, cortina: E.cortina });
+        D.interruptor(x, 520, 112);
+      };
+      R.luzes.push({ x: 330, y: 330, r: 280 });
+    } else {
+      if (v) add(O('pilha_caixas', 120, 190, 60, 44, { e: 26 }), O('pilha_caixas', 600, 440, 56, 40, { e: 24 }));
+      else {
+        add(O('tapete', 96, 290, 240, 120, { solid: false, k: -50, cor: E.tap[0], cor2: E.tap[1], padrao: 'persa' }));
+        add(cama(112, 190, 170, 100, { cor: d ? '#2e8b5e' : '#7a2a3a', padrao: 'listras', label: d ? 'DORMIR ATÉ AMANHECER (SALVA O JOGO)' : 'DESCANSAR NA CAMA', r: 44, act: bedAct }));
+        add(O('bloco', 76, 196, 32, 30, { e: 20, top: '#7a5230', front: '#5a3a22', variante: 'abajur' })); carteira(288, 196, 32);
+        if (!d) add(cama(360, 190, 76, 84, { cor: '#e8a040' }), cama(454, 190, 76, 84, { cor: '#40b8a0', padrao: 'listras' }), cama(548, 190, 76, 84, { cor: '#b84a8a' }));
+        add(armario(96, 476, 130, {}), O('armario', 232, 476, 100, 44, { e: 64, front: '#6a4a30', espelho: true }));
+        add(O('escrivaninha', 420, 470, 140, 56, { e: 22 }), O('cadeira_esc', 478, 528, 28, 28, {}));
+        add(O('poltrona', 640, 330, 58, 58, { e: 22, dir: 's', cor: E.sofa2, label: 'SENTAR NA POLTRONA', r: 28, act: S2 => { K.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }));
+        if (!d) cofre(710, 500);
+        add(O('planta', 78, 380, 42, 56, {}), O('planta', 724, 420, 42, 56, {}), O('luminaria', 340, 300, 20, 16), O('cesto', 360, 420, 26, 26, {}));
+      }
+      portaBanho();
+      R.deco = x => {
+        K.janela(x, 150, 74, 100, 58, { vista: E.vista, cortina: E.cortina || '#8a2a3a', arco: true }); K.janela(x, 372, 80, 60, 50, { vista: E.vista, cortina: E.cortina }); K.janela(x, 560, 80, 60, 50, { vista: E.vista, cortina: E.cortina });
+        D.quadro(x, 76, 84, 40, 50, 'retrato', '#c8a24a'); D.quadro(x, 470, 84, 50, 34, 'abstrato', '#c8a24a'); D.interruptor(x, 640, 112);
+      };
+      R.luzes.push({ x: 300, y: 340, r: 320 }, { x: 560, y: 330, r: 260 });
+    }
+    R.aoEntrar = (S2, R2) => povoar(S2, R2);
+    R.onUpdate = onUpdate;
+    return R;
+  }
+
+  // =====================================================================
+  //  BANHEIRO
+  // =====================================================================
+  function banheiroCasa(S, lg, c) {
+    const nv = nivel(c), v = aVenda(S, c), d = dono(S, c), E = estilo(c), M = DIM[nv].banho, QM = DIM[nv].quartos;
+    const azul = ['#cfe4ec', '#d8ecd8', '#f0e4d0', '#e0dcec'][E.seed % 4];
+    const R = L.novaSala({ w: M.w, h: M.h, nome: nomeCasa(S, c) + ' — BANHEIRO', cor: d ? '#2e8b3e' : '#c8a060', piso: nv === 'rica' ? 'porcelanato' : 'azulejo', pisoCores: nv === 'rica' ? ['#e8e2d6', '#bdb6a6'] : ['#f0f2f0', '#9aa8ac', '#6a9ac8'], parede: azul, portaX: M.px });
+    R.estiloParede = 'azulejo'; R.lambri = false; R.seed = E.seed + 3; R.casa = c; R.capacho = '#4a7aa8';
+    R.porta = { para: 'quartos', px: portaBanhoCx(nv), py: 200, ph: Math.PI, label: 'VOLTAR PARA OS QUARTOS', rotulo: 'QUARTOS' };
+    const add = (...a) => R.objs.push(...a), x0 = R.x0, y0 = R.y0, x1 = R.x1, y1 = R.y1;
+    if (nv === 'simples') {
+      add(O('vaso_sanitario', 92, 172, 34, 42, { e: 14 }), O('lavatorio', 140, 176, 54, 36, { e: 24, label: d ? 'LAVAR AS MÃOS' : undefined, r: 30, act: d ? S2 => { K.cura(S2, 2); G.say('Você lavou o rosto. (+2 vida)', 2.2); } : undefined }), O('chuveiro', 212, 166, 66, 78, {}));
+      if (!v) add(O('cesto', 96, 296, 26, 26, {}));
+      R.deco = x => { K.janela(x, 100, 84, 40, 34, { vista: 'jardim', persiana: 0.5, cor: '#c8c0b0', semLuz: true }); D.espelhoParede(x, 148, 84, 42, 34, '#a8a8a0'); D.toalheiro(x, 214, 84, 60); };
+      R.luzes.push({ x: 180, y: 260, r: 190 });
+    } else if (nv === 'media') {
+      add(O('vaso_sanitario', 96, 172, 36, 44, { e: 14 }), O('lavatorio', 152, 176, 62, 38, { e: 26, label: d ? 'LAVAR AS MÃOS' : undefined, r: 30, act: d ? S2 => { K.cura(S2, 2); G.say('Você lavou o rosto. (+2 vida)', 2.2); } : undefined }), O('chuveiro', 250, 166, 76, 84, {}));
+      if (!v) add(O('lavadora', 90, 268, 52, 44, { e: 34 }), O('cesto', 160, 300, 26, 26, {}), O('tapete', 150, 330, 80, 46, { solid: false, k: -50, cor: '#4aa0c8', cor2: '#e8f4f8', padrao: 'pelo' }));
+      R.deco = x => { K.janela(x, 100, 84, 44, 34, { vista: 'jardim', persiana: 0.4, semLuz: true }); D.espelhoParede(x, 156, 82, 50, 38); D.toalheiro(x, 218, 84, 32); };
+      R.luzes.push({ x: 205, y: 280, r: 220 });
+    } else {
+      add(O('banheira', 92, 172, 160, 72, {}), O('lavatorio', 276, 176, 64, 40, { e: 26, label: d ? 'LAVAR AS MÃOS' : undefined, r: 30, act: d ? S2 => { K.cura(S2, 2); G.say('Você lavou o rosto. (+2 vida)', 2.2); } : undefined }), O('lavatorio', 342, 176, 64, 40, { e: 26 }), O('vaso_sanitario', 96, 300, 36, 44, { e: 14 }), O('chuveiro', 340, 262, 84, 94, {}));
+      if (!v) add(O('cesto', 160, 330, 26, 26, {}), O('planta', 236, 330, 40, 50, {}), O('tapete', 210, 272, 90, 56, { solid: false, k: -50, cor: '#e8e0d0', cor2: '#c8a24a', padrao: 'pelo' }));
+      R.deco = x => { K.janela(x, 110, 82, 70, 40, { vista: E.vista, persiana: 0, cortina: '#e8e0d0', semLuz: true }); D.espelhoParede(x, 276, 78, 60, 42, '#c8a24a'); D.espelhoParede(x, 344, 78, 60, 42, '#c8a24a'); D.toalheiro(x, 428, 84, 36); };
+      R.luzes.push({ x: 260, y: 300, r: 260 });
+    }
+    return R;
+  }
+
+  // ---------- registro ----------
+  L.casaLay = {
+    spots: nv => SPOTS[nv],
+    criar(id, S, lg, c) { return id === 'quartos' ? quartosCasa(S, lg, c) : id === 'banheiro' ? banheiroCasa(S, lg, c) : salaCasa(S, lg, c); }
+  };
 })(window.G = window.G || {});
 
 </script>

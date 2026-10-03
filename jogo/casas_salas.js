@@ -33,19 +33,19 @@
   const SPOTS = {
     simples: {
       bed: [{ x: 118, y: 238 }, { x: 166, y: 238 }, { x: 316, y: 232 }, { x: 390, y: 232 }, { x: 464, y: 232 }],
-      sofa: [{ x: 184, y: 394 }, { x: 218, y: 394 }, { x: 252, y: 394 }], coz: [{ x: 505, y: 224 }, { x: 446, y: 224 }],
+      sofa: [{ x: 176, y: 381 }, { x: 203, y: 381 }, { x: 230, y: 381 }, { x: 257, y: 381 }], coz: [{ x: 505, y: 224 }, { x: 446, y: 224 }],
       passeio: [{ x: 330, y: 300 }, { x: 300, y: 440 }, { x: 440, y: 430 }, { x: 200, y: 300 }, { x: 372, y: 250 }],
       passeioQ: [{ x: 250, y: 330 }, { x: 330, y: 350 }, { x: 180, y: 340 }], laneSala: 252, laneQuarto: 322
     },
     media: {
       bed: [{ x: 128, y: 242 }, { x: 184, y: 242 }, { x: 293, y: 236 }, { x: 381, y: 236 }, { x: 469, y: 236 }],
-      sofa: [{ x: 215, y: 396 }, { x: 265, y: 396 }, { x: 315, y: 396 }], coz: [{ x: 606, y: 224 }, { x: 540, y: 224 }],
+      sofa: [{ x: 205, y: 383 }, { x: 245, y: 383 }, { x: 285, y: 383 }, { x: 325, y: 383 }, { x: 437, y: 332, h: Math.PI }], coz: [{ x: 606, y: 224 }, { x: 540, y: 224 }],
       passeio: [{ x: 340, y: 266 }, { x: 470, y: 290 }, { x: 300, y: 470 }, { x: 430, y: 500 }, { x: 250, y: 250 }],
       passeioQ: [{ x: 300, y: 390 }, { x: 400, y: 410 }, { x: 260, y: 370 }], laneSala: 250, laneQuarto: 332
     },
     rica: {
       bed: [{ x: 160, y: 246 }, { x: 232, y: 246 }, { x: 398, y: 240 }, { x: 492, y: 240 }, { x: 586, y: 240 }],
-      sofa: [{ x: 235, y: 412 }, { x: 300, y: 412 }, { x: 365, y: 412 }], coz: [{ x: 800, y: 226 }, { x: 716, y: 226 }],
+      sofa: [{ x: 222, y: 397 }, { x: 275, y: 397 }, { x: 328, y: 397 }, { x: 381, y: 397 }, { x: 141, y: 336, h: Math.PI }, { x: 465, y: 336, h: Math.PI }], coz: [{ x: 800, y: 226 }, { x: 716, y: 226 }],
       passeio: [{ x: 330, y: 260 }, { x: 560, y: 300 }, { x: 330, y: 500 }, { x: 560, y: 520 }, { x: 440, y: 260 }],
       passeioQ: [{ x: 300, y: 400 }, { x: 440, y: 420 }, { x: 560, y: 400 }], laneSala: 252, laneQuarto: 340
     }
@@ -82,8 +82,13 @@
     const d = dono(S, c), K2 = K;
     return {
       tv(x, y, w, h, e, o) { return O('tv', x, y, w, h, Object.assign({ e, label: d ? 'LIGAR A TV' : 'ROUBAR A TV', act: (S2, R2, ob) => { if (d) { G.say(pick(['Noticiário: a polícia procura um motorista de fuga vermelho...', 'Novela das 8: ela descobriu tudo!']), 4); return; } loot(S2, R2, ob, 'tv', 70, 200, 'Você levou a TV nos braços e vendeu na hora: $$.', 0.85); } }, o)); },
-      sofa(x, y, w, h, e, o) { return O('sofa', x, y, w, h, Object.assign({ e, r: 30, label: 'SENTAR NO SOFÁ', act: S2 => { K2.cura(S2, 8); G.say('Você relaxou no sofá. (+8 vida)', 2.5); } }, o)); },
-      poltrona(x, y, w, h, e, o) { return O('poltrona', x, y, w, h, Object.assign({ e, r: 28, label: 'SENTAR NA POLTRONA', act: S2 => { K2.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }, o)); },
+      // o sofá de costas para nós é desenhado em 2 partes: quem senta aparece ENTRE a almofada e o encosto
+      sofa(x, y, w, h, e, o) {
+        const dir = (o && o.dir) || 'n', op = Object.assign({ e, r: 30, label: 'SENTAR NO SOFÁ', act: S2 => { K2.cura(S2, 8); G.say('Você relaxou no sofá. (+8 vida)', 2.5); }, k: y + 1 }, o);
+        if (dir === 'n') { op.parte = 'base'; R.objs.push(O('sofa', x, y, w, h, Object.assign({}, o, { e, solid: false, parte: 'costas', k: y + h }))); }
+        return O('sofa', x, y, w, h, op);
+      },
+      poltrona(x, y, w, h, e, o) { return O('poltrona', x, y, w, h, Object.assign({ e, r: 28, k: y + 12, label: 'SENTAR NA POLTRONA', act: S2 => { K2.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }, o)); },
       geladeira(x, y, w, h, e, o) {
         return O('geladeira', x, y, w, h, Object.assign({ e, label: d ? 'ABRIR A GELADEIRA' : 'MEXER NA GELADEIRA', act: (S2, R2) => {
           const st = c.est = c.est || {}; const dia = Math.floor(S2.dayT);

@@ -5,7 +5,11 @@ const L = G.lugares;
 const pdc = c => c && (c.pl || (c.pl = { id: 'casa:' + c.id, tipo: 'casa', casa: c, nome: 'CASA', x: c.x, y: c.y, r: 24, cor: '#9dff9d' }));
 function acha(c) {
   const [k, v] = c.split(':');
-  if (k === 'casa') { const q = +v; return pdc(W.casas.find(h => (h.riqueza != null ? h.riqueza : (h.area < 14 ? 0 : h.area < 34 ? 1 : 2)) === q && h.b && h.b.casa3 && !h.b.place)); }
+  if (k === 'casa') {      // casa:<riqueza>[.<n>]  (n-ésima casa; 'v' no fim = à venda)
+    const venda = /v/.test(v), [q0, n0] = v.replace('v', '').split('.'), q = +q0, n = parseInt(n0) || 0;
+    const lista = W.casas.filter(h => (h.riqueza != null ? h.riqueza : (h.area < 14 ? 0 : h.area < 34 ? 1 : 2)) === q && h.b && h.b.casa3 && !h.b.place && !!h.venda === venda);
+    return pdc(lista[n]);
+  }
   if (k === 'casac') return pdc(W.casas.find(h => !h.b.casa3 && !h.b.place));
   if (k === 'id') return W.places.find(p => p.id === v);
   if (k === 'loja') return (W.lojas || []).find(p => p.loja === v);

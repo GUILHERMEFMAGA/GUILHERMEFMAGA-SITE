@@ -31,7 +31,8 @@
     const A = solo ? 11 : Math.min(15, w * 0.1), db = Math.max(13, h * 0.3), hs = 10, ha = hs + 10, hb = Math.max(e + 8, 26);
     const top = shade(cor, 0.12), fr = cor, opc = { r: 6, semSombra: true };
     const frente = o.dir === 's';
-    sombra(c, x, y, w, h, { dx: 4, dy: 8, r: 9 });
+    const parte = o.parte;   // 'base' (sem o encosto da frente) | 'costas' (só o encosto da frente): assim quem senta aparece ENTRE os dois
+    if (parte !== 'costas') sombra(c, x, y, w, h, { dx: 4, dy: 8, r: 9 });
     const n = Math.max(1, Math.round((w - 2 * A) / 48)), cw = (w - 2 * A) / n;
     const encosto = () => {
       const by = frente ? y : y + h - db;
@@ -51,7 +52,8 @@
       }
     };
     const bracos = () => { caixa(c, x, y, A, h, ha, shade(cor, 0.2), cor, opc); caixa(c, x + w - A, y, A, h, ha, shade(cor, 0.2), cor, opc); };
-    if (frente) { encosto(); assento(); bracos(); } else { assento(); bracos(); encosto(); }
+    if (parte === 'costas') { encosto(); return; }
+    if (frente) { encosto(); assento(); bracos(); } else if (parte === 'base') { assento(); bracos(); } else { assento(); bracos(); encosto(); }
     // almofadas de enfeite
     const almofada = (px, py, ang, cc) => { c.save(); c.translate(px, py); c.rotate(ang); c.fillStyle = 'rgba(0,0,0,0.25)'; rr(c, -8, -6, 17, 17, 5); c.fill(); const g = c.createLinearGradient(-9, -9, 9, 9); g.addColorStop(0, shade(cc, 0.22)); g.addColorStop(1, shade(cc, -0.15)); c.fillStyle = g; rr(c, -9, -9, 18, 18, 5); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; rr(c, -8.5, -8.5, 17, 17, 5); c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.moveTo(-6, -6); c.lineTo(6, 6); c.stroke(); c.restore(); };
     if (!solo && o.almofadas !== false) { const py = frente ? y + db + 6 - hs : y + 6 - hs + 4; almofada(x + A + 12, py, -0.25, cor2); almofada(x + w - A - 12, py, 0.3, shade(cor2, -0.2)); }
