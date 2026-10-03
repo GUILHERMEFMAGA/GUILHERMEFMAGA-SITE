@@ -15,6 +15,31 @@ const GR = {
     O('tapete', 200, 110, 0, { cor: '#7a2a3a', cor2: '#d8b878' }), O('tapete', 140, 90, 0, { cor: '#2f5a7a', cor2: '#e8e0c8', padrao: 'geometrico' }), O('tapete', 120, 120, 0, { cor: '#8a7a5a', cor2: '#e8e0c8', forma: 'redondo', padrao: 'pelo' }),
     O('pilha_caixas', 70, 44, 30), O('porta', 56, 54, 0, { placa: 'QUARTOS' }), O('porta', 56, 54, 0, { estilo: 'elevador' }), O('luminaria', 20, 14, 0),
   ],
+  lojas: [
+    O('cadeira', 22, 22, 0), O('mesa', 56, 40, 18), O('gondola', 110, 36, 34, { nome: 'RAÇÃO', cores: ['#c8402a', '#2a58b8', '#e0b030'] }), O('balcao', 200, 40, 28, { itens: 'pastel' }),
+    O('freezer', 110, 40, 26), O('banco_espera', 150, 26, 16), O('recepcao', 150, 40, 30), O('jukebox', 56, 30, 50),
+    O('bancada', 220, 44, 26), O('beliche', 90, 46, 24), O('arara', 120, 36, 36), O('supino', 150, 60, 14),
+    O('grade', 160, 14, 90), O('caixa_reg', 100, 40, 0, { aberto: true }), O('cadeira_b', 46, 46, 20), O('sinuca', 170, 92, 16),
+    O('saco', 30, 30, 0), O('provador', 90, 30, 0), O('halteres', 160, 36, 34), O('espreguicadeira', 34, 62, 0, { cor: '#e8402a' }),
+    O('bebedouro', 36, 36, 36), O('banco_igreja', 170, 22, 14), O('balanca', 40, 40, 10), O('velas', 70, 40, 28),
+    O('pilha_carrinhos', 70, 38, 0), O('panelao', 100, 44, 30), O('palco', 200, 60, 24), O('halter', 90, 18, 10),
+    O('confessionario', 76, 64, 76), O('computador', 110, 40, 24), O('balcao_padaria', 200, 30, 28), O('altar', 120, 46, 30),
+    O('esteira', 76, 60, 16), O('torre', 40, 14, 0), O('cesta', 70, 14, 0), O('mesa', 90, 60, 18),
+  ],
+  lojas2: [
+    O('prateleira', 110, 36, 52, { tema: 'tintas', nome: 'TINTAS' }), O('prateleira', 110, 36, 52, { tema: 'parafusos', nome: 'PARAFUSOS' }), O('prateleira', 110, 36, 52, { tema: 'racao', nome: 'RAÇÃO' }), O('prateleira', 110, 36, 52, { tema: 'pet' }),
+    O('prateleira', 110, 36, 52, { tema: 'celulares', front: '#3a3e48' }), O('prateleira', 110, 36, 52, { tema: 'garrafas', front: '#5a3a22' }), O('prateleira', 110, 36, 52, { tema: 'vasos', front: '#8a6a40' }), O('prateleira', 110, 36, 52, { tema: 'tenis', front: '#c8c8d0' }),
+    O('prateleira', 110, 36, 52, { tema: 'doces', front: '#f0a0c0' }), O('prateleira', 110, 36, 52, { tema: 'graos' }), O('prateleira', 110, 36, 52, { tema: 'bebidas', front: '#2a58b8' }), O('prateleira', 110, 36, 52, { tema: 'oculos', front: '#2a2d36' }),
+    O('vitrine', 140, 44, 38, { tema: 'carne' }), O('vitrine', 140, 44, 38, { tema: 'doces' }), O('vitrine', 140, 44, 38, { tema: 'oculos', front: '#2a2d36' }), O('vitrine', 140, 44, 38, { tema: 'celular', front: '#3a3e48' }),
+    O('vitrine', 140, 44, 38, { tema: 'sorvete', front: '#e8a0c0' }), O('arara', 120, 30, 40, { tema: 'camisa' }), O('arara', 120, 30, 40, { tema: 'calca' }), O('manequim', 30, 30, 64, { cor: '#e84a8a' }),
+    O('aquario', 120, 50, 46), O('gaiola', 70, 44, 28), O('gaiola', 70, 44, 28, { bicho: 'gato', cor: '#aaa' }), O('cama_pet', 90, 44, 0),
+    O('balde_flores', 120, 40, 40), O('mesa', 56, 40, 18, { estilo: 'cafe' }), O('mesa', 60, 44, 18, { estilo: 'lanche' }), O('mesa', 56, 40, 18, { estilo: 'bar' }),
+    O('mesa', 56, 40, 18, { estilo: 'sorvete' }), O('cadeira', 22, 22, 0, { dir: 'n' }), O('cadeira', 22, 22, 0, { dir: 's', estilo: 'plastico' }), O('cadeira', 22, 22, 0, { dir: 'e', estilo: 'plastico', cor: '#f2c82a' }),
+    O('banco_espera', 150, 26, 16), O('cepo', 44, 44, 26), O('caixote_frutas', 110, 36, 20), O('pilha_sacos', 70, 44, 34),
+    O('pilha_sacos', 70, 44, 34, { tipo: 'racao' }), O('escada', 34, 10, 70), O('cabine_prova', 70, 40, 70), O('mesa_expo', 120, 50, 24, { tema: 'eletronicos' }),
+    O('mesa_expo', 120, 50, 24, { tema: 'livros' }), O('mesa_expo', 120, 50, 24, { tema: 'volantes', top: '#d8c8a0', front: '#a88a58' }), O('mesa_expo', 120, 50, 24, { tema: 'roupas' }), O('mesa_expo', 120, 50, 24, { tema: 'doces' }),
+    O('vidro_guiche', 160, 6, 52), O('fila', 100, 10, 26), O('pendente', 30, 10, 90),
+  ],
   banho: [O('vaso_sanitario', 34, 40, 0), O('lavatorio', 56, 40, 26), O('chuveiro', 70, 70, 0), O('banheira', 120, 62, 14), O('cesto', 24, 24, 0), O('lavadora', 50, 44, 34), O('escrivaninha', 120, 54, 22), O('cadeira_esc', 28, 28, 0)]
 };
 const lista = GR[grupo] || GR.casa; const cols = 6, cw = 200, ch = 170, rows = Math.ceil(lista.length / cols);

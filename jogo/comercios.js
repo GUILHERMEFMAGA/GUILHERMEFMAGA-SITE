@@ -250,20 +250,30 @@
 
   function criaLoja(id, lg) {
     const pl = lg.place, c = TIPOS[pl.loja] || TIPOS.mercadinho;
-    const R = salaBase(pl, c);
+    const lay = L.lojaLay && L.lojaLay[pl.loja];          // layout rico (lojas_novas.js), se existir
+    const R = salaBase(pl, lay && lay.sala ? Object.assign({}, c, lay.sala) : c);
     const add = (...a) => R.objs.push(...a);
+    const cx = (R.x0 + R.x1) / 2;
     // balcão com o atendente atrás
     const menu = S => abre(S, c.titulo, c.itens());
-    add(O('balcao', 230, 190, 260, 40, { e: 28, itens: c.balcao, label: c.label, r: 46, act: menu }));
-    c.extras(R, add, pl);
-    R.deco = x => { c.deco && c.deco(x, pl); letreiro(x, pl, c.neon); };
-    const at = { k: 232, x: 360, y: 206, p: look(c.atendente), falas: c.falas, h: Math.PI, fixo: true, nome: pick(['Seu Carlos', 'Dona Rita', 'Marcos', 'Luana', 'Seu Antônio', 'Fátima', 'Rogério', 'Camila']), dinheiro: Math.round(rand(60, 220)), label: 'CONVERSAR / ASSALTAR' };
+    add(O('balcao', cx - 130, 190, 260, 40, { e: 28, itens: c.balcao, label: c.label, r: 46, act: menu }));
+    let decoLay = null;
+    if (lay) {
+      // os objetos "com ação" da loja original (sinuca, jukebox, freezer...) são reaproveitados no layout novo
+      const orig = []; try { c.extras(R, (...a) => orig.push(...a), pl); } catch (e) { /* sem extras */ }
+      R.cliente = null;
+      const porTipo = {}; orig.forEach(o => { (porTipo[o.t] = porTipo[o.t] || []).push(o); });   // guarda o tipo ANTES do layout mudar o desenho
+      decoLay = lay.criar(R, (...a) => add(...a.filter(Boolean)), pl, c, { cx, orig, abre, comida, especial, look, letreiro, pegaOrig: (t, k) => (porTipo[t] || [])[k || 0] });
+    } else c.extras(R, add, pl);
+    R.deco = x => { if (decoLay) decoLay(x, pl); else c.deco && c.deco(x, pl); letreiro(x, pl, c.neon, cx); };
+    const at = { k: 232, x: cx, y: 206, p: look(c.atendente), falas: c.falas, h: Math.PI, fixo: true, nome: pick(['Seu Carlos', 'Dona Rita', 'Marcos', 'Luana', 'Seu Antônio', 'Fátima', 'Rogério', 'Camila']), dinheiro: Math.round(rand(60, 220)), label: 'CONVERSAR / ASSALTAR' };
     R.npcs.push(at);
-    if (R.cliente) R.npcs.push({ x: R.cliente.x, y: R.cliente.y, p: look({}), falas: R.cliente.falas, h: Math.PI * 0.5, fixo: true, nome: pick(['Seu Nilton', 'Jéssica', 'Paulo', 'Marina']), dinheiro: Math.round(rand(20, 90)) });
-    R.luzes.push({ x: 380, y: 250, r: 300 });
+    if (R.cliente) R.npcs.push({ x: R.cliente.x, y: R.cliente.y, p: look({}), falas: R.cliente.falas, h: R.cliente.h != null ? R.cliente.h : Math.PI * 0.5, sentado: !!R.cliente.sentado, fixo: true, nome: pick(['Seu Nilton', 'Jéssica', 'Paulo', 'Marina']), dinheiro: Math.round(rand(20, 90)) });
+    R.luzes.push({ x: cx, y: 250, r: 300 });
     return R;
   }
   L.construtores['tipo:loja'] = { criar: criaLoja };
+  L.lojaApi = { TIPOS, salaBase, letreiro, look, horaTxt, abre, comida, especial };
 
   // =====================================================================
   //  BANCO RIBEIRÃO
