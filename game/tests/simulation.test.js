@@ -12,6 +12,21 @@ test('the opening frame starts on the chosen artwork, at the beginning of the ro
   assert.equal(state.arrived, false);
 });
 
+test('walking visibly advances the camera and adds a first-person step bob', () => {
+  const game = new GameState();
+  const opening = game.snapshot();
+  const walking = game.update({ ...neutral, forward: 1 }, 0.05);
+  assert.ok(walking.progress > opening.progress);
+  assert.ok(walking.zoom > opening.zoom);
+  assert.ok(walking.bobY > 0.006);
+  assert.equal(walking.moving, true);
+
+  const stopped = game.update(neutral, 0.05);
+  assert.equal(stopped.moving, false);
+  assert.equal(stopped.bobX, 0);
+  assert.equal(stopped.bobY, 0);
+});
+
 test('forward movement approaches the keep and stops at the gate', () => {
   const game = new GameState();
   for (let i = 0; i < 500; i++) game.update({ ...neutral, forward: 1 }, 0.05);
@@ -37,7 +52,7 @@ test('look and strafe are bounded for stable image framing', () => {
   const state = game.snapshot();
   assert.ok(Math.abs(state.panX) <= 0.11);
   assert.ok(Math.abs(state.panY) <= 0.02);
-  assert.ok(state.zoom <= 1.22);
+  assert.ok(state.zoom <= 1.72);
 });
 
 test('running increases travel speed but frame time is safely clamped', () => {

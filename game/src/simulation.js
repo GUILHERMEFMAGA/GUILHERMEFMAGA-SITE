@@ -28,7 +28,7 @@ export class GameState {
     }
 
     const pace = controls.run ? 1.65 : 1;
-    const step = 0.058 * pace * dt;
+    const step = 0.075 * pace * dt;
     this.progress = clamp(this.progress + forward * step, 0, 1);
     this.strafe = clamp(this.strafe + side * 0.34 * dt, -0.42, 0.42);
     this.moving = length > 0;
@@ -48,11 +48,11 @@ export class GameState {
       progress: this.progress,
       metersToGate,
       arrived: this.progress >= 1,
-      zoom: 1 + this.progress * 0.22,
+      zoom: 1 + this.progress * 0.72,
       panX: clamp(this.strafe * 0.10 + this.yaw * 0.028, -0.11, 0.11),
       panY: clamp(this.pitch * 0.055, -0.02, 0.02),
-      bobX: this.moving ? Math.sin(this.stride) * 0.0025 : 0,
-      bobY: this.moving ? Math.abs(Math.sin(this.stride * 2)) * 0.004 : 0,
+      bobX: this.moving ? Math.sin(this.stride) * 0.0055 : 0,
+      bobY: this.moving ? Math.abs(Math.sin(this.stride * 2)) * 0.012 : 0,
       moving: this.moving,
       stride: this.stride,
     };
