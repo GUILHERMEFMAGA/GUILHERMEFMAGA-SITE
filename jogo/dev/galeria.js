@@ -40,6 +40,12 @@ const GR = {
     O('mesa_expo', 120, 50, 24, { tema: 'livros' }), O('mesa_expo', 120, 50, 24, { tema: 'volantes', top: '#d8c8a0', front: '#a88a58' }), O('mesa_expo', 120, 50, 24, { tema: 'roupas' }), O('mesa_expo', 120, 50, 24, { tema: 'doces' }),
     O('vidro_guiche', 160, 6, 52), O('fila', 100, 10, 26), O('pendente', 30, 10, 90),
   ],
+  novos3: [
+    O('recepcao', 260, 44, 30), O('bancada', 220, 44, 26), O('beliche', 90, 46, 24), O('grade', 160, 14, 90), O('esteira', 76, 60, 16), O('supino', 150, 60, 14),
+    O('halteres', 160, 36, 34), O('espreguicadeira', 34, 62, 0, { cor: '#e8402a' }), O('banco_igreja', 170, 22, 14), O('altar', 120, 46, 30), O('confessionario', 76, 64, 76), O('palco', 200, 60, 24),
+    O('panelao', 100, 44, 30), O('computador', 110, 40, 24), O('balcao_padaria', 200, 30, 28), O('caixa_reg', 100, 40, 22, { aberto: true }), O('pilha_carrinhos', 70, 38, 0), O('torre', 40, 14, 0),
+    O('halter', 90, 18, 10), O('cofre_banco', 120, 60, 46),
+  ],
   banho: [O('vaso_sanitario', 34, 40, 0), O('lavatorio', 56, 40, 26), O('chuveiro', 70, 70, 0), O('banheira', 120, 62, 14), O('cesto', 24, 24, 0), O('lavadora', 50, 44, 34), O('escrivaninha', 120, 54, 22), O('cadeira_esc', 28, 28, 0)]
 };
 const lista = GR[grupo] || GR.casa; const cols = 6, cw = 200, ch = 170, rows = Math.ceil(lista.length / cols);
