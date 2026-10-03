@@ -2,7 +2,7 @@
 
 ## Jogo — The Ashen Way
 
-🎮 **[Jogar agora no navegador](https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/d6b4d14/game/index.html)**
+🎮 **[Jogar agora no navegador](https://raw.githack.com/GUILHERMEFMAGA/GUILHERMEFMAGA-SITE/9d08f48/game/index.html)**
 
 Protótipo jogável de fantasia sombria em pixel art: a arte escolhida abre o jogo, e um cavaleiro controlável caminha pelo caminho com WASD enquanto a cena se aproxima da fortaleza.
 
