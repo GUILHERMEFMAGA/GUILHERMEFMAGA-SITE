@@ -45,6 +45,29 @@
   ITENS.frutas = (c, px, b, rh, r) => { bola(c, px + 4, b - 4, 4.2, pick(r, ['#e8801a', '#c8302a', '#e8d02a', '#4aa02a'])); c.fillStyle = 'rgba(255,255,255,0.45)'; c.fillRect(px + 2, b - 7, 2, 2); return 9; };
   ITENS.livros = (c, px, b, rh, r) => { const bh = rh * (0.5 + r() * 0.4), bw = 4 + r() * 4; c.fillStyle = pick(r, ['#c8402a', '#2a58b8', '#e0b32a', '#2f8a6a', '#7a3a8a', '#e8e0cc', '#3a2a22']); c.fillRect(px, b - bh, bw, bh); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(px + 1, b - bh + 1, 1, bh - 3); c.fillStyle = 'rgba(255,220,140,0.7)'; c.fillRect(px, b - bh + 3, bw, 1.2); return bw + 1; };
 
+  // farmácia e padaria: caixinhas de remédio, frascos de higiene, cosméticos e pães
+  ITENS.remedios = (c, px, b, rh, r) => {
+    if (r() < 0.6) { const h = rh * 0.62; c.fillStyle = pick(r, ['#f4f4f4', '#e8f2ff', '#fff4d8', '#e8f8e8']); c.fillRect(px, b - h, 9, h); c.fillStyle = pick(r, ['#2f9a4a', '#2a78c8', '#d9363e', '#e8a02a']); c.fillRect(px, b - h * 0.55, 9, h * 0.3); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(px + 7, b - h, 2, h); return 11; }
+    const h = rh * 0.6; c.fillStyle = pick(r, ['#e8a02a', '#8a5a2a']); rr(c, px, b - h, 7, h, 2); c.fill(); c.fillStyle = '#f4f4f4'; c.fillRect(px + 1, b - h - 2, 5, 2.4); c.fillStyle = '#f4ecd8'; c.fillRect(px + 1, b - h * 0.62, 5, h * 0.3); return 9;
+  };
+  ITENS.higiene = (c, px, b, rh, r) => {
+    const cc = pick(r, ['#4aa8e8', '#e84a8a', '#2fb86a', '#f2c82a', '#8a4fc2']);
+    if (r() < 0.6) { const h = rh * 0.7; c.fillStyle = cc; rr(c, px, b - h, 8, h, 2.4); c.fill(); c.fillStyle = '#f4f4f4'; c.fillRect(px + 2, b - h - 2.4, 4, 2.6); c.fillStyle = 'rgba(255,255,255,0.45)'; c.fillRect(px + 1.2, b - h + 2, 1.4, h - 5); return 10; }
+    const h = rh * 0.5; c.fillStyle = '#f4f4f4'; c.fillRect(px, b - h, 12, h); c.fillStyle = cc; c.fillRect(px, b - h * 0.6, 12, h * 0.3); return 14;
+  };
+  ITENS.cosmeticos = (c, px, b, rh, r) => {
+    const t = r(), cc = pick(r, ['#d9363e', '#e84a8a', '#8a2a5a', '#f08a2a', '#c8a24a']);
+    if (t < 0.4) { c.fillStyle = '#2a2d36'; c.fillRect(px, b - 7, 4, 7); c.fillStyle = cc; c.fillRect(px + 0.6, b - 11, 2.8, 4); return 6; }
+    if (t < 0.75) { c.fillStyle = 'rgba(210,235,245,0.7)'; rr(c, px, b - rh * 0.55, 9, rh * 0.55, 2.4); c.fill(); c.fillStyle = cc; c.fillRect(px + 1, b - rh * 0.3, 7, rh * 0.2); c.fillStyle = '#c8a24a'; c.fillRect(px + 2.4, b - rh * 0.55 - 2.4, 4.2, 2.6); return 11; }
+    c.fillStyle = cc; c.beginPath(); c.ellipse(px + 5, b - 3.4, 5.4, 3.4, 0, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(px + 2, b - 5.4, 4, 1.2); return 12;
+  };
+  ITENS.paes = (c, px, b, rh, r) => {
+    const t = r();
+    if (t < 0.5) { c.fillStyle = pick(r, ['#c8883a', '#d8a050', '#b8742a']); c.beginPath(); c.ellipse(px + 8, b - 4, 8.4, 3.6, 0, 0, TAU); c.fill(); c.strokeStyle = 'rgba(255,230,170,0.7)'; c.lineWidth = 0.9; for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(px + 3 + i * 4.4, b - 6); c.lineTo(px + 5.4 + i * 4.4, b - 2.2); c.stroke(); } return 18; }
+    if (t < 0.8) { bola(c, px + 5, b - 5, 5, pick(r, ['#e0b070', '#c8883a'])); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(px + 2.6, b - 8, 2.4, 1.4); return 12; }
+    c.fillStyle = '#8a5a34'; c.fillRect(px, b - 7, 14, 7); for (let i = 0; i < 3; i++) bola(c, px + 3 + i * 4, b - 8.6, 2.8, '#d8a050'); return 16;
+  };
+
   reg('prateleira', (c, o) => {
     const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 52, tema = o.tema || 'caixas', quadro = o.front || '#8a9099';
     caixa(c, x, y, w, h, e, o.top || shade(quadro, 0.2), quadro, { r: 2 });

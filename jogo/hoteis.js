@@ -152,7 +152,7 @@
       K.neon(x, pl.nome, 450, 110, luxo ? 26 : 22, luxo ? '#ffd24a' : '#fff');
       if (luxo) { x.fillStyle = 'rgba(200,162,74,0.35)'; for (let k = 0; k < 5; k++) x.fillRect(100 + k * 160, 140, 4, 8); }
       if (!luxo && pl.nivel === 'feio') { x.fillStyle = 'rgba(0,0,0,0.25)'; for (let k = 0; k < 7; k++) x.fillRect(110 + k * 91, 70 + (k * 37) % 50, 5 + k % 3 * 6, 18 + k % 4 * 7); x.fillStyle = 'rgba(0,0,0,0.12)'; x.fillRect(70, 150, 760, 420); }
-      K.cartaz(x, 300, 74, 54, 44, '#e8e0d0', ['RECEPÇÃO']);
+      K.cartaz(x, 218, 74, 54, 44, '#e8e0d0', ['RECEPÇÃO']);
     };
     R.luzes = luxo ? [{ x: 450, y: 360, r: 380 }, { x: 200, y: 400, r: 220 }, { x: 700, y: 400, r: 220 }] : [{ x: 450, y: 360, r: 300 * nv.luz + 100 }];
     const rec = fixo(R, { x: 450, y: 172, p: lookStaff({ shirt: luxo ? '#1a1a2e' : '#2a58b8', pat: 'liso', sleeve: 'longa', fem: true, hairStyle: 'coque' }), falas: ['Bem-vindo ao ' + pl.nome + '!', 'Posso ajudar? Temos quartos disponíveis.'], h: Math.PI, nome: 'Recepcionista', label: 'ALUGAR UM QUARTO', act: S2 => menuRecepcao(S2, R, pl, nv), ameacavel: true, dinheiro: Math.round(rand(100, luxo ? 700 : 250)), semColisao: true });

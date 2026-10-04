@@ -269,16 +269,16 @@
     if (f === 'treino') return ['TREINO ABERTO', 'JOGO HOJE ÀS 13H'];
     return e.min > 0 ? ['ÚLTIMO JOGO', nome] : ['PRÓXIMO JOGO', 'MUNICIPAL x ' + fora];
   }
-  const temIngresso = S => !!(S.ingresso && S.ingresso.dia === dia(S));
+  const temIngresso = S => !!(S.ingressoEstadio && S.ingressoEstadio.dia === dia(S));
 
   function menuBilheteria(S, R) {
     const f = fase(S);
     const vende = (nome, preco, tipo, desc) => ({ n: nome + ' — $' + preco, desc, fn: S2 => {
       if (temIngresso(S2)) { G.say('Você já tem ingresso para hoje.', 3); return; }
       if (f === 'vazio') { G.say('A bilheteria só abre de manhã até as 19h.', 3.5); return; }
-      K.compra(S2, preco, () => { S2.ingresso = { dia: dia(S2), tipo }; G.say('Ingresso ' + tipo + ' comprado! Passe pelas catracas e entre no campo.', 4.5); });
+      K.compra(S2, preco, () => { S2.ingressoEstadio = { dia: dia(S2), tipo }; G.say('Ingresso ' + tipo + ' comprado! Passe pelas catracas e entre no campo.', 4.5); });
     } });
-    L.abrirMenu(S, { titulo: 'BILHETERIA — ESTÁDIO MUNICIPAL', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => temIngresso(S2) ? 'ingresso: ' + S2.ingresso.tipo : '$' + Math.floor(S2.save.money), itens: [
+    L.abrirMenu(S, { titulo: 'BILHETERIA — ESTÁDIO MUNICIPAL', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => temIngresso(S2) ? 'ingresso: ' + S2.ingressoEstadio.tipo : '$' + Math.floor(S2.save.money), itens: [
       vende('Arquibancada', 30, 'comum', 'bancos de concreto, junto da torcida'),
       vende('Camarote', 100, 'camarote', 'cadeira cativa, vista de cima do gramado'),
       { n: 'Ver o jogo de hoje', desc: 'placar e horário', fn: S2 => G.say(textoPlacar(S2).join('  ·  '), 5) },
@@ -536,7 +536,7 @@
     R.porta = { para: 'entrada', px: 520, py: 215, ph: Math.PI, label: 'VOLTAR AO SAGUÃO', rotulo: 'SAGUÃO' };
     const add = (...a) => R.objs.push(...a);
     const torcida = () => { const S = G.S, f = fase(S); return f === 'jogo' ? (R.jogo && R.jogo.golT > 0 ? 'gol' : 'jogo') : f === 'chegando' ? 'dia' : false; };
-    const sentaAr = S => { const cam = S.ingresso && S.ingresso.dia === dia(S) && S.ingresso.tipo === 'camarote'; K.cura(S, cam ? 10 : 5); G.say('Você assistiu da ' + (cam ? 'cadeira do camarote' : 'arquibancada') + ': ' + textoPlacar(S).join(' · ') + ' (+' + (cam ? 10 : 5) + ' vida)', 5); };
+    const sentaAr = S => { const cam = S.ingressoEstadio && S.ingressoEstadio.dia === dia(S) && S.ingressoEstadio.tipo === 'camarote'; K.cura(S, cam ? 10 : 5); G.say('Você assistiu da ' + (cam ? 'cadeira do camarote' : 'arquibancada') + ': ' + textoPlacar(S).join(' · ') + ' (+' + (cam ? 10 : 5) + ' vida)', 5); };
     [90, 510, 930].forEach(x => add(O('arquibancada', x, 190, 420, 40, { e: 60, n: 5, cadeira: '#2f8a45', torcida, label: 'ASSISTIR DA ARQUIBANCADA', r: 80, act: sentaAr })));
     add(O('placar', 500, 76, 440, 46, { solid: false, k: 1, fnTexto: () => textoPlacar(G.S) }));
     // gols e bandeirinhas

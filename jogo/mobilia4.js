@@ -523,4 +523,20 @@
     for (let j = 0; j < 3; j++) for (let i = 0; i < 5; i++) { circ(c, bx + 6 + i * 8, bt + 6 + j * 8, 2.8, '#fff6c8'); circ(c, bx + 6 + i * 8, bt + 6 + j * 8, 1.4, '#ffffff'); }
   }, { alto: 40, pad: 40 });
 
+  // =====================================================================
+  //  MALAS (hotel, aeroporto): duas malas de rodinha e uma maleta
+  // =====================================================================
+  reg('malas', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 5 });
+    const mala = (mx, my, mw, mh, e, cor) => {
+      caixa(c, mx, my, mw, mh, e, shade(cor, 0.2), cor, { r: 3, semSombra: true });
+      c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1; for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(mx + k * mw / 4, my - e + 3); c.lineTo(mx + k * mw / 4, my + mh - 3); c.stroke(); }
+      c.strokeStyle = '#2a2d34'; c.lineWidth = 2.2; c.beginPath(); c.moveTo(mx + mw * 0.3, my - e + 1); c.lineTo(mx + mw * 0.3, my - e - 5); c.lineTo(mx + mw * 0.7, my - e - 5); c.lineTo(mx + mw * 0.7, my - e + 1); c.stroke();
+      c.fillStyle = '#c8a24a'; c.fillRect(mx + mw / 2 - 3, my + mh - e * 0.5, 6, 3); roda(c, mx + 4, my + mh + 1, 2); roda(c, mx + mw - 4, my + mh + 1, 2);
+    };
+    mala(x, y + 4, w * 0.5, h - 4, 30, o.cor || '#8a2a3a');
+    mala(x + w * 0.56, y + 10, w * 0.4, h - 10, 22, o.cor2 || '#2a4a7a');
+  }, { alto: 12 });
+
 })(window.G = window.G || {});
