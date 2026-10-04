@@ -52,7 +52,7 @@
 
   // ---------- cache dos móveis (desenha uma vez, depois só copia) ----------
   // fn(ctx, o, t) desenha o móvel; opt.din(ctx, o, t) desenha só o que se mexe (chama, tela da TV...)
-  const ASS = ['x', 'y', 'w', 'h', 'e', 'cor', 'top', 'front', 'variante', 'aberto', 'ligado', 'estilo', 'itens', 'toalha', 'prato', 'dir', 'nome', 'texto', 'n', 'padrao', 'forma', 'cor2', 'seed', 'vaso', 'espelho', 'alt', 'luz', 'parte', 'manta', 'almofadas'];
+  const ASS = ['x', 'y', 'w', 'h', 'e', 'cor', 'top', 'front', 'variante', 'aberto', 'ligado', 'estilo', 'itens', 'toalha', 'prato', 'dir', 'nome', 'texto', 'n', 'padrao', 'forma', 'cor2', 'seed', 'vaso', 'espelho', 'alt', 'luz', 'parte', 'manta', 'almofadas', 'pais', 'cadeira', 'cadeiras'];
   const assina = o => { let s = o.t; for (let i = 0; i < ASS.length; i++) { const v = o[ASS[i]]; if (v !== undefined) s += '|' + v; } if (o.cores) s += o.cores.join(); return s; };
   D.est = function (fn, opt) {
     opt = opt || {};

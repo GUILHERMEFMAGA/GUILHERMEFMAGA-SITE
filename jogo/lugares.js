@@ -616,12 +616,24 @@
     return R;
   };
 
+  // ---------- ENRIQUECER: outros arquivos acrescentam detalhes a uma sala que já existe ----------
+  // L.enriquecer['farmacia:entrada'] = (R, pl) => { R.objs.push(...); }   (chave = id do lugar + ':' + sala)
+  // L.enriquecer['tipo:banco:entrada'] = ...                               (chave = 'tipo:' + tipo + ':' + sala)
+  L.enriquecer = {};
+  function aposCriar(R, pl) {
+    const f = L.enriquecer[pl.id + ':' + R.id] || L.enriquecer['tipo:' + pl.tipo + ':' + R.id];
+    if (!f || R.enriquecida) return;
+    R.enriquecida = true;
+    try { f(R, pl); } catch (e) { console.error('enriquecer ' + pl.id + ':' + R.id, e); }
+  }
+
   function montar(pl) {
     const cons = L.construtores[pl.id] || L.construtores['tipo:' + pl.tipo];
     let R;
     if (cons) { const lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar }; R = lg.criar('entrada', lg); R.lugar = lg; R.id = R.id || 'entrada'; lg.salas[R.id] = R; }
     else { R = montarLegado(pl); R.lugar = { id: pl.id, place: pl, salas: { entrada: R }, estado: {} }; R.id = 'entrada'; }
     R.place = R.place || pl; R.dentroDesde = G.S ? G.S.time : 0;
+    aposCriar(R, pl);
     if (R.aoEntrar) R.aoEntrar(G.S, R);
     centraCam(R);
     return R;
@@ -634,7 +646,7 @@
     G.snd.door();
     L.trans(S, () => {
       const lg = R0.lugar; let R = lg.salas[id];
-      if (!R) { R = lg.salas[id] = lg.criar(id, lg); R.lugar = lg; R.id = id; R.place = R.place || lg.place; }
+      if (!R) { R = lg.salas[id] = lg.criar(id, lg); R.lugar = lg; R.id = id; R.place = R.place || lg.place; aposCriar(R, lg.place); }
       if (R.aoEntrar) R.aoEntrar(S, R);
       R.px = px != null ? px : R.px; R.py = py != null ? py : R.py; R.ph = ph != null ? ph : Math.PI; R.sentado = null; R.menu = null; R.mini = null;
       S.inside = R; centraCam(R);
@@ -796,13 +808,13 @@
     let lg = pl._lgVigia;
     if (!lg) {
       if (cons) lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar };
-      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; }
+      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; aposCriar(R0, pl); }
       lg.vigia = true; pl._lgVigia = lg;
     }
     let R = lg.salas[salaId];
     if (!R) {
       if (!lg.criar) return null;
-      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R;
+      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R; aposCriar(R, pl);
       R.vigiada = true;
     }
     return R;

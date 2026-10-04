@@ -46,6 +46,12 @@ const GR = {
     O('panelao', 100, 44, 30), O('computador', 110, 40, 24), O('balcao_padaria', 200, 30, 28), O('caixa_reg', 100, 40, 22, { aberto: true }), O('pilha_carrinhos', 70, 38, 0), O('torre', 40, 14, 0),
     O('halter', 90, 18, 10), O('cofre_banco', 120, 60, 46),
   ],
+  pub: [
+    O('leito', 70, 120, 16, { cor: '#6aa8d8' }), O('maca', 56, 110, 20, { cor: '#9ec8e8' }), O('soro', 34, 20, 72), O('monitor_vital', 40, 22, 48), O('cadeira_rodas', 40, 44, 0), O('armario_med', 110, 38, 70),
+    O('maquina_venda', 60, 36, 78, { nome: 'LANCHES' }), O('biombo', 90, 8, 72, { cor: '#9ccab8' }), O('bebedouro', 36, 36, 62), O('balanca', 42, 40, 8), O('arquivo', 50, 40, 56), O('caixa_eletronico', 52, 36, 62),
+    O('catraca', 50, 40, 36), O('trave', 120, 14, 48), O('banco_reserva', 150, 30, 46), O('arquibancada', 190, 40, 60, { torcida: 'jogo' }), O('bandeira', 30, 20, 90, { pais: 'br' }), O('bandeira', 30, 20, 90, { pais: 'sp' }),
+    O('cadeira_b', 46, 46, 20), O('poste_barb', 20, 20, 60), O('fonte', 150, 90, 16), O('forno', 100, 44, 70), O('leito', 70, 120, 16, { cor: '#d8b8c8' }), O('arquibancada', 190, 40, 60, { torcida: 'dia' }),
+  ],
   banho: [O('vaso_sanitario', 34, 40, 0), O('lavatorio', 56, 40, 26), O('chuveiro', 70, 70, 0), O('banheira', 120, 62, 14), O('cesto', 24, 24, 0), O('lavadora', 50, 44, 34), O('escrivaninha', 120, 54, 22), O('cadeira_esc', 28, 28, 0)]
 };
 const lista = GR[grupo] || GR.casa; const cols = 6, cw = 200, ch = 170, rows = Math.ceil(lista.length / cols);
