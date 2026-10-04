@@ -378,4 +378,203 @@
     irPara(S, 'campo', 1300, 840);
   }
 
+  // ---------- campo de jogo ----------
+  const P = { x: 230, y: 250, w: 1000, h: 650 }, CY = P.y + P.h / 2;
+  const FORM = [[0.04, 0.5], [0.2, 0.14], [0.2, 0.38], [0.2, 0.62], [0.2, 0.86], [0.42, 0.24], [0.42, 0.5], [0.42, 0.76], [0.64, 0.2], [0.68, 0.5], [0.64, 0.8]];   // goleiro, 4 zagueiros, 3 meias, 3 atacantes
+  const KIT = [{ shirt: '#2a9a4a', pants: '#f4f4f4' }, { shirt: '#f4f4f4', pants: '#2a3a8a' }];
+  const KIT_GOL = [{ shirt: '#f2d82a', pants: '#16181e' }, { shirt: '#e8602a', pants: '#16181e' }];
+  const NOMES = ['Neto', 'Gabriel', 'Rafa', 'Bruno', 'Léo', 'Thiago', 'Caio', 'Dudu', 'Lucas', 'Pedro', 'Ronaldo'];
+  const mover = (n, a, v) => { if (Math.hypot(a.x - n.x, a.y - n.y) < 6) { n.alvo = null; return; } n.alvo = { x: a.x, y: a.y }; n.v = v; };
+  // onde o jogador fica: formação, puxada para o lado da bola (quem tem a bola avança)
+  function posForm(time, i, bx, by, ataca) {
+    const f = FORM[i]; let fx = f[0];
+    if (i > 0) fx = ataca ? Math.min(0.92, fx + 0.14) : Math.max(0.05, fx - 0.06);
+    const gx = P.x + (time ? 1 - fx : fx) * P.w, gy = P.y + f[1] * P.h;
+    if (i === 0) return { x: gx, y: CY + clamp((by - CY) * 0.22, -46, 46) };
+    return { x: gx + (bx - gx) * 0.3, y: gy + (by - gy) * 0.3 };
+  }
+  function campoConfig(R, S, f) {
+    R.npcs = R.npcs.filter(n => !n.doCampo);
+    R.faseAtual = f; R.jogo = null; R.bola.invisivel = true; R.segs = null; R.invasao = 0;
+    const poe = n => { n.doCampo = true; n.semColisao = true; n.ameacavel = false; n.label = n.label || 'CONVERSAR'; R.npcs.push(n); return n; };
+    const h = L.hora(S);
+    // seguranças nos cantos do campo
+    R.guardas = [[190, 290], [1270, 290], [190, 870], [1270, 870]].map(([x, y], i) => { const g = poe({ x, y, home: { x, y }, p: look({ shirt: '#f2d82a', pants: '#16181e', sleeve: 'curta', cap: 'swat' }), falas: ['Fique fora do gramado!', 'Invasão de campo dá multa e confusão.', 'Aqui eu fico de olho em todo mundo.'], h: i < 2 ? Math.PI : 0, nome: 'Segurança ' + ['Rui', 'Dida', 'Beto', 'Nando'][i], dinheiro: 20, v: 60 }); g.ameacavel = true; return g; });
+    if (f !== 'jogo' && f !== 'treino') {
+      R.guardas.forEach(g => { R.npcs.splice(R.npcs.indexOf(g), 1); }); R.guardas = [];
+      if (h >= 6 && h < 20) { R.jardim = [0, 1].map(i => poe({ x: P.x + 60 + i * 400, y: P.y + 80 + i * 300, p: look({ shirt: '#e8872a', pants: '#3a4a6a', sleeve: 'curta', cap: 'hat' }), falas: ['Gramado é coisa séria, viu?', 'Hoje o jogo vai ser bonito.'], h: 0, nome: i ? 'Jardineiro Nilton' : 'Jardineiro Dedé', dinheiro: 15, v: 54 })); }
+      return;
+    }
+    const J = R.jogo = { treino: f === 'treino', t: 0, b: { x: P.x + P.w / 2, y: CY, z: 0, vx: 0, vy: 0, vz: 0, rot: 0 }, dono: null, ultimo: null, ultimoT: 0, tAcao: 1, pausa: 0, espera: 1.5, golT: 0, jog: [[], []], todos: [] };
+    R.bola.invisivel = false;
+    [0, 1].forEach(t => FORM.forEach((_, i) => {
+      const pp = posForm(t, i, P.x + P.w / 2, CY, false);
+      const n = poe({ x: pp.x, y: pp.y, p: look(Object.assign({ sleeve: 'curta', shoe: '#16181e', pat: 'liso' }, i === 0 ? KIT_GOL[t] : KIT[t])), h: t ? -Math.PI / 2 : Math.PI / 2, v: 80, falas: ['Agora não, tô no jogo!', 'Sai do gramado, torcedor!', 'Passa a bola!'], nome: (i + 1) + ' ' + NOMES[i], dinheiro: 0, time: t, idx: i });
+      J.jog[t].push(n); J.todos.push(n);
+    }));
+    J.ref = poe({ x: P.x + P.w / 2 - 60, y: CY + 50, p: look({ shirt: '#16181e', pants: '#16181e', sleeve: 'curta' }), falas: ['Cartão amarelo pra você, torcedor!', 'Fora do gramado!'], h: 0, nome: 'Árbitro Silva', dinheiro: 0, v: 70 });
+    // reservas sentados nos bancos e técnicos em pé
+    [0, 1].forEach(t => { for (let i = 0; i < 4; i++) poe({ x: (t ? 845 : 445) + i * 34, y: 958, p: look(Object.assign({ sleeve: 'curta' }, KIT[t])), sentado: true, h: Math.PI, falas: ['Quero entrar logo!', 'O professor vai me colocar.'], nome: 'Reserva ' + (12 + i), dinheiro: 0 }); poe({ x: t ? 1030 : 640, y: 925, p: look({ shirt: t ? '#2a3a8a' : '#1f6a2c', pants: '#23232c', sleeve: 'longa' }), falas: ['Marca! Fecha o meio!', 'Sobe o time!'], h: Math.PI, nome: t ? 'Técnico Marquinhos' : 'Técnico Gilmar', dinheiro: 0 }); });
+    saque(R, J, 0, true);
+  }
+  // bola no meio; quem saca vai até lá (inicio = todo mundo já em formação)
+  function saque(R, J, quem, inicio) {
+    const b = J.b; b.x = P.x + P.w / 2; b.y = CY; b.z = 0; b.vx = b.vy = b.vz = 0; J.dono = null; J.espera = inicio ? 0.5 : 3; J.pausa = 0; J.quem = quem;
+    if (inicio) J.todos.forEach(n => { const pp = posForm(n.time, n.idx, b.x, b.y, false); n.x = pp.x; n.y = pp.y; });
+    const k = J.jog[quem][7]; if (inicio) { k.x = b.x - 14 * (quem ? -1 : 1); k.y = b.y; }
+  }
+  function marcou(R, S, J, time) {
+    const E = sincroniza(S); if (!J.treino) E.placar[time]++;
+    J.golT = 5; J.pausa = 3.8; J.dono = null; J.b.vx = J.b.vy = 0; J.b.z = 0; J.marcou = time;
+    J.artilheiro = J.ultimo && J.ultimo.time === time && J.ultimo.idx > 0 ? J.ultimo : J.jog[time][9];
+    if (S.inside === R) { const nome = time ? adversario(S) : 'MUNICIPAL'; G.say('GOOOOL do ' + nome + '! MUNICIPAL ' + E.placar[0] + ' x ' + E.placar[1] + ' ' + adversario(S), 5); if (G.snd && G.snd.cash) G.snd.cash(); }
+  }
+  function passa(J, d) {
+    const dir = d.time ? -1 : 1; let best = null, bs = -1e9;
+    J.jog[d.time].forEach(m => { if (m === d || m.idx === 0) return; const dist = Math.hypot(m.x - d.x, m.y - d.y); if (dist < 60) return; const sc = (m.x - d.x) * dir * 0.7 - dist * 0.25 + Math.random() * 90; if (sc > bs) { bs = sc; best = m; } });
+    if (!best) best = J.jog[d.time][1 + ((Math.random() * 10) | 0)];
+    const dx = best.x - d.x, dy = best.y - d.y, dist = Math.hypot(dx, dy) || 1, v = Math.max(160, dist * 1.2), b = J.b;
+    b.vx = dx / dist * v; b.vy = dy / dist * v; b.vz = 0; J.dono = null; J.ultimo = d; J.ultimoT = 0.35;
+  }
+  function chuta(J, d) {
+    const dir = d.time ? -1 : 1, gx = d.time ? P.x : P.x + P.w, b = J.b, r = Math.random();
+    let ty = CY + (Math.random() - 0.5) * 60;
+    if (r > 0.45) ty = CY + (Math.random() < 0.5 ? -1 : 1) * rand(50, 120);       // pra fora
+    const dx = gx + dir * 16 - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy) || 1, v = 560;
+    b.vx = dx / dist * v; b.vy = dy / dist * v; b.vz = rand(0, 70); J.dono = null; J.ultimo = d; J.ultimoT = 0.3;
+    const gk = J.jog[1 - d.time][0]; if (r > 0.14 && r <= 0.45) { gk.chute = 1.2; gk.alvoY = ty; }      // defesa do goleiro
+  }
+  function passo(R, S, dt) {
+    const J = R.jogo; if (!J) return;
+    const b = J.b, m = minutoJogo(S), E = sincroniza(S);
+    if (!J.treino) E.min = m;
+    J.t += dt; J.ultimoT -= dt; if (J.golT > 0) J.golT -= dt;
+    const intervalo = !J.treino && m >= 45 && m < 50, acabou = !J.treino && m >= 95;
+    if (intervalo || acabou) {      // intervalo: todos vão para o túnel; fim: roda no meio do campo
+      J.dono = null; J.parado = true;
+      J.todos.concat([J.ref]).forEach((n, k) => mover(n, intervalo ? { x: R.portaX - 60 + (k % 8) * 18, y: R.y1 - 100 - ((k / 8) | 0) * 22 } : { x: P.x + P.w / 2 + Math.cos(k * 1.7) * 70, y: CY + Math.sin(k * 1.7) * 50 }, 90));
+      R.bola.x = b.x - 5; R.bola.y = b.y - 5; R.bola.z = 0; return;
+    }
+    if (J.parado) { J.parado = false; saque(R, J, 1, false); }
+    // ----- comemoração depois do gol -----
+    if (J.pausa > 0) {
+      J.pausa -= dt;
+      J.todos.forEach(n => { if (n === J.artilheiro) mover(n, { x: J.marcou ? P.x + 20 : P.x + P.w - 20, y: P.y + P.h - 30 }, 140); else { const pp = posForm(n.time, n.idx, P.x + P.w / 2, CY, false); mover(n, pp, 80); } });
+      if (J.pausa <= 0) saque(R, J, 1 - J.marcou, false);
+    } else if (J.espera > 0) {     // esperando o saque: todos vão à formação
+      J.espera -= dt;
+      J.todos.forEach(n => { const pp = posForm(n.time, n.idx, b.x, b.y, false); if (n.time === J.quem && n.idx === 7) mover(n, { x: b.x - 10 * (n.time ? -1 : 1), y: b.y }, 100); else mover(n, pp, 90); });
+    } else {
+      // ----- bola -----
+      const dono = J.dono;
+      if (dono) {
+        const dir = dono.time ? -1 : 1, gx = dono.time ? P.x : P.x + P.w;
+        b.x += (dono.x + dir * 12 - b.x) * Math.min(1, dt * 14); b.y += (dono.y + 3 - b.y) * Math.min(1, dt * 14); b.z = 0;
+        J.tAcao -= dt;
+        J.todos.forEach(q => { if (q.time !== dono.time && Math.abs(q.x - dono.x) < 17 && Math.abs(q.y - dono.y) < 17 && Math.random() < dt * 0.9) { J.dono = null; J.ultimo = dono; J.ultimoT = 0.25; b.vx = rand(-90, 90); b.vy = rand(-90, 90); } });
+        if (J.dono && J.tAcao <= 0) {
+          const dist = Math.hypot(gx - dono.x, CY - dono.y), r = Math.random();
+          if (dono.idx === 0) { passa(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else if (dist < 320 && r < 0.55) { chuta(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else if (r < 0.7) { passa(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else J.tAcao = rand(0.5, 1.2);
+        }
+      } else {
+        b.x += b.vx * dt; b.y += b.vy * dt; b.vz -= 520 * dt; b.z = Math.max(0, b.z + b.vz * dt); if (b.z === 0 && b.vz < 0) b.vz = b.vz < -90 ? -b.vz * 0.35 : 0;
+        const at = Math.pow(0.35, dt); b.vx *= at; b.vy *= at; b.rot += Math.hypot(b.vx, b.vy) * dt * 0.12;
+        if (b.x < P.x - 2 || b.x > P.x + P.w + 2) {      // passou da linha de fundo
+          const oeste = b.x < P.x;
+          if (Math.abs(b.y - CY) < 36 && b.z < 36) marcou(R, S, J, oeste ? 1 : 0);
+          else { const def = oeste ? 0 : 1; J.dono = J.jog[def][0]; J.tAcao = rand(1, 1.8); b.vx = b.vy = 0; }
+        } else if (b.y < P.y - 2 || b.y > P.y + P.h + 2) {   // lateral: o adversário de quem tocou por último repõe
+          const t2 = J.ultimo ? 1 - J.ultimo.time : 0; b.y = clamp(b.y, P.y, P.y + P.h); b.vx = b.vy = 0;
+          let bn = null, bd = 1e9; J.jog[t2].forEach(q => { if (q.idx === 0) return; const d = Math.hypot(q.x - b.x, q.y - b.y); if (d < bd) { bd = d; bn = q; } });
+          J.dono = bn; J.tAcao = rand(0.8, 1.4);
+        }
+        if (!J.dono && !(J.golT > 0 && J.pausa > 0)) J.todos.forEach(q => { if (J.dono) return; if (q === J.ultimo && J.ultimoT > 0) return; if (b.z < 18 && Math.abs(q.x - b.x) < 14 && Math.abs(q.y - b.y) < 14) { J.dono = q; J.tAcao = rand(0.5, 1.2); b.vx = b.vy = 0; } });
+      }
+      // ----- jogadores -----
+      const ataca = t => !!(J.dono && J.dono.time === t);
+      const chase = [null, null];
+      [0, 1].forEach(t => { if (ataca(t)) return; let bd = 1e9; J.jog[t].forEach(q => { if (q.idx === 0) return; const d = Math.hypot(q.x - b.x, q.y - b.y); if (d < bd) { bd = d; chase[t] = q; } }); });
+      J.todos.forEach(n => {
+        if (n === J.dono) { const dir = n.time ? -1 : 1; mover(n, { x: clamp(n.x + dir * 70, P.x + 10, P.x + P.w - 10), y: clamp(n.y + (CY - n.y) * 0.3, P.y + 10, P.y + P.h - 10) }, 88); return; }
+        if (n.chute > 0) { n.chute -= dt; mover(n, { x: n.x, y: clamp(n.alvoY, CY - 50, CY + 50) }, 150); return; }
+        if (n === chase[n.time] && n.idx > 0) { mover(n, { x: b.x, y: b.y }, 104); return; }
+        mover(n, posForm(n.time, n.idx, b.x, b.y, ataca(n.time)), n.idx === 0 ? 60 : 84);
+      });
+    }
+    // árbitro e rosto dos jogadores parados virado para a bola
+    mover(J.ref, { x: clamp(b.x - 50, P.x + 30, P.x + P.w - 30), y: clamp(b.y + 60, P.y + 30, P.y + P.h - 30) }, 70);
+    J.todos.concat([J.ref]).forEach(n => { if (!n.alvo) n.h = Math.atan2(b.x - n.x, -(b.y - n.y)); });
+    if (!isFinite(b.x + b.y)) { b.x = P.x + P.w / 2; b.y = CY; b.vx = b.vy = 0; }
+    R.bola.x = b.x - 5; R.bola.y = b.y - 5; R.bola.z = b.z; R.bola.rot = b.rot;
+  }
+  // invasão de campo: depois de uns segundos no gramado, os seguranças vêm te tirar (multa)
+  function vigia(R, S, dt) {
+    if (S.inside !== R) return;
+    const dentro = R.px > P.x - 4 && R.px < P.x + P.w + 4 && R.py > P.y - 4 && R.py < P.y + P.h + 4;
+    if (R.invasao < 0) { R.invasao += dt; return; }
+    if (dentro) {
+      R.invasao += dt;
+      if (R.invasao > 2.2 && !R.segs) { R.segs = R.guardas; G.say('INVASÃO DE CAMPO! Os seguranças estão vindo te pegar!', 4.5); if (G.snd && G.snd.fail) G.snd.fail(); }
+    } else if (!dentro) { R.invasao = 0; if (R.segs) { R.segs = null; R.guardas.forEach(g => { g.alvo = null; L.rota(g, [g.home]); }); } }
+    if (R.segs) R.segs.forEach(g => {
+      g.rota = []; mover(g, { x: R.px, y: R.py }, 150);
+      if (R.segs && Math.hypot(g.x - R.px, g.y - R.py) < 36) {
+        const multa = Math.min(50, Math.floor(S.save.money)); S.save.money -= multa; G.save();
+        R.px = R.portaX; R.py = R.y1 - 100; R.invasao = -4; const gs = R.segs; R.segs = null; gs.forEach(q => { q.alvo = null; L.rota(q, [q.home]); });
+        G.say('Os seguranças tiraram você do gramado! Multa de $' + multa + '.', 5.5);
+      }
+    });
+  }
+
+  function estCampo(lg) {
+    const pl = lg.place, w = 1300, h = 840;
+    const R = L.novaSala({ place: pl, w, h, nome: 'CAMPO — ' + (pl.nome || 'ESTÁDIO MUNICIPAL'), cor: VERDE, piso: 'gramado', pisoCores: ['#3d8f3b', '#4aa046'], parede: '#bdb9ae', estiloParede: 'concreto', rodape: '#8a867c', capacho: '#6a6a6a', subtitulo: 'gramado e arquibancadas', luzes: [{ x: 380, y: 620, r: 540 }, { x: 1060, y: 620, r: 540 }, { x: 720, y: 330, r: 520 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    R.porta = { para: 'entrada', px: 520, py: 215, ph: Math.PI, label: 'VOLTAR AO SAGUÃO', rotulo: 'SAGUÃO' };
+    const add = (...a) => R.objs.push(...a);
+    const torcida = () => { const S = G.S, f = fase(S); return f === 'jogo' ? (R.jogo && R.jogo.golT > 0 ? 'gol' : 'jogo') : f === 'chegando' ? 'dia' : false; };
+    const sentaAr = S => { const cam = S.ingresso && S.ingresso.dia === dia(S) && S.ingresso.tipo === 'camarote'; K.cura(S, cam ? 10 : 5); G.say('Você assistiu da ' + (cam ? 'cadeira do camarote' : 'arquibancada') + ': ' + textoPlacar(S).join(' · ') + ' (+' + (cam ? 10 : 5) + ' vida)', 5); };
+    [90, 510, 930].forEach(x => add(O('arquibancada', x, 190, 420, 40, { e: 60, n: 5, cadeira: '#2f8a45', torcida, label: 'ASSISTIR DA ARQUIBANCADA', r: 80, act: sentaAr })));
+    add(O('placar', 500, 76, 440, 46, { solid: false, k: 1, fnTexto: () => textoPlacar(G.S) }));
+    // gols e bandeirinhas
+    add(O('trave', P.x - 26, CY - 35, 26, 70, { dir: 'w', e: 44, solid: false }), O('trave', P.x + P.w, CY - 35, 26, 70, { dir: 'e', e: 44, solid: false }));
+    [[P.x, P.y], [P.x + P.w, P.y], [P.x, P.y + P.h], [P.x + P.w, P.y + P.h]].forEach(([x, y]) => add(O('bandeirinha', x - 5, y - 5, 10, 10, { e: 28, solid: false })));
+    // bancos de reservas e holofotes
+    add(O('banco_reserva', 420, 944, 160, 28, { e: 46, cor: '#1f6a2c' }), O('banco_reserva', 820, 944, 160, 28, { e: 46, cor: '#2a3a8a' }));
+    add(O('holofote', 96, 950, 20, 20, { e: 150, solid: true }), O('holofote', 1330, 950, 20, 20, { e: 150, solid: true }));
+    // a bola
+    R.bola = O('bola_jogo', P.x + P.w / 2 - 5, CY - 5, 10, 10, { solid: false, z: 0, rot: 0, invisivel: true }); add(R.bola);
+    const faixas = ['BANCO DO POVO', 'PINGUIM CHOPP', 'AUTO CENTER', 'SUPER ATACADÃO', 'FARMÁCIA SAÚDE', 'PIZZARIA SABOR', 'POSTO RIBEIRÃO', 'CASAS LÍDER', 'ÓTICA VISÃO', 'TV CIDADE'];
+    const cfx = ['#c8302a', '#2a58b8', '#f2c82a', '#2f9a4a', '#16181e', '#e8872a', '#7a3a9a', '#2a8a8a', '#d8a82a', '#e84a8a'];
+    R.pisoExtra = x => {
+      D.campoFutebol(x, P.x, P.y, P.w, P.h);
+      x.fillStyle = 'rgba(255,255,255,0.35)'; [[420, 160], [820, 160]].forEach(([bx, bw]) => { x.fillRect(bx - 6, 906, bw + 12, 2); x.fillRect(bx - 6, 906, 2, 62); x.fillRect(bx + bw + 4, 906, 2, 62); });
+    };
+    R.deco = x => {
+      // faixa de patrocinadores colada na muralha, atrás da arquibancada
+      for (let i = 0; i < 10; i++) { const bx = 80 + i * 130; x.fillStyle = cfx[i]; x.fillRect(bx, 66, 126, 46); x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(bx, 66, 126, 3); x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(bx + 126, 66, 4, 46); }
+      x.save(); x.textAlign = 'center'; x.font = 'bold 10px Arial'; x.fillStyle = '#fff'; for (let i = 0; i < 10; i++) if (i < 3 || i > 6) x.fillText(faixas[i], 80 + i * 130 + 63, 94); x.restore();
+      // placas de publicidade de frente para o campo (norte)
+      for (let i = 0; i < 10; i++) { const bx = P.x + i * 100; x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(bx + 2, 236, 98, 18); x.fillStyle = cfx[(i + 4) % 10]; x.fillRect(bx, 232, 98, 18); x.fillStyle = 'rgba(255,255,255,0.35)'; x.fillRect(bx, 232, 98, 2); x.fillStyle = '#fff'; x.font = 'bold 9px Arial'; x.textAlign = 'center'; x.fillText(faixas[(i + 4) % 10], bx + 49, 245); x.textAlign = 'left'; }
+      // escudo no centro do túnel de acesso
+      x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(R.portaX - 60, R.y1 - 6, 120, 6);
+    };
+    R.aoEntrar = (S, R2) => { const f = fase(S); if (R2.faseAtual !== f) campoConfig(R2, S, f); };
+    R.onUpdate = (S, R2, dt) => {
+      try {
+        R2.tf = (R2.tf || 0) - dt;
+        if (R2.tf <= 0) { R2.tf = 1; const f = fase(S); if (f !== R2.faseAtual) campoConfig(R2, S, f); }
+        if (R2.jogo) { passo(R2, S, dt); vigia(R2, S, dt); }
+        else if (R2.jardim) { R2.tj = (R2.tj || 0) - dt; if (R2.tj <= 0) { R2.tj = rand(5, 9); R2.jardim.forEach(g => { if (!g.alvo && !(g.rota && g.rota.length)) L.rota(g, [{ x: rand(P.x + 30, P.x + P.w - 30), y: g.y }, { x: rand(P.x + 30, P.x + P.w - 30), y: rand(P.y + 60, P.y + P.h - 60) }]); }); } }
+      } catch (e) { R2.onUpdate = null; console.error('campo do estadio', e); }
+    };
+    campoConfig(R, G.S || { dayT: 0.3 }, G.S ? fase(G.S) : 'jogo');
+    return R;
+  }
+
+  L.construtores['tipo:estadio'] = { criar(sid, lg) { return sid === 'campo' ? estCampo(lg) : estEntrada(lg); } };
+
 })(window.G = window.G || {});

@@ -6009,12 +6009,24 @@
     return R;
   };
 
+  // ---------- ENRIQUECER: outros arquivos acrescentam detalhes a uma sala que já existe ----------
+  // L.enriquecer['farmacia:entrada'] = (R, pl) => { R.objs.push(...); }   (chave = id do lugar + ':' + sala)
+  // L.enriquecer['tipo:banco:entrada'] = ...                               (chave = 'tipo:' + tipo + ':' + sala)
+  L.enriquecer = {};
+  function aposCriar(R, pl) {
+    const f = L.enriquecer[pl.id + ':' + R.id] || L.enriquecer['tipo:' + pl.tipo + ':' + R.id];
+    if (!f || R.enriquecida) return;
+    R.enriquecida = true;
+    try { f(R, pl); } catch (e) { console.error('enriquecer ' + pl.id + ':' + R.id, e); }
+  }
+
   function montar(pl) {
     const cons = L.construtores[pl.id] || L.construtores['tipo:' + pl.tipo];
     let R;
     if (cons) { const lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar }; R = lg.criar('entrada', lg); R.lugar = lg; R.id = R.id || 'entrada'; lg.salas[R.id] = R; }
     else { R = montarLegado(pl); R.lugar = { id: pl.id, place: pl, salas: { entrada: R }, estado: {} }; R.id = 'entrada'; }
     R.place = R.place || pl; R.dentroDesde = G.S ? G.S.time : 0;
+    aposCriar(R, pl);
     if (R.aoEntrar) R.aoEntrar(G.S, R);
     centraCam(R);
     return R;
@@ -6027,7 +6039,7 @@
     G.snd.door();
     L.trans(S, () => {
       const lg = R0.lugar; let R = lg.salas[id];
-      if (!R) { R = lg.salas[id] = lg.criar(id, lg); R.lugar = lg; R.id = id; R.place = R.place || lg.place; }
+      if (!R) { R = lg.salas[id] = lg.criar(id, lg); R.lugar = lg; R.id = id; R.place = R.place || lg.place; aposCriar(R, lg.place); }
       if (R.aoEntrar) R.aoEntrar(S, R);
       R.px = px != null ? px : R.px; R.py = py != null ? py : R.py; R.ph = ph != null ? ph : Math.PI; R.sentado = null; R.menu = null; R.mini = null;
       S.inside = R; centraCam(R);
@@ -6189,13 +6201,13 @@
     let lg = pl._lgVigia;
     if (!lg) {
       if (cons) lg = { id: pl.id, place: pl, salas: {}, estado: {}, criar: cons.criar };
-      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; }
+      else { lg = { id: pl.id, place: pl, salas: {}, estado: {} }; const R0 = montarLegado(pl); R0.lugar = lg; R0.id = 'entrada'; R0.place = R0.place || pl; lg.salas.entrada = R0; aposCriar(R0, pl); }
       lg.vigia = true; pl._lgVigia = lg;
     }
     let R = lg.salas[salaId];
     if (!R) {
       if (!lg.criar) return null;
-      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R;
+      R = lg.criar(salaId, lg); R.lugar = lg; R.id = salaId; R.place = R.place || pl; lg.salas[salaId] = R; aposCriar(R, pl);
       R.vigiada = true;
     }
     return R;
@@ -6566,7 +6578,7 @@
 
   // ---------- cache dos móveis (desenha uma vez, depois só copia) ----------
   // fn(ctx, o, t) desenha o móvel; opt.din(ctx, o, t) desenha só o que se mexe (chama, tela da TV...)
-  const ASS = ['x', 'y', 'w', 'h', 'e', 'cor', 'top', 'front', 'variante', 'aberto', 'ligado', 'estilo', 'itens', 'toalha', 'prato', 'dir', 'nome', 'texto', 'n', 'padrao', 'forma', 'cor2', 'seed', 'vaso', 'espelho', 'alt', 'luz', 'parte', 'manta', 'almofadas'];
+  const ASS = ['x', 'y', 'w', 'h', 'e', 'cor', 'top', 'front', 'variante', 'aberto', 'ligado', 'estilo', 'itens', 'toalha', 'prato', 'dir', 'nome', 'texto', 'n', 'padrao', 'forma', 'cor2', 'seed', 'vaso', 'espelho', 'alt', 'luz', 'parte', 'manta', 'almofadas', 'pais', 'cadeira', 'cadeiras'];
   const assina = o => { let s = o.t; for (let i = 0; i < ASS.length; i++) { const v = o[ASS[i]]; if (v !== undefined) s += '|' + v; } if (o.cores) s += o.cores.join(); return s; };
   D.est = function (fn, opt) {
     opt = opt || {};
@@ -8009,6 +8021,982 @@
     c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(px + 3, py + 4, w, h); c.fillStyle = cor; c.fillRect(px, py, w, h); c.strokeStyle = cor2 || '#fff'; c.lineWidth = 2; c.strokeRect(px + 3, py + 3, w - 6, h - 6);
     c.textAlign = 'center'; (linhas || []).forEach((l, i) => { c.fillStyle = i === 0 ? (cor2 || '#fff') : '#fff'; c.font = 'bold ' + (i === 0 ? Math.min(14, w / 6) : Math.min(11, w / 8)) + 'px Arial'; c.fillText(l, px + w / 2, py + 16 + i * 14); }); c.textAlign = 'left';
   };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   MOBILIA3.JS — os móveis ANTIGOS refeitos com formas de verdade.
+   Balcão de recepção, bancada de aço, beliche, grade de cadeia, esteira, supino,
+   halteres, espreguiçadeira, banco de igreja, altar, confessionário, palco, panelão,
+   computador, caixa de supermercado, carrinhos, balcão de padaria...
+   Mesmos nomes de objeto de sempre (o jogo não muda): só o desenho.
+   Convenção: o.x,o.y,o.w,o.h = pegada no chão; o.e = altura.
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, D = G.deco, TAU = Math.PI * 2;
+  const shade = K.shade, hh = K.hh, rr = D.rr, mix = D.mix, rng = D.rng;
+  const reg = D.reg, caixa = D.caixa, sombra = D.sombra;
+  const pick = (r, a) => a[(r() * a.length) | 0];
+  const circ = (c, x, y, r, cor) => { c.fillStyle = cor; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
+  const contorno = (c, x, y, w, h, r) => { c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; rr(c, x + 0.5, y + 0.5, w - 1, h - 1, r || 1); c.stroke(); };
+  const brilho = (c, x, y, w, a) => { c.fillStyle = 'rgba(255,255,255,' + (a || 0.4) + ')'; c.fillRect(x, y, w, 1.2); };
+  // chapa de aço escovado (degradê vertical)
+  const aco = (c, x, y, w, h, r, claro) => { const g = c.createLinearGradient(x, y, x, y + h); g.addColorStop(0, claro ? '#fafbfc' : '#eef1f4'); g.addColorStop(0.5, claro ? '#d8dde2' : '#c2c8ce'); g.addColorStop(1, claro ? '#aab1b8' : '#8a9199'); c.fillStyle = g; rr(c, x, y, w, h, r == null ? 2 : r); c.fill(); };
+  // cilindro vertical (barra, perna): degradê horizontal
+  const barra = (c, x, y, w, h, cor) => { const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, shade(cor, 0.35)); g.addColorStop(0.45, cor); g.addColorStop(1, shade(cor, -0.42)); c.fillStyle = g; c.fillRect(x, y, w, h); };
+
+  // ======================= BALCÃO DE RECEPÇÃO (hotel, banco, delegacia, prefeitura) =======================
+  reg('recepcao', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, corpo = o.front || '#a8895a', topo = o.top || '#efe6d2', r = rng((x * 3 + y) | 0);
+    caixa(c, x, y, w, h, e, topo, corpo, { r: 4 });
+    const fy = y + h - e, ty = y - e;
+    // painéis almofadados na frente
+    const n = Math.max(2, Math.round(w / 54)), pw = (w - 10) / n;
+    for (let i = 0; i < n; i++) { const px = x + 5 + i * pw; c.fillStyle = 'rgba(0,0,0,0.22)'; rr(c, px + 3, fy + 6, pw - 6, e - 13, 2); c.fill(); c.strokeStyle = 'rgba(255,255,255,0.2)'; c.lineWidth = 1; rr(c, px + 3.5, fy + 6.5, pw - 7, e - 14, 2); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.08)'; c.fillRect(px + 5, fy + 8, pw - 10, 2); }
+    // filete dourado na quina do tampo e rodapé escuro
+    c.fillStyle = o.filete || '#c8a24a'; c.fillRect(x + 2, fy - 2.5, w - 4, 2.4); brilho(c, x + 2, fy - 2.5, w - 4, 0.5);
+    c.fillStyle = 'rgba(0,0,0,0.38)'; c.fillRect(x + 2, y + h - 4, w - 4, 3);
+    // em cima: monitores (de costas, o atendente está atrás), teclado, sino, pastas, abajur
+    const nm = Math.max(1, Math.floor(w / 120));
+    for (let i = 0; i < nm; i++) {
+      const mx = x + (i + 0.5) * w / nm - 11, my = ty + 6;
+      c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, mx + 2, my + 3, 22, 12, 2); c.fill();
+      c.fillStyle = '#2a2d34'; rr(c, mx, my, 22, 12, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(mx + 2, my + 1.5, 18, 1.4); circ(c, mx + 11, my + 7, 1.4, '#6a707a');
+      c.fillStyle = '#3a3e48'; c.fillRect(mx + 8, my + 12, 6, 4); c.fillStyle = '#d8dce0'; rr(c, mx + 1, ty + h - 14, 20, 6, 1.4); c.fill(); contorno(c, mx + 1, ty + h - 14, 20, 6, 1.4);
+    }
+    circ(c, x + w * 0.1, ty + h * 0.5, 4.2, '#d8b24a'); c.fillStyle = '#b8922a'; c.fillRect(x + w * 0.1 - 5, ty + h * 0.5 + 3, 10, 2); circ(c, x + w * 0.1 - 1, ty + h * 0.5 - 1.4, 1.2, 'rgba(255,255,255,0.8)');
+    for (let k = 0; k < 3; k++) { c.fillStyle = pick(r, ['#c8402a', '#2a58b8', '#e0b32a', '#f2f2f2']); c.fillRect(x + w * 0.82 + k * 0.6, ty + 8 + k * 3, 16, 3); }
+    c.fillStyle = '#16181e'; c.fillRect(x + w * 0.93 - 1, ty + 9, 2, 8); circ(c, x + w * 0.93, ty + 8, 5, '#e8d890'); c.fillStyle = 'rgba(255,255,255,0.6)'; c.beginPath(); c.arc(x + w * 0.93 - 1.5, ty + 6.5, 1.8, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(x + 4, ty + 1, w - 8, 1.2);
+  }, { alto: 24 });
+
+  // ======================= BANCADA DE AÇO (cozinha, corte, trabalho) =======================
+  reg('bancada', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 26, ty = y - e, fy = y + h - e, r = rng((x * 3 + y) | 0);
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 3 });
+    c.fillStyle = '#14161c'; c.fillRect(x + 2, fy + 3, w - 4, e - 3);
+    const sy = fy + e * 0.64; aco(c, x + 3, sy, w - 6, 3, 1);
+    for (let k = x + 14; k < x + w - 28; k += 40 + ((r() * 16) | 0)) { const bw = 22 + ((r() * 10) | 0); aco(c, k, sy - 8, bw, 8, 3); c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(k + 2, sy - 7, bw - 4, 2.4); }
+    [x, x + w - 5].forEach(px => barra(c, px, fy + 2, 5, e - 1, '#b8bec6'));
+    c.fillStyle = 'rgba(0,0,0,0.4)'; c.fillRect(x + 5, y + h - 3, w - 10, 2);
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, x - 1, ty + 2, w + 2, h + 4, 3); c.fill();
+    aco(c, x, ty, w, h, 3, true);
+    c.fillStyle = '#98a0a8'; c.fillRect(x + 1, ty + h - 1, w - 2, 4); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x + 1, ty + h + 2.5, w - 2, 1.3);
+    c.fillStyle = '#d6dbe0'; c.fillRect(x + 1, ty, w - 2, 4); brilho(c, x + 1, ty, w - 2, 0.8);
+    // cubas
+    const nc = w > 160 ? 2 : 1;
+    for (let i = 0; i < nc; i++) {
+      const cw = Math.min(46, w * 0.2), cx0 = x + w * (nc === 2 ? 0.2 + i * 0.4 : 0.28);
+      c.fillStyle = '#7f868e'; rr(c, cx0, ty + 9, cw, h - 18, 3); c.fill();
+      const gg = c.createLinearGradient(cx0, ty + 10, cx0, ty + h - 10); gg.addColorStop(0, '#5a6068'); gg.addColorStop(1, '#a4acb3'); c.fillStyle = gg; rr(c, cx0 + 2, ty + 11, cw - 4, h - 22, 2); c.fill();
+      circ(c, cx0 + cw / 2, ty + h / 2, 1.7, '#22252c');
+      c.strokeStyle = '#d0d4da'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(cx0 + cw / 2, ty + 5); c.lineTo(cx0 + cw / 2, ty + 11); c.stroke(); circ(c, cx0 + cw / 2, ty + 6, 2.3, '#eef1f4');
+    }
+    // tábua de corte, faca, tigelas
+    const tx = x + w * (nc === 2 ? 0.7 : 0.62);
+    c.fillStyle = 'rgba(0,0,0,0.25)'; rr(c, tx + 1.5, ty + 12, 34, 20, 2); c.fill(); c.fillStyle = '#c8a070'; rr(c, tx, ty + 10, 34, 20, 2); c.fill(); contorno(c, tx, ty + 10, 34, 20, 2);
+    c.fillStyle = '#d8402a'; c.beginPath(); c.arc(tx + 10, ty + 20, 3.4, 0, TAU); c.fill(); c.fillStyle = '#6aa83a'; c.fillRect(tx + 16, ty + 17, 8, 3); c.fillStyle = '#f2c82a'; c.fillRect(tx + 18, ty + 23, 7, 3);
+    c.fillStyle = '#e8ecf0'; c.fillRect(tx + 28, ty + 13, 2, 14); c.fillStyle = '#16181e'; c.fillRect(tx + 28, ty + 25, 2, 5);
+    circ(c, x + w * 0.06 + 8, ty + h * 0.55, 6, '#f2f2f2'); circ(c, x + w * 0.06 + 8, ty + h * 0.55, 3.8, '#e8c070'); contorno(c, x + w * 0.06 + 2, ty + h * 0.55 - 6, 12, 12, 6);
+  }, { alto: 14 });
+
+  // ======================= BELICHE (cadeia, hotel barato) =======================
+  reg('beliche', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 24, cor = o.cor || '#6a7a5a', ty = y - e;
+    sombra(c, x - 2, y - 2, w + 4, h + 4, { dx: 5, dy: 8, r: 3 });
+    // beliche de baixo (aparece embaixo da de cima)
+    c.fillStyle = '#16181e'; rr(c, x + 1, ty + h * 0.5, w - 2, e + h * 0.5 - 1, 2); c.fill();
+    c.fillStyle = '#e0dccc'; rr(c, x + 4, y + h - e * 0.5 - 6, w - 8, 6, 2); c.fill(); c.fillStyle = shade(cor, -0.1); rr(c, x + 4, y + h - e * 0.5 - 4, w - 8, 4, 2); c.fill();
+    // colchão de cima + cobertor + travesseiro
+    caixa(c, x, y, w, h, 6, '#d8d4c4', '#8a8a82', { r: 3, semSombra: true });
+    const my = y - 6 - 0;
+    c.fillStyle = '#ecebe2'; rr(c, x + 3, ty + 2 + 0, w - 6, h - 4, 4); c.fill();
+    const gc = c.createLinearGradient(0, ty + h * 0.35, 0, ty + h); gc.addColorStop(0, shade(cor, 0.12)); gc.addColorStop(1, shade(cor, -0.22)); c.fillStyle = gc; rr(c, x + 3, ty + h * 0.34, w - 6, h * 0.66 - 2, 4); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(x + 5, ty + h * 0.34 + k * (h * 0.6 / 4)); c.lineTo(x + w - 5, ty + h * 0.34 + k * (h * 0.6 / 4)); c.stroke(); }
+    c.fillStyle = '#fbfaf4'; rr(c, x + 6, ty + 4, 24, 14, 5); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.stroke();
+    // colunas e escada
+    [[x - 1, ty - 2], [x + w - 3, ty - 2], [x - 1, y + h - 8], [x + w - 3, y + h - 8]].forEach(([px, py], i) => barra(c, px, py - (i < 2 ? 0 : 0), 4, (i < 2 ? e + 8 : e + 8), '#7a828c'));
+    c.fillStyle = '#9aa2aa'; for (let k = 0; k < 3; k++) c.fillRect(x + w - 2, ty + 6 + k * 7, 4, 2);
+    contorno(c, x, ty, w, h + 4, 3);
+  }, { alto: 40 });
+
+  // ======================= GRADE DE CADEIA =======================
+  reg('grade', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 90, ty = y - e, cor = '#4a4f58';
+    // sombra das barras no chão
+    c.fillStyle = 'rgba(0,0,0,0.22)'; for (let k = x + 4; k < x + w; k += 11) c.fillRect(k + 3, y + 2, 4, 9);
+    // trilhos de cima e de baixo
+    const trilho = yy => { const g = c.createLinearGradient(0, yy, 0, yy + 7); g.addColorStop(0, '#9aa2ac'); g.addColorStop(0.5, '#5a606a'); g.addColorStop(1, '#2a2d34'); c.fillStyle = g; c.fillRect(x - 3, yy, w + 6, 7); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x - 3, yy, w + 6, 1.2); };
+    // barras verticais (cilindros)
+    for (let k = x; k <= x + w - 5; k += 11) barra(c, k, ty + 4, 5, e + 6, '#6a707a');
+    // travessas
+    const tr = [ty + e * 0.34, ty + e * 0.68];
+    tr.forEach(yy => { c.fillStyle = '#3a3e48'; c.fillRect(x - 1, yy, w + 2, 4); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x - 1, yy, w + 2, 1); });
+    trilho(ty); trilho(y + h - 2);
+    // fechadura
+    const lx = x + w * 0.5 - 9; c.fillStyle = '#2a2d34'; rr(c, lx, ty + e * 0.45, 18, 14, 2); c.fill(); circ(c, lx + 9, ty + e * 0.45 + 6, 2.4, '#c8a24a'); c.fillStyle = '#e8c870'; c.fillRect(lx + 8, ty + e * 0.45 + 7, 2, 4);
+    // cabo de aço: a porta
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x + w * 0.5 - 1, ty + 6, 2, e);
+  }, { alto: 16, pad: 12 });
+
+  // ======================= ESTEIRA =======================
+  reg('esteira', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 16, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 6 });
+    // chassi
+    caixa(c, x + 4, y + 4, w - 8, h - 6, e - 6, '#2a2d36', '#16181e', { r: 5, semSombra: true });
+    // esteira de borracha com listras de movimento
+    const by = ty + 8, bh = h - 24;
+    const gb = c.createLinearGradient(0, by, 0, by + bh); gb.addColorStop(0, '#2a2c32'); gb.addColorStop(1, '#14151a'); c.fillStyle = gb; rr(c, x + 11, by, w - 22, bh, 5); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.09)'; c.lineWidth = 1; for (let k = 0; k < bh; k += 5) { c.beginPath(); c.moveTo(x + 13, by + k); c.lineTo(x + w - 13, by + k); c.stroke(); }
+    c.fillStyle = '#e8402a'; c.fillRect(x + w / 2 - 1, by + 3, 2, bh - 6);
+    // trilhos laterais
+    [x + 6, x + w - 11].forEach(px => { aco(c, px, by - 2, 5, bh + 4, 2); });
+    // rolo da frente
+    aco(c, x + 8, by + bh - 1, w - 16, 5, 2); brilho(c, x + 8, by + bh - 1, w - 16, 0.5);
+    // coluna e painel (na frente, junto ao fundo da máquina)
+    const px = x + 8, py = y - 22;
+    barra(c, x + 8, ty - 10, 4, 14, '#3a3e48'); barra(c, x + w - 12, ty - 10, 4, 14, '#3a3e48');
+    caixa(c, px + 4, ty - 10, w - 24, 10, 6, '#3a3e48', '#22252c', { r: 3, semSombra: true });
+    c.fillStyle = '#0a1a2a'; rr(c, px + 12, ty - 22, w - 40, 8, 2); c.fill(); c.fillStyle = '#3ad0ff'; c.font = 'bold 6px Arial'; c.textAlign = 'left'; c.fillText('8.5 km/h  05:12', px + 14, ty - 15.4);
+    circ(c, px + w - 20, ty - 18, 1.6, '#3ad060'); circ(c, px + w - 15, ty - 18, 1.6, '#e8402a');
+    // apoio de mãos e suporte de garrafa
+    c.strokeStyle = '#8a9099'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x + 10, ty - 6); c.quadraticCurveTo(x + 4, ty + bh * 0.4, x + 8, ty + bh * 0.75); c.moveTo(x + w - 10, ty - 6); c.quadraticCurveTo(x + w - 4, ty + bh * 0.4, x + w - 8, ty + bh * 0.75); c.stroke();
+    contorno(c, x + 4, ty, w - 8, h, 5);
+  }, { alto: 36 });
+
+  // ======================= SUPINO (banco com barra e anilhas) =======================
+  reg('supino', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 14, ty = y - e, cy = ty + h / 2;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 6 });
+    // tapete de borracha
+    c.fillStyle = '#1e2026'; rr(c, x - 2, y - 4, w + 4, h + 8, 5); c.fill(); c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1; rr(c, x, y - 2, w, h + 4, 4); c.stroke();
+    // banco acolchoado (vermelho com costura)
+    const bx = x + w * 0.2, bw = w * 0.62, bh = Math.min(20, h * 0.34);
+    caixa(c, bx, cy + bh / 2 - 2, bw, bh, 8, '#c8302a', '#7a1a16', { r: 6, semSombra: true });
+    c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 1; c.setLineDash([3, 3]); rr(c, bx + 3, cy - bh / 2 + 3 - 6, bw - 6, bh - 4, 4); c.stroke(); c.setLineDash([]);
+    c.fillStyle = '#3a3e48'; c.fillRect(bx + bw - 4, cy - bh / 2 - 6, 3, bh + 12);
+    // suportes da barra (dois montantes)
+    [x + w * 0.26, x + w * 0.62].forEach(px => { barra(c, px, ty - 30, 5, 38, '#4a4f58'); c.fillStyle = '#2a2d34'; c.fillRect(px - 6, ty + 8, 17, 3); });
+    // barra olímpica e anilhas nas pontas (vistas de frente)
+    const by = ty - 24; c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + 6, by + 9, w - 12, 2);
+    const gb = c.createLinearGradient(0, by, 0, by + 4); gb.addColorStop(0, '#f2f4f6'); gb.addColorStop(1, '#8a9099'); c.fillStyle = gb; c.fillRect(x + 4, by, w - 8, 4);
+    [[x + 4, 1], [x + w - 4, -1]].forEach(([px, sg]) => { [['#16181e', 9, 34], ['#2a58b8', 5, 28], ['#e8402a', 4, 22]].forEach(([cc, ww, hh2], k) => { const xx = sg > 0 ? px + k * 0 + [0, 9, 14][k] : px - ww - [0, 9, 14][k]; barra(c, xx, by + 2 - hh2 / 2, ww, hh2, cc); c.fillStyle = 'rgba(255,255,255,0.2)'; c.fillRect(xx + 1, by + 2 - hh2 / 2 + 1, ww - 2, 1); }); });
+    // anilhas guardadas num suporte à direita
+    const tx = x + w - 10; barra(c, tx, ty - 6, 3, 22, '#3a3e48'); [0, 1, 2].forEach(k => { c.fillStyle = ['#16181e', '#2a58b8', '#e8402a'][k]; c.beginPath(); c.ellipse(tx + 1.5, ty + 6 + k * 4, 7, 3, 0, 0, TAU); c.fill(); });
+  }, { alto: 36, pad: 16 });
+
+  // ======================= HALTERES (suporte com pesos) =======================
+  reg('halteres', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 34, ty = y - e, fy = y + h - e;
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 3 });
+    // estrutura
+    c.fillStyle = '#14161c'; c.fillRect(x + 1, fy + 2, w - 2, e - 2);
+    [x, x + w - 6].forEach(px => barra(c, px, ty + 2, 6, e + h - 2, '#3a3e48'));
+    // duas prateleiras de pesos (cada halter: barra + duas cabeças sextavadas)
+    const r = rng((x * 5 + y) | 0), niv = [fy + e * 0.3, fy + e * 0.72];
+    niv.forEach((yy, q) => {
+      c.fillStyle = '#5a606a'; c.fillRect(x + 6, yy + 5, w - 12, 3); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 6, yy + 5, w - 12, 1);
+      const n = Math.floor((w - 20) / 17);
+      for (let i = 0; i < n; i++) {
+        const px = x + 10 + i * 17, s = 4 + i * 0.62 + q * 3;   // peso cresce da esquerda para a direita
+        c.fillStyle = '#9aa2aa'; c.fillRect(px + 1, yy + 1 - 0, 12, 3);
+        const cc = shade(['#2a2d36', '#3a3e48'][q % 2], 0); const g = c.createLinearGradient(0, yy - s, 0, yy + 4); g.addColorStop(0, '#6a707a'); g.addColorStop(1, '#16181e');
+        c.fillStyle = g; rr(c, px - 1, yy - s * 0.55, 5, s + 4, 1.4); c.fill(); rr(c, px + 9, yy - s * 0.55, 5, s + 4, 1.4); c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(px, yy - s * 0.55 + 1, 3, 1); c.fillRect(px + 10, yy - s * 0.55 + 1, 3, 1);
+        c.fillStyle = q ? '#e8402a' : '#ffd84a'; c.fillRect(px + 1, yy + 6.5, 11, 1.6);
+      }
+    });
+    // tampo e topo
+    caixa(c, x, y, w, 6, 0, '#4a4f58', '#2a2d34', { r: 2, semSombra: true });
+    c.fillStyle = '#5a606a'; rr(c, x, ty - 3, w, 5, 2); c.fill(); brilho(c, x + 1, ty - 3, w - 2, 0.5);
+    contorno(c, x, ty - 3, w, e + h + 3, 2);
+  }, { alto: 20 });
+
+  // ======================= ESPREGUIÇADEIRA =======================
+  reg('espreguicadeira', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#e8402a', cx = x + w / 2;
+    sombra(c, x - 2, y, w + 4, h + 2, { dx: 6, dy: 8, r: 6 });
+    // pés e quadro branco
+    c.fillStyle = '#e8eaee'; rr(c, x - 1, y + 2, w + 2, h - 4, 5); c.fill(); contorno(c, x - 1, y + 2, w + 2, h - 4, 5);
+    // encosto reclinado (mais comprido, mostra a espuma)
+    const gc = c.createLinearGradient(x, y, x + w, y); gc.addColorStop(0, shade(cor, 0.2)); gc.addColorStop(0.5, cor); gc.addColorStop(1, shade(cor, -0.3));
+    c.fillStyle = gc; rr(c, x + 3, y - 6, w - 6, h * 0.42, 5); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.4)'; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x + 6, y - 4, w - 12, 1.6);
+    // assento e apoio de pernas
+    c.fillStyle = gc; rr(c, x + 3, y + h * 0.4 - 4, w - 6, h * 0.58, 5); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.65)'; for (let k = 0; k < 5; k++) c.fillRect(x + 3, y + h * 0.4 + k * (h * 0.12), w - 6, 2.2);
+    // toalha e óculos
+    c.fillStyle = '#f4f0e8'; rr(c, x + 5, y - 3, w - 10, 11, 3); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.stroke(); c.fillStyle = shade(cor, 0.1); c.fillRect(x + 5, y, w - 10, 2);
+    c.strokeStyle = '#16181e'; c.lineWidth = 1.4; c.beginPath(); c.arc(cx - 4, y + h * 0.5, 2.4, 0, TAU); c.arc(cx + 4, y + h * 0.5, 2.4, 0, TAU); c.stroke();
+    // rodinhas
+    circ(c, x + 3, y + h - 1, 2.6, '#2a2d34'); circ(c, x + w - 3, y + h - 1, 2.6, '#2a2d34');
+  }, { alto: 12, pad: 14 });
+
+  // ======================= BANCO DE IGREJA =======================
+  reg('banco_igreja', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 14, mad = o.front || '#6a4424', ty = y - e;
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 3 });
+    const eb = e + 22;   // altura do encosto (visto pelas costas)
+    // costas do banco: painel com almofada e filete
+    const g = c.createLinearGradient(0, y + h - eb, 0, y + h); g.addColorStop(0, shade(mad, 0.15)); g.addColorStop(1, shade(mad, -0.4)); c.fillStyle = g; rr(c, x, y + h - eb, w, eb, 3); c.fill();
+    c.fillStyle = 'rgba(0,0,0,0.25)'; const np = Math.max(2, Math.round(w / 38)), pw = (w - 12) / np;
+    for (let i = 0; i < np; i++) { rr(c, x + 6 + i * pw + 2, y + h - eb + 8, pw - 4, eb - 14, 2); c.fill(); c.strokeStyle = 'rgba(255,255,255,0.12)'; c.lineWidth = 1; rr(c, x + 6.5 + i * pw + 2, y + h - eb + 8.5, pw - 5, eb - 15, 2); c.stroke(); c.fillStyle = 'rgba(0,0,0,0.25)'; }
+    // tampo do encosto (visto de cima)
+    const gt = c.createLinearGradient(0, y + h - eb - 8, 0, y + h - eb); gt.addColorStop(0, shade(mad, 0.4)); gt.addColorStop(1, shade(mad, 0.12)); c.fillStyle = gt; rr(c, x - 2, y + h - eb - 8, w + 4, 9, 3); c.fill(); contorno(c, x - 2, y + h - eb - 8, w + 4, 9, 3);
+    // assento visível (um pedaço atrás do encosto)
+    c.fillStyle = shade(mad, 0.1); rr(c, x + 2, y - 2, w - 4, h - eb + 14 > 4 ? 6 : 4, 2); c.fill();
+    // laterais entalhadas (cheeks) mais altas
+    [x - 3, x + w - 5].forEach(px => { const gs = c.createLinearGradient(px, 0, px + 8, 0); gs.addColorStop(0, shade(mad, 0.3)); gs.addColorStop(1, shade(mad, -0.35)); c.fillStyle = gs; rr(c, px, y + h - eb - 12, 8, eb + 14, 3); c.fill(); contorno(c, px, y + h - eb - 12, 8, eb + 14, 3); circ(c, px + 4, y + h - eb - 8, 2.4, shade(mad, 0.45)); });
+    // livro de cânticos e filete dourado
+    c.fillStyle = '#c8a24a'; c.fillRect(x + 8, y + h - 3, w - 16, 1.4); c.fillStyle = '#8a1428'; rr(c, x + w * 0.3, y + h - eb - 6, 9, 5, 1); c.fill();
+  }, { alto: 30 });
+
+  // ======================= ALTAR =======================
+  reg('altar', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e, fy = y + h - e, cx = x + w / 2;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 4 });
+    // degrau de mármore
+    caixa(c, x - 10, y + 6, w + 20, h - 4, 5, '#d8d4cc', '#a8a49a', { r: 3, semSombra: true });
+    // mesa de mármore com toalha branca e bordado
+    caixa(c, x, y, w, h, e, '#f4f2ec', '#fbfaf6', { r: 3, semSombra: true });
+    c.fillStyle = '#c8a24a'; c.fillRect(x, fy + e * 0.55, w, 2.4); c.fillRect(x, fy + e - 3, w, 2);
+    c.fillStyle = '#8a1428'; c.fillRect(x + w * 0.28, fy + 3, w * 0.44, e * 0.5); c.strokeStyle = '#c8a24a'; c.lineWidth = 1; c.strokeRect(x + w * 0.28 + 0.5, fy + 3.5, w * 0.44 - 1, e * 0.5 - 1);
+    c.fillStyle = '#e8c870'; c.fillRect(cx - 1, fy + 5, 2, e * 0.38); c.fillRect(cx - 5, fy + 9, 10, 2);
+    c.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = x + 12; k < x + w - 4; k += 18) c.fillRect(k, fy + 2, 1.4, e - 5);   // dobras
+    // em cima: cruz dourada, castiçais, flores, livro
+    const ty2 = ty + h * 0.5;
+    c.fillStyle = '#d8b24a'; c.fillRect(cx - 2, ty2 - 30, 4, 30); c.fillRect(cx - 9, ty2 - 24, 18, 4); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(cx - 2, ty2 - 30, 1.2, 30); circ(c, cx, ty2 - 22, 2.6, '#c8302a');
+    [x + w * 0.2, x + w * 0.8].forEach(px => { c.fillStyle = '#c8a24a'; c.fillRect(px - 1.5, ty2 - 12, 3, 12); c.fillRect(px - 5, ty2 - 1, 10, 3); c.fillStyle = '#fbf6e0'; c.fillRect(px - 2, ty2 - 22, 4, 10); c.fillStyle = '#ffd86a'; c.beginPath(); c.ellipse(px, ty2 - 24, 2.2, 3.4, 0, 0, TAU); c.fill(); });
+    [[x + w * 0.38, '#e84a6a'], [x + w * 0.46, '#f2f2f2'], [x + w * 0.62, '#f2d84a']].forEach(([px, cc], k) => { c.fillStyle = '#2f8a3c'; c.fillRect(px - 0.5, ty2 - 8, 1.4, 8); circ(c, px, ty2 - 9, 2.8, cc); });
+    c.fillStyle = '#8a1428'; rr(c, cx - 9, ty2 + 4, 18, 9, 1.5); c.fill(); c.fillStyle = '#e8c870'; c.fillRect(cx - 7, ty2 + 7, 14, 1.2);
+  }, { alto: 40, pad: 16 });
+
+  // ======================= CONFESSIONÁRIO =======================
+  reg('confessionario', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 76, ty = y - e, fy = y + h - e, mad = '#4a2c18';
+    sombra(c, x, y, w, h, { dx: 6, dy: 9, r: 4 });
+    // telhado (de cima) com cumeeira e a frente entalhada
+    caixa(c, x, y, w, h, e, shade(mad, 0.22), mad, { r: 3, semSombra: true });
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + w / 2 - 1, ty, 2, h); c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(x + 2, ty + 2, w - 4, 1.6);
+    // frente: 3 partes (esquerda: grade do padre, centro: cabine com porta, direita: cortina)
+    const sw = (w - 8) / 3;
+    for (let i = 0; i < 3; i++) {
+      const px = x + 4 + i * sw, py = fy + 12, pw = sw - 3, ph = e - 22;
+      c.fillStyle = shade(mad, -0.4); c.beginPath(); c.moveTo(px, py + ph); c.lineTo(px, py + 12); c.quadraticCurveTo(px + pw / 2, py - 6, px + pw, py + 12); c.lineTo(px + pw, py + ph); c.closePath(); c.fill();
+      c.strokeStyle = '#c8a24a'; c.lineWidth = 1; c.stroke();
+      if (i === 1) {   // porta com cortina roxa
+        const g = c.createLinearGradient(px, 0, px + pw, 0); g.addColorStop(0, '#5a1a6a'); g.addColorStop(0.5, '#8a3a9a'); g.addColorStop(1, '#4a1458'); c.fillStyle = g; c.fillRect(px + 2, py + 12, pw - 4, ph - 12);
+        c.strokeStyle = 'rgba(0,0,0,0.3)'; for (let k = 1; k < 5; k++) { c.beginPath(); c.moveTo(px + 2 + k * (pw - 4) / 5, py + 12); c.lineTo(px + 2 + k * (pw - 4) / 5, py + ph); c.stroke(); }
+        c.fillStyle = '#c8a24a'; c.fillRect(px + pw - 7, py + ph * 0.55, 3, 3);
+      } else {   // grade de madeira
+        c.fillStyle = '#16100a'; c.fillRect(px + 3, py + 14, pw - 6, ph * 0.4); c.strokeStyle = '#8a5a30'; c.lineWidth = 1; for (let k = 0; k < 6; k++) { c.beginPath(); c.moveTo(px + 3 + k * (pw - 6) / 5, py + 14); c.lineTo(px + 3 + k * (pw - 6) / 5, py + 14 + ph * 0.4); c.stroke(); }
+        c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, px + 4, py + ph * 0.58, pw - 8, ph * 0.34, 2); c.fill();
+      }
+    }
+    // cruz no alto
+    const cx = x + w / 2; c.fillStyle = '#c8a24a'; c.fillRect(cx - 1.4, ty - 14, 3, 14); c.fillRect(cx - 5, ty - 10, 10, 3);
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x + 2, fy + 1, w - 4, 1.4);
+  }, { alto: 24 });
+
+  // ======================= PALCO =======================
+  reg('palco', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 24, ty = y - e, fy = y + h - e, r = rng((x + y) | 0);
+    sombra(c, x, y, w, h, { dx: 5, dy: 9, r: 3 });
+    // frente: saia de veludo vinho com franja dourada
+    const g = c.createLinearGradient(0, fy, 0, y + h); g.addColorStop(0, '#9a1a30'); g.addColorStop(1, '#4a0a16'); c.fillStyle = g; c.fillRect(x, fy, w, e);
+    c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1.2; for (let k = x + 8; k < x + w; k += 14) { c.beginPath(); c.moveTo(k, fy + 1); c.quadraticCurveTo(k + 3, fy + e * 0.5, k, y + h - 3); c.stroke(); }
+    c.fillStyle = '#c8a24a'; c.fillRect(x, fy, w, 2.6); for (let k = x + 3; k < x + w; k += 5) { c.fillRect(k, y + h - 6, 1.6, 6); }
+    // piso de tábuas
+    c.fillStyle = '#8a5e34'; c.fillRect(x, ty, w, h);
+    for (let j = 0; j < h; j += 9) { c.fillStyle = shade('#8a5e34', (r() - 0.5) * 0.18); c.fillRect(x, ty + j, w, 8); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x, ty + j + 8, w, 1); }
+    c.fillStyle = 'rgba(255,255,255,0.1)'; for (let k = 0; k < w / 30; k++) c.fillRect(x + r() * w, ty + r() * h, 22, 1);
+    // marcas de posição (fita)
+    c.fillStyle = '#f2e84a'; [0.25, 0.5, 0.75].forEach(a => { c.fillRect(x + w * a - 5, ty + h * 0.5 - 1, 10, 2); c.fillRect(x + w * a - 1, ty + h * 0.5 - 5, 2, 10); });
+    // luzes de rampa na borda da frente
+    for (let k = x + 16; k < x + w - 8; k += 36) { circ(c, k, ty + h - 4, 3.4, '#ffd86a'); c.fillStyle = 'rgba(255,220,120,0.25)'; c.beginPath(); c.arc(k, ty + h - 4, 9, 0, TAU); c.fill(); }
+    // escadinhas nas pontas
+    [x - 14, x + w].forEach(px => { caixa(c, px, y + h - 12, 14, 12, 8, '#a0703a', '#6a4424', { r: 2, semSombra: true }); });
+    // microfone no centro
+    const mx = x + w / 2; c.strokeStyle = '#2a2d34'; c.lineWidth = 2; c.beginPath(); c.moveTo(mx, ty + h * 0.55); c.lineTo(mx, ty + h * 0.2); c.stroke(); circ(c, mx, ty + h * 0.18, 3, '#16181e'); c.fillStyle = '#4a4f58'; c.fillRect(mx - 4, ty + h * 0.55, 8, 2);
+    contorno(c, x, ty, w, h + e, 3);
+  }, { alto: 20, pad: 20 });
+
+  // ======================= PANELÃO (cozinha industrial) =======================
+  reg('panelao', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e, cx = x + w / 2;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 3 });
+    // fogão industrial (base) e bocas
+    caixa(c, x, y, w, h, e - 10, '#3a3e48', '#22252c', { r: 3, semSombra: true });
+    const fy = y + h - (e - 10);
+    c.fillStyle = '#16181e'; for (let k = 0; k < 3; k++) { rr(c, x + 8 + k * (w - 16) / 3, fy + 5, (w - 16) / 3 - 6, e - 20, 2); c.fill(); }
+    for (let k = 0; k < 4; k++) { circ(c, x + 10 + k * (w - 20) / 3, fy + e - 14, 3, '#8a9099'); circ(c, x + 10 + k * (w - 20) / 3, fy + e - 14, 1.2, '#2a2d34'); }
+    // panelão de aço com duas alças e tampa entreaberta
+    const py = ty - 8, pr = Math.min(w, h * 1.4) * 0.36;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.beginPath(); c.ellipse(cx + 3, py + 6, pr + 2, pr * 0.8, 0, 0, TAU); c.fill();
+    const g = c.createLinearGradient(cx - pr, 0, cx + pr, 0); g.addColorStop(0, '#8a9099'); g.addColorStop(0.35, '#eef1f4'); g.addColorStop(1, '#6a707a'); c.fillStyle = g; c.beginPath(); c.ellipse(cx, py, pr, pr * 0.8, 0, 0, TAU); c.fill(); contorno(c, cx - pr, py - pr * 0.8, pr * 2, pr * 1.6, pr);
+    c.fillStyle = '#2a1a0e'; c.beginPath(); c.ellipse(cx, py, pr * 0.78, pr * 0.62, 0, 0, TAU); c.fill(); c.fillStyle = '#c8602a'; c.beginPath(); c.ellipse(cx, py + 1, pr * 0.7, pr * 0.54, 0, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,230,180,0.55)'; for (let k = 0; k < 7; k++) circ(c, cx + Math.cos(k * 2.4) * pr * 0.4, py + Math.sin(k * 2.4) * pr * 0.3, 1.6, 'rgba(255,225,170,0.6)');
+    [-1, 1].forEach(sg => { c.fillStyle = '#16181e'; rr(c, cx + sg * pr - 3, py - 3, 6, 6, 2); c.fill(); });
+    c.strokeStyle = '#d8dce0'; c.lineWidth = 3; c.beginPath(); c.moveTo(cx + 4, py - 3); c.lineTo(cx + pr * 1.1, py - pr * 0.9); c.stroke(); c.fillStyle = '#8a5a30'; rr(c, cx + pr * 1.05, py - pr * 1.0, 5, 12, 2); c.fill();
+  }, { alto: 30, din: (c, o, t) => { const cx = o.x + o.w / 2, py = o.y - (o.e || 30) - 14, pr = Math.min(o.w, o.h * 1.4) * 0.36; for (let k = 0; k < 4; k++) { const ph = (t * 0.8 + k * 0.25) % 1; c.fillStyle = 'rgba(255,255,255,' + 0.26 * (1 - ph) + ')'; c.beginPath(); c.arc(cx + Math.sin(t * 2 + k * 2) * pr * 0.35, py - ph * 34, 3 + ph * 7, 0, TAU); c.fill(); } } });
+
+  // ======================= COMPUTADOR (mesa com PC) =======================
+  reg('computador', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 24, ty = y - e, fy = y + h - e;
+    caixa(c, x, y, w, h, e, '#c8a878', '#8a6a46', { r: 3 });
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, x + 6, fy + 6, w * 0.4, e - 12, 2); c.fill(); c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, x + w * 0.52, fy + 6, w * 0.42, e - 12, 2); c.fill();
+    c.fillStyle = '#d8c890'; c.fillRect(x + w * 0.4 - 8, fy + e * 0.45, 8, 2); c.fillRect(x + w * 0.52 + 8, fy + e * 0.45, 8, 2);
+    // monitor (tela virada para quem usa, ao sul), teclado, mouse, caneca, papéis
+    const mx = x + w * 0.5 - 22, my = ty + 3;
+    c.fillStyle = 'rgba(0,0,0,0.28)'; rr(c, mx + 3, my + 4, 46, 28, 3); c.fill();
+    c.fillStyle = '#d4d8dc'; rr(c, mx, my, 44, 28, 3); c.fill(); contorno(c, mx, my, 44, 28, 3);
+    const gs = c.createLinearGradient(mx, my, mx + 40, my + 22); gs.addColorStop(0, '#3a7ad8'); gs.addColorStop(1, '#1a3a78'); c.fillStyle = gs; rr(c, mx + 3, my + 3, 38, 20, 1.6); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.7)'; for (let k = 0; k < 4; k++) c.fillRect(mx + 6, my + 6 + k * 4, 12 + (k % 2) * 8, 1.6); c.fillStyle = 'rgba(255,255,255,0.18)'; c.fillRect(mx + 3, my + 3, 38, 3);
+    c.fillStyle = '#8a9099'; c.fillRect(mx + 17, my + 28, 10, 2); c.fillRect(mx + 12, my + 30, 20, 2.4);
+    c.fillStyle = '#e8ecee'; rr(c, mx + 3, ty + h - 11, 36, 7, 1.6); c.fill(); contorno(c, mx + 3, ty + h - 11, 36, 7, 1.6); c.fillStyle = 'rgba(0,0,0,0.18)'; for (let k = 0; k < 3; k++) c.fillRect(mx + 5, ty + h - 9.5 + k * 2, 32, 0.8);
+    c.fillStyle = '#e8ecee'; rr(c, mx + 46, ty + h - 11, 6, 8, 3); c.fill(); contorno(c, mx + 46, ty + h - 11, 6, 8, 3);
+    c.fillStyle = '#f4f0e8'; rr(c, x + w - 30, ty + 6, 20, 14, 1); c.fill(); contorno(c, x + w - 30, ty + 6, 20, 14, 1); c.fillStyle = 'rgba(0,0,0,0.3)'; for (let k = 0; k < 3; k++) c.fillRect(x + w - 27, ty + 9 + k * 3.4, 14, 1);
+    circ(c, x + 14, ty + 14, 5, '#e8e2d6'); circ(c, x + 14, ty + 14, 3.4, '#5a3a22'); contorno(c, x + 9, ty + 9, 10, 10, 5);
+  }, { alto: 26 });
+
+  // ======================= BALCÃO DE PADARIA (vitrine de pães) =======================
+  reg('balcao_padaria', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 28, ty = y - e, fy = y + h - e, r = rng((x * 3 + y) | 0), bh = Math.round(e * 0.5);
+    caixa(c, x, y, w, h, bh, '#f0e0c0', '#8a5a34', { r: 3 });
+    // frente de madeira com almofadas
+    const n = Math.max(2, Math.round(w / 46)), pw = (w - 8) / n, fb = y + h - bh;
+    for (let i = 0; i < n; i++) { c.fillStyle = 'rgba(0,0,0,0.22)'; rr(c, x + 4 + i * pw + 3, fb + 4, pw - 6, bh - 8, 2); c.fill(); c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 1; rr(c, x + 4.5 + i * pw + 3, fb + 4.5, pw - 7, bh - 9, 2); c.stroke(); }
+    // bandejas com pães vistas pelo vidro
+    const by = y - bh, ah = e - bh;
+    c.fillStyle = '#f4ecd8'; rr(c, x + 3, by - h + 2, w - 6, h - 2, 3); c.fill();
+    for (let k = x + 12, i = 0; k < x + w - 12; k += 20, i++) {
+      const t = i % 4, my = by - h * 0.55;
+      if (t === 0) { c.fillStyle = '#c8884a'; c.beginPath(); c.ellipse(k, my, 9, 4, 0.2, 0, TAU); c.fill(); c.fillStyle = '#e8b070'; c.beginPath(); c.ellipse(k - 1, my - 1, 7, 2.6, 0.2, 0, TAU); c.fill(); c.strokeStyle = 'rgba(120,60,20,0.5)'; for (let q = -1; q <= 1; q++) { c.beginPath(); c.moveTo(k + q * 3 - 1, my - 3); c.lineTo(k + q * 3 + 1, my + 2); c.stroke(); } }
+      else if (t === 1) { c.fillStyle = '#d8a060'; circ(c, k - 4, my, 4.4, '#d8a060'); circ(c, k + 4, my + 1, 4.4, '#c8904a'); circ(c, k, my - 3, 4, '#e0b070'); }
+      else if (t === 2) { c.fillStyle = '#e8c070'; rr(c, k - 8, my - 4, 16, 8, 4); c.fill(); c.fillStyle = '#f8f0e0'; c.fillRect(k - 6, my - 2, 12, 1.6); circ(c, k, my, 1.4, '#c8302a'); }
+      else { c.fillStyle = '#8a5a34'; c.beginPath(); c.ellipse(k, my, 8, 4.6, 0, 0, TAU); c.fill(); c.fillStyle = '#f4ecd8'; c.beginPath(); c.ellipse(k, my - 1, 5, 2.4, 0, 0, TAU); c.fill(); circ(c, k, my - 1, 1.4, '#c8302a'); }
+      c.fillStyle = '#f2e84a'; c.fillRect(k - 5, by - 2, 9, 2.4);   // etiqueta de preço
+    }
+    // vidro curvo
+    const gv = c.createLinearGradient(x, by - ah - h, x + w, by); gv.addColorStop(0, 'rgba(210,235,250,0.3)'); gv.addColorStop(0.5, 'rgba(210,235,250,0.08)'); gv.addColorStop(1, 'rgba(210,235,250,0.3)');
+    c.fillStyle = gv; rr(c, x + 2, by - ah - h + 2, w - 4, ah + h, 5); c.fill(); c.strokeStyle = '#b8bec6'; c.lineWidth = 2; rr(c, x + 2, by - ah - h + 2, w - 4, ah + h, 5); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.55)'; c.beginPath(); c.moveTo(x + 10, by - ah - h + 4); c.lineTo(x + 26, by - ah - h + 4); c.lineTo(x + 12, by - 2); c.lineTo(x + 6, by - 2); c.closePath(); c.fill();
+    // cesta de pão na ponta e balança
+    c.fillStyle = '#b88a4a'; rr(c, x + w - 24, ty - 3, 18, 12, 4); c.fill(); contorno(c, x + w - 24, ty - 3, 18, 12, 4); circ(c, x + w - 18, ty, 3.6, '#d8a060'); circ(c, x + w - 12, ty + 1, 3.4, '#c8904a');
+  }, { alto: 26 });
+
+  // ======================= CAIXA DE SUPERMERCADO (esteira + registradora) =======================
+  reg('caixa_reg', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 22, ty = y - e, r = rng((x + y) | 0), aberto = o.aberto !== false;
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 3 });
+    // esteira rolante (lado esquerdo) com rolos e produtos
+    const bw = w * 0.56;
+    caixa(c, x, y, bw, h, e - 8, '#3a3e48', '#22252c', { r: 3, semSombra: true });
+    const by = ty + 8; c.fillStyle = '#16181e'; rr(c, x + 3, by, bw - 6, h - 10, 3); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.08)'; c.lineWidth = 1; for (let k = 0; k < bw - 6; k += 6) { c.beginPath(); c.moveTo(x + 4 + k, by + 1); c.lineTo(x + 4 + k, by + h - 11); c.stroke(); }
+    if (aberto) {
+      circ(c, x + 11, by + 10, 4.6, '#e8402a'); circ(c, x + 11 - 1, by + 9, 1.5, 'rgba(255,255,255,0.7)'); c.fillStyle = '#2a58b8'; rr(c, x + 20, by + 5, 9, 14, 2); c.fill(); c.fillStyle = '#f2c82a'; c.fillRect(x + 21, by + 8, 7, 3);
+      c.fillStyle = '#6aa83a'; rr(c, x + 33, by + 9, 14, 7, 3); c.fill();
+    }
+    c.fillStyle = '#e8402a'; c.fillRect(x + bw - 8, by, 2.4, h - 10);   // separador
+    // registradora (direita): pedestal, monitor com tela, scanner, gaveta
+    const rx = x + bw + 4, rw = w - bw - 4;
+    caixa(c, rx, y, rw, h, e, '#d8dce0', '#5a606a', { r: 3, semSombra: true });
+    c.fillStyle = '#14161c'; rr(c, rx + 3, ty - 14, rw - 6, 14, 2); c.fill();
+    c.fillStyle = aberto ? '#2a8a4a' : '#8a2a2a'; rr(c, rx + 5, ty - 12, rw - 10, 9, 1); c.fill(); c.fillStyle = 'rgba(255,255,255,0.8)'; for (let k = 0; k < 3; k++) c.fillRect(rx + 7, ty - 10.4 + k * 2.6, 8 + k * 3, 1);
+    c.fillStyle = '#16181e'; rr(c, rx + 4, ty + 6, rw - 8, 10, 2); c.fill(); c.fillStyle = 'rgba(255,60,40,0.6)'; c.fillRect(rx + 8, ty + 10, rw - 16, 1.4);
+    c.fillStyle = 'rgba(0,0,0,0.35)'; for (let k = 0; k < 2; k++) for (let j = 0; j < 3; j++) c.fillRect(rx + 5 + j * 6, ty + h - 12 + k * 4, 4.4, 2.6);
+    circ(c, rx + rw - 5, ty - 15, 2.2, aberto ? '#3ad060' : '#e8402a'); c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(rx + 2, ty + 0.5, rw - 4, 1.2);
+    contorno(c, x, ty, w, h + e, 3);
+  }, { alto: 24 });
+
+  // ======================= PILHA DE CARRINHOS =======================
+  reg('pilha_carrinhos', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    sombra(c, x, y + 2, w, h, { dx: 5, dy: 7, r: 4 });
+    const n = 5;
+    for (let i = n - 1; i >= 0; i--) {
+      const ox = x + i * 8, oy = y + h * 0.1 - i * 3;   // cada carrinho encaixado no outro, um pouco mais alto
+      const cw = w - 38, ch = h * 0.72;
+      c.fillStyle = 'rgba(0,0,0,0.15)'; rr(c, ox + 2, oy + 4, cw, ch, 4); c.fill();
+      c.fillStyle = 'rgba(210,225,240,0.2)'; rr(c, ox, oy, cw, ch, 4); c.fill(); c.strokeStyle = i === 0 ? '#e8ecf0' : '#aab2ba'; c.lineWidth = 1.2; rr(c, ox, oy, cw, ch, 4); c.stroke();
+      c.strokeStyle = 'rgba(190,200,210,0.65)'; c.lineWidth = 0.8; for (let k = 4; k < cw; k += 5) { c.beginPath(); c.moveTo(ox + k, oy + 1); c.lineTo(ox + k, oy + ch - 1); c.stroke(); } for (let k = 4; k < ch; k += 5) { c.beginPath(); c.moveTo(ox + 1, oy + k); c.lineTo(ox + cw - 1, oy + k); c.stroke(); }
+      // cabo vermelho
+      c.strokeStyle = '#d8302a'; c.lineWidth = 3; c.beginPath(); c.moveTo(ox + cw - 1, oy + 1); c.lineTo(ox + cw + 10, oy - 1); c.stroke();
+      circ(c, ox + 4, oy + ch + 1, 1.8, '#2a2d34'); circ(c, ox + cw - 4, oy + ch + 1, 1.8, '#2a2d34');
+    }
+    c.fillStyle = '#d8302a'; rr(c, x + 8 * (n - 1) + w - 38 + 4, y + h * 0.1 - (n - 1) * 3 - 3, 12, 4, 2); c.fill();
+  }, { alto: 14, pad: 14 });
+
+  // ======================= TORRE DE VIGIA (pátio da cadeia) =======================
+  reg('torre', (c, o) => {
+    const x = o.x, y = o.y, w = o.w;
+    const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, '#6a707a'); g.addColorStop(0.5, '#4a4f58'); g.addColorStop(1, '#2a2d34'); c.fillStyle = g; c.fillRect(x, y - 150, w, 150);
+    c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1; for (let k = 0; k < 150; k += 14) { c.beginPath(); c.moveTo(x, y - k); c.lineTo(x + w, y - k); c.stroke(); }
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + w, y - 150, 6, 152);
+    // cabine com vidro, farol e telhado
+    c.fillStyle = '#16181e'; rr(c, x - 12, y - 190, w + 24, 46, 4); c.fill(); c.fillStyle = '#e8d890'; for (let k = 0; k < 3; k++) { c.fillRect(x - 8 + k * ((w + 16) / 3), y - 182, (w + 16) / 3 - 4, 24); }
+    c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x - 8, y - 182, w + 16, 4); c.fillStyle = '#3a3e48'; c.fillRect(x - 16, y - 196, w + 32, 8);
+    circ(c, x + w / 2, y - 200, 5, '#fffbe0'); c.fillStyle = 'rgba(255,250,200,0.15)'; c.beginPath(); c.moveTo(x + w / 2, y - 200); c.lineTo(x - 80, y - 90); c.lineTo(x + w + 80, y - 90); c.closePath(); c.fill();
+    c.fillStyle = '#2a2d34'; c.fillRect(x + w * 0.35, y - 30, w * 0.3, 30);
+  }, { alto: 210, pad: 90 });
+
+  // ======================= HALTER (barra com anilhas, pátio) =======================
+  reg('halter', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cy = y - 4;
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 3 });
+    // banco de peso
+    caixa(c, x + w * 0.3, y + 2, w * 0.4, h - 2, 8, '#2a2d36', '#16181e', { r: 4, semSombra: true });
+    [x + w * 0.2, x + w * 0.76].forEach(px => { barra(c, px, cy - 30, 4, 40, '#4a4f58'); });
+    const by = cy - 24; const gb = c.createLinearGradient(0, by, 0, by + 4); gb.addColorStop(0, '#f2f4f6'); gb.addColorStop(1, '#8a9099'); c.fillStyle = gb; c.fillRect(x + 2, by, w - 4, 4);
+    [[x + 2, 1], [x + w - 2, -1]].forEach(([px, sg]) => { [['#16181e', 8, 30], ['#d8302a', 5, 24], ['#2a58b8', 4, 18]].forEach(([cc, ww, hh2], k) => { const off = [0, 8, 13][k]; const xx = sg > 0 ? px + off : px - ww - off; barra(c, xx, by + 2 - hh2 / 2, ww, hh2, cc); }); });
+  }, { alto: 36, pad: 14 });
+
+  // ======================= BALANÇA, SACO, COFRE DE BANCO... (extras de lugar) =======================
+  // cofre-forte do banco: porta redonda de aço com volante
+  const cofreBanco = (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 46, fy = y + h - e;
+    caixa(c, x, y, w, h, e, '#6a707a', '#4a4f58', { r: 4 });
+    c.fillStyle = 'rgba(0,0,0,0.25)'; rr(c, x + 6, fy + 6, w - 12, e - 12, 3); c.fill();
+    const cx = x + w / 2, cy = fy + e / 2, r = Math.min(e / 2 - 5, w * 0.3);
+    const g = c.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 2, cx, cy, r); g.addColorStop(0, '#d8dce0'); g.addColorStop(1, '#7a808a'); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, TAU); c.fill(); contorno(c, cx - r, cy - r, r * 2, r * 2, r);
+    c.strokeStyle = '#3a3e48'; c.lineWidth = 2.4; for (let k = 0; k < 6; k++) { const a = k * TAU / 6; c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8); c.stroke(); circ(c, cx + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8, 2, '#c8a24a'); }
+    circ(c, cx, cy, 3.6, '#2a2d34'); c.fillStyle = '#e8c870'; c.beginPath(); c.arc(cx, cy, 1.6, 0, TAU); c.fill();
+    for (let k = 0; k < 4; k++) circ(c, x + 6 + (k % 2) * (w - 12), fy + 6 + ((k / 2) | 0) * (e - 12), 1.6, '#aab0b8');
+  };
+  reg('cofre_banco', cofreBanco, { alto: 12 });
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   MOBILIA4.JS — móveis de hospital, escritório, banco, estádio, barbearia e shopping:
+   leito e maca, soro, monitor, cadeira de rodas, armário de remédios, máquina de lanche,
+   biombo, bebedouro, balança, arquivo, caixa eletrônico, catraca, trave de gol,
+   banco de reservas, arquibancada com torcida, bandeira, cadeira de barbeiro, poste de
+   barbeiro, fonte do shopping e forno de pizza. Chão de gramado e linhas do campo.
+   Convenção: o.x,o.y,o.w,o.h = pegada no chão; o.e = altura.
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, D = G.deco, TAU = Math.PI * 2;
+  const shade = K.shade, hh = K.hh, rr = D.rr, mix = D.mix, rng = D.rng;
+  const reg = D.reg, caixa = D.caixa, sombra = D.sombra;
+  const circ = (c, x, y, r, cor) => { c.fillStyle = cor; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
+  const elip = (c, x, y, rx, ry, cor) => { c.fillStyle = cor; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, TAU); c.fill(); };
+  const contorno = (c, x, y, w, h, r) => { c.strokeStyle = 'rgba(0,0,0,0.4)'; c.lineWidth = 1; rr(c, x + 0.5, y + 0.5, w - 1, h - 1, r || 1); c.stroke(); };
+  const brilho = (c, x, y, w, a) => { c.fillStyle = 'rgba(255,255,255,' + (a || 0.4) + ')'; c.fillRect(x, y, w, 1.2); };
+  const aco = (c, x, y, w, h, r, claro) => { const g = c.createLinearGradient(x, y, x, y + h); g.addColorStop(0, claro ? '#fafbfc' : '#eef1f4'); g.addColorStop(0.5, claro ? '#d8dde2' : '#c2c8ce'); g.addColorStop(1, claro ? '#aab1b8' : '#8a9199'); c.fillStyle = g; rr(c, x, y, w, h, r || 0); c.fill(); };
+  const barra = (c, x, y, w, h, cor) => { const g = c.createLinearGradient(x, 0, x + w, 0); g.addColorStop(0, shade(cor, 0.35)); g.addColorStop(0.45, cor); g.addColorStop(1, shade(cor, -0.42)); c.fillStyle = g; c.fillRect(x, y, w, h); };
+  const roda = (c, x, y, r) => { circ(c, x, y, r, '#23262d'); circ(c, x, y, r * 0.45, '#9aa2aa'); };
+
+  // =====================================================================
+  //  LEITO E MACA
+  // =====================================================================
+  function camaHosp(c, o, maca) {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || (maca ? 20 : 16), top = y - e, cor = o.cor || (maca ? '#9ec8e8' : '#6aa8d8');
+    sombra(c, x, y, w, h, { dx: 4, dy: 8, r: 5 });
+    if (!maca) {   // cabeceira: painel alto atrás do colchão
+      const g = c.createLinearGradient(0, top - 18, 0, top + 6); g.addColorStop(0, '#eef2f5'); g.addColorStop(1, '#b8c2cc');
+      c.fillStyle = g; rr(c, x + 1, top - 18, w - 2, 26, 3); c.fill(); contorno(c, x + 1, top - 18, w - 2, 26, 3);
+      c.fillStyle = 'rgba(0,0,0,0.12)'; rr(c, x + 6, top - 13, w - 12, 12, 2); c.fill(); brilho(c, x + 3, top - 17, w - 6, 0.6);
+    }
+    caixa(c, x, y, w, h, e, '#f6f8fa', '#aeb6be', { r: 3, semSombra: true });
+    // rodinhas
+    roda(c, x + 7, y + h + 0.5, 3.4); roda(c, x + w - 7, y + h + 0.5, 3.4);
+    // colchão e lençol
+    c.fillStyle = '#e6ebef'; rr(c, x + 3, top + 3, w - 6, h - 6, 4); c.fill();
+    // cobertor (parte de baixo)
+    const by = top + h * (maca ? 0.3 : 0.36), bh = top + h - 4 - by;
+    const gb = c.createLinearGradient(x, by, x + w, by + bh); gb.addColorStop(0, shade(cor, 0.16)); gb.addColorStop(1, shade(cor, -0.16));
+    c.fillStyle = gb; rr(c, x + 4, by, w - 8, bh, 4); c.fill();
+    c.fillStyle = '#f8fafc'; c.fillRect(x + 4, by, w - 8, 6); c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(x + 4, by + 6, w - 8, 1.4);   // dobra do lençol
+    c.strokeStyle = 'rgba(0,0,0,0.12)'; c.lineWidth = 1; for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(x + 8, by + 8 + k * bh / 4.4); c.quadraticCurveTo(x + w / 2, by + 4 + k * bh / 4.4, x + w - 8, by + 9 + k * bh / 4.4); c.stroke(); }
+    if (maca) { c.fillStyle = '#2a3a5a'; c.fillRect(x + 4, by + bh * 0.42, w - 8, 3.4); c.fillStyle = '#c8d0d8'; c.fillRect(x + w / 2 - 3, by + bh * 0.42 - 0.5, 6, 4.4); }
+    // travesseiro
+    const pw = w * 0.66, ph = Math.min(17, h * 0.2);
+    c.fillStyle = 'rgba(0,0,0,0.18)'; rr(c, x + (w - pw) / 2 + 1, top + 6, pw, ph, 6); c.fill();
+    c.fillStyle = '#fdfdfd'; rr(c, x + (w - pw) / 2, top + 5, pw, ph, 6); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1; rr(c, x + (w - pw) / 2 + 0.5, top + 5.5, pw - 1, ph - 1, 6); c.stroke();
+    // grades laterais
+    [x - 1, x + w - 3].forEach(px => { c.fillStyle = '#d0d7de'; c.fillRect(px, top + 9, 4, h - 20); c.fillStyle = 'rgba(255,255,255,0.7)'; c.fillRect(px + 0.5, top + 9, 1, h - 20); c.fillStyle = '#8a929a'; c.fillRect(px + 1, top + 9, 1, h - 20); c.fillRect(px, top + 9, 4, 1.6); c.fillRect(px, top + h - 12, 4, 1.6); });
+    // pé da cama
+    c.fillStyle = '#d6dce2'; c.fillRect(x + 2, top + h - 5, w - 4, 4); c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + 2, top + h - 1.5, w - 4, 1.5);
+  }
+  reg('leito', (c, o) => camaHosp(c, o, false), { alto: 24 });
+  reg('maca', (c, o) => camaHosp(c, o, true), { alto: 6 });
+
+  // =====================================================================
+  //  SORO, MONITOR, CADEIRA DE RODAS
+  // =====================================================================
+  reg('soro', (c, o) => {
+    const cx = o.x + o.w / 2, cy = o.y + o.h - 5, e = o.e || 72;
+    elip(c, cx + 3, cy + 3, 13, 5, 'rgba(0,0,0,0.22)');
+    c.strokeStyle = '#9aa2aa'; c.lineWidth = 2.2; c.lineCap = 'round';
+    [[-12, 2], [12, 2], [-7, 6], [7, 6], [0, -4]].forEach(([dx, dy]) => { c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + dx, cy + dy); c.stroke(); });
+    [[-12, 2], [12, 2], [-7, 6], [7, 6]].forEach(([dx, dy]) => circ(c, cx + dx, cy + dy + 1, 1.9, '#23262d'));
+    barra(c, cx - 1.5, cy - e, 3, e, '#c8d0d8');
+    c.strokeStyle = '#c8d0d8'; c.lineWidth = 2; c.beginPath(); c.moveTo(cx - 10, cy - e + 2); c.lineTo(cx + 10, cy - e + 2); c.stroke();
+    // bolsa de soro pendurada
+    const bx = cx - 14, by = cy - e + 4;
+    c.fillStyle = 'rgba(225,240,250,0.92)'; rr(c, bx, by, 12, 24, 4); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.35)'; c.lineWidth = 1; rr(c, bx + 0.5, by + 0.5, 11, 23, 4); c.stroke();
+    c.fillStyle = 'rgba(90,170,230,0.75)'; rr(c, bx + 2, by + 9, 8, 13, 3); c.fill(); c.fillStyle = '#e8f4ff'; c.fillRect(bx + 2, by + 4, 8, 4); c.fillStyle = '#c8302a'; c.fillRect(bx + 3, by + 5, 4, 1.4);
+    c.fillStyle = 'rgba(255,255,255,0.7)'; c.fillRect(bx + 2, by + 2, 1.6, 18);
+    // gotejador e tubinho
+    c.fillStyle = '#e8f4ff'; rr(c, bx + 4, by + 24, 4, 7, 1.5); c.fill(); contorno(c, bx + 4, by + 24, 4, 7, 1.5);
+    c.strokeStyle = 'rgba(215,235,248,0.95)'; c.lineWidth = 1.3; c.beginPath(); c.moveTo(bx + 6, by + 31); c.bezierCurveTo(bx + 6, by + 46, cx + 20, by + 36, cx + 22, cy - e * 0.3); c.stroke();
+  }, { alto: 14 });
+
+  reg('monitor_vital', (c, o) => {
+    const cx = o.x + o.w / 2, cy = o.y + o.h - 4, e = o.e || 48;
+    elip(c, cx + 2, cy + 2, 14, 5, 'rgba(0,0,0,0.22)');
+    c.strokeStyle = '#7a828a'; c.lineWidth = 2; [[-11, 3], [11, 3]].forEach(([dx, dy]) => { c.beginPath(); c.moveTo(cx, cy - 4); c.lineTo(cx + dx, cy + dy); c.stroke(); roda(c, cx + dx, cy + dy + 1.4, 2); });
+    barra(c, cx - 2, cy - e + 22, 4, e - 22, '#9aa2aa');
+    const mw = 36, mh = 26, mx = cx - mw / 2, my = cy - e;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, mx + 2, my + 3, mw, mh, 3); c.fill();
+    aco(c, mx, my, mw, mh, 3, false); contorno(c, mx, my, mw, mh, 3);
+    c.fillStyle = '#05080c'; rr(c, mx + 3, my + 3, mw - 6, mh - 9, 2); c.fill();
+    c.strokeStyle = 'rgba(80,200,120,0.18)'; c.lineWidth = 1; for (let k = 1; k < 4; k++) { c.beginPath(); c.moveTo(mx + 3 + k * (mw - 6) / 4, my + 3); c.lineTo(mx + 3 + k * (mw - 6) / 4, my + mh - 6); c.stroke(); }
+    c.fillStyle = '#4a5058'; for (let k = 0; k < 4; k++) c.fillRect(mx + 5 + k * 7, my + mh - 5, 5, 2.4);
+    circ(c, mx + mw - 5, my + mh - 4, 1.3, '#e84a4a');
+  }, {
+    alto: 8, din(ctx, o, t) {
+      const cx = o.x + o.w / 2, cy = o.y + o.h - 4, e = o.e || 48, mw = 36, mh = 26, mx = cx - mw / 2, my = cy - e;
+      ctx.save(); ctx.beginPath(); ctx.rect(mx + 3, my + 3, mw - 6, mh - 9); ctx.clip();
+      ctx.strokeStyle = '#4af08a'; ctx.lineWidth = 1.3; ctx.beginPath();
+      for (let i = 0; i <= 30; i++) { const ph = ((i / 30) * 2 + t * 1.2) % 1, v = ph < 0.08 ? -9 * Math.sin(ph / 0.08 * Math.PI) : ph < 0.14 ? 5 * Math.sin((ph - 0.08) / 0.06 * Math.PI) : 0; const px = mx + 3 + i * (mw - 6) / 30, py = my + 3 + (mh - 9) * 0.55 - v * 0.8; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+      ctx.stroke(); ctx.restore();
+      ctx.fillStyle = '#f2e84a'; ctx.font = 'bold 6px Arial'; ctx.fillText('72', mx + mw - 14, my + 9); ctx.fillStyle = '#5ac8ff'; ctx.fillText('98', mx + mw - 14, my + 16);
+      if (Math.sin(t * 7) > 0.6) circ(ctx, mx + 6, my + 7, 1.2, '#e84a4a');
+    }
+  });
+
+  reg('cadeira_rodas', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cor = o.cor || '#2a4a7a';
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 6 });
+    // rodas grandes dos lados (vistas de cima)
+    [x - 1, x + w - 4].forEach(px => { c.fillStyle = '#1c1f24'; rr(c, px, y + 5, 5, h * 0.62, 2); c.fill(); c.strokeStyle = '#9aa2aa'; c.lineWidth = 1; rr(c, px + 0.5, y + 5.5, 4, h * 0.62 - 1, 2); c.stroke(); c.strokeStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); for (let k = 0; k < 4; k++) { c.moveTo(px + 1, y + 9 + k * 5); c.lineTo(px + 4, y + 9 + k * 5); } c.stroke(); });
+    // rodinhas da frente e apoio dos pés
+    roda(c, x + 6, y + h - 3, 2.6); roda(c, x + w - 6, y + h - 3, 2.6);
+    c.fillStyle = '#8a929a'; rr(c, x + 7, y + h - 9, w - 14, 5, 2); c.fill();
+    // assento e encosto
+    const g = c.createLinearGradient(x, y, x + w, y + h); g.addColorStop(0, shade(cor, 0.2)); g.addColorStop(1, shade(cor, -0.2));
+    c.fillStyle = g; rr(c, x + 4, y + 9, w - 8, h * 0.5, 4); c.fill(); contorno(c, x + 4, y + 9, w - 8, h * 0.5, 4);
+    c.fillStyle = shade(cor, -0.1); rr(c, x + 4, y - 4, w - 8, 14, 4); c.fill(); contorno(c, x + 4, y - 4, w - 8, 14, 4); brilho(c, x + 7, y - 3, w - 14, 0.4);
+    // apoios de braço e manoplas
+    c.fillStyle = '#16181e'; c.fillRect(x + 3, y + 3, 3, 12); c.fillRect(x + w - 6, y + 3, 3, 12);
+    c.fillStyle = '#16181e'; rr(c, x + 3, y - 7, 5, 4, 1.5); c.fill(); rr(c, x + w - 8, y - 7, 5, 4, 1.5); c.fill();
+  }, { alto: 14 });
+
+  // =====================================================================
+  //  ARMÁRIO DE REMÉDIOS, MÁQUINA DE LANCHE, BIOMBO, BEBEDOURO, BALANÇA, ARQUIVO
+  // =====================================================================
+  reg('armario_med', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 70, fy = y + h - e;
+    caixa(c, x, y, w, h, e, '#e8edf0', '#d4dce2', { r: 2 });
+    // metade de cima: vidro com frascos
+    const gh = e * 0.52, n = Math.max(2, Math.round(w / 28)), pw = (w - 6) / n;
+    for (let i = 0; i < n; i++) {
+      const px = x + 3 + i * pw; c.fillStyle = '#7a8c98'; rr(c, px + 1, fy + 4, pw - 2, gh, 2); c.fill(); c.fillStyle = '#c8dae6'; rr(c, px + 2, fy + 5, pw - 4, gh - 2, 2); c.fill();
+      c.fillStyle = 'rgba(40,60,80,0.25)'; c.fillRect(px + 2, fy + 5 + gh * 0.5, pw - 4, 1.4);
+      for (let k = 0; k < 2; k++) for (let j = 0; j < 3; j++) { const bx = px + 5 + j * ((pw - 10) / 3), by = fy + 8 + k * gh * 0.5, cc = ['#e8402a', '#2a58b8', '#f2c82a', '#2f9a4a', '#f4f4f4'][(i * 7 + j * 3 + k) % 5]; c.fillStyle = cc; c.fillRect(bx, by + 4, 4.5, 8); c.fillStyle = '#f4f4f4'; c.fillRect(bx + 0.8, by + 2, 2.8, 2.4); }
+      c.fillStyle = 'rgba(255,255,255,0.4)'; c.beginPath(); c.moveTo(px + 3, fy + 5); c.lineTo(px + 9, fy + 5); c.lineTo(px + 4, fy + 4 + gh); c.lineTo(px + 2, fy + 4 + gh); c.closePath(); c.fill();
+      c.fillStyle = '#9aa4ac'; c.fillRect(px + pw - 6, fy + 4 + gh * 0.5, 2, 6);
+    }
+    // metade de baixo: portas lisas com cruz vermelha
+    c.fillStyle = 'rgba(0,0,0,0.16)'; c.fillRect(x + 2, fy + gh + 8, w - 4, 1.4);
+    for (let i = 0; i < n; i++) { const px = x + 3 + i * pw; c.strokeStyle = 'rgba(0,0,0,0.22)'; c.strokeRect(px + 1.5, fy + gh + 11.5, pw - 3, e - gh - 18); c.fillStyle = '#9aa4ac'; c.fillRect(px + pw - 6, fy + gh + 16, 2, 7); }
+    c.fillStyle = '#d93636'; c.fillRect(x + w / 2 - 1.8, fy + gh + 15, 3.6, 11); c.fillRect(x + w / 2 - 5.5, fy + gh + 18.6, 11, 3.6);
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + 2, y + h - 3, w - 4, 3);
+  }, { alto: 8 });
+
+  reg('maquina_venda', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 78, fy = y + h - e, cor = o.cor || '#c8302a';
+    caixa(c, x, y, w, h, e, shade(cor, 0.1), cor, { r: 3 });
+    // letreiro aceso
+    c.fillStyle = '#fff4c8'; rr(c, x + 4, fy + 4, w - 8, 9, 2); c.fill(); c.fillStyle = shade(cor, -0.2); c.font = 'bold 7px Arial'; c.textAlign = 'center'; c.fillText(o.nome || 'LANCHES', x + w / 2, fy + 11.2); c.textAlign = 'left';
+    // vitrine com produtos
+    const vx = x + 4, vy = fy + 16, vw = w * 0.66, vh = e - 36;
+    c.fillStyle = '#0d1014'; rr(c, vx, vy, vw, vh, 2); c.fill();
+    const r = rng((x * 7 + y) | 0), nl = 5, lh = vh / nl;
+    for (let l = 0; l < nl; l++) {
+      c.fillStyle = 'rgba(255,255,255,0.12)'; c.fillRect(vx + 1, vy + (l + 1) * lh - 2, vw - 2, 1.6);
+      for (let k = 0; k < 5; k++) { const bw = (vw - 6) / 5, bx = vx + 3 + k * bw; c.fillStyle = ['#e8402a', '#f2c82a', '#2a58b8', '#2f9a4a', '#e84a8a', '#f08a2a', '#8a4fc2'][(r() * 7) | 0]; rr(c, bx + 0.8, vy + l * lh + 3, bw - 2, lh - 6, 1.4); c.fill(); c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(bx + 1.6, vy + l * lh + 4, bw - 4, 1.2); }
+    }
+    c.fillStyle = 'rgba(255,255,255,0.18)'; c.beginPath(); c.moveTo(vx + 2, vy); c.lineTo(vx + 14, vy); c.lineTo(vx + 3, vy + vh); c.lineTo(vx + 1, vy + vh); c.closePath(); c.fill();
+    // painel lateral: teclado e moedeiro
+    const px = x + w * 0.72, pw = w * 0.24; c.fillStyle = '#2a2d34'; rr(c, px, vy, pw, vh * 0.7, 2); c.fill();
+    c.fillStyle = '#4af08a'; c.fillRect(px + 2, vy + 3, pw - 4, 5); for (let k = 0; k < 6; k++) { c.fillStyle = '#c8ccd2'; c.fillRect(px + 2 + (k % 2) * (pw / 2 - 1), vy + 12 + ((k / 2) | 0) * 6, pw / 2 - 3, 4); }
+    c.fillStyle = '#0d1014'; c.fillRect(px + 3, vy + vh * 0.7 - 7, pw - 6, 2.4);
+    // bandeja de retirada
+    c.fillStyle = '#0d1014'; rr(c, vx, vy + vh + 3, vw, 8, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.14)'; c.fillRect(vx + 2, vy + vh + 4, vw - 4, 1.4);
+  }, { alto: 8 });
+
+  reg('biombo', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 72, cor = o.cor || '#9ccab8', fy = y + h - e;
+    c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(x + 3, y + h - 1, w, 4);
+    // cortina com dobras
+    const g = c.createLinearGradient(x, 0, x + w, 0); const n = Math.max(3, Math.round(w / 12));
+    for (let i = 0; i < n; i++) { const a = x + i * w / n, b = x + (i + 1) * w / n; const gg = c.createLinearGradient(a, 0, b, 0); gg.addColorStop(0, shade(cor, -0.2)); gg.addColorStop(0.5, shade(cor, 0.16)); gg.addColorStop(1, shade(cor, -0.22)); c.fillStyle = gg; c.fillRect(a, fy + 3, b - a + 0.6, e - 14); }
+    // faixa de tela no alto
+    c.fillStyle = 'rgba(255,255,255,0.28)'; c.fillRect(x, fy + 3, w, 14); c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1; for (let i = 0; i <= w; i += 4) { c.beginPath(); c.moveTo(x + i, fy + 3); c.lineTo(x + i, fy + 17); c.stroke(); }
+    c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(x, fy + e - 11, w, 1.4);
+    // trilho e argolas
+    c.fillStyle = '#c8d0d8'; c.fillRect(x - 2, fy, w + 4, 3); brilho(c, x - 2, fy, w + 4, 0.7);
+    for (let i = 0; i < w; i += 9) { c.strokeStyle = '#d8dee4'; c.lineWidth = 1.2; c.beginPath(); c.arc(x + 4 + i, fy + 5, 2, 0, TAU); c.stroke(); }
+    // pés com rodinhas
+    barra(c, x - 1, fy + 3, 3, e - 3, '#c8d0d8'); barra(c, x + w - 2, fy + 3, 3, e - 3, '#c8d0d8'); roda(c, x, y + h, 2.4); roda(c, x + w, y + h, 2.4);
+  }, { alto: 8 });
+
+  reg('bebedouro', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 62, cx = x + w / 2, fy = y + h - e;
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 5 });
+    caixa(c, x + 2, y + 2, w - 4, h - 2, e * 0.62, '#dfe4e8', '#c2cad2', { r: 3, semSombra: true });
+    // torneiras e bandeja
+    const ty = y + h - e * 0.62 + 8;
+    c.fillStyle = '#3a8ad8'; c.fillRect(cx - 7, ty, 4, 5); c.fillStyle = '#d84a3a'; c.fillRect(cx + 3, ty, 4, 5);
+    c.fillStyle = '#8a929a'; rr(c, cx - 9, ty + 9, 18, 4, 1.4); c.fill(); c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(cx - 8, ty + 10, 16, 1.4);
+    // galão de água emborcado
+    const gx = cx - 10, gy = fy - 2;
+    const gg = c.createLinearGradient(gx, 0, gx + 20, 0); gg.addColorStop(0, 'rgba(120,190,240,0.95)'); gg.addColorStop(0.5, 'rgba(190,225,250,0.95)'); gg.addColorStop(1, 'rgba(90,160,220,0.95)');
+    c.fillStyle = gg; rr(c, gx, gy, 20, 26, 8); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.3)'; c.lineWidth = 1; rr(c, gx + 0.5, gy + 0.5, 19, 25, 8); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.65)'; c.fillRect(gx + 3, gy + 4, 2, 15); c.fillStyle = 'rgba(30,90,160,0.4)'; c.fillRect(gx + 14, gy + 6, 2, 14);
+    c.fillStyle = '#d0d6dc'; rr(c, gx + 5, gy + 24, 10, 4, 1.4); c.fill();
+  }, { alto: 10 });
+
+  reg('balanca', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    caixa(c, x, y, w, h, 7, '#dfe4e8', '#8a929a', { r: 4 });
+    c.fillStyle = '#c0c8d0'; rr(c, x + 4, y - 7 + 4, w - 8, h - 8, 3); c.fill(); c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1; for (let k = 0; k < 5; k++) { c.beginPath(); c.moveTo(x + 7, y - 3 + k * (h - 10) / 4 + 2); c.lineTo(x + w - 7, y - 3 + k * (h - 10) / 4 + 2); c.stroke(); }
+    // coluna com visor e régua de altura
+    caixa(c, x + w - 12, y - 6, 8, 5, 46, '#c8cdd2', '#a8aeb6', { r: 2, semSombra: true });
+    c.fillStyle = '#05080c'; rr(c, x + w - 11, y - 6 - 46 + 4, 6, 8, 1); c.fill(); c.fillStyle = '#4af08a'; c.fillRect(x + w - 10, y - 6 - 46 + 6, 4, 2);
+    c.fillStyle = '#16181e'; c.fillRect(x + 4, y - 6 - 46 + 14, 3, 40); c.fillStyle = '#f2f2f2'; for (let k = 0; k < 10; k++) c.fillRect(x + 4, y - 6 - 46 + 16 + k * 4, 3, 1);
+  }, { alto: 12 });
+
+  reg('arquivo', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 56, cor = o.cor || '#7f8f93', fy = y + h - e;
+    caixa(c, x, y, w, h, e, shade(cor, 0.15), cor, { r: 2 });
+    const n = 4, gh = (e - 6) / n;
+    for (let i = 0; i < n; i++) {
+      const gy = fy + 3 + i * gh; c.fillStyle = 'rgba(0,0,0,0.22)'; rr(c, x + 3, gy + 1, w - 6, gh - 2, 1.5); c.fill(); c.fillStyle = shade(cor, 0.08); rr(c, x + 3, gy, w - 6, gh - 2, 1.5); c.fill(); contorno(c, x + 3, gy, w - 6, gh - 2, 1.5);
+      c.fillStyle = '#e8e4d0'; c.fillRect(x + w / 2 - 6, gy + 2, 12, 3.6); c.fillStyle = '#2a2d34'; c.fillRect(x + w / 2 - 5, gy + 3, 7, 1);
+      c.fillStyle = '#d0d6dc'; rr(c, x + w / 2 - 5, gy + gh - 6, 10, 2.6, 1); c.fill(); brilho(c, x + w / 2 - 5, gy + gh - 6, 10, 0.7);
+    }
+    c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x + 1, y + h - 2.4, w - 2, 2.4);
+  }, { alto: 8 });
+
+  reg('caixa_eletronico', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 62, fy = y + h - e, cor = o.cor || '#23406e';
+    caixa(c, x, y, w, h, e, shade(cor, 0.2), cor, { r: 3 });
+    c.fillStyle = '#e8f0ff'; rr(c, x + 4, fy + 3, w - 8, 9, 2); c.fill(); c.fillStyle = cor; c.font = 'bold 6.5px Arial'; c.textAlign = 'center'; c.fillText('24 HORAS', x + w / 2, fy + 10); c.textAlign = 'left';
+    c.fillStyle = '#05080c'; rr(c, x + 5, fy + 15, w - 10, 20, 2); c.fill(); c.fillStyle = '#3a9af0'; rr(c, x + 7, fy + 17, w - 14, 16, 1.5); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.8)'; c.fillRect(x + 9, fy + 20, w - 22, 2); c.fillRect(x + 9, fy + 25, w - 28, 2); c.fillStyle = '#ffe04a'; c.fillRect(x + w - 15, fy + 27, 6, 3);
+    for (let k = 0; k < 12; k++) { c.fillStyle = '#c8ccd2'; c.fillRect(x + 7 + (k % 3) * 8, fy + 38 + ((k / 3) | 0) * 4.4, 6, 3); }
+    c.fillStyle = '#0d1014'; c.fillRect(x + w - 12, fy + 38, 7, 2); c.fillStyle = '#0d1014'; rr(c, x + 6, fy + e - 8, w - 12, 4, 1.5); c.fill();
+  }, { alto: 8 });
+
+  // =====================================================================
+  //  ESTÁDIO: catraca, trave, banco de reservas, arquibancada, bandeira
+  // =====================================================================
+  reg('catraca', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 36, cx = x + w / 2, topo = y + h - e;
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 4 });
+    caixa(c, x + w * 0.1, y, w * 0.8, h, e, '#d0d6dc', '#9aa2aa', { r: 3, semSombra: true });
+    c.fillStyle = '#2f9a4a'; c.beginPath(); c.moveTo(cx - 4, topo + 8); c.lineTo(cx + 4, topo + 8); c.lineTo(cx, topo + 14); c.closePath(); c.fill();
+    c.fillStyle = '#16181e'; rr(c, cx - 5, topo + 17, 10, 5, 1.5); c.fill(); c.fillStyle = '#4af08a'; c.fillRect(cx - 3, topo + 18.4, 6, 1.6);
+    // braços giratórios (3 barras)
+    c.strokeStyle = '#c8d0d8'; c.lineWidth = 3; c.lineCap = 'round';
+    [[-1, -0.1], [1, -0.1], [0, 1]].forEach(([dx, dy], i) => { c.beginPath(); c.moveTo(cx, topo - 6); c.lineTo(cx + dx * w * 0.42, topo - 6 + dy * 12 + (i === 2 ? 0 : 6)); c.stroke(); });
+    c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1; [[-1, 0.1], [1, 0.1]].forEach(([dx]) => { c.beginPath(); c.moveTo(cx, topo - 7); c.lineTo(cx + dx * w * 0.42, topo - 1); c.stroke(); });
+    circ(c, cx, topo - 6, 3.4, '#aab2ba'); circ(c, cx, topo - 6.6, 1.6, '#e8edf0');
+  }, { alto: 14 });
+
+  reg('trave', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 48, rede = 'rgba(240,244,248,0.6)', dir = o.dir || 'n';
+    if (dir === 'w' || dir === 'e') {          // gol na lateral: a boca do gol vai de y até y+h; a rede é para o lado
+      const gx = dir === 'w' ? x + w : x, sg = dir === 'w' ? -1 : 1, prof = w;
+      const tras = gx + sg * prof, topoTras = e * 0.55;
+      c.fillStyle = 'rgba(0,0,0,0.16)'; c.fillRect(Math.min(gx, tras) + 3, y + 2, prof, h + 5);
+      // fundo e teto da rede
+      c.fillStyle = 'rgba(210,220,230,0.2)'; c.beginPath(); c.moveTo(gx, y - e); c.lineTo(gx, y + h - e); c.lineTo(tras, y + h - topoTras); c.lineTo(tras, y - topoTras); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(210,220,230,0.14)'; c.beginPath(); c.moveTo(tras, y - topoTras); c.lineTo(tras, y + h - topoTras); c.lineTo(tras, y + h); c.lineTo(tras, y); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(210,220,230,0.16)'; c.beginPath(); c.moveTo(gx, y); c.lineTo(gx, y - e); c.lineTo(tras, y - topoTras); c.lineTo(tras, y); c.closePath(); c.fill();
+      c.strokeStyle = rede; c.lineWidth = 0.8; c.beginPath();
+      for (let k = 0; k <= prof; k += 5) { c.moveTo(gx + sg * k, y - e + (e - topoTras) * k / prof); c.lineTo(gx + sg * k, y + h - e + (e - topoTras) * k / prof); }
+      for (let k = 0; k <= h; k += 5) { c.moveTo(gx, y - e + k); c.lineTo(tras, y - topoTras + k); }
+      for (let k = 0; k <= e; k += 5) { c.moveTo(tras, y - topoTras + (k / e) * topoTras); c.lineTo(tras, y + h - topoTras + (k / e) * topoTras); }
+      c.stroke();
+      barra(c, gx - 2, y - e - 1, 4, e + 2, '#f2f4f6'); barra(c, gx - 2, y + h - e - 1, 4, e + 3, '#f2f4f6');
+      c.fillStyle = '#f2f4f6'; c.fillRect(gx - 2, y - e - 2, 4, h + 5); c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(gx - 2, y - e - 2, 1.2, h + 5);
+      elip(c, gx, y + 1, 3.4, 1.6, 'rgba(0,0,0,0.35)'); elip(c, gx, y + h + 1, 3.4, 1.6, 'rgba(0,0,0,0.35)');
+      return;
+    }
+    // gol de frente (rede vai para trás, para o norte)
+    const prof = 22, base = y + h;
+    c.fillStyle = 'rgba(0,0,0,0.16)'; c.fillRect(x + 4, base - 2, w, 10);
+    c.fillStyle = 'rgba(210,220,230,0.22)'; c.beginPath(); c.moveTo(x, base - e); c.lineTo(x + w, base - e); c.lineTo(x + w - 6, base - e - prof); c.lineTo(x + 6, base - e - prof); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(210,220,230,0.16)'; c.beginPath(); c.moveTo(x + 6, base - e - prof); c.lineTo(x + w - 6, base - e - prof); c.lineTo(x + w - 6, base - prof * 0.4); c.lineTo(x + 6, base - prof * 0.4); c.closePath(); c.fill();
+    c.strokeStyle = rede; c.lineWidth = 0.8; c.beginPath();
+    for (let i = 0; i <= w; i += 5) { c.moveTo(x + i, base - e); c.lineTo(x + 6 + (i / w) * (w - 12), base - e - prof); c.moveTo(x + 6 + (i / w) * (w - 12), base - e - prof); c.lineTo(x + 6 + (i / w) * (w - 12), base - prof * 0.4); }
+    for (let j = 0; j <= prof; j += 4) { c.moveTo(x + j * 0.27, base - e - j); c.lineTo(x + w - j * 0.27, base - e - j); }
+    for (let j = 0; j <= e - prof * 0.6; j += 5) { c.moveTo(x + 6, base - e - prof + j); c.lineTo(x + w - 6, base - e - prof + j); }
+    c.stroke();
+    barra(c, x - 2, base - e - 1, 4, e + 1, '#f2f4f6'); barra(c, x + w - 2, base - e - 1, 4, e + 1, '#f2f4f6');
+    c.fillStyle = '#f2f4f6'; c.fillRect(x - 2, base - e - 2, w + 4, 4); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x - 2, base - e + 2, w + 4, 1.2);
+    c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillRect(x - 2, base - e - 2, w + 4, 1.2);
+    elip(c, x, base + 1, 3.4, 1.6, 'rgba(0,0,0,0.35)'); elip(c, x + w, base + 1, 3.4, 1.6, 'rgba(0,0,0,0.35)');
+  }, { alto: 34, pad: 40 });
+
+  reg('banco_reserva', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 46, cor = o.cor || '#2a58b8';
+    sombra(c, x, y, w, h, { dx: 4, dy: 7, r: 4 });
+    // banco com assentos coloridos
+    caixa(c, x, y + h - 14, w, 14, 12, '#d8dde2', shade(cor, -0.1), { r: 3, semSombra: true });
+    const n = Math.max(2, Math.round(w / 34)), sw = (w - 8) / n;
+    for (let i = 0; i < n; i++) { c.fillStyle = cor; rr(c, x + 4 + i * sw + 1, y + h - 24, sw - 2, 11, 3); c.fill(); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 6 + i * sw, y + h - 23, sw - 5, 1.4); contorno(c, x + 4 + i * sw + 1, y + h - 24, sw - 2, 11, 3); }
+    // cobertura de acrílico transparente
+    const ty = y + h - e;
+    c.fillStyle = 'rgba(170,215,240,0.32)'; c.beginPath(); c.moveTo(x - 4, ty + 6); c.lineTo(x + w + 4, ty + 6); c.lineTo(x + w + 2, y + h - 8); c.lineTo(x - 2, y + h - 8); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 1.2; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.beginPath(); c.moveTo(x + 8, ty + 6); c.lineTo(x + 30, ty + 6); c.lineTo(x + 14, y + h - 8); c.lineTo(x + 2, y + h - 8); c.closePath(); c.fill();
+    c.fillStyle = '#c8d0d8'; c.fillRect(x - 4, ty + 3, w + 8, 4); brilho(c, x - 4, ty + 3, w + 8, 0.7);
+    barra(c, x - 4, ty + 6, 3, e - 12, '#aab2ba'); barra(c, x + w + 1, ty + 6, 3, e - 12, '#aab2ba');
+  }, { alto: 10 });
+
+  // arquibancada: degraus com assentos; torcida só aparece na hora do jogo (din)
+  const CORES_TORCIDA = ['#e8402a', '#f2f2f2', '#2a58b8', '#f2c82a', '#2f9a4a', '#e84a8a'];
+  reg('arquibancada', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 60, n = o.n || 5, cor = o.cor || '#aab4c0', r = rng((x * 13 + y) | 0);
+    const tot = h + e, bh = tot / n, top = y - e;
+    sombra(c, x, y, w, h, { dx: 4, dy: 6, r: 3 });
+    for (let i = 0; i < n; i++) {
+      const by = top + i * bh;
+      // degrau: assento (claro) e espelho vertical (escuro)
+      c.fillStyle = shade(cor, 0.12 - i * 0.015); c.fillRect(x, by, w, bh * 0.58);
+      c.fillStyle = shade(cor, -0.3 - i * 0.02); c.fillRect(x, by + bh * 0.58, w, bh * 0.42);
+      c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x, by, w, 1.2); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x, by + bh - 1.2, w, 1.2);
+      // cadeiras
+      for (let k = x + 4; k < x + w - 10; k += 13) { c.fillStyle = shade(o.cadeira || '#2a58b8', (r() - 0.5) * 0.12); rr(c, k, by + 1, 9, bh * 0.5, 2); c.fill(); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(k + 1, by + 1.5, 7, 1); }
+    }
+    // escadas laterais e murinho
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x, top, 3, tot); c.fillRect(x + w - 3, top, 3, tot);
+    c.fillStyle = '#e8edf0'; c.fillRect(x, y + h - 5, w, 5); c.fillStyle = 'rgba(0,0,0,0.3)'; c.fillRect(x, y + h - 1.4, w, 1.4); brilho(c, x, y + h - 5, w, 0.6);
+    contorno(c, x, top, w, tot, 1);
+  }, {
+    alto: 4, din(ctx, o, t) {
+      if (!o.torcida) return;
+      const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 60, n = o.n || 5, bh = (h + e) / n, top = y - e;
+      const tem = typeof o.torcida === 'function' ? o.torcida() : o.torcida; if (!tem) return;
+      const gol = tem === 'gol', jogo = tem === 'jogo' || gol;
+      for (let i = 0; i < n; i++) {
+        const by = top + i * bh;
+        for (let k = x + 6, j = 0; k < x + w - 10; k += 13, j++) {
+          const hs = hh(j * 3 + i, o.x * 0.1 + 1); if (hs < (jogo ? 0.12 : 0.62)) continue;
+          const cc = CORES_TORCIDA[((hs * 100) | 0) % CORES_TORCIDA.length], pulo = jogo ? Math.abs(Math.sin(t * (gol ? 9 : 5) + hs * 20)) * (gol ? 6 : 3) : 0;
+          const px = k + 4.5, py = by + bh * 0.3 - pulo;
+          ctx.fillStyle = cc; rr(ctx, px - 4, py - 1, 8, 8, 3); ctx.fill();
+          ctx.fillStyle = ['#e8c8a0', '#c8946a', '#8a5a3a', '#f2d4b0'][((hs * 40) | 0) % 4]; ctx.beginPath(); ctx.arc(px, py - 3, 3, 0, TAU); ctx.fill();
+          if (jogo && (gol || hs > 0.7)) { ctx.fillStyle = cc; ctx.fillRect(px + 3, py - 8 - pulo * 0.4, 1.8, 6); }
+        }
+      }
+    }
+  });
+
+  reg('bandeira', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h - 3, e = o.e || 90, pais = o.pais || 'br', fw = 54, fh = 36, fy = by - e + 3, fx = cx + 2;
+    elip(c, cx + 2, by + 1, 9, 3.4, 'rgba(0,0,0,0.3)'); elip(c, cx, by, 7, 3, '#4a4e58'); elip(c, cx, by - 1.4, 5.4, 2.2, '#8a929a');
+    barra(c, cx - 1.5, fy - 4, 3, e, '#c8a24a'); circ(c, cx, fy - 5, 2.6, '#e8c870');
+    c.save(); c.beginPath(); c.moveTo(fx, fy); for (let i = 0; i <= fw; i += 3) c.lineTo(fx + i, fy + Math.sin(i * 0.12) * 2.2); for (let i = fw; i >= 0; i -= 3) c.lineTo(fx + i, fy + fh + Math.sin(i * 0.12 + 0.6) * 2.2); c.closePath(); c.clip();
+    if (pais === 'sp') {
+      for (let k = 0; k < 13; k++) { c.fillStyle = k % 2 ? '#f6f6f6' : '#16161a'; c.fillRect(fx, fy + k * fh / 13 - 1, fw, fh / 13 + 1); }
+      c.fillStyle = '#d02a2a'; c.fillRect(fx, fy - 2, fw * 0.42, fh * 0.56); circ(c, fx + fw * 0.21, fy + fh * 0.26, 6.6, '#f6f6f6'); circ(c, fx + fw * 0.21, fy + fh * 0.26, 4.8, '#1f3a8a');
+    } else {
+      c.fillStyle = '#1f8a3a'; c.fillRect(fx - 2, fy - 3, fw + 4, fh + 6);
+      c.fillStyle = '#f6d82a'; c.beginPath(); c.moveTo(fx + fw / 2, fy + 3); c.lineTo(fx + fw - 6, fy + fh / 2); c.lineTo(fx + fw / 2, fy + fh - 3); c.lineTo(fx + 6, fy + fh / 2); c.closePath(); c.fill();
+      circ(c, fx + fw / 2, fy + fh / 2, 8.6, '#2a4aa8'); c.strokeStyle = '#f6f6f6'; c.lineWidth = 1.6; c.beginPath(); c.arc(fx + fw / 2, fy + fh / 2 + 9, 11, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+    }
+    const gs = c.createLinearGradient(fx, 0, fx + fw, 0); for (let i = 0; i <= 6; i++) gs.addColorStop(i / 6, i % 2 ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)'); c.fillStyle = gs; c.fillRect(fx - 2, fy - 3, fw + 4, fh + 6);
+    c.restore();
+  }, { alto: 14, pad: 40 });
+
+  // =====================================================================
+  //  BARBEARIA: cadeira de barbeiro e poste
+  // =====================================================================
+  reg('cadeira_b', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cx = x + w / 2, cor = o.cor || '#b8242a', e = o.e || 20;
+    sombra(c, x + 2, y + 6, w - 4, h - 6, { dx: 3, dy: 6, r: 12, oval: true });
+    // base redonda cromada
+    elip(c, cx, y + h - 6, w * 0.34, 8, '#6a7078'); elip(c, cx, y + h - 8, w * 0.3, 6.4, '#c8d0d8'); elip(c, cx, y + h - 9, w * 0.2, 4, '#e8edf0');
+    barra(c, cx - 4, y + h - 8 - e + 4, 8, e, '#b8c0c8');
+    const ty = y + h - 8 - e;   // altura do assento
+    // apoio dos pés
+    c.fillStyle = '#9aa2aa'; rr(c, cx - 12, ty + 14, 24, 7, 2.5); c.fill(); c.fillStyle = '#16181e'; rr(c, cx - 10, ty + 15, 20, 3, 1.5); c.fill(); brilho(c, cx - 11, ty + 14, 22, 0.7);
+    // assento de couro
+    const g = c.createLinearGradient(x, ty - 6, x + w, ty + 14); g.addColorStop(0, shade(cor, 0.22)); g.addColorStop(1, shade(cor, -0.22));
+    c.fillStyle = g; rr(c, x + 5, ty - 5, w - 10, 20, 8); c.fill(); contorno(c, x + 5, ty - 5, w - 10, 20, 8);
+    c.strokeStyle = 'rgba(255,255,255,0.28)'; c.lineWidth = 1; rr(c, x + 9, ty - 2, w - 18, 14, 6); c.stroke();
+    // braços cromados com pontas de couro
+    [x + 1, x + w - 6].forEach(px => { c.fillStyle = '#c8d0d8'; rr(c, px, ty - 4, 5, 17, 2); c.fill(); c.fillStyle = shade(cor, -0.1); rr(c, px - 1, ty - 6, 7, 9, 3); c.fill(); contorno(c, px - 1, ty - 6, 7, 9, 3); });
+    // encosto alto + apoio de cabeça (ao norte)
+    const bg = c.createLinearGradient(0, ty - 34, 0, ty - 4); bg.addColorStop(0, shade(cor, 0.2)); bg.addColorStop(1, shade(cor, -0.3));
+    c.fillStyle = bg; rr(c, x + 7, ty - 32, w - 14, 30, 8); c.fill(); contorno(c, x + 7, ty - 32, w - 14, 30, 8);
+    c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1; [0.34, 0.68].forEach(k => { c.beginPath(); c.moveTo(x + 10, ty - 32 + k * 30); c.lineTo(x + w - 10, ty - 32 + k * 30); c.stroke(); });
+    c.fillStyle = shade(cor, 0.1); rr(c, cx - 9, ty - 40, 18, 11, 5); c.fill(); contorno(c, cx - 9, ty - 40, 18, 11, 5); brilho(c, cx - 6, ty - 39, 12, 0.5);
+    brilho(c, x + 10, ty - 31, w - 20, 0.4);
+  }, { alto: 32 });
+
+  reg('poste_barb', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h - 2, e = o.e || 60, ww = 12;
+    elip(c, cx + 2, by + 1, 9, 3.4, 'rgba(0,0,0,0.3)'); elip(c, cx, by - 1, 8, 3, '#2a2d34');
+    const ty = by - e;
+    c.fillStyle = '#e8edf0'; rr(c, cx - ww / 2, ty, ww, e - 3, 4); c.fill();
+    c.save(); rr(c, cx - ww / 2, ty, ww, e - 3, 4); c.clip();
+    for (let k = -2; k < 10; k++) { const yy = ty + k * 12; c.fillStyle = k % 3 === 0 ? '#d02a2a' : k % 3 === 1 ? '#2a4aa8' : '#f2f2f2'; c.beginPath(); c.moveTo(cx - ww / 2, yy); c.lineTo(cx + ww / 2, yy - 9); c.lineTo(cx + ww / 2, yy - 1); c.lineTo(cx - ww / 2, yy + 8); c.closePath(); c.fill(); }
+    const gg = c.createLinearGradient(cx - ww / 2, 0, cx + ww / 2, 0); gg.addColorStop(0, 'rgba(0,0,0,0.28)'); gg.addColorStop(0.35, 'rgba(255,255,255,0.4)'); gg.addColorStop(1, 'rgba(0,0,0,0.38)'); c.fillStyle = gg; c.fillRect(cx - ww / 2, ty, ww, e);
+    c.restore();
+    circ(c, cx, ty - 1, 7, '#c8d0d8'); circ(c, cx, ty - 2.2, 5, '#e8edf0'); circ(c, cx, ty - 8, 3.4, '#d02a2a');
+    c.fillStyle = '#c8d0d8'; rr(c, cx - 8, by - 5, 16, 5, 2); c.fill();
+  }, { alto: 16 });
+
+  // =====================================================================
+  //  SHOPPING: fonte
+  // =====================================================================
+  reg('fonte', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, cx = x + w / 2, cy = y + h / 2 + 4, e = o.e || 16;
+    sombra(c, x, y, w, h, { dx: 4, dy: 8, r: 20, oval: true });
+    // borda de mármore (frente + topo)
+    elip(c, cx, cy + 3, w / 2, h / 2, '#8a8478'); elip(c, cx, cy - e * 0.2, w / 2, h / 2, '#e8e2d6');
+    elip(c, cx, cy - e * 0.2 + 1, w / 2 - 6, h / 2 - 5, '#bdb6a6');
+    const ga = c.createLinearGradient(0, cy - h / 2, 0, cy + h / 2); ga.addColorStop(0, '#5ab0e0'); ga.addColorStop(1, '#2a78b8');
+    c.fillStyle = ga; c.beginPath(); c.ellipse(cx, cy - e * 0.2 + 2, w / 2 - 9, h / 2 - 8, 0, 0, TAU); c.fill();
+    // moedinhas no fundo
+    for (let k = 0; k < 8; k++) circ(c, cx + (hh(k, 3) - 0.5) * (w - 40), cy + (hh(k, 7) - 0.5) * (h - 30), 1.4, 'rgba(255,230,140,0.8)');
+    // coluna central com duas bacias
+    barra(c, cx - 5, cy - e - 26, 10, 28, '#d8d2c4');
+    elip(c, cx, cy - e - 8, 20, 8, '#cfc9ba'); elip(c, cx, cy - e - 9.5, 17, 6.4, '#8ac8ea');
+    elip(c, cx, cy - e - 26, 11, 4.6, '#cfc9ba'); elip(c, cx, cy - e - 27, 8.4, 3.4, '#8ac8ea');
+    circ(c, cx, cy - e - 32, 4, '#e8e2d6');
+  }, {
+    alto: 36, din(ctx, o, t) {
+      const x = o.x, y = o.y, w = o.w, h = o.h, cx = x + w / 2, cy = y + h / 2 + 4, e = o.e || 16;
+      ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+      for (let k = 0; k < 3; k++) { const ph = (t * 0.7 + k / 3) % 1, rx = 8 + ph * (w / 2 - 20), ry = rx * (h / w); ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.ellipse(cx, cy - e * 0.2 + 3, rx, ry, 0, 0, TAU); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      // esguicho central e gotas
+      ctx.strokeStyle = 'rgba(200,235,255,0.9)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(cx, cy - e - 33); ctx.lineTo(cx, cy - e - 44 + Math.sin(t * 6) * 1.5); ctx.stroke();
+      for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, ph = (t * 1.4 + k * 0.13) % 1, rr2 = 4 + ph * 16; ctx.fillStyle = 'rgba(200,235,255,' + (0.9 - ph * 0.8) + ')'; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * rr2, cy - e - 26 + ph * ph * 22, 1.3, 0, TAU); ctx.fill(); }
+    }
+  });
+
+  // =====================================================================
+  //  PIZZARIA: forno de lenha
+  // =====================================================================
+  reg('forno', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 70, cx = x + w / 2, fy = y + h - e;
+    caixa(c, x, y, w, h, e * 0.42, '#b86a4a', '#9a4a32', { r: 3 });
+    // tijolinhos na base
+    const bt = y + h - e * 0.42; c.fillStyle = 'rgba(0,0,0,0.25)'; for (let j = 0; j < 3; j++) { c.fillRect(x + 2, bt + 3 + j * 8, w - 4, 1); for (let i = (j % 2) * 8; i < w; i += 16) c.fillRect(x + 2 + i, bt + 3 + j * 8, 1, 8); }
+    // cúpula
+    const dg = c.createRadialGradient(cx - 10, fy + e * 0.4, 6, cx, fy + e * 0.55, w * 0.62); dg.addColorStop(0, '#d8a07a'); dg.addColorStop(1, '#8a4a30');
+    c.fillStyle = dg; c.beginPath(); c.moveTo(x + 4, bt); c.quadraticCurveTo(x + 4, fy + 6, cx, fy + 4); c.quadraticCurveTo(x + w - 4, fy + 6, x + w - 4, bt); c.closePath(); c.fill(); contorno(c, x + 4, fy + 4, w - 8, bt - fy - 4, 6);
+    c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1; for (let k = 1; k < 5; k++) { c.beginPath(); c.arc(cx, bt, k * (w / 2 - 4) / 4.4, Math.PI, TAU); c.stroke(); }
+    // chaminé
+    barra(c, cx - 7, fy - 20, 14, 28, '#7a4a38'); c.fillStyle = '#4a2a20'; c.fillRect(cx - 9, fy - 22, 18, 4);
+    // boca do forno (arco escuro)
+    const mw = w * 0.42, mx = cx - mw / 2, my = bt - e * 0.34;
+    c.fillStyle = '#1a0c06'; c.beginPath(); c.moveTo(mx, bt - 2); c.lineTo(mx, my + 10); c.quadraticCurveTo(cx, my - 6, mx + mw, my + 10); c.lineTo(mx + mw, bt - 2); c.closePath(); c.fill();
+    c.strokeStyle = '#6a4a38'; c.lineWidth = 3; c.stroke();
+    // lenha empilhada ao lado
+    for (let k = 0; k < 4; k++) { c.fillStyle = k % 2 ? '#7a5230' : '#8a6038'; rr(c, x + w + 2, y + h - 8 - k * 5, 16, 5, 2); c.fill(); c.fillStyle = '#d8b078'; c.beginPath(); c.arc(x + w + 3, y + h - 5.5 - k * 5, 2, 0, TAU); c.fill(); }
+  }, {
+    alto: 30, din(ctx, o, t) {
+      const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 70, cx = x + w / 2, bt = y + h - e * 0.42, mw = w * 0.42, my = bt - e * 0.34;
+      ctx.save(); ctx.beginPath(); ctx.moveTo(cx - mw / 2 + 2, bt - 3); ctx.lineTo(cx - mw / 2 + 2, my + 12); ctx.quadraticCurveTo(cx, my - 2, cx + mw / 2 - 2, my + 12); ctx.lineTo(cx + mw / 2 - 2, bt - 3); ctx.closePath(); ctx.clip();
+      const g = ctx.createRadialGradient(cx, bt, 2, cx, bt - 6, mw * 0.7); g.addColorStop(0, 'rgba(255,230,120,0.95)'); g.addColorStop(0.5, 'rgba(255,120,30,0.9)'); g.addColorStop(1, 'rgba(160,30,10,0.9)'); ctx.fillStyle = g; ctx.fillRect(cx - mw / 2, my, mw, bt - my);
+      for (let k = 0; k < 4; k++) { const fx = cx - mw * 0.3 + k * mw * 0.2, fh = 10 + 6 * Math.sin(t * 8 + k * 2); ctx.fillStyle = 'rgba(255,200,60,0.9)'; ctx.beginPath(); ctx.moveTo(fx - 4, bt - 3); ctx.quadraticCurveTo(fx, bt - fh - 4, fx + 4, bt - 3); ctx.fill(); }
+      ctx.restore();
+    }
+  });
+
+  // =====================================================================
+  //  CHÃO DE GRAMADO + LINHAS DO CAMPO
+  // =====================================================================
+  D.PISOS.gramado = (c, X, Y, w, h, cs, sd) => {
+    const r = rng(sd || 1), a = cs[0], b = cs[1], faixa = 44;
+    for (let i = 0; i * faixa < w + faixa; i++) { c.fillStyle = i % 2 ? a : b; c.fillRect(X + i * faixa, Y, faixa + 1, h); }
+    for (let k = 0; k < w * h / 55; k++) { c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,0.05)' : 'rgba(0,30,0,0.08)'; c.fillRect(X + r() * w, Y + r() * h, 2, 3); }
+    const g = c.createLinearGradient(0, Y, 0, Y + h); g.addColorStop(0, 'rgba(0,20,0,0.18)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,20,0,0.14)'); c.fillStyle = g; c.fillRect(X, Y, w, h);
+  };
+  // linhas brancas de um campo de futebol (gols nos lados esquerdo e direito), medidas de verdade
+  // (campo de 105 x 68 m: x,y,w,h = o retângulo do campo em pixels)
+  D.campoFutebol = (c, x, y, w, h) => {
+    const s = w / 105, cx = x + w / 2, cy = y + h / 2;
+    c.save(); c.strokeStyle = 'rgba(255,255,255,0.92)'; c.fillStyle = c.strokeStyle; c.lineWidth = 3; c.lineJoin = 'round';
+    c.strokeRect(x, y, w, h);
+    c.beginPath(); c.moveTo(cx, y); c.lineTo(cx, y + h); c.stroke();
+    c.beginPath(); c.arc(cx, cy, 9.15 * s, 0, TAU); c.stroke(); c.beginPath(); c.arc(cx, cy, 3.6, 0, TAU); c.fill();
+    const pa = 16.5 * s, pw = 40.32 * s, ga = 5.5 * s, gw = 18.32 * s, ps = 11 * s, rr9 = 9.15 * s, a0 = Math.acos((pa - ps) / rr9);
+    [[x, 1], [x + w, -1]].forEach(([gx, sg]) => {
+      c.strokeRect(sg > 0 ? gx : gx - pa, cy - pw / 2, pa, pw);
+      c.strokeRect(sg > 0 ? gx : gx - ga, cy - gw / 2, ga, gw);
+      c.beginPath(); c.arc(gx + sg * ps, cy, 3, 0, TAU); c.fill();
+      c.beginPath(); if (sg > 0) c.arc(gx + ps, cy, rr9, -a0, a0); else c.arc(gx - ps, cy, rr9, Math.PI - a0, Math.PI + a0); c.stroke();
+    });
+    [[x, y, 0], [x + w, y, Math.PI / 2], [x + w, y + h, Math.PI], [x, y + h, -Math.PI / 2]].forEach(([qx, qy, a]) => { c.beginPath(); c.arc(qx, qy, 10, a, a + Math.PI / 2); c.stroke(); });
+    c.restore();
+  };
+
+  // =====================================================================
+  //  PLACAR ELETRÔNICO (o texto vem de o.fnTexto() e muda a cada quadro)
+  // =====================================================================
+  reg('placar', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h;
+    c.fillStyle = 'rgba(0,0,0,0.3)'; rr(c, x + 3, y + 5, w, h, 5); c.fill();
+    c.fillStyle = '#23262e'; rr(c, x - 5, y - 5, w + 10, h + 10, 6); c.fill(); contorno(c, x - 5, y - 5, w + 10, h + 10, 6);
+    c.fillStyle = '#05080c'; rr(c, x, y, w, h, 3); c.fill();
+    [[x - 2, y - 2], [x + w + 1, y - 2], [x - 2, y + h + 1], [x + w + 1, y + h + 1]].forEach(([px, py]) => circ(c, px, py, 1.4, '#8a929a'));
+    c.fillStyle = 'rgba(255,255,255,0.05)'; for (let k = 0; k < h; k += 3) c.fillRect(x, y + k, w, 1);
+  }, {
+    alto: 6, din(ctx, o, t) {
+      const lin = o.fnTexto ? o.fnTexto() : ['PLACAR']; const n = lin.length, lh = o.h / n;
+      ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      lin.forEach((l, i) => { ctx.fillStyle = i === 0 ? '#ffd24a' : '#7aff9a'; ctx.font = 'bold ' + Math.min(lh * 0.74, o.w / (l.length * 0.62 + 1)) + 'px "Courier New", monospace'; ctx.fillText(l, o.x + o.w / 2, o.y + lh * (i + 0.5)); });
+      ctx.restore();
+    }
+  });
+
+  // =====================================================================
+  //  BOLA DE FUTEBOL (desenhada direto, todo quadro: o.z = altura do chute)
+  // =====================================================================
+  K.novos.bola_jogo = (ctx, o, t) => {
+    const x = o.x + 5, y = o.y + 5, z = o.z || 0;
+    ctx.fillStyle = 'rgba(0,0,0,' + (0.3 - Math.min(0.15, z * 0.004)) + ')'; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, 5.2, 2.8, 0, 0, TAU); ctx.fill();
+    const by = y - 4 - z, rot = (o.rot || 0);
+    ctx.fillStyle = '#f8f8f8'; ctx.beginPath(); ctx.arc(x, by, 5.6, 0, TAU); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 0.9; ctx.stroke();
+    ctx.fillStyle = '#16181e'; for (let k = 0; k < 3; k++) { const a = rot + k * TAU / 3; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 2.6, by + Math.sin(a) * 2.6, 1.3, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillRect(x - 3, by - 3.4, 1.6, 1.2);
+  };
+
+  // =====================================================================
+  //  BANDEIRINHA DE ESCANTEIO e HOLOFOTE
+  // =====================================================================
+  reg('bandeirinha', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h - 2, e = o.e || 28;
+    elip(c, cx + 2, by + 1, 5, 2, 'rgba(0,0,0,0.3)'); barra(c, cx - 1, by - e, 2, e, '#f2f4f6');
+    c.fillStyle = o.cor || '#f2d82a'; c.beginPath(); c.moveTo(cx + 1, by - e); c.lineTo(cx + 15, by - e + 4); c.lineTo(cx + 1, by - e + 9); c.closePath(); c.fill();
+  }, { alto: 4, pad: 20 });
+  reg('holofote', (c, o) => {
+    const cx = o.x + o.w / 2, by = o.y + o.h - 3, e = o.e || 140;
+    elip(c, cx + 4, by + 2, 14, 5, 'rgba(0,0,0,0.3)'); elip(c, cx, by, 10, 4, '#5a5e68');
+    barra(c, cx - 3, by - e, 6, e, '#8a929a'); c.strokeStyle = 'rgba(0,0,0,0.25)'; c.lineWidth = 1; for (let k = 0; k < e; k += 12) { c.beginPath(); c.moveTo(cx - 3, by - k); c.lineTo(cx + 3, by - k - 6); c.stroke(); }
+    const bw = 44, bh = 28, bx = cx - bw / 2, bt = by - e - bh + 4;
+    c.fillStyle = '#2a2d34'; rr(c, bx, bt, bw, bh, 3); c.fill(); contorno(c, bx, bt, bw, bh, 3);
+    for (let j = 0; j < 3; j++) for (let i = 0; i < 5; i++) { circ(c, bx + 6 + i * 8, bt + 6 + j * 8, 2.8, '#fff6c8'); circ(c, bx + 6 + i * 8, bt + 6 + j * 8, 1.4, '#ffffff'); }
+  }, { alto: 40, pad: 40 });
+
 })(window.G = window.G || {});
 
 </script>
@@ -9684,7 +10672,7 @@
       // fila de clientes e segurança
       R.npcs.push({ x: 350, y: 300, p: look({}), falas: ['Essa fila não anda...', 'Só vim pagar uma conta.'], h: 0, fixo: true, nome: 'Seu Jorge', dinheiro: 60 }, { x: 350, y: 340, p: look({}), falas: ['Hoje o banco está cheio.'], h: 0, fixo: true, nome: 'Dona Lúcia', dinheiro: 90 },
         { x: 120, y: 430, p: look({ shirt: '#16181e', pat: 'liso', sleeve: 'curta', acc: 'cap', accCol: '#16181e', hairStyle: 'raspado', fem: false }), falas: ['Qualquer confusão e eu chamo a polícia.', 'Câmeras em todo canto, hein.'], h: Math.PI, fixo: true, nome: 'Segurança', dinheiro: 40, label: 'CONVERSAR' });
-      add(O('cofre', 560, 330, 120, 60, { e: 46, label: 'COFRE-FORTE DO BANCO', r: 46, act: S => { if (!K.armado(S)) { G.say('A porta do cofre é de aço. Sem uma arma na mão, ninguém abre isso.', 4); return; } if (R.cofreAberto) { G.say('O cofre já foi esvaziado.', 3); return; } R.cofreAberto = true; const v = Math.round(rand(700, 1400)); S.save.money += v; G.save(); G.snd.cash(); G.say('ASSALTO AO BANCO! Você levou $' + v + ' do cofre. A polícia foi chamada!', 6); K.chamaPolicia(S, R, 4); R.assaltos = (R.assaltos || 0) + 1; } }));
+      add(O('cofre_banco', 560, 330, 120, 60, { e: 46, label: 'COFRE-FORTE DO BANCO', r: 46, act: S => { if (!K.armado(S)) { G.say('A porta do cofre é de aço. Sem uma arma na mão, ninguém abre isso.', 4); return; } if (R.cofreAberto) { G.say('O cofre já foi esvaziado.', 3); return; } R.cofreAberto = true; const v = Math.round(rand(700, 1400)); S.save.money += v; G.save(); G.snd.cash(); G.say('ASSALTO AO BANCO! Você levou $' + v + ' do cofre. A polícia foi chamada!', 6); K.chamaPolicia(S, R, 4); R.assaltos = (R.assaltos || 0) + 1; } }));
       add(O('banco_espera', 130, 340, 150, 26, { e: 16, label: 'SENTAR NA FILA', r: 30, act: S => { K.cura(S, 4); G.say('Você esperou sentado um pouco. (+4 vida)', 3); } }));
       add(O('planta', 90, 470, 40, 50, {}), O('planta', 700, 470, 40, 50, {}));
       R.deco = x => { x.fillStyle = '#c8a24a'; x.fillRect(120, 70, 600, 3); [150, 690].forEach(a => K.cartaz(x, a - 30, 76, 60, 40, '#f2f2f2', [])); x.fillStyle = '#2a4a7a'; x.font = 'bold 11px Arial'; x.textAlign = 'center'; x.fillText('JUROS', 150, 100); x.fillText('CRÉDITO', 690, 100); x.textAlign = 'left'; letreiro(x, pl, '#8ac8ff', 420); };
@@ -10152,6 +11140,589 @@
   };
 
   L.lojaLay = LAY;
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   PUBLICOS.JS — por dentro do HOSPITAL e do ESTÁDIO
+   (antes os dois mostravam o layout da catedral: bancos de igreja e altar!)
+
+   HOSPITAL SANTA CASA  (3 salas, ligadas por portas coloridas)
+     recepção   balcão do pronto-socorro (tratar ferimentos de graça), sala de espera, máquina de lanche,
+                faixas coloridas no chão, cadeiras de rodas, maca, médicos e pacientes
+     enfermaria 5 leitos com monitor e soro, pacientes dormindo, posto de enfermagem
+     consultório mesa da médica, maca de exame, balança, armário de remédios, tabela de olhos
+
+   ESTÁDIO MUNICIPAL  (veja a segunda metade deste arquivo)
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const W = G.world, L = G.lugares, K = L.kit, SP = G.sprites, D = G.deco;
+  const O = K.O, rand = K.rand, clamp = K.clamp, pick = K.pick, TAU = Math.PI * 2;
+  const look = o => Object.assign(SP.randomLook(), { acc: 'none' }, o);
+  const porta = (x, y, w, o) => O('porta', x, y, w, 54, Object.assign({ solid: false, k: 10, r: 50 }, o));
+  const rr = D.rr;
+  // posição de chegada ao entrar numa sala nova (porta de baixo, no centro)
+  const chega = (w, h) => ({ x: 70 + w / 2, y: 150 + h - 40 });
+  const irPara = (S, id, w, h) => { const c = chega(w, h); L.irSala(S, id, c.x, c.y, Math.PI); };
+
+  // cruz vermelha num quadrado branco
+  function cruz(x, cx, cy, s, fundo, cor) {
+    x.fillStyle = 'rgba(0,0,0,0.25)'; rr(x, cx - s / 2 + 2, cy - s / 2 + 3, s, s, s * 0.18); x.fill();
+    x.fillStyle = fundo || '#f6fafc'; rr(x, cx - s / 2, cy - s / 2, s, s, s * 0.18); x.fill();
+    x.fillStyle = cor || '#d9363e'; x.fillRect(cx - s * 0.12, cy - s * 0.36, s * 0.24, s * 0.72); x.fillRect(cx - s * 0.36, cy - s * 0.12, s * 0.72, s * 0.24);
+  }
+  // frasco de álcool em gel na parede
+  function alcool(x, px, py) {
+    x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(px + 2, py + 2, 12, 22); x.fillStyle = '#f2f4f6'; rr(x, px, py, 12, 22, 3); x.fill(); x.strokeStyle = 'rgba(0,0,0,0.3)'; x.lineWidth = 1; rr(x, px + 0.5, py + 0.5, 11, 21, 3); x.stroke();
+    x.fillStyle = '#4aa8e8'; x.fillRect(px + 2, py + 3, 8, 9); x.fillStyle = '#c8d0d8'; x.fillRect(px + 4, py + 15, 4, 5);
+  }
+  // quadro de aviso com papéis
+  function mural(x, px, py, w, h) {
+    x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(px + 3, py + 3, w, h); x.fillStyle = '#9a7040'; x.fillRect(px - 3, py - 3, w + 6, h + 6); x.fillStyle = '#c8a878'; x.fillRect(px, py, w, h);
+    const cs = ['#ffffff', '#ffe9a0', '#bfe3ff', '#ffd0d0', '#d8f2c8'];
+    for (let i = 0; i < 6; i++) { const ax = px + 4 + (i % 3) * (w - 8) / 3, ay = py + 4 + ((i / 3) | 0) * (h - 8) / 2; x.fillStyle = cs[i % 5]; x.fillRect(ax, ay, (w - 14) / 3, (h - 12) / 2); x.fillStyle = 'rgba(0,0,0,0.35)'; for (let k = 0; k < 3; k++) x.fillRect(ax + 2, ay + 3 + k * 4, (w - 14) / 3 - 4, 1); x.fillStyle = '#d93636'; x.fillRect(ax + (w - 14) / 6 - 1, ay - 1, 2, 3); }
+  }
+
+  const HOSP = { azul: '#2a78c8', verde: '#2f9a6a', verm: '#d9363e' };
+
+  // lotação mostrada no balcão (usa o hospital da lista W.hospitais, se tiver)
+  function lotacao(pl) {
+    const hs = W.hospitais || []; let b = null, bd = 1e9;
+    hs.forEach(h => { const d = Math.hypot(h.x - pl.x, h.y - pl.y); if (d < bd) { bd = d; b = h; } });
+    return b && bd < 400 ? Math.round((b.lot || 0) * 100) : Math.round(20 + (pl.x * 7 % 40));
+  }
+
+  function menuBalcao(S, R) {
+    const pl = R.lugar.place, lot = lotacao(pl);
+    const it = [];
+    it.push({ n: 'Tratar ferimentos (atendimento SUS)', desc: 'grátis — a enfermeira cuida de você',
+      fn: S2 => { if (S2.player.hp >= 100) { G.say('A enfermeira confere seus sinais: você está inteiro, nada a tratar.', 3.5); return; } S2.player.hp = 100; G.snd.beep(); G.say('Curativos, soro e analgésico. Ferimentos tratados — vida cheia!', 4.5); return 'fechar'; } });
+    it.push({ n: 'Check-up particular — $120', desc: 'sem fila: vida cheia, passa a bebedeira e a energia',
+      fn: S2 => K.compra(S2, 120, () => { S2.player.hp = 100; S2.bebado = 0; S2.energia = 0; G.say('Exames em dia. Você saiu novinho em folha!', 4.5); }) });
+    it.push({ n: 'Perguntar pelas salas', desc: 'enfermaria, consultório e centro cirúrgico',
+      fn: () => G.say('Faixa AZUL leva à enfermaria, VERDE aos consultórios e VERMELHA ao centro cirúrgico (só equipe médica).', 6) });
+    it.push({ n: 'Fechar', fn: () => 'fechar' });
+    L.abrirMenu(S, { titulo: 'BALCÃO — PRONTO-SOCORRO', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => 'lotação ' + lot + '%  ·  $' + Math.floor(S2.save.money), itens: it });
+  }
+
+  // =====================================================================
+  //  HOSPITAL: recepção
+  // =====================================================================
+  function hospEntrada(lg) {
+    const pl = lg.place, w = 940, h = 450;
+    const R = L.novaSala({ place: pl, w, h, nome: pl.nome || 'HOSPITAL', cor: HOSP.verm, piso: 'ladrilho', pisoCores: ['#eef3f6', '#d6e0e8'], parede: '#dcebef', estiloParede: 'azulejo', lambri: '#9ec8d8', lambriAlt: 30, rodape: '#bcd0d8', capacho: HOSP.azul, subtitulo: 'pronto-socorro 24 horas', luzes: [{ x: 300, y: 330, r: 380 }, { x: 780, y: 330, r: 380 }, { x: 540, y: 250, r: 320 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    const add = (...a) => R.objs.push(...a);
+    const x0 = R.x0, x1 = R.x1, cx = 540;
+    // portas na parede de trás
+    add(porta(130, 96, 70, { cor: HOSP.azul, placa: 'ENFERMARIA', label: 'ENTRAR NA ENFERMARIA', act: S => irPara(S, 'enfermaria', 900, 430) }));
+    add(porta(290, 96, 70, { cor: HOSP.verde, placa: 'CONSULTAS', label: 'ENTRAR NO CONSULTÓRIO', act: S => irPara(S, 'consultorio', 700, 400) }));
+    add(porta(760, 96, 70, { cor: HOSP.verm, placa: 'CIRURGIA', label: 'CENTRO CIRÚRGICO', act: S => G.say('Somente equipe médica. Os cirurgiões estão em operação.', 3.5) }));
+    // balcão do pronto-socorro (a enfermeira fica atrás)
+    add(O('recepcao', 400, 232, 280, 44, { e: 30, top: '#f4f8fa', front: '#4a8ab8', label: 'PRONTO-SOCORRO (TRATAR FERIMENTOS)', r: 62, act: S => menuBalcao(S, R) }));
+    // lado esquerdo: cadeiras de rodas e balança
+    add(O('cadeira_rodas', 86, 236, 40, 44, { solid: false }), O('cadeira_rodas', 86, 300, 40, 44, { solid: false, cor: '#4a4e58' }));
+    add(O('balanca', 222, 196, 42, 40, { e: 8, label: 'SUBIR NA BALANÇA', r: 36, act: S => G.say('Balança: ' + Math.round(rand(68, 84)) + ' kg. ' + pick(['Está ótimo!', 'Dá pra reduzir a feijoada.', 'Falta músculo.']), 3.5) }));
+    // lado direito: máquina de lanche, bebedouro, maca com soro
+    add(O('maquina_venda', 930, 190, 56, 36, { e: 76, nome: 'LANCHES', label: 'MÁQUINA DE LANCHE', r: 50, act: S => L.abrirMenu(S, { titulo: 'MÁQUINA DE LANCHE', rodape: 'E confirmar · ESC sair', info: S2 => '$' + Math.floor(S2.save.money), itens: [
+      { n: 'Água mineral — $4', desc: '+3 vida', fn: S2 => K.compra(S2, 4, () => { K.cura(S2, 3); G.say('Água geladinha. (+3 vida)', 2.5); }) },
+      { n: 'Biscoito recheado — $5', desc: '+8 vida', fn: S2 => K.compra(S2, 5, () => { K.cura(S2, 8); G.say('Biscoito de chocolate! (+8 vida)', 2.5); }) },
+      { n: 'Fechar', fn: () => 'fechar' }] }) }));
+    add(O('bebedouro', 886, 198, 36, 36, { e: 62, label: 'BEBER ÁGUA', r: 40, act: S => { K.cura(S, 2); G.snd.beep(); G.say('Água fresquinha do bebedouro. (+2 vida)', 2.5); } }));
+    add(O('maca', 900, 340, 56, 110, { e: 20, solid: true }), O('soro', 868, 348, 30, 20, { e: 72, solid: false }));
+    R.npcs.push({ x: 928, y: 396, p: look({ shirt: '#bcd8e8', pat: 'liso', sleeve: 'curta' }), dorme: true, h: Math.PI, falas: ['Ai... minha cabeça...', 'Doutor, quanto tempo?'], nome: 'Paciente da maca', dinheiro: 0, ameacavel: false });
+    // salas de espera: bancos e pacientes sentados
+    const espera = (x, y) => add(O('banco_espera', x, y, 170, 26, { e: 16, label: 'SENTAR NA ESPERA', r: 30, act: S => { K.cura(S, 4); G.say('Você esperou sentado um pouco. (+4 vida)', 3); } }));
+    espera(110, 392); espera(110, 482); espera(740, 392); espera(740, 482);
+    const pac = (x, y, nome, falas, o) => R.npcs.push(Object.assign({ x, y, p: look({}), sentado: true, h: 0, falas, nome, dinheiro: Math.round(rand(10, 60)), k: y + 60 }, o || {}));
+    pac(150, 396, 'Dona Neide', ['Faz três horas que estou esperando...', 'É só uma tosse, mas não passa.'], { p: look({ fem: true, hairStyle: 'coque', shirt: '#8a4a6a' }) });
+    pac(220, 396, 'Seu Aparecido', ['Caí da escada, mas tô inteiro.', 'No meu tempo o hospital era mais vazio.']);
+    pac(790, 486, 'Marcelo', ['Torci o pé no futebol de domingo.', 'Pelo menos o café da máquina é barato.'], { p: look({ shirt: '#d8c040', sleeve: 'curta' }) });
+    pac(850, 486, 'Priscila', ['Meu filho está com febre. Estou preocupada.', 'Será que chamam logo?'], { p: look({ fem: true, shirt: '#4a8a8a' }) });
+    // equipe
+    const medico = { x: 520, y: 345, p: look({ shirt: '#f6f8fa', pants: '#3a4a6a', pat: 'jaqueta', sleeve: 'longa', hairStyle: 'curto' }), h: 0, falas: ['Respire fundo, vamos cuidar de você.', 'Estou de plantão há 20 horas.', 'Sem emergência, espere ser chamado.'], nome: 'Dr. Ricardo', dinheiro: 90, label: 'CONVERSAR' };
+    const enf2 = { x: 330, y: 345, p: look({ fem: true, shirt: '#58c0c8', pants: '#58c0c8', sleeve: 'curta', hairStyle: 'rabo' }), h: 0, falas: ['Pegue uma senha e aguarde.', 'Fique tranquilo, o médico já vem.'], nome: 'Enfermeira Lia', dinheiro: 35, label: 'CONVERSAR' };
+    R.npcs.push({ x: 470, y: 210, k: 600, p: look({ fem: true, shirt: '#58c0c8', pants: '#58c0c8', sleeve: 'curta', hairStyle: 'coque' }), falas: ['Pronto-socorro, boa tarde. Qual a queixa?', 'Atendimento pelo SUS é gratuito, viu?', 'Quer tratar ferimentos? Fale comigo no balcão.'], h: Math.PI, fixo: true, nome: 'Enfermeira Rosa', dinheiro: 40, label: 'CONVERSAR' });
+    R.npcs.push(medico, enf2);
+    R.npcs.push({ x: 430, y: 540, p: look({ shirt: '#15171c', pants: '#15171c', cap: 'swat', sleeve: 'curta' }), falas: ['Boa tarde. Aqui dentro, sem confusão.', 'Visitas só até as 20h.'], h: 0, fixo: true, nome: 'Segurança Dias', dinheiro: 20, label: 'CONVERSAR' });
+    R.equipe = [medico, enf2];
+    add(O('planta', 84, 520, 40, 50, { variante: 'folhagem' }), O('planta', 950, 520, 40, 50, { variante: 'samambaia' }), O('planta', 665, 296, 40, 50, {}));
+    // faixas do chão (triagem) + parede
+    R.pisoExtra = x => {
+      [[165, HOSP.azul], [325, HOSP.verde], [795, HOSP.verm]].forEach(([fx, cor]) => {
+        x.fillStyle = 'rgba(255,255,255,0.8)'; x.fillRect(fx - 7, 150, 14, 330); x.fillStyle = cor; x.fillRect(fx - 4, 150, 8, 330);
+        x.fillStyle = 'rgba(255,255,255,0.9)'; for (let y = 190; y < 470; y += 64) { x.beginPath(); x.moveTo(fx, y - 10); x.lineTo(fx + 8, y + 4); x.lineTo(fx - 8, y + 4); x.closePath(); x.fill(); }
+      });
+      // tapete de entrada e desenho no chão em frente ao balcão
+      x.fillStyle = 'rgba(42,120,200,0.1)'; rr(x, 380, 300, 320, 20, 4); x.fill();
+    };
+    R.deco = x => {
+      // letreiro central com cruz
+      x.fillStyle = 'rgba(0,0,0,0.3)'; rr(x, 392, 80, 300, 40, 6); x.fill();
+      x.fillStyle = '#f6fafc'; rr(x, 388, 76, 300, 40, 6); x.fill(); x.strokeStyle = HOSP.verm; x.lineWidth = 3; rr(x, 391, 79, 294, 34, 5); x.stroke();
+      cruz(x, 414, 96, 26, HOSP.verm, '#fff');
+      x.save(); x.textAlign = 'center'; x.fillStyle = HOSP.verm; x.font = 'bold 18px Arial'; x.fillText('PRONTO-SOCORRO', 556, 95); x.font = 'bold 9px Arial'; x.fillStyle = HOSP.azul; x.fillText((pl.nome || 'HOSPITAL') + ' · 24 HORAS', 556, 108); x.restore();
+      // janelas e cartazes
+      K.janela(x, 214, 76, 64, 46, { vista: 'cidade', cor: '#eef3f6' });
+      K.janela(x, 850, 76, 64, 46, { vista: 'cidade', cor: '#eef3f6' });
+      D.cartazLoja(x, 706, 80, 48, 60, '#e8f4ff', ['MÃOS', 'LIMPAS', 'SALVAM'], HOSP.azul);
+      D.cartazLoja(x, 84, 84, 36, 56, '#fff4d8', ['VACINA', 'EM DIA'], HOSP.verm);
+      mural(x, 924, 84, 56, 36);
+      alcool(x, 204, 112); alcool(x, 372, 112); alcool(x, 836, 112); alcool(x, 124, 112 + 0);
+      D.relogio(x, 540, 134, 9, '#f6fafc');
+      // placa "silêncio" e faixa de rodapé azul
+      x.fillStyle = HOSP.azul; x.fillRect(70, 140, 940, 3);
+    };
+    R.onUpdate = (S, R2, dt) => {
+      R2.tp = (R2.tp || 0) - dt;
+      if (R2.tp > 0) return; R2.tp = rand(5, 9);
+      const n = pick(R2.equipe); if (n.alvo || (n.rota && n.rota.length)) return;
+      L.rota(n, [{ x: n.x, y: 335 }, { x: rand(150, 880), y: 335 }, { x: rand(150, 880), y: rand(330, 360) }]);
+    };
+    return R;
+  }
+
+  // =====================================================================
+  //  HOSPITAL: enfermaria
+  // =====================================================================
+  function hospEnfermaria(lg) {
+    const pl = lg.place, w = 900, h = 430;
+    const R = L.novaSala({ place: pl, w, h, nome: 'ENFERMARIA', cor: HOSP.azul, piso: 'ladrilho', pisoCores: ['#e4eef0', '#cfdde2'], parede: '#d2e8e0', estiloParede: 'azulejo', lambri: '#8cc0b0', lambriAlt: 30, rodape: '#b8d0c8', capacho: HOSP.azul, subtitulo: 'internação', luzes: [{ x: 300, y: 330, r: 340 }, { x: 700, y: 330, r: 340 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    R.porta = { para: 'entrada', px: 165, py: 215, ph: Math.PI, label: 'VOLTAR À RECEPÇÃO', rotulo: 'RECEPÇÃO' };
+    const add = (...a) => R.objs.push(...a);
+    const ocupados = [0, 2, 3];
+    const nomes = ['Seu Antônio', 'Dona Lourdes', 'Sr. Jorge', 'Camila', 'Pedrinho'];
+    const falas = [['zzz... zzz...', 'Mais um cobertor, por favor...'], ['Estou melhor, só preciso descansar.', 'O jantar daqui é sem sal...'], ['Fiz cirurgia ontem. Dói quando eu rio.', 'Quando eu saio?']];
+    const cores = ['#6aa8d8', '#d8b8c8', '#9ccab8', '#6aa8d8', '#e8c898'];
+    for (let i = 0; i < 5; i++) {
+      const bx = 110 + i * 165;
+      add(O('leito', bx, 190, 70, 118, { e: 16, cor: cores[i], label: 'DESCANSAR NO LEITO', r: 50, act: S => {
+        if (S.player.hp >= 100) { G.say('Você está bem. Deixe o leito para quem precisa.', 3.5); return; }
+        K.cura(S, 40); S.dayT += 0.02; G.snd.beep(); G.say('Você descansou no leito por algumas horas. (+40 vida)', 4);
+      } }));
+      add(O('monitor_vital', bx + 76, 198, 40, 22, { e: 48, solid: true }));
+      add(O('soro', bx - 30, 252, 30, 20, { e: 72, solid: false }));
+      if (ocupados.indexOf(i) >= 0) {
+        const j = ocupados.indexOf(i);
+        R.npcs.push({ x: bx + 35, y: 262, p: look({ shirt: '#cfe0ec', sleeve: 'curta', fem: i === 1 }), dorme: true, h: Math.PI, falas: falas[j], nome: nomes[i], dinheiro: Math.round(rand(0, 30)), ameacavel: false, k: 308 });
+      }
+    }
+    // posto de enfermagem
+    add(O('recepcao', 330, 420, 250, 44, { e: 30, top: '#f4f8fa', front: '#4a8ab8', label: 'POSTO DE ENFERMAGEM', r: 60, act: S => G.say(pick(['Os prontuários estão trancados no arquivo.', 'A enfermeira de plantão confere a lista de remédios.', 'Sem autorização você não mexe nos prontuários.']), 4) }));
+    add(O('arquivo', 600, 410, 50, 40, { e: 56, label: 'ARQUIVO DE PRONTUÁRIOS', r: 40, act: S => G.say('Gavetas trancadas. Tudo em ordem alfabética.', 3.5) }));
+    // canto de exame: maca com biombo e carrinho
+    add(O('maca', 760, 390, 56, 110, { e: 20 }), O('biombo', 730, 360, 100, 8, { e: 72, solid: false, k: 520, cor: '#a8d0e0' }), O('soro', 836, 396, 30, 20, { e: 72, solid: false }));
+    add(O('armario_med', 90, 400, 110, 38, { e: 70, label: 'ARMÁRIO DE REMÉDIOS', r: 50, act: S => G.say('Trancado a chave. Só a enfermeira-chefe abre.', 3.5) }));
+    add(O('cadeira_rodas', 220, 440, 40, 44, { solid: false }), O('bebedouro', 880, 200, 36, 36, { e: 62, label: 'BEBER ÁGUA', r: 40, act: S => { K.cura(S, 2); G.snd.beep(); G.say('Água fresquinha. (+2 vida)', 2.5); } }));
+    add(O('planta', 84, 500, 40, 50, { variante: 'samambaia' }), O('planta', 930, 480, 40, 50, {}));
+    R.npcs.push({ x: 400, y: 398, k: 600, p: look({ fem: true, shirt: '#58c0c8', pants: '#58c0c8', sleeve: 'curta', hairStyle: 'longo' }), falas: ['Hora do remédio! Quem é o próximo?', 'Silêncio, aqui tem gente descansando.', 'Fique tranquilo, vai dar tudo certo.'], h: Math.PI, fixo: true, nome: 'Enfermeira Bia', dinheiro: 35, label: 'CONVERSAR' });
+    R.npcs.push({ x: 650, y: 360, p: look({ shirt: '#f6f8fa', pants: '#3a4a6a', pat: 'jaqueta', sleeve: 'longa' }), falas: ['Ronda dos leitos. Todos estáveis.', 'Descanso é o melhor remédio.'], h: 0, nome: 'Dr. Paulo', dinheiro: 70, label: 'CONVERSAR' });
+    R.equipe = [R.npcs[R.npcs.length - 1]];
+    R.deco = x => {
+      for (let i = 0; i < 4; i++) K.janela(x, 196 + i * 165, 76, 64, 46, { vista: i % 2 ? 'jardim' : 'cidade', cor: '#eef3f6' });
+      cruz(x, 852, 100, 28, HOSP.azul, '#fff');
+      x.save(); x.textAlign = 'center'; x.font = 'bold 9px Arial'; x.fillStyle = '#2a5a7a'; x.fillText('ENFERMARIA', 852, 128); x.restore();
+      for (let i = 0; i < 5; i++) { x.fillStyle = '#f6fafc'; rr(x, 110 + i * 165 + 25, 126, 20, 14, 2); x.fill(); x.strokeStyle = HOSP.azul; x.lineWidth = 1; rr(x, 110 + i * 165 + 25.5, 126.5, 19, 13, 2); x.stroke(); x.fillStyle = HOSP.azul; x.font = 'bold 9px Arial'; x.textAlign = 'center'; x.fillText(String(i + 1), 110 + i * 165 + 35, 137); x.textAlign = 'left'; }
+      alcool(x, 934, 100);
+      D.relogio(x, 560, 100, 9, '#f6fafc');
+    };
+    R.onUpdate = (S, R2, dt) => {
+      R2.tp = (R2.tp || 0) - dt; if (R2.tp > 0) return; R2.tp = rand(6, 10);
+      const n = R2.equipe[0]; if (n.alvo || (n.rota && n.rota.length)) return;
+      L.rota(n, [{ x: n.x, y: 355 }, { x: rand(150, 800), y: 355 }, { x: rand(150, 800), y: rand(340, 370) }]);
+    };
+    return R;
+  }
+
+  // =====================================================================
+  //  HOSPITAL: consultório
+  // =====================================================================
+  function hospConsultorio(lg) {
+    const pl = lg.place, w = 700, h = 400;
+    const R = L.novaSala({ place: pl, w, h, nome: 'CONSULTÓRIO', cor: HOSP.verde, piso: 'ladrilho', pisoCores: ['#eaf2ee', '#d2e2da'], parede: '#e6f0ea', estiloParede: 'liso', lambri: '#9cc8b8', lambriAlt: 30, rodape: '#c4d8d0', capacho: HOSP.verde, subtitulo: 'atendimento', luzes: [{ x: 420, y: 330, r: 400 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    R.porta = { para: 'entrada', px: 325, py: 215, ph: Math.PI, label: 'VOLTAR À RECEPÇÃO', rotulo: 'RECEPÇÃO' };
+    const add = (...a) => R.objs.push(...a);
+    add(O('armario_med', 100, 188, 130, 38, { e: 70, label: 'ARMÁRIO DE REMÉDIOS', r: 50, act: S => G.say('Frascos e caixas organizados por tarja. Nada de se servir!', 3.5) }));
+    add(O('arquivo', 250, 188, 50, 40, { e: 56 }));
+    add(O('escrivaninha', 380, 214, 190, 54, { e: 22, label: 'CONSULTA MÉDICA', r: 60, act: S => menuConsulta(S, R) }));
+    add(O('cadeira', 420, 300, 24, 24, { dir: 'n', solid: false, estilo: 'plastico', cor: '#2a78c8' }), O('cadeira', 500, 300, 24, 24, { dir: 'n', solid: false, estilo: 'plastico', cor: '#2a78c8' }));
+    add(O('maca', 120, 336, 56, 110, { e: 20, label: 'DEITAR NA MACA', r: 46, act: S => { if (S.player.hp >= 100) { G.say('Você não está com nada, doutora só te examinou.', 3.5); return; } K.cura(S, 20); G.say('A doutora examinou você deitado na maca. (+20 vida)', 4); } }));
+    add(O('biombo', 90, 306, 120, 8, { e: 72, solid: false, cor: '#a8d0c8' }));
+    add(O('balanca', 230, 336, 42, 40, { e: 8, label: 'SUBIR NA BALANÇA', r: 36, act: S => G.say('Balança: ' + Math.round(rand(66, 86)) + ' kg.', 3) }));
+    add(O('soro', 292, 330, 30, 20, { e: 72, solid: false }));
+    add(O('planta', 640, 190, 40, 50, { variante: 'palmeira' }), O('planta', 84, 500, 40, 50, {}));
+    add(O('bebedouro', 640, 300, 36, 36, { e: 62, label: 'BEBER ÁGUA', r: 40, act: S => { K.cura(S, 2); G.say('Água fresca. (+2 vida)', 2.5); } }));
+    R.npcs.push({ x: 475, y: 196, k: 600, p: look({ fem: true, shirt: '#f6f8fa', pants: '#3a4a6a', pat: 'jaqueta', sleeve: 'longa', hairStyle: 'rabo' }), falas: ['Sente-se, o que está sentindo?', 'Respire fundo... agora solte.', 'Beba bastante água e descanse.'], h: Math.PI, fixo: true, nome: 'Dra. Helena', dinheiro: 90, label: 'CONVERSAR' });
+    R.deco = x => {
+      // diplomas
+      [[380, 92], [440, 92], [500, 92]].forEach(([dx, dy], i) => { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(dx + 2, dy + 3, 46, 34); x.fillStyle = '#8a6a3a'; x.fillRect(dx - 2, dy - 2, 50, 38); x.fillStyle = '#f8f2dc'; x.fillRect(dx, dy, 46, 34); x.fillStyle = 'rgba(0,0,0,0.4)'; for (let k = 0; k < 4; k++) x.fillRect(dx + 6, dy + 8 + k * 5, 34, 1.2); x.fillStyle = '#c8a24a'; x.beginPath(); x.arc(dx + 23, dy + 29, 3.4, 0, TAU); x.fill(); });
+      // tabela de olhos (Snellen)
+      x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(704, 88, 52, 52); x.fillStyle = '#fafafa'; x.fillRect(700, 84, 52, 52); x.strokeStyle = '#888'; x.lineWidth = 1; x.strokeRect(700.5, 84.5, 51, 51);
+      x.fillStyle = '#16181e'; x.textAlign = 'center';
+      [['E', 22], ['F P', 15], ['T O Z', 11], ['L P E D', 8], ['P E C F D', 6]].forEach(([t, s], i) => { x.font = 'bold ' + s + 'px Arial'; x.fillText(t, 726, 100 + i * 9 + (i > 0 ? 4 : 0) + (i === 0 ? 0 : 0)); }); x.textAlign = 'left';
+      // cartaz do coração
+      D.cartazLoja(x, 570, 82, 52, 60, '#ffe8e8', ['CUIDE DO', 'CORAÇÃO'], HOSP.verm);
+      x.fillStyle = HOSP.verm; x.beginPath(); x.moveTo(596, 130); x.bezierCurveTo(580, 118, 586, 108, 596, 116); x.bezierCurveTo(606, 108, 612, 118, 596, 130); x.fill();
+      K.janela(x, 270, 76, 64, 46, { vista: 'jardim', cor: '#f2f6f2' });
+      alcool(x, 640, 108);
+      D.relogio(x, 660, 100, 9, '#f6fafc');
+    };
+    return R;
+  }
+  function menuConsulta(S, R) {
+    const it = [
+      { n: 'Consulta particular — $120', desc: 'a doutora examina: vida cheia, passa a bebedeira e a energia', fn: S2 => K.compra(S2, 120, () => { S2.player.hp = 100; S2.bebado = 0; S2.energia = 0; G.say('A doutora fez os exames. Você está ótimo!', 4.5); }) },
+      { n: 'Pedir um atestado', desc: 'de graça, mas não resolve nada...', fn: () => G.say('Dra. Helena: "Atestado de 1 dia. Descanse de verdade!"', 4) },
+      { n: 'Perguntar sobre saúde', desc: 'dicas de quem entende', fn: () => G.say(pick(['Coma bem: pão de queijo e frutas ajudam a recuperar a vida.', 'Evite brigas: costelas quebradas demoram a curar.', 'Descanse no leito da enfermaria, é a melhor cura.']), 5) },
+      { n: 'Fechar', fn: () => 'fechar' }];
+    L.abrirMenu(S, { titulo: 'CONSULTÓRIO — DRA. HELENA', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => '$' + Math.floor(S2.save.money), itens: it });
+  }
+
+  L.construtores['tipo:hospital'] = { criar(sid, lg) { return sid === 'enfermaria' ? hospEnfermaria(lg) : sid === 'consultorio' ? hospConsultorio(lg) : hospEntrada(lg); } };
+
+  // =====================================================================
+  //  ESTÁDIO MUNICIPAL
+  //    saguão   bilheteria (compre o ingresso!), catracas, lanchonete, loja do time, telão com o placar
+  //    campo    gramado de verdade, traves, arquibancadas com torcida, bancos de reservas,
+  //             jogo de futebol com 22 jogadores e árbitro (13h às 19h), seguranças contra invasão de campo
+  // =====================================================================
+  const VERDE = '#2a8a3a';
+  const OPONENTES = ['RIBEIRÃO FC', 'ATLÉTICO NORTE', 'PORTO UNIDO', 'VALE VERDE', 'NOVO HORIZONTE', 'FAZENDA FC'];
+  const dia = S => Math.floor(S.dayT);
+  // fase do dia: treino 8h-12h, chegando 12h-13h, jogo 13h-19h, vazio no resto
+  const fase = S => { const h = L.hora(S); return h >= 13 && h < 19 ? 'jogo' : h >= 12 && h < 13 ? 'chegando' : h >= 8 && h < 12 ? 'treino' : 'vazio'; };
+  const minutoJogo = S => clamp((L.hora(S) - 13) / 6 * 95, 0, 95);      // 0 a 95 (inclui o intervalo)
+  const adversario = S => OPONENTES[dia(S) % OPONENTES.length];
+  // o placar do dia (fica em S.estadio; quem está longe do campo "perde" gols de forma sorteada)
+  function sincroniza(S) {
+    let e = S.estadio;
+    if (!e || e.dia !== dia(S)) e = S.estadio = { dia: dia(S), placar: [0, 0], min: 0 };
+    if (fase(S) === 'jogo') {
+      const m = minutoJogo(S), dm = m - e.min;
+      if (dm > 0.6) { for (let i = 0; i < Math.floor(dm); i++) [0, 1].forEach(t => { if (Math.random() < 0.011) e.placar[t]++; }); e.min = m; }
+      else if (dm > 0) e.min = m;
+    }
+    return e;
+  }
+  function textoPlacar(S) {
+    const e = sincroniza(S), f = fase(S), fora = adversario(S), nome = 'MUNICIPAL ' + e.placar[0] + ' x ' + e.placar[1] + ' ' + fora;
+    if (f === 'jogo') { const m = minutoJogo(S); return [nome, m < 45 ? '1º TEMPO  ' + Math.floor(m) + "'" : m < 50 ? 'INTERVALO' : m < 95 ? '2º TEMPO  ' + Math.floor(m - 5) + "'" : 'FIM DE JOGO']; }
+    if (f === 'chegando') return ['HOJE ÀS 13H', 'MUNICIPAL x ' + fora];
+    if (f === 'treino') return ['TREINO ABERTO', 'JOGO HOJE ÀS 13H'];
+    return e.min > 0 ? ['ÚLTIMO JOGO', nome] : ['PRÓXIMO JOGO', 'MUNICIPAL x ' + fora];
+  }
+  const temIngresso = S => !!(S.ingresso && S.ingresso.dia === dia(S));
+
+  function menuBilheteria(S, R) {
+    const f = fase(S);
+    const vende = (nome, preco, tipo, desc) => ({ n: nome + ' — $' + preco, desc, fn: S2 => {
+      if (temIngresso(S2)) { G.say('Você já tem ingresso para hoje.', 3); return; }
+      if (f === 'vazio') { G.say('A bilheteria só abre de manhã até as 19h.', 3.5); return; }
+      K.compra(S2, preco, () => { S2.ingresso = { dia: dia(S2), tipo }; G.say('Ingresso ' + tipo + ' comprado! Passe pelas catracas e entre no campo.', 4.5); });
+    } });
+    L.abrirMenu(S, { titulo: 'BILHETERIA — ESTÁDIO MUNICIPAL', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => temIngresso(S2) ? 'ingresso: ' + S2.ingresso.tipo : '$' + Math.floor(S2.save.money), itens: [
+      vende('Arquibancada', 30, 'comum', 'bancos de concreto, junto da torcida'),
+      vende('Camarote', 100, 'camarote', 'cadeira cativa, vista de cima do gramado'),
+      { n: 'Ver o jogo de hoje', desc: 'placar e horário', fn: S2 => G.say(textoPlacar(S2).join('  ·  '), 5) },
+      { n: 'Fechar', fn: () => 'fechar' }] });
+  }
+  function menuLanchonete(S, R) {
+    const it = (n, preco, hp, msg, bebado) => ({ n: n + ' — $' + preco, desc: '+' + hp + ' vida', fn: S2 => K.compra(S2, preco, () => { K.cura(S2, hp); if (bebado) S2.bebado = (S2.bebado || 0) + bebado; G.say(msg + ' (+' + hp + ' vida)' + (bebado ? ' — a cabeça roda...' : ''), 3.5); }) });
+    L.abrirMenu(S, { titulo: 'LANCHONETE DO ESTÁDIO', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => '$' + Math.floor(S2.save.money), itens: [
+      it('Pastel de carne', 8, 15, 'Pastel quentinho!'), it('Cachorro-quente', 10, 18, 'Dogão com purê e batata palha!'), it('Refrigerante', 5, 6, 'Gelado, do jeito que tem que ser.'),
+      it('Cerveja gelada', 9, 8, 'Saúde! Hoje é dia de jogo.', 8), { n: 'Fechar', fn: () => 'fechar' }] });
+  }
+  function menuLoja(S, R) {
+    const it = (n, preco, msg, flag) => ({ n: n + ' — $' + preco, desc: S.save[flag] ? 'você já tem' : 'orgulho do clube', fn: S2 => { if (S2.save[flag]) { G.say('Você já tem esse item.', 3); return; } K.compra(S2, preco, () => { S2.save[flag] = true; G.say(msg, 4); }); } });
+    L.abrirMenu(S, { titulo: 'LOJA OFICIAL DO MUNICIPAL', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => '$' + Math.floor(S2.save.money), itens: [
+      it('Camisa do time', 80, 'Camisa verde e branca do Municipal! Agora você é torcedor de carteirinha.', 'camisaTime'),
+      it('Cachecol', 30, 'Cachecol do Municipal. Bom para o frio e para cantar.', 'cachecolTime'),
+      it('Bandeira', 25, 'Bandeira do clube para balançar na arquibancada.', 'bandeiraTime'),
+      { n: 'Fechar', fn: () => 'fechar' }] });
+  }
+
+  // ---------- saguão ----------
+  function estEntrada(lg) {
+    const pl = lg.place, w = 900, h = 430;
+    const R = L.novaSala({ place: pl, w, h, nome: pl.nome || 'ESTÁDIO MUNICIPAL', cor: VERDE, piso: 'ladrilho_g', pisoCores: ['#cfcbc2', '#b9b5ac'], parede: '#d9d6cc', estiloParede: 'concreto', lambri: VERDE, lambriAlt: 30, rodape: '#1f6a2c', capacho: VERDE, subtitulo: 'bilheteria e portões', luzes: [{ x: 300, y: 330, r: 360 }, { x: 760, y: 330, r: 360 }, { x: 520, y: 250, r: 300 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    const add = (...a) => R.objs.push(...a), S0 = G.S, f0 = S0 ? fase(S0) : 'jogo';
+    const cx = 520;
+    // portão do campo, catracas e fiscal
+    add(porta(465, 96, 110, { cor: VERDE, placa: 'CAMPO', label: 'ENTRAR NO CAMPO (PORTÃO A)', act: S => entrarCampo(S, R) }));
+    [300, 352, 404, 592, 644, 696].forEach(x => add(O('catraca', x, 236, 44, 40, { e: 36, solid: true })));
+    add(O('bandeira', 428, 178, 24, 16, { e: 92, pais: 'br', solid: false }), O('bandeira', 592, 178, 24, 16, { e: 92, pais: 'sp', solid: false }));
+    R.npcs.push({ x: 478, y: 262, p: look({ shirt: '#f2d82a', pants: '#16181e', sleeve: 'curta', cap: 'swat' }), falas: ['Ingresso, por favor! Sem ingresso não passa.', 'Compre na bilheteria, à esquerda.', 'Jogo hoje a partir das 13h!'], h: 0, fixo: true, nome: 'Fiscal Dirceu', dinheiro: 25, label: 'CONVERSAR' });
+    // telão com o placar ao vivo
+    add(O('placar', 610, 78, 150, 46, { solid: false, k: 1, fnTexto: () => textoPlacar(G.S) }));
+    // bilheteria e fila
+    add(O('recepcao', 90, 196, 210, 38, { e: 30, top: '#f4efe0', front: VERDE, label: 'COMPRAR INGRESSO', r: 60, act: S => menuBilheteria(S, R) }));
+    add(O('vidro_guiche', 90, 240, 210, 6, { e: 54, solid: false, k: 250 }));
+    R.npcs.push({ x: 195, y: 178, k: 245, p: look({ fem: true, shirt: '#2a8a3a', pants: '#23232c', sleeve: 'curta', hairStyle: 'coque' }), falas: ['Arquibancada $30, camarote $100. Qual vai ser?', 'O jogo começa às 13h, viu?', 'Sem ingresso não entra no campo.'], h: Math.PI, fixo: true, nome: 'Bilheteira Sônia', dinheiro: 140, label: 'CONVERSAR' });
+    add(O('fila', 100, 296, 70, 12, { e: 26, solid: false }), O('fila', 215, 296, 70, 12, { e: 26, solid: false }), O('fila', 100, 372, 70, 12, { e: 26, solid: false }), O('fila', 215, 372, 70, 12, { e: 26, solid: false }));
+    const nFila = f0 === 'chegando' ? 4 : f0 === 'jogo' ? 2 : 0, falaF = ['Esse ano o Municipal leva!', 'A fila anda devagar...', 'Trouxe até a bandeira.', 'Vim com a família toda.'];
+    for (let i = 0; i < nFila; i++) R.npcs.push({ x: 192, y: 282 + i * 28, p: look({ shirt: pick(['#2a9a4a', '#f4f4f4', '#2a9a4a', '#d8d8d8']) }), falas: [pick(falaF)], h: 0, semColisao: true, nome: pick(['Torcedor', 'Torcedora']), dinheiro: Math.round(rand(10, 70)) });
+    // loja do time (canto de baixo, à esquerda)
+    add(O('arara', 92, 430, 120, 30, { e: 40, tema: 'camisa', label: 'LOJA OFICIAL DO TIME', r: 52, act: S => menuLoja(S, R) }), O('arara', 232, 430, 120, 30, { e: 40, tema: 'camisa', label: 'LOJA OFICIAL DO TIME', r: 52, act: S => menuLoja(S, R) }));
+    add(O('manequim', 380, 440, 30, 30, { e: 64, cor: '#2a9a4a' }), O('manequim', 420, 440, 30, 30, { e: 64, cor: '#f4f4f4' }), O('mesa_expo', 120, 510, 130, 50, { e: 24, tema: 'roupas', label: 'LOJA OFICIAL DO TIME', r: 50, act: S => menuLoja(S, R) }));
+    R.npcs.push({ x: 300, y: 515, p: look({ fem: true, shirt: '#2a9a4a', pants: '#23232c', sleeve: 'curta' }), falas: ['A camisa nova está linda, né?', 'Cachecol e bandeira também, olha só!', 'Aqui é a loja oficial do Municipal.'], h: Math.PI, fixo: true, nome: 'Vendedora Tânia', dinheiro: 90, label: 'LOJA DO TIME', act: S => menuLoja(S, R) });
+    // lanchonete (canto de cima, à direita) e mesinhas
+    add(O('balcao', 780, 196, 190, 40, { e: 28, itens: 'pastel', top: '#e8dcc0', front: VERDE, label: 'LANCHONETE DO ESTÁDIO', r: 60, act: S => menuLanchonete(S, R) }));
+    R.npcs.push({ x: 860, y: 176, k: 245, p: look({ shirt: '#f4f4f4', pants: '#23232c', sleeve: 'curta', cap: 'chef' }), falas: ['Pastel quentinho, quem vai querer?', 'Cerveja gelada pra comemorar!', 'Dogão com batata palha, o melhor do estádio.'], h: Math.PI, fixo: true, nome: 'Seu Zé do Pastel', dinheiro: 80, label: 'PEDIR LANCHE', act: S => menuLanchonete(S, R) });
+    add(O('banqueta', 800, 250, 26, 26, { cor: VERDE }), O('banqueta', 850, 250, 26, 26, { cor: VERDE }), O('banqueta', 900, 250, 26, 26, { cor: VERDE }));
+    [[790, 340], [890, 340]].forEach(([mx, my]) => { add(O('mesa', mx, my, 54, 44, { e: 18, estilo: 'lanche' })); add(O('cadeira', mx - 29, my + 8, 26, 26, { dir: 'w', estilo: 'plastico', cor: '#f2f2f2', solid: false, k: my + 8 }), O('cadeira', mx + 57, my + 8, 26, 26, { dir: 'e', estilo: 'plastico', cor: VERDE, solid: false, k: my + 8 })); });
+    add(O('banco_espera', 760, 470, 170, 26, { e: 16, label: 'SENTAR', r: 30, act: S => { K.cura(S, 3); G.say('Você descansou um pouco. (+3 vida)', 2.5); } }));
+    add(O('bebedouro', 936, 400, 36, 36, { e: 62, label: 'BEBER ÁGUA', r: 40, act: S => { K.cura(S, 2); G.snd.beep(); G.say('Água geladinha. (+2 vida)', 2.5); } }));
+    add(O('planta', 84, 560, 40, 50, { variante: 'folhagem' }), O('planta', 940, 530, 40, 50, {}));
+    // torcedores passeando
+    if (f0 !== 'vazio' && f0 !== 'treino') {
+      R.passeio = [];
+      for (let i = 0; i < 3; i++) { const n = { x: rand(330, 740), y: rand(330, 400), p: look({ shirt: pick(['#2a9a4a', '#f4f4f4', '#2a9a4a']), pat: Math.random() < 0.3 ? 'listra' : 'liso' }), falas: pick([['Hoje a vitória é nossa!', 'Alguém viu o meu ingresso?'], ['Vim só pelo pastel.', 'Está lotado hoje, hein?'], ['Meu time, meu amor!', 'Quanto tá o jogo?']]), h: 0, nome: pick(['Torcedor', 'Torcedora', 'Seu Chico']), dinheiro: Math.round(rand(10, 80)) }; R.npcs.push(n); R.passeio.push(n); }
+    }
+    R.onUpdate = (S, R2, dt) => {
+      R2.tp = (R2.tp || 0) - dt; if (R2.tp > 0 || !R2.passeio) return; R2.tp = rand(3, 7);
+      const n = pick(R2.passeio); if (n.alvo || (n.rota && n.rota.length)) return;
+      L.rota(n, [{ x: rand(330, 740), y: rand(330, 400) }, { x: rand(330, 740), y: rand(330, 420) }]);
+    };
+    // chão: escudo do clube no meio do saguão
+    R.pisoExtra = x => {
+      const ex = 560, ey = 470;
+      x.fillStyle = 'rgba(0,0,0,0.16)'; x.beginPath(); x.ellipse(ex + 3, ey + 4, 66, 50, 0, 0, TAU); x.fill();
+      x.fillStyle = VERDE; x.beginPath(); x.ellipse(ex, ey, 64, 48, 0, 0, TAU); x.fill(); x.strokeStyle = '#f4f4f4'; x.lineWidth = 4; x.stroke();
+      x.strokeStyle = 'rgba(255,255,255,0.7)'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(ex, ey, 54, 39, 0, 0, TAU); x.stroke();
+      x.fillStyle = '#f4f4f4'; x.beginPath(); x.arc(ex, ey - 6, 15, 0, TAU); x.fill(); x.fillStyle = '#16181e'; for (let k = 0; k < 5; k++) { const a = k * TAU / 5 - Math.PI / 2; x.beginPath(); x.arc(ex + Math.cos(a) * 8, ey - 6 + Math.sin(a) * 8, 3.2, 0, TAU); x.fill(); } x.beginPath(); x.arc(ex, ey - 6, 4, 0, TAU); x.fill();
+      x.fillStyle = '#f4f4f4'; x.font = 'bold 12px Arial'; x.textAlign = 'center'; x.fillText('MUNICIPAL', ex, ey + 25); x.textAlign = 'left';
+      // faixa de pedestres do portão e setas
+      x.fillStyle = 'rgba(255,255,255,0.65)'; for (let k = 0; k < 6; k++) x.fillRect(472 + k * 18, 286, 12, 60);
+    };
+    R.deco = x => {
+      // letreiro principal
+      x.fillStyle = 'rgba(0,0,0,0.3)'; rr(x, 342, 80, 360, 44, 7); x.fill();
+      x.fillStyle = VERDE; rr(x, 338, 76, 360, 44, 7); x.fill(); x.strokeStyle = '#f4f4f4'; x.lineWidth = 3; rr(x, 342, 80, 352, 36, 5); x.stroke();
+      x.save(); x.textAlign = 'center'; x.fillStyle = '#f4f4f4'; x.font = 'bold 22px Georgia'; x.fillText(pl.nome || 'ESTÁDIO MUNICIPAL', 518, 104); x.font = 'bold 9px Arial'; x.fillStyle = '#ffe04a'; x.fillText('PORTÃO A · ARQUIBANCADAS E CAMAROTE', 518, 114); x.restore();
+      // bilheteria: letreiro e tabela de preços
+      x.fillStyle = '#16181e'; rr(x, 96, 74, 200, 26, 4); x.fill(); x.fillStyle = '#ffe04a'; x.font = 'bold 17px Arial'; x.textAlign = 'center'; x.fillText('BILHETERIA', 196, 93); x.textAlign = 'left';
+      D.quadroNegro(x, 110, 106, 172, 36, [['Arquibancada', '$30'], ['Camarote', '$100']], 'INGRESSOS');
+      // lanchonete: cardápio
+      x.fillStyle = '#16181e'; rr(x, 784, 74, 182, 26, 4); x.fill(); x.fillStyle = '#ffe04a'; x.font = 'bold 15px Arial'; x.textAlign = 'center'; x.fillText('LANCHONETE', 875, 92); x.textAlign = 'left';
+      D.quadroNegro(x, 800, 106, 150, 36, [['Pastel', '$8'], ['Dogão', '$10']], 'CARDÁPIO');
+      // faixas de campeão, cartaz da tabela e relógio
+      [[330, 'CAMPEÃO', '1998'], [780, 'CAMPEÃO', '2011']].forEach(([bx, t1, t2]) => { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(bx + 3, 70, 30, 66); x.fillStyle = '#f4f4f4'; x.beginPath(); x.moveTo(bx, 66); x.lineTo(bx + 30, 66); x.lineTo(bx + 30, 130); x.lineTo(bx + 15, 120); x.lineTo(bx, 130); x.closePath(); x.fill(); x.fillStyle = VERDE; x.fillRect(bx, 66, 30, 8); x.font = 'bold 6.5px Arial'; x.textAlign = 'center'; x.fillText(t1, bx + 15, 88); x.fillText(t2, bx + 15, 98); x.fillStyle = '#c8a24a'; x.beginPath(); x.arc(bx + 15, 110, 5, 0, TAU); x.fill(); x.textAlign = 'left'; });
+      D.relogio(x, 340, 132, 8, '#f6f6f2');
+      x.fillStyle = VERDE; x.fillRect(70, 140, 900, 3);
+    };
+    return R;
+  }
+  function entrarCampo(S, R) {
+    const f = fase(S);
+    if ((f === 'jogo' || f === 'chegando') && !temIngresso(S)) { G.say('Fiscal: "Sem ingresso você não passa! A bilheteria fica à esquerda."', 4.5); return; }
+    if (f === 'jogo' || f === 'chegando') G.say('Ingresso conferido. Bom jogo!', 2.5);
+    irPara(S, 'campo', 1300, 840);
+  }
+
+  // ---------- campo de jogo ----------
+  const P = { x: 230, y: 250, w: 1000, h: 650 }, CY = P.y + P.h / 2;
+  const FORM = [[0.04, 0.5], [0.2, 0.14], [0.2, 0.38], [0.2, 0.62], [0.2, 0.86], [0.42, 0.24], [0.42, 0.5], [0.42, 0.76], [0.64, 0.2], [0.68, 0.5], [0.64, 0.8]];   // goleiro, 4 zagueiros, 3 meias, 3 atacantes
+  const KIT = [{ shirt: '#2a9a4a', pants: '#f4f4f4' }, { shirt: '#f4f4f4', pants: '#2a3a8a' }];
+  const KIT_GOL = [{ shirt: '#f2d82a', pants: '#16181e' }, { shirt: '#e8602a', pants: '#16181e' }];
+  const NOMES = ['Neto', 'Gabriel', 'Rafa', 'Bruno', 'Léo', 'Thiago', 'Caio', 'Dudu', 'Lucas', 'Pedro', 'Ronaldo'];
+  const mover = (n, a, v) => { if (Math.hypot(a.x - n.x, a.y - n.y) < 6) { n.alvo = null; return; } n.alvo = { x: a.x, y: a.y }; n.v = v; };
+  // onde o jogador fica: formação, puxada para o lado da bola (quem tem a bola avança)
+  function posForm(time, i, bx, by, ataca) {
+    const f = FORM[i]; let fx = f[0];
+    if (i > 0) fx = ataca ? Math.min(0.92, fx + 0.14) : Math.max(0.05, fx - 0.06);
+    const gx = P.x + (time ? 1 - fx : fx) * P.w, gy = P.y + f[1] * P.h;
+    if (i === 0) return { x: gx, y: CY + clamp((by - CY) * 0.22, -46, 46) };
+    return { x: gx + (bx - gx) * 0.3, y: gy + (by - gy) * 0.3 };
+  }
+  function campoConfig(R, S, f) {
+    R.npcs = R.npcs.filter(n => !n.doCampo);
+    R.faseAtual = f; R.jogo = null; R.bola.invisivel = true; R.segs = null; R.invasao = 0;
+    const poe = n => { n.doCampo = true; n.semColisao = true; n.ameacavel = false; n.label = n.label || 'CONVERSAR'; R.npcs.push(n); return n; };
+    const h = L.hora(S);
+    // seguranças nos cantos do campo
+    R.guardas = [[190, 290], [1270, 290], [190, 870], [1270, 870]].map(([x, y], i) => { const g = poe({ x, y, home: { x, y }, p: look({ shirt: '#f2d82a', pants: '#16181e', sleeve: 'curta', cap: 'swat' }), falas: ['Fique fora do gramado!', 'Invasão de campo dá multa e confusão.', 'Aqui eu fico de olho em todo mundo.'], h: i < 2 ? Math.PI : 0, nome: 'Segurança ' + ['Rui', 'Dida', 'Beto', 'Nando'][i], dinheiro: 20, v: 60 }); g.ameacavel = true; return g; });
+    if (f !== 'jogo' && f !== 'treino') {
+      R.guardas.forEach(g => { R.npcs.splice(R.npcs.indexOf(g), 1); }); R.guardas = [];
+      if (h >= 6 && h < 20) { R.jardim = [0, 1].map(i => poe({ x: P.x + 60 + i * 400, y: P.y + 80 + i * 300, p: look({ shirt: '#e8872a', pants: '#3a4a6a', sleeve: 'curta', cap: 'hat' }), falas: ['Gramado é coisa séria, viu?', 'Hoje o jogo vai ser bonito.'], h: 0, nome: i ? 'Jardineiro Nilton' : 'Jardineiro Dedé', dinheiro: 15, v: 54 })); }
+      return;
+    }
+    const J = R.jogo = { treino: f === 'treino', t: 0, b: { x: P.x + P.w / 2, y: CY, z: 0, vx: 0, vy: 0, vz: 0, rot: 0 }, dono: null, ultimo: null, ultimoT: 0, tAcao: 1, pausa: 0, espera: 1.5, golT: 0, jog: [[], []], todos: [] };
+    R.bola.invisivel = false;
+    [0, 1].forEach(t => FORM.forEach((_, i) => {
+      const pp = posForm(t, i, P.x + P.w / 2, CY, false);
+      const n = poe({ x: pp.x, y: pp.y, p: look(Object.assign({ sleeve: 'curta', shoe: '#16181e', pat: 'liso' }, i === 0 ? KIT_GOL[t] : KIT[t])), h: t ? -Math.PI / 2 : Math.PI / 2, v: 80, falas: ['Agora não, tô no jogo!', 'Sai do gramado, torcedor!', 'Passa a bola!'], nome: (i + 1) + ' ' + NOMES[i], dinheiro: 0, time: t, idx: i });
+      J.jog[t].push(n); J.todos.push(n);
+    }));
+    J.ref = poe({ x: P.x + P.w / 2 - 60, y: CY + 50, p: look({ shirt: '#16181e', pants: '#16181e', sleeve: 'curta' }), falas: ['Cartão amarelo pra você, torcedor!', 'Fora do gramado!'], h: 0, nome: 'Árbitro Silva', dinheiro: 0, v: 70 });
+    // reservas sentados nos bancos e técnicos em pé
+    [0, 1].forEach(t => { for (let i = 0; i < 4; i++) poe({ x: (t ? 845 : 445) + i * 34, y: 958, p: look(Object.assign({ sleeve: 'curta' }, KIT[t])), sentado: true, h: Math.PI, falas: ['Quero entrar logo!', 'O professor vai me colocar.'], nome: 'Reserva ' + (12 + i), dinheiro: 0 }); poe({ x: t ? 1030 : 640, y: 925, p: look({ shirt: t ? '#2a3a8a' : '#1f6a2c', pants: '#23232c', sleeve: 'longa' }), falas: ['Marca! Fecha o meio!', 'Sobe o time!'], h: Math.PI, nome: t ? 'Técnico Marquinhos' : 'Técnico Gilmar', dinheiro: 0 }); });
+    saque(R, J, 0, true);
+  }
+  // bola no meio; quem saca vai até lá (inicio = todo mundo já em formação)
+  function saque(R, J, quem, inicio) {
+    const b = J.b; b.x = P.x + P.w / 2; b.y = CY; b.z = 0; b.vx = b.vy = b.vz = 0; J.dono = null; J.espera = inicio ? 0.5 : 3; J.pausa = 0; J.quem = quem;
+    if (inicio) J.todos.forEach(n => { const pp = posForm(n.time, n.idx, b.x, b.y, false); n.x = pp.x; n.y = pp.y; });
+    const k = J.jog[quem][7]; if (inicio) { k.x = b.x - 14 * (quem ? -1 : 1); k.y = b.y; }
+  }
+  function marcou(R, S, J, time) {
+    const E = sincroniza(S); if (!J.treino) E.placar[time]++;
+    J.golT = 5; J.pausa = 3.8; J.dono = null; J.b.vx = J.b.vy = 0; J.b.z = 0; J.marcou = time;
+    J.artilheiro = J.ultimo && J.ultimo.time === time && J.ultimo.idx > 0 ? J.ultimo : J.jog[time][9];
+    if (S.inside === R) { const nome = time ? adversario(S) : 'MUNICIPAL'; G.say('GOOOOL do ' + nome + '! MUNICIPAL ' + E.placar[0] + ' x ' + E.placar[1] + ' ' + adversario(S), 5); if (G.snd && G.snd.cash) G.snd.cash(); }
+  }
+  function passa(J, d) {
+    const dir = d.time ? -1 : 1; let best = null, bs = -1e9;
+    J.jog[d.time].forEach(m => { if (m === d || m.idx === 0) return; const dist = Math.hypot(m.x - d.x, m.y - d.y); if (dist < 60) return; const sc = (m.x - d.x) * dir * 0.7 - dist * 0.25 + Math.random() * 90; if (sc > bs) { bs = sc; best = m; } });
+    if (!best) best = J.jog[d.time][1 + ((Math.random() * 10) | 0)];
+    const dx = best.x - d.x, dy = best.y - d.y, dist = Math.hypot(dx, dy) || 1, v = Math.max(160, dist * 1.2), b = J.b;
+    b.vx = dx / dist * v; b.vy = dy / dist * v; b.vz = 0; J.dono = null; J.ultimo = d; J.ultimoT = 0.35;
+  }
+  function chuta(J, d) {
+    const dir = d.time ? -1 : 1, gx = d.time ? P.x : P.x + P.w, b = J.b, r = Math.random();
+    let ty = CY + (Math.random() - 0.5) * 60;
+    if (r > 0.45) ty = CY + (Math.random() < 0.5 ? -1 : 1) * rand(50, 120);       // pra fora
+    const dx = gx + dir * 16 - d.x, dy = ty - d.y, dist = Math.hypot(dx, dy) || 1, v = 560;
+    b.vx = dx / dist * v; b.vy = dy / dist * v; b.vz = rand(0, 70); J.dono = null; J.ultimo = d; J.ultimoT = 0.3;
+    const gk = J.jog[1 - d.time][0]; if (r > 0.14 && r <= 0.45) { gk.chute = 1.2; gk.alvoY = ty; }      // defesa do goleiro
+  }
+  function passo(R, S, dt) {
+    const J = R.jogo; if (!J) return;
+    const b = J.b, m = minutoJogo(S), E = sincroniza(S);
+    if (!J.treino) E.min = m;
+    J.t += dt; J.ultimoT -= dt; if (J.golT > 0) J.golT -= dt;
+    const intervalo = !J.treino && m >= 45 && m < 50, acabou = !J.treino && m >= 95;
+    if (intervalo || acabou) {      // intervalo: todos vão para o túnel; fim: roda no meio do campo
+      J.dono = null; J.parado = true;
+      J.todos.concat([J.ref]).forEach((n, k) => mover(n, intervalo ? { x: R.portaX - 60 + (k % 8) * 18, y: R.y1 - 100 - ((k / 8) | 0) * 22 } : { x: P.x + P.w / 2 + Math.cos(k * 1.7) * 70, y: CY + Math.sin(k * 1.7) * 50 }, 90));
+      R.bola.x = b.x - 5; R.bola.y = b.y - 5; R.bola.z = 0; return;
+    }
+    if (J.parado) { J.parado = false; saque(R, J, 1, false); }
+    // ----- comemoração depois do gol -----
+    if (J.pausa > 0) {
+      J.pausa -= dt;
+      J.todos.forEach(n => { if (n === J.artilheiro) mover(n, { x: J.marcou ? P.x + 20 : P.x + P.w - 20, y: P.y + P.h - 30 }, 140); else { const pp = posForm(n.time, n.idx, P.x + P.w / 2, CY, false); mover(n, pp, 80); } });
+      if (J.pausa <= 0) saque(R, J, 1 - J.marcou, false);
+    } else if (J.espera > 0) {     // esperando o saque: todos vão à formação
+      J.espera -= dt;
+      J.todos.forEach(n => { const pp = posForm(n.time, n.idx, b.x, b.y, false); if (n.time === J.quem && n.idx === 7) mover(n, { x: b.x - 10 * (n.time ? -1 : 1), y: b.y }, 100); else mover(n, pp, 90); });
+    } else {
+      // ----- bola -----
+      const dono = J.dono;
+      if (dono) {
+        const dir = dono.time ? -1 : 1, gx = dono.time ? P.x : P.x + P.w;
+        b.x += (dono.x + dir * 12 - b.x) * Math.min(1, dt * 14); b.y += (dono.y + 3 - b.y) * Math.min(1, dt * 14); b.z = 0;
+        J.tAcao -= dt;
+        J.todos.forEach(q => { if (q.time !== dono.time && Math.abs(q.x - dono.x) < 17 && Math.abs(q.y - dono.y) < 17 && Math.random() < dt * 0.9) { J.dono = null; J.ultimo = dono; J.ultimoT = 0.25; b.vx = rand(-90, 90); b.vy = rand(-90, 90); } });
+        if (J.dono && J.tAcao <= 0) {
+          const dist = Math.hypot(gx - dono.x, CY - dono.y), r = Math.random();
+          if (dono.idx === 0) { passa(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else if (dist < 320 && r < 0.55) { chuta(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else if (r < 0.7) { passa(J, dono); J.tAcao = rand(0.8, 1.6); }
+          else J.tAcao = rand(0.5, 1.2);
+        }
+      } else {
+        b.x += b.vx * dt; b.y += b.vy * dt; b.vz -= 520 * dt; b.z = Math.max(0, b.z + b.vz * dt); if (b.z === 0 && b.vz < 0) b.vz = b.vz < -90 ? -b.vz * 0.35 : 0;
+        const at = Math.pow(0.35, dt); b.vx *= at; b.vy *= at; b.rot += Math.hypot(b.vx, b.vy) * dt * 0.12;
+        if (b.x < P.x - 2 || b.x > P.x + P.w + 2) {      // passou da linha de fundo
+          const oeste = b.x < P.x;
+          if (Math.abs(b.y - CY) < 36 && b.z < 36) marcou(R, S, J, oeste ? 1 : 0);
+          else { const def = oeste ? 0 : 1; J.dono = J.jog[def][0]; J.tAcao = rand(1, 1.8); b.vx = b.vy = 0; }
+        } else if (b.y < P.y - 2 || b.y > P.y + P.h + 2) {   // lateral: o adversário de quem tocou por último repõe
+          const t2 = J.ultimo ? 1 - J.ultimo.time : 0; b.y = clamp(b.y, P.y, P.y + P.h); b.vx = b.vy = 0;
+          let bn = null, bd = 1e9; J.jog[t2].forEach(q => { if (q.idx === 0) return; const d = Math.hypot(q.x - b.x, q.y - b.y); if (d < bd) { bd = d; bn = q; } });
+          J.dono = bn; J.tAcao = rand(0.8, 1.4);
+        }
+        if (!J.dono && !(J.golT > 0 && J.pausa > 0)) J.todos.forEach(q => { if (J.dono) return; if (q === J.ultimo && J.ultimoT > 0) return; if (b.z < 18 && Math.abs(q.x - b.x) < 14 && Math.abs(q.y - b.y) < 14) { J.dono = q; J.tAcao = rand(0.5, 1.2); b.vx = b.vy = 0; } });
+      }
+      // ----- jogadores -----
+      const ataca = t => !!(J.dono && J.dono.time === t);
+      const chase = [null, null];
+      [0, 1].forEach(t => { if (ataca(t)) return; let bd = 1e9; J.jog[t].forEach(q => { if (q.idx === 0) return; const d = Math.hypot(q.x - b.x, q.y - b.y); if (d < bd) { bd = d; chase[t] = q; } }); });
+      J.todos.forEach(n => {
+        if (n === J.dono) { const dir = n.time ? -1 : 1; mover(n, { x: clamp(n.x + dir * 70, P.x + 10, P.x + P.w - 10), y: clamp(n.y + (CY - n.y) * 0.3, P.y + 10, P.y + P.h - 10) }, 88); return; }
+        if (n.chute > 0) { n.chute -= dt; mover(n, { x: n.x, y: clamp(n.alvoY, CY - 50, CY + 50) }, 150); return; }
+        if (n === chase[n.time] && n.idx > 0) { mover(n, { x: b.x, y: b.y }, 104); return; }
+        mover(n, posForm(n.time, n.idx, b.x, b.y, ataca(n.time)), n.idx === 0 ? 60 : 84);
+      });
+    }
+    // árbitro e rosto dos jogadores parados virado para a bola
+    mover(J.ref, { x: clamp(b.x - 50, P.x + 30, P.x + P.w - 30), y: clamp(b.y + 60, P.y + 30, P.y + P.h - 30) }, 70);
+    J.todos.concat([J.ref]).forEach(n => { if (!n.alvo) n.h = Math.atan2(b.x - n.x, -(b.y - n.y)); });
+    if (!isFinite(b.x + b.y)) { b.x = P.x + P.w / 2; b.y = CY; b.vx = b.vy = 0; }
+    R.bola.x = b.x - 5; R.bola.y = b.y - 5; R.bola.z = b.z; R.bola.rot = b.rot;
+  }
+  // invasão de campo: depois de uns segundos no gramado, os seguranças vêm te tirar (multa)
+  function vigia(R, S, dt) {
+    if (S.inside !== R) return;
+    const dentro = R.px > P.x - 4 && R.px < P.x + P.w + 4 && R.py > P.y - 4 && R.py < P.y + P.h + 4;
+    if (R.invasao < 0) { R.invasao += dt; return; }
+    if (dentro) {
+      R.invasao += dt;
+      if (R.invasao > 2.2 && !R.segs) { R.segs = R.guardas; G.say('INVASÃO DE CAMPO! Os seguranças estão vindo te pegar!', 4.5); if (G.snd && G.snd.fail) G.snd.fail(); }
+    } else if (!dentro) { R.invasao = 0; if (R.segs) { R.segs = null; R.guardas.forEach(g => { g.alvo = null; L.rota(g, [g.home]); }); } }
+    if (R.segs) R.segs.forEach(g => {
+      g.rota = []; mover(g, { x: R.px, y: R.py }, 150);
+      if (R.segs && Math.hypot(g.x - R.px, g.y - R.py) < 36) {
+        const multa = Math.min(50, Math.floor(S.save.money)); S.save.money -= multa; G.save();
+        R.px = R.portaX; R.py = R.y1 - 100; R.invasao = -4; const gs = R.segs; R.segs = null; gs.forEach(q => { q.alvo = null; L.rota(q, [q.home]); });
+        G.say('Os seguranças tiraram você do gramado! Multa de $' + multa + '.', 5.5);
+      }
+    });
+  }
+
+  function estCampo(lg) {
+    const pl = lg.place, w = 1300, h = 840;
+    const R = L.novaSala({ place: pl, w, h, nome: 'CAMPO — ' + (pl.nome || 'ESTÁDIO MUNICIPAL'), cor: VERDE, piso: 'gramado', pisoCores: ['#3d8f3b', '#4aa046'], parede: '#bdb9ae', estiloParede: 'concreto', rodape: '#8a867c', capacho: '#6a6a6a', subtitulo: 'gramado e arquibancadas', luzes: [{ x: 380, y: 620, r: 540 }, { x: 1060, y: 620, r: 540 }, { x: 720, y: 330, r: 520 }] });
+    R.chegada = { x: R.portaX, y: R.y1 + 10 };
+    R.porta = { para: 'entrada', px: 520, py: 215, ph: Math.PI, label: 'VOLTAR AO SAGUÃO', rotulo: 'SAGUÃO' };
+    const add = (...a) => R.objs.push(...a);
+    const torcida = () => { const S = G.S, f = fase(S); return f === 'jogo' ? (R.jogo && R.jogo.golT > 0 ? 'gol' : 'jogo') : f === 'chegando' ? 'dia' : false; };
+    const sentaAr = S => { const cam = S.ingresso && S.ingresso.dia === dia(S) && S.ingresso.tipo === 'camarote'; K.cura(S, cam ? 10 : 5); G.say('Você assistiu da ' + (cam ? 'cadeira do camarote' : 'arquibancada') + ': ' + textoPlacar(S).join(' · ') + ' (+' + (cam ? 10 : 5) + ' vida)', 5); };
+    [90, 510, 930].forEach(x => add(O('arquibancada', x, 190, 420, 40, { e: 60, n: 5, cadeira: '#2f8a45', torcida, label: 'ASSISTIR DA ARQUIBANCADA', r: 80, act: sentaAr })));
+    add(O('placar', 500, 76, 440, 46, { solid: false, k: 1, fnTexto: () => textoPlacar(G.S) }));
+    // gols e bandeirinhas
+    add(O('trave', P.x - 26, CY - 35, 26, 70, { dir: 'w', e: 44, solid: false }), O('trave', P.x + P.w, CY - 35, 26, 70, { dir: 'e', e: 44, solid: false }));
+    [[P.x, P.y], [P.x + P.w, P.y], [P.x, P.y + P.h], [P.x + P.w, P.y + P.h]].forEach(([x, y]) => add(O('bandeirinha', x - 5, y - 5, 10, 10, { e: 28, solid: false })));
+    // bancos de reservas e holofotes
+    add(O('banco_reserva', 420, 944, 160, 28, { e: 46, cor: '#1f6a2c' }), O('banco_reserva', 820, 944, 160, 28, { e: 46, cor: '#2a3a8a' }));
+    add(O('holofote', 96, 950, 20, 20, { e: 150, solid: true }), O('holofote', 1330, 950, 20, 20, { e: 150, solid: true }));
+    // a bola
+    R.bola = O('bola_jogo', P.x + P.w / 2 - 5, CY - 5, 10, 10, { solid: false, z: 0, rot: 0, invisivel: true }); add(R.bola);
+    const faixas = ['BANCO DO POVO', 'PINGUIM CHOPP', 'AUTO CENTER', 'SUPER ATACADÃO', 'FARMÁCIA SAÚDE', 'PIZZARIA SABOR', 'POSTO RIBEIRÃO', 'CASAS LÍDER', 'ÓTICA VISÃO', 'TV CIDADE'];
+    const cfx = ['#c8302a', '#2a58b8', '#f2c82a', '#2f9a4a', '#16181e', '#e8872a', '#7a3a9a', '#2a8a8a', '#d8a82a', '#e84a8a'];
+    R.pisoExtra = x => {
+      D.campoFutebol(x, P.x, P.y, P.w, P.h);
+      x.fillStyle = 'rgba(255,255,255,0.35)'; [[420, 160], [820, 160]].forEach(([bx, bw]) => { x.fillRect(bx - 6, 906, bw + 12, 2); x.fillRect(bx - 6, 906, 2, 62); x.fillRect(bx + bw + 4, 906, 2, 62); });
+    };
+    R.deco = x => {
+      // faixa de patrocinadores colada na muralha, atrás da arquibancada
+      for (let i = 0; i < 10; i++) { const bx = 80 + i * 130; x.fillStyle = cfx[i]; x.fillRect(bx, 66, 126, 46); x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(bx, 66, 126, 3); x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(bx + 126, 66, 4, 46); }
+      x.save(); x.textAlign = 'center'; x.font = 'bold 10px Arial'; x.fillStyle = '#fff'; for (let i = 0; i < 10; i++) if (i < 3 || i > 6) x.fillText(faixas[i], 80 + i * 130 + 63, 94); x.restore();
+      // placas de publicidade de frente para o campo (norte)
+      for (let i = 0; i < 10; i++) { const bx = P.x + i * 100; x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(bx + 2, 236, 98, 18); x.fillStyle = cfx[(i + 4) % 10]; x.fillRect(bx, 232, 98, 18); x.fillStyle = 'rgba(255,255,255,0.35)'; x.fillRect(bx, 232, 98, 2); x.fillStyle = '#fff'; x.font = 'bold 9px Arial'; x.textAlign = 'center'; x.fillText(faixas[(i + 4) % 10], bx + 49, 245); x.textAlign = 'left'; }
+      // escudo no centro do túnel de acesso
+      x.fillStyle = 'rgba(0,0,0,0.3)'; x.fillRect(R.portaX - 60, R.y1 - 6, 120, 6);
+    };
+    R.aoEntrar = (S, R2) => { const f = fase(S); if (R2.faseAtual !== f) campoConfig(R2, S, f); };
+    R.onUpdate = (S, R2, dt) => {
+      try {
+        R2.tf = (R2.tf || 0) - dt;
+        if (R2.tf <= 0) { R2.tf = 1; const f = fase(S); if (f !== R2.faseAtual) campoConfig(R2, S, f); }
+        if (R2.jogo) { passo(R2, S, dt); vigia(R2, S, dt); }
+        else if (R2.jardim) { R2.tj = (R2.tj || 0) - dt; if (R2.tj <= 0) { R2.tj = rand(5, 9); R2.jardim.forEach(g => { if (!g.alvo && !(g.rota && g.rota.length)) L.rota(g, [{ x: rand(P.x + 30, P.x + P.w - 30), y: g.y }, { x: rand(P.x + 30, P.x + P.w - 30), y: rand(P.y + 60, P.y + P.h - 60) }]); }); } }
+      } catch (e) { R2.onUpdate = null; console.error('campo do estadio', e); }
+    };
+    campoConfig(R, G.S || { dayT: 0.3 }, G.S ? fase(G.S) : 'jogo');
+    return R;
+  }
+
+  L.construtores['tipo:estadio'] = { criar(sid, lg) { return sid === 'campo' ? estCampo(lg) : estEntrada(lg); } };
+
 })(window.G = window.G || {});
 
 </script>
