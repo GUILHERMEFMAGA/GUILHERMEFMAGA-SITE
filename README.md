@@ -30,3 +30,17 @@ python main.py web    # painel no navegador (http://localhost:8000)
 | Automações estilo n8n: gatilho por horário/intervalo e passos com `{{variaveis}}` | ✅ |
 | Painel web sem Flask (servidor HTTP da biblioteca padrão) | ✅ |
 | "Não sei" honesto quando a confiança é baixa (anti-alucinação) | ✅ |
+
+## 🎮 Jogo: RUA VERMELHA (estilo GTA 1/2)
+
+Mundo aberto top-down em HTML5 Canvas + JavaScript puro, com visual dos primeiros GTA:
+dirija/roube carros, atenda orelhões para missões, fuja da polícia e vire o **Rei da Cidade**.
+
+```bash
+# abra direto no navegador (funciona até por file://):
+xdg-open jogo/index.html
+# ou sirva localmente:
+python3 -m http.server 8000 --directory jogo   # http://localhost:8000
+```
+
+Referência visual: `jogo/imagens/gta1-estilo-limpo.png`. Sem sangue/gore — tom cartunesco, livre para todas as idades.
