@@ -2,6 +2,8 @@
 /* ============================================================
    world.js — cidade em tiles (estilo GTA 1/2), desenho do mapa,
    semáforos, zonas de interação e minimapa.
+   Visual fiel ao print de referência: telhados extrudados com
+   sombra, asfalto lavanda com estrias, calçada quadriculada.
    ============================================================ */
 const T = 32, MW = 64, MH = 64;               // tamanho do tile e do mapa (tiles)
 const TY = { ROAD:0, SIDE:1, BLD:2, GRASS:3, TREE:4, WATER:5, BRIDGE:6, PLAZA:7, LOT:8, PATH:9 };
@@ -9,8 +11,8 @@ const TY = { ROAD:0, SIDE:1, BLD:2, GRASS:3, TREE:4, WATER:5, BRIDGE:6, PLAZA:7,
 const WORLD = {};
 (function build() {
   const tiles = new Uint8Array(MW * MH).fill(TY.BLD);
-  const decor = new Uint8Array(MW * MH);      // variante de cor / flags (9=fonte sólida)
-  const mark  = new Uint8Array(MW * MH);      // 1=amarela dir,2=amarela esq,4=amarela emb,8=amarela cim, cw bits 16N/32S/64W/128E
+  const decor = new Uint8Array(MW * MH);      // variante / flags (9=fonte sólida)
+  const mark  = new Uint8Array(MW * MH);      // 1/2 amarela dupla, 4/8 horiz., 16N/32S/64W/128E faixas
   const idx = (x, y) => y * MW + x;
   const get = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? TY.BLD : tiles[idx(x, y)];
   const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < MW && y < MH) tiles[idx(x, y)] = t; };
@@ -45,12 +47,11 @@ const WORLD = {};
   for (let y = 22; y <= 24; y++) for (let x = 24; x <= 27; x++) set(x, y, TY.WATER); // lago
   for (let x = 22; x <= 29; x++) { set(x, 21, TY.PATH); set(x, 25, TY.PATH); }       // trilhas
 
-  // ------- árvores (determinístico) -------
+  // ------- árvores (só parque/margem; calçada limpa como no print) -------
   let seed = 7;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
     if (get(x, y) === TY.GRASS && rnd() < 0.16) set(x, y, TY.TREE);
-    if (get(x, y) === TY.SIDE && rnd() < 0.05) set(x, y, TY.TREE); // árvores de calçada
   }
   // margem sul do rio: praia/gramado
   for (let y = 58; y < MH; y++) for (let x = 0; x < MW; x++) if (get(x, y) === TY.BLD) set(x, y, rnd() < 0.2 ? TY.TREE : TY.GRASS);
@@ -74,29 +75,51 @@ const WORLD = {};
   // bombas do posto (sólidas)
   const pumps = [{ x: 11 * T + 16, y: 11 * T + 8 }, { x: 12 * T + 16, y: 11 * T + 8 }];
 
-  // ------- faixas amarelas centrais + faixas de pedestres -------
+  // ------- quarteirões de prédio (blocos únicos p/ telhado extrudado) -------
+  const blocks = [];
+  const seen = new Uint8Array(MW * MH);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    if (get(x, y) !== TY.BLD || seen[idx(x, y)]) continue;
+    // cresce o retângulo máximo
+    let x1 = x; while (x1 + 1 < MW && get(x1 + 1, y) === TY.BLD && !seen[idx(x1 + 1, y)]) x1++;
+    let y1 = y;
+    outer: while (y1 + 1 < MH) {
+      for (let xx = x; xx <= x1; xx++) if (get(xx, y1 + 1) !== TY.BLD || seen[idx(xx, y1 + 1)]) break outer;
+      y1++;
+    }
+    for (let yy = y; yy <= y1; yy++) for (let xx = x; xx <= x1; xx++) seen[idx(xx, yy)] = 1;
+    blocks.push({ x0: x * T, y0: y * T, x1: (x1 + 1) * T, y1: (y1 + 1) * T, ci: (x * 7 + y * 13) % 6 });
+  }
+  const ROOFS = ['#c78d4f', '#b9763f', '#d1a05e', '#a8672f', '#c9b28a', '#9c6b3a'];
+
+  // ------- marcas: dupla amarela central + tracejado de faixa + faixas de pedestres -------
   const isRoad = (x, y) => get(x, y) === TY.ROAD;
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
     if (!isRoad(x, y)) continue;
     const vert = isRoad(x, y - 1) && isRoad(x, y + 1);
     const hor  = isRoad(x - 1, y) && isRoad(x + 1, y);
-    if (vert && !hor) {                       // trecho vertical
+    if (vert && !hor) {
       let s = x; while (isRoad(s - 1, y)) s--;
       const off = x - s;
-      if (off === 1) mark[idx(x, y)] |= 1;    // linha na borda direita
-      if (off === 2) mark[idx(x, y)] |= 2;    // linha na borda esquerda
+      if (off === 1) mark[idx(x, y)] |= 1;    // dupla central (dir)
+      if (off === 2) mark[idx(x, y)] |= 2;    // dupla central (esq)
+      if (off === 0) mark[idx(x, y)] |= 16;   // tracejado de faixa
+      if (off === 3) mark[idx(x, y)] |= 32;
     }
     if (hor && !vert) {
       let s = y; while (isRoad(x, s - 1)) s--;
       const off = y - s;
       if (off === 1) mark[idx(x, y)] |= 4;
       if (off === 2) mark[idx(x, y)] |= 8;
+      if (off === 0) mark[idx(x, y)] |= 64;
+      if (off === 3) mark[idx(x, y)] |= 128;
     }
   }
-  // faixas de pedestres nas bordas de cada cruzamento
+  // faixas de pedestres nas bordas de cada cruzamento (reusa bits? não: array cw)
+  const cw = new Uint8Array(MW * MH);
   for (const v of VX) for (const h of HY) {
-    for (let x = v; x < v + 4; x++) { mark[idx(x, h - 1)] |= 16; mark[idx(x, h + 4)] |= 32; }
-    for (let y = h; y < h + 4; y++) { mark[idx(v - 1, y)] |= 64; mark[idx(v + 4, y)] |= 128; }
+    for (let x = v; x < v + 4; x++) { cw[idx(x, h - 1)] |= 1; cw[idx(x, h + 4)] |= 2; }
+    for (let y = h; y < h + 4; y++) { cw[idx(v - 1, y)] |= 4; cw[idx(v + 4, y)] |= 8; }
   }
 
   // ------- semáforos em todos os cruzamentos -------
@@ -140,15 +163,12 @@ const WORLD = {};
     return t === TY.SIDE || t === TY.PATH || t === TY.PLAZA || t === TY.GRASS || t === TY.LOT;
   };
 
-  // ------- paletas de telhado por região -------
-  const PAL = [['#8a5a3b', '#a8672f', '#7d7f86', '#5b6e8c'], ['#9c4f36', '#b3803a', '#6d6f76', '#7a5a8c'], ['#7f6a4a', '#a3742f', '#8c8c93', '#4f6e5c']];
-
   // ------- minimapa (offscreen) -------
   const mini = document.createElement('canvas');
   mini.width = MW * 2; mini.height = MH * 2;
   (function paintMini() {
     const m = mini.getContext('2d');
-    const col = t => [ '#565a74', '#cfc49a', '#7a5a3b', '#4f7a3a', '#2e5d2a', '#3f6fb5', '#8f8f96', '#c9b28a', '#7d7d84', '#b7a97f' ][t];
+    const col = t => ['#63658c', '#cdc39b', '#b9763f', '#4f7a3a', '#2e5d2a', '#3f6fb5', '#8f8f96', '#c9b28a', '#7d7d84', '#b7a97f'][t];
     for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
       m.fillStyle = col(tiles[idx(x, y)]);
       m.fillRect(x * 2, y * 2, 2, 2);
@@ -156,14 +176,13 @@ const WORLD = {};
   })();
 
   Object.assign(WORLD, {
-    tiles, decor, mark, VX, HY, VXC, HYC, zones, pumps, lights, phones, mini,
+    tiles, decor, mark, cw, VX, HY, VXC, HYC, zones, pumps, lights, phones, mini, blocks,
     lightGreen, walkable, solidAt, walkableTile: walkable,
     tileAt(px, py) { return get(Math.floor(px / T), Math.floor(py / T)); },
     zoneAt(px, py) {
       for (const z of zones) if (px >= z.x0 && px <= z.x1 && py >= z.y0 && py <= z.y1) return z;
       return null;
     },
-    // em qual linha de via o ponto está: {axis:'v',i} / {axis:'h',j}
     roadLine(px, py) {
       const x = Math.floor(px / T), y = Math.floor(py / T);
       for (let i = 0; i < VX.length; i++) if (x >= VX[i] && x < VX[i] + 4) return { axis: 'v', i };
@@ -175,41 +194,49 @@ const WORLD = {};
     draw(ctx, cam, clock) {
       const x0 = Math.max(0, Math.floor(cam.x / T)), y0 = Math.max(0, Math.floor(cam.y / T));
       const x1 = Math.min(MW - 1, Math.ceil((cam.x + 800) / T)), y1 = Math.min(MH - 1, Math.ceil((cam.y + 600) / T));
+      // ---- chão (ruas, calçadas, água, praças, lotes, grama) ----
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-        const t = tiles[idx(x, y)], px = x * T - cam.x, py = y * T - cam.y, m = mark[idx(x, y)], d = decor[idx(x, y)];
+        const t = tiles[idx(x, y)], px = x * T - cam.x, py = y * T - cam.y, m = mark[idx(x, y)], c = cw[idx(x, y)];
         if (t === TY.ROAD || t === TY.BRIDGE) {
-          ctx.fillStyle = ((x + y) & 1) ? '#585a76' : '#55576f';
+          ctx.fillStyle = '#63658c';                       // asfalto lavanda do print
           ctx.fillRect(px, py, T, T);
+          ctx.fillStyle = 'rgba(255,255,255,.045)';        // estrias suaves
+          ctx.fillRect(px + ((x * 13) % 3) * 10 + 3, py, 6, T);
+          ctx.fillStyle = 'rgba(0,0,0,.05)';
+          ctx.fillRect(px + ((x * 7) % 3) * 10 + 16, py, 5, T);
           if (t === TY.BRIDGE) { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(px, py, T, 3); ctx.fillRect(px, py + T - 3, T, 3); }
           ctx.fillStyle = '#d8b71a';
-          if (m & 1) ctx.fillRect(px + T - 2, py, 2, T);
-          if (m & 2) ctx.fillRect(px, py, 2, T);
-          if (m & 4) ctx.fillRect(px, py + T - 2, T, 2);
-          if (m & 8) ctx.fillRect(px, py, T, 2);
-          ctx.fillStyle = 'rgba(240,240,240,.85)';
-          if (m & 16) for (let k = 0; k < 4; k++) ctx.fillRect(px + k * 8 + 2, py + 4, 4, T - 14);
-          if (m & 32) for (let k = 0; k < 4; k++) ctx.fillRect(px + k * 8 + 2, py + 10, 4, T - 14);
-          if (m & 64) for (let k = 0; k < 4; k++) ctx.fillRect(px + 4, py + k * 8 + 2, T - 14, 4);
-          if (m & 128) for (let k = 0; k < 4; k++) ctx.fillRect(px + 10, py + k * 8 + 2, T - 14, 4);
+          if (m & 1) ctx.fillRect(px + T - 3, py, 2, T);    // dupla central
+          if (m & 2) ctx.fillRect(px + 1, py, 2, T);
+          if (m & 4) ctx.fillRect(px, py + T - 3, T, 2);
+          if (m & 8) ctx.fillRect(px, py + 1, T, 2);
+          if (m & 16 && (y & 1) === 0) ctx.fillRect(px + T - 2, py + 4, 2, T - 10); // tracejado de faixa
+          if (m & 32 && (y & 1) === 0) ctx.fillRect(px, py + 4, 2, T - 10);
+          if (m & 64 && (x & 1) === 0) ctx.fillRect(px + 4, py + T - 2, T - 10, 2);
+          if (m & 128 && (x & 1) === 0) ctx.fillRect(px + 4, py, T - 10, 2);
+          ctx.fillStyle = 'rgba(245,245,245,.9)';          // faixas de pedestres
+          if (c & 1) for (let k = 0; k < 4; k++) ctx.fillRect(px + k * 8 + 2, py + 6, 4, T - 12);
+          if (c & 2) for (let k = 0; k < 4; k++) ctx.fillRect(px + k * 8 + 2, py + 6, 4, T - 12);
+          if (c & 4) for (let k = 0; k < 4; k++) ctx.fillRect(px + 6, py + k * 8 + 2, T - 12, 4);
+          if (c & 8) for (let k = 0; k < 4; k++) ctx.fillRect(px + 6, py + k * 8 + 2, T - 12, 4);
         } else if (t === TY.SIDE) {
-          ctx.fillStyle = '#cfc49a'; ctx.fillRect(px, py, T, T);
-          ctx.strokeStyle = '#b3a87f'; ctx.strokeRect(px + .5, py + .5, T - 1, T - 1);
-          ctx.fillStyle = '#efe9d2'; // meio-fio branco do lado da rua
+          ctx.fillStyle = '#cdc39b'; ctx.fillRect(px, py, T, T);
+          ctx.strokeStyle = 'rgba(140,128,90,.55)'; ctx.lineWidth = 1;
+          ctx.strokeRect(px + .5, py + .5, T / 2, T / 2);   // grade fina da calçada
+          ctx.strokeRect(px + T / 2, py + .5, T / 2, T / 2);
+          ctx.strokeRect(px + .5, py + T / 2, T / 2, T / 2);
+          ctx.strokeRect(px + T / 2, py + T / 2, T / 2, T / 2);
+          ctx.fillStyle = '#f2ecd8';                        // meio-fio branco
           if (get(x, y - 1) === TY.ROAD || get(x, y - 1) === TY.BRIDGE) ctx.fillRect(px, py, T, 3);
           if (get(x, y + 1) === TY.ROAD || get(x, y + 1) === TY.BRIDGE) ctx.fillRect(px, py + T - 3, T, 3);
           if (get(x - 1, y) === TY.ROAD || get(x - 1, y) === TY.BRIDGE) ctx.fillRect(px, py, 3, T);
           if (get(x + 1, y) === TY.ROAD || get(x + 1, y) === TY.BRIDGE) ctx.fillRect(px + T - 3, py, 3, T);
-        } else if (t === TY.BLD) {
-          const pal = PAL[(Math.floor(x / 12) + Math.floor(y / 10)) % 3];
-          ctx.fillStyle = pal[d % 4]; ctx.fillRect(px, py, T, T);
-          ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(px, py, T, 2); ctx.fillRect(px, py, 2, T);
-          if (d % 7 === 3) { ctx.fillStyle = '#c9c9cf'; ctx.fillRect(px + 8, py + 8, 8, 8); }   // ar-condicionado
-          if (d % 9 === 5) { ctx.fillStyle = '#889'; ctx.beginPath(); ctx.arc(px + 20, py + 18, 6, 0, 7); ctx.fill(); } // caixa d'água
         } else if (t === TY.GRASS) {
           ctx.fillStyle = '#4f7a3a'; ctx.fillRect(px, py, T, T);
-          ctx.fillStyle = '#467032'; ctx.fillRect(px + (d % 4) * 7, py + (d % 3) * 9, 5, 4);
+          ctx.fillStyle = '#467032'; ctx.fillRect(px + (decor[idx(x, y)] % 4) * 7, py + (decor[idx(x, y)] % 3) * 9, 5, 4);
         } else if (t === TY.TREE) {
           ctx.fillStyle = '#4f7a3a'; ctx.fillRect(px, py, T, T);
+          ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.arc(px + 18, py + 18, 11, 0, 7); ctx.fill();
           ctx.fillStyle = '#5d4426'; ctx.fillRect(px + 14, py + 14, 5, 5);
           ctx.fillStyle = '#2e5d2a'; ctx.beginPath(); ctx.arc(px + 16, py + 15, 11, 0, 7); ctx.fill();
           ctx.fillStyle = '#3a7034'; ctx.beginPath(); ctx.arc(px + 13, py + 12, 6, 0, 7); ctx.fill();
@@ -217,12 +244,12 @@ const WORLD = {};
           ctx.fillStyle = '#3f6fb5'; ctx.fillRect(px, py, T, T);
           ctx.fillStyle = 'rgba(255,255,255,.18)';
           const w = (clock * 8 + x * 7 + y * 13) % T;
-          ctx.fillRect(px + ((w) % (T - 8)), py + ((y * 5) % (T - 4)), 8, 2);
+          ctx.fillRect(px + (w % (T - 8)), py + ((y * 5) % (T - 4)), 8, 2);
         } else if (t === TY.PLAZA) {
           ctx.fillStyle = '#c9b28a'; ctx.fillRect(px, py, T, T);
-          ctx.strokeStyle = '#b49a72'; ctx.beginPath();
-          ctx.moveTo(px, py + T); ctx.lineTo(px + T, py); ctx.stroke();
-          if (d === 9) { // fonte
+          ctx.strokeStyle = 'rgba(150,125,85,.5)'; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(px, py + T); ctx.lineTo(px + T, py); ctx.stroke();
+          if (decor[idx(x, y)] === 9) { // fonte
             ctx.fillStyle = '#9aa0ab'; ctx.fillRect(px + 2, py + 2, T - 4, T - 4);
             ctx.fillStyle = '#3f6fb5'; ctx.fillRect(px + 6, py + 6, T - 12, T - 12);
             ctx.fillStyle = '#bfe0ff'; ctx.fillRect(px + 13, py + 13, 6, 6);
@@ -232,8 +259,22 @@ const WORLD = {};
           ctx.fillStyle = '#a5966d'; ctx.fillRect(px, py + 15, T, 2);
         } else if (t === TY.LOT) {
           ctx.fillStyle = '#7d7d84'; ctx.fillRect(px, py, T, T);
-          ctx.fillStyle = '#70707a'; ctx.fillRect(px + (d % 5) * 6, py + (d % 4) * 7, 6, 2);
+          ctx.fillStyle = '#70707a'; ctx.fillRect(px + (decor[idx(x, y)] % 5) * 6, py + (decor[idx(x, y)] % 4) * 7, 6, 2);
         }
+        // (BLD desenhado em camada de quarteirões abaixo)
+      }
+      // ---- quarteirões: sombra + parede + telhado extrudado ----
+      for (const b of blocks) {
+        if (b.x1 < cam.x || b.y1 < cam.y || b.x0 > cam.x + 800 || b.y0 > cam.y + 600) continue;
+        const px = b.x0 - cam.x, py = b.y0 - cam.y, w = b.x1 - b.x0, h = b.y1 - b.y0;
+        ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.fillRect(px + 7, py + 9, w, h);          // sombra no chão
+        ctx.fillStyle = shade(ROOFS[b.ci], -45); ctx.fillRect(px, py, w, h);           // parede (extrusão)
+        ctx.fillStyle = ROOFS[b.ci]; ctx.fillRect(px, py, w - 6, h - 6);               // topo do telhado
+        ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(px, py, w - 6, 4);       // brilho superior
+        ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 1;
+        for (let sy = 16; sy < h - 6; sy += 16) { ctx.beginPath(); ctx.moveTo(px + 2, py + sy); ctx.lineTo(px + w - 8, py + sy); ctx.stroke(); }
+        if (w > 96 && h > 64) { ctx.fillStyle = '#c9c9cf'; ctx.fillRect(px + 12, py + 12, 10, 10); }   // ar-condicionado
+        if (w > 64 && h > 96) { ctx.fillStyle = '#8b939c'; ctx.beginPath(); ctx.arc(px + w - 26, py + 22, 7, 0, 7); ctx.fill(); } // caixa d'água
       }
       // bombas do posto
       for (const p of pumps) {

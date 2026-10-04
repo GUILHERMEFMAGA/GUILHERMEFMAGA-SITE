@@ -190,8 +190,8 @@ const AI = {
   tryCross(p) {
     // procura faixa de pedestres adjacente com sinal seguro
     const tx = Math.floor(p.x / T), ty = Math.floor(p.y / T);
-    for (const [ax, ay, bit, vert] of [[0, -1, 16, true], [0, 1, 32, true], [-1, 0, 64, false], [1, 0, 128, false]]) {
-      const m = WORLD.mark[(ty + ay) * MW + (tx + ax)];
+    for (const [ax, ay, bit, vert] of [[0, -1, 1, true], [0, 1, 2, true], [-1, 0, 4, false], [1, 0, 8, false]]) {
+      const m = WORLD.cw[(ty + ay) * MW + (tx + ax)];
       if (m & bit && !WORLD.lightGreen(vert, GAME.clock)) {
         p.mode = 'cross'; p.tx = (tx + ax) * T + 16; p.ty = (ty + ay) * T + 16;
         // alvo final: atravessar até o outro lado

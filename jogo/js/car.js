@@ -106,8 +106,10 @@ class Car {
     const base = this.wreck ? '#2a2a2a' : this.color;
     g.addColorStop(0, shade(base, 26)); g.addColorStop(.5, base); g.addColorStop(1, shade(base, -26));
     ctx.fillStyle = g;
-    roundRect(ctx, -this.hl, -this.hw, this.hl * 2, this.hw * 2, 5); ctx.fill();
+    roundRect(ctx, -this.hl - 2, -this.hw - 1, (this.hl + 2) * 2, (this.hw + 1) * 2, 6); ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.22)';                 // brilho do verniz (luz de cima)
+    ctx.fillRect(-this.hl + 2, -this.hw + 1, this.hl * 2 - 4, 3);
 
     if (this.kind === 'police' && !this.wreck) {           // faixa da polícia
       ctx.fillStyle = '#24409a'; ctx.fillRect(-this.hl + 3, -3, this.hl * 2 - 6, 6);
