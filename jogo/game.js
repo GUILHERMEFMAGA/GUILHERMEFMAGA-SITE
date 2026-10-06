@@ -21,11 +21,13 @@ const SRC = {
   // poses Dante
   dWalkA: "sprites2/d-walkA.png", dWalkB: "sprites2/d-walkB.png",
   dRunA: "sprites2/d-runA.png", dRunB: "sprites2/d-runB.png",
+  dRunC: "sprites2/d-runC.png", dRunD: "sprites2/d-runD.png",
   dAim: "sprites2/d-aim.png", dFire: "sprites2/d-fire.png", dReload: "sprites2/d-reload.png",
   dHurt: "sprites2/d-hurt.png", dCrouch: "sprites2/d-crouch.png", dJump: "sprites2/d-jump.png",
   // poses Luca
   lWalkA: "sprites2/l-walkA.png", lWalkB: "sprites2/l-walkB.png",
   lRunA: "sprites2/l-runA.png", lRunB: "sprites2/l-runB.png",
+  lRunC: "sprites2/l-runC.png", lRunD: "sprites2/l-runD.png",
   lPrep: "sprites2/l-prep.png", lThrust: "sprites2/l-thrust.png",
   lHurt: "sprites2/l-hurt.png", lCrouch: "sprites2/l-crouch.png", lJump: "sprites2/l-jump.png",
   // inimigos
@@ -188,7 +190,7 @@ function update(dt) {
   d.x = Math.max(140, Math.min(1440, d.x));
   d.y = Math.max(640, Math.min(990, d.y));
   if (vx) d.face = vx > 0 ? 1 : -1;
-  if (vx || vy) game.step += dt * (run ? 14 : 9);
+  if (vx || vy) game.step += dt * (run ? 11 : 6);
   game.moving = !!(vx || vy); game.run = run;
 
   // pulo
@@ -226,7 +228,7 @@ function update(dt) {
   l.moving = dl > 24;
   if (dl > 24) {
     l.x += (dx / dl) * 250 * dt; l.y += (dy / dl) * 220 * dt;
-    l.face = dx > 0 ? 1 : -1; l.step += dt * 10;
+    l.face = dx > 0 ? 1 : -1; l.step += dt * (l.moving && best < 340 ? 11 : 6);
   }
   l.x = Math.max(140, Math.min(1440, l.x));
   l.y = Math.max(640, Math.min(990, l.y));
@@ -402,16 +404,15 @@ function danteFrame() {
   if (game.jumpT > 0) return img.dJump;
   if (game.crouch) return img.dCrouch;
   if (game.moving) {
-    const a = Math.floor(game.step) % 2 === 0;
-    return game.run ? (a ? img.dRunA : img.dRunB) : (a ? img.dWalkA : img.dWalkB);
+    if (game.run) return [img.dRunA, img.dRunB, img.dRunC, img.dRunD][Math.floor(game.step) % 4];
+    return Math.floor(game.step) % 2 === 0 ? img.dWalkA : img.dWalkB;
   }
   return img.dante;
 }
 function lucaFrame() {
   if (game.luca.atkT > 0) return game.luca.atkT > 0.25 ? img.lPrep : img.lThrust;
   if (game.luca.moving) {
-    const a = Math.floor(game.luca.step) % 2 === 0;
-    return a ? img.lWalkA : img.lWalkB;
+    return [img.lRunA, img.lRunB, img.lRunC, img.lRunD][Math.floor(game.luca.step) % 4];
   }
   return img.luca;
 }
@@ -512,8 +513,10 @@ function drawWorld() {
 
   // irmaos
   const blink = game.invuln > 0 && Math.floor(ST.t * 14) % 2 === 0;
-  drawAt(lucaFrame(), game.luca.x, game.luca.y, game.luca.face);
-  if (!blink) drawAt(danteFrame(), game.dante.x, game.dante.y, game.dante.face, jumpLift());
+  const rbL = game.luca.moving ? (Math.floor(game.luca.step) % 2) * 4 : 0;
+  drawAt(lucaFrame(), game.luca.x, game.luca.y, game.luca.face, rbL);
+  const rb = game.run && game.moving ? (Math.floor(game.step) % 2) * 4 : 0;
+  if (!blink) drawAt(danteFrame(), game.dante.x, game.dante.y, game.dante.face, jumpLift() + rb);
 
   // balotes + flash
   ctx.fillStyle = "#ffe9b0";
