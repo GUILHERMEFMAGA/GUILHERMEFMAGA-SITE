@@ -28,7 +28,11 @@ def diff(a, b):
     return sum(sum(q) for q in px) / (n * 765.0)
 
 # ---------- B) AUDITORIA VISUAL ----------
-CANON = 470
+def _canon(pref):
+    im = Image.open(os.path.join(S2, pref + "-idle.png")).convert("RGBA")
+    bb = im.getbbox()
+    return (bb[3] - bb[1]) if bb else 470
+CANON_D, CANON_L = _canon("d"), _canon("l")
 for fam, pref in (("DANTE", "d-"), ("LUCA", "l-")):
     nomes = sorted(f[:-4] for f in os.listdir(S2) if f.startswith(pref))
     hs = []
@@ -38,6 +42,7 @@ for fam, pref in (("DANTE", "d-"), ("LUCA", "l-")):
         hs.append(st["h"])
         if st["fundo"]:
             add("B", "CRITICO", f"{n}: FUNDO EMBUTIDO (cantos opacos, {st['transp']:.0%} transparente) — vira bloco retangular na tela")
+        CANON = CANON_D if pref == "d-" else CANON_L
         if abs(st["h"] - CANON) > CANON * 0.05:
             add("B", "GRAVE", f"{n}: altura {st['h']}px fora do canonico {CANON}px ({100*st['h']/CANON:.0f}%)")
     if hs and (max(hs) - min(hs)) > 24:

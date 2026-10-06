@@ -23,12 +23,14 @@ const SRC = {
   dWalkA: "sprites2/d-walkA.png", dWalkB: "sprites2/d-walkB.png",
   dRunA: "sprites2/d-runA.png", dRunB: "sprites2/d-runB.png",
   dRunC: "sprites2/d-runC.png", dRunD: "sprites2/d-runD.png",
+  dIdle: "sprites2/d-idle.png",
   dAim: "sprites2/d-aim.png", dFire: "sprites2/d-fire.png", dReload: "sprites2/d-reload.png",
   dHurt: "sprites2/d-hurt.png", dCrouch: "sprites2/d-crouch.png", dJump: "sprites2/d-jump.png",
   // poses Luca
   lWalkA: "sprites2/l-walkA.png", lWalkB: "sprites2/l-walkB.png",
   lRunA: "sprites2/l-runA.png", lRunB: "sprites2/l-runB.png",
   lRunC: "sprites2/l-runC.png", lRunD: "sprites2/l-runD.png",
+  lIdle: "sprites2/l-idle.png",
   lPrep: "sprites2/l-prep.png", lThrust: "sprites2/l-thrust.png",
   lHurt: "sprites2/l-hurt.png", lCrouch: "sprites2/l-crouch.png", lJump: "sprites2/l-jump.png",
   // inimigos
@@ -436,14 +438,14 @@ function danteFrame() {
     if (game.run) return [img.dRunA, img.dRunB, img.dRunC, img.dRunD][Math.floor(game.step) % 4];
     return Math.floor(game.step) % 2 === 0 ? img.dWalkA : img.dWalkB;
   }
-  return img.dante;
+  return img.dIdle || img.dante;
 }
 function lucaFrame() {
   if (game.luca.atkT > 0) return game.luca.atkT > 0.25 ? img.lPrep : img.lThrust;
   if (game.luca.moving) {
     return [img.lRunA, img.lRunB, img.lRunC, img.lRunD][Math.floor(game.luca.step) % 4];
   }
-  return img.luca;
+  return img.lIdle || img.luca;
 }
 
 function drawTesteHud() {
