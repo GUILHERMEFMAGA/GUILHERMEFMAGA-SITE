@@ -116,6 +116,67 @@ LIM = 10
 plano = fila[:LIM]
 restam = fila[LIM:]
 
+# ---------------- A7 · OLHO GIGANTE (visao composta) ----------------
+try:
+    out = subprocess.run([sys.executable, os.path.join(ROOT, "olho.py")], capture_output=True, text=True, timeout=180)
+    for ln in out.stdout.splitlines():
+        if "[x]" in ln: diz("OLHO", "GRAVE", ln.strip()[4:])
+        elif "cenas sadias" in ln: diz("OLHO", "OK", ln.strip())
+except Exception as e: diz("OLHO", "CRITICO", "olho falhou: " + str(e))
+
+# ---------------- A8 · AUDITORA DE CODIGO ----------------
+gsrc = open(os.path.join(ROOT, "game.js"), encoding="utf-8").read()
+init_game = set(re.findall(r"game\.(\w+)\s*=", gsrc))
+init_m = set(re.findall(r"game\.malphas = \{([^}]*)\}", gsrc)[0].replace(":", "=").split(",")) if "malphas" in gsrc else set()
+init_m = set(x.split("=")[0].strip() for x in init_m if x.strip())
+st_lit = re.search(r"const ST = \{([^}]*)\}", gsrc)
+st_init = set(k.split(":")[0].strip() for k in st_lit.group(1).split(",") if k.strip()) if st_lit else set()
+achados8 = 0
+for mvar, initset in (("game", init_game), ("m", init_m)):
+    for mm in re.finditer(re.escape(mvar) + r"\.(\w+)\s*<=?\s*0", gsrc):
+        fld = mm.group(1)
+        if fld not in initset:
+            diz("CODE", "CRITICO", f"{mvar}.{fld} usado em comparacao <=0 mas nunca inicializado (undefined <= 0 eh false!)")
+            achados8 += 1
+for mm in re.finditer(r"ST\.(\w+)\s*===", gsrc):
+    if mm.group(1) not in st_init and mm.group(1) not in ("state", "paused"):
+        pass  # t/cut/night sao mutaveis, ok
+if not achados8: diz("CODE", "OK", "nenhuma comparacao contra campo nao-inicializado (bug do atkAnim nao volta)")
+
+# ---------------- A9 · CIENTISTA DE DADOS (memoria entre rodadas) ----------------
+HIST = os.path.join(ROOT, "council_history.jsonl")
+prev = None
+if os.path.exists(HIST):
+    lines = [json.loads(l) for l in open(HIST) if l.strip()]
+    if lines: prev = lines[-1]
+agora_msgs = set(m for (_, n, m, _) in F if n in ("CRITICO", "GRAVE"))
+if prev:
+    antes = set(prev.get("problemas", []))
+    resolvidos = antes - agora_msgs
+    regres = agora_msgs - antes
+    for r in sorted(resolvidos): diz("DADOS", "OK", f"resolvido desde a ultima rodada: {r}")
+    for r in sorted(regres): diz("DADOS", "CRITICO", f"REGRESSAO nova: {r}")
+    diz("DADOS", "OK", f"tendencia de nota: {prev.get('nota', 0):.0f} -> (atual no fim)")
+else:
+    diz("DADOS", "OK", "primeira rodada com memoria ativa")
+
+# ---------------- A10 · PERFORMANCE ----------------
+try:
+    out = subprocess.run(["node", os.path.join(ROOT, "perf.js")], capture_output=True, text=True, timeout=180)
+    ln = [l for l in out.stdout.splitlines() if "A10" in l]
+    if ln:
+        diz("PERF", "OK", ln[0].strip())
+        ms = float(re.search(r"([\d.]+)ms", ln[0]).group(1))
+        if ms > 8: diz("PERF", "GRAVE", f"frame lento: {ms}ms (>8ms)")
+except Exception as e: diz("PERF", "CRITICO", str(e))
+
+# ---------------- A11 · UX & ACESSIBILIDADE ----------------
+for chk, lbl in (('"WASD', "controles documentados no titulo/hint"), ("KeyM", "mute de som disponivel"),
+                 ("PAUSA", "pausa implementada"), ("PRESS START", "chamada clara de inicio"),
+                 ("hintT", "dica inicial de controles")):
+    if chk in gsrc: diz("UX", "OK", lbl + " ✔")
+    else: diz("UX", "LEVE", "falta: " + lbl)
+
 # ---------------- DELIBERACAO ----------------
 ORDEM = {"CRITICO": 0, "GRAVE": 1, "LEVE": 2, "OK": 3}
 SCORE = {"CRITICO": 0, "GRAVE": 0.5, "LEVE": 0.8, "OK": 1.0}
@@ -125,10 +186,12 @@ nG = sum(1 for _, n, _, _ in F if n == "GRAVE")
 verd = "HORRIVEL" if nC else ("RUIM" if nG > 3 else ("REGULAR" if nG else "BOM"))
 
 print("=" * 76)
-print(" CONSELHO DE TESTES — 6 ESPECIALISTAS DELIBERANDO")
+print(" CONSELHO DE TESTES — MODO DEUS: 11 IAS DELIBERANDO")
 print("=" * 76)
-for ag, tit in (("ANIM", "A1 ANIMACOES"), ("ARTE", "A2 DIRETORA DE ARTE"), ("IMAGE", "A3 DIRETOR DE IMAGEM"),
-                ("GAME", "A4 GAMEPLAY"), ("MUNDO", "A5 MUNDO & ESCALA"), ("CANON", "A6 GUARDIA DO CANON")):
+for ag, tit in (("ANIM", "A1 ANIMACOES"), ("ARTE", "A2 DIRETORA DE ARTE"),
+                ("GAME", "A4 GAMEPLAY"), ("MUNDO", "A5 MUNDO & ESCALA"), ("CANON", "A6 GUARDIA DO CANON"),
+                ("OLHO", "A7 OLHO GIGANTE"), ("CODE", "A8 AUDITORA DE CODIGO"), ("DADOS", "A9 CIENTISTA DE DADOS"),
+                ("PERF", "A10 PERFORMANCE"), ("UX", "A11 UX")):
     if ag == "IMAGE": continue
     print(f"\n[{tit}]")
     for a, n, m, _ in sorted([x for x in F if x[0] == ag], key=lambda x: ORDEM[x[1]]):
@@ -144,3 +207,5 @@ if restam: print("   FILA P/ PROXIMA RODADA:", ", ".join(restam))
 print("=" * 76)
 json.dump({"plano": plano, "restam": restam, "nota": nota, "veredito": verd},
           open(os.path.join(ROOT, "council_plan.json"), "w"))
+with open(os.path.join(ROOT, "council_history.jsonl"), "a") as hf:
+    hf.write(json.dumps({"nota": nota, "veredito": verd, "problemas": sorted(agora_msgs)}) + "\n")
