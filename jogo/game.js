@@ -1,4 +1,4 @@
-/* SOBRENATURAL — Noite 1: Estrada 66 (engine v2 com todas as animações)
+/* SOBRENATURAL — Noite 1: Estrada 66 (engine v2.1 com selo de versão)
  * Controles: setas/WASD mover · SHIFT correr · C agachar · K pular ·
  * ESPAÇO/J atirar · R recarregar (perto do Impala reabastece) · P/ESC pausa · ENTER avança
  */
@@ -565,6 +565,7 @@ function drawTitle() {
   ctx.fillStyle = titleBg; ctx.fillRect(bx, by, bw, bh);
   if ((ST.t % 1.1) < 0.72) px("PRESS START", bx + bw / 2, by + bh / 2, 44, "#f2f2f2", "center");
   px("SETAS/WASD · SHIFT correr · C agachar · K pular · ESPACO atirar · R recarregar · P pausa", W / 2, H - 24, 13, "#8f8f9a", "center");
+  px("ENGINE v2.1 — TODAS AS ANIMACOES", 20, 30, 12, "#9a9aa8");
 }
 
 function centerBox(lines, title) {
