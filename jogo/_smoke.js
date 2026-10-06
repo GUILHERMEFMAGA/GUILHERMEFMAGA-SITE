@@ -66,9 +66,26 @@ function assert(c, m) { if (!c) { console.error("FALHOU:", m); process.exit(1); 
   assert(g.bossOn === true, "chefe ativa em 12 abates");
   T.damageBoss(200);
   frames(140);
-  assert(g.bossDead === true && T.ST.state === "end", "chefe morre -> tela final");
+  assert(g.bossDead === true && T.ST.state === "end1", "noite 1: chefe morre -> end1");
   T.onPress("Enter");
-  assert(T.ST.state === "title", "final -> titulo (jogabilidade preservada)");
+  assert(T.ST.state === "cut" && T.ST.night === 2, "end1 -> cutscene da noite 2");
+  for (let i = 0; i < 3; i++) T.onPress("Enter");
+  assert(T.ST.state === "play" && T.ST.night === 2, "noite 2 em jogo");
+  assert(g.boss === 180 && g.points >= 1250, "noite 2: chefe 180hp e pontos preservados");
+  g.ghosts.length = 0; g.bossDead = false; g.bossOn = false; g.boss = 180; g.kills = 0;
+  while (g.kills < 10) {
+    const gh = { kind: "neon", x: 700, y: 700, hw: 85, hh: 120, hp: 2, sp: 0, dir: 1, seed: 1, dying: 0, atkT: 0 };
+    g.ghosts.push(gh);
+    T.damageGhost(gh, 2);
+    frames(1);
+  }
+  frames(30);
+  assert(g.bossOn === true, "chefe da noite 2 ativa em 10 abates");
+  T.damageBoss(300);
+  frames(140);
+  assert(T.ST.state === "end", "noite 2: final verdadeiro");
+  T.onPress("Enter");
+  assert(T.ST.state === "title", "final -> titulo");
   console.log("SMOKE OK");
   process.exit(0);
 })();

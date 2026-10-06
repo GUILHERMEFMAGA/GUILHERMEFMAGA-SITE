@@ -44,6 +44,8 @@ const SRC = {
   pLd: "sprites2/p-l-dor.png", pLs: "sprites2/p-l-sorriso.png",
   bgImpala: "sprites2/bg-impala.png", bgQuarto: "sprites2/bg-quarto.png",
   bgFloresta: "sprites2/bg-floresta.png",
+  bgCidade: "sprites2/bg-cidade.png", bgPorta: "sprites2/bg-porta.png",
+  boss2: "sprites2/boss2-idle.png", eNeon: "sprites2/e-neon.png",
 };
 const img = {};
 let loaded = 0, total = Object.keys(SRC).length, loadError = null, booted = false;
@@ -90,7 +92,7 @@ function bestPoints() { try { return +localStorage.getItem("sobrenatural_best") 
 function saveBest() { try { const b = bestPoints(); if (game.points > b) localStorage.setItem("sobrenatural_best", game.points); } catch (e) {} }
 
 /* ---------- estado ---------- */
-const ST = { state: "title", paused: false, t: 0, cut: 0 };
+const ST = { state: "title", paused: false, t: 0, cut: 0, night: 1 };
 const game = {};
 const IMPALA = { x: 265, y: 700 };   // centro do Impala na plate
 
@@ -102,10 +104,18 @@ const CUTSCENE = [
   { bg: "bgQuarto", who: "d", expr: "neutro", nome: "DANTE", txt: "Cala a boca e recarrega." },
 ];
 
-function resetGame() {
+const CUT2 = [
+  { bg: "bgImpala", who: "d", expr: "raiva", nome: "DANTE", txt: "O rádio voltou a tocar ao contrário. A cidade inteira ouviu o cadeado quebrar." },
+  { bg: "bgCidade", who: "l", expr: "dor", nome: "LUCA", txt: "Eu sonho com ela toda noite… 3h07. Todos dormem em pé, e algo anda entre eles." },
+  { bg: "bgCidade", who: "d", expr: "neutro", nome: "DANTE", txt: "Então a gente acorda a cidade antes disso. Perto de mim. Sempre." },
+];
+
+function resetGame(night) {
+  const kp = game.points, kh = game.hearts;
+  ST.night = night || 1;
   game.hearts = 3; game.ammo = 6; game.reserve = 24;
   game.points = 1250; game.kills = 0;
-  game.boss = 160; game.bossOn = false; game.bossDead = false;
+  game.boss = ST.night === 2 ? 180 : 160; game.bossOn = false; game.bossDead = false;
   game.invuln = 0; game.reloadT = 0; game.shootCd = 0; game.shootAnim = 0;
   game.flashRed = 0; game.muzzle = 0; game.spawnT = 2.0; game.hintT = 8;
   game.jumpT = 0; game.crouch = false; game.step = 0;
@@ -113,7 +123,8 @@ function resetGame() {
   game.luca = { x: 962, y: 860, face: -1, slashCd: 0, atkT: 0, step: 0 };
   game.ghosts = []; game.pellets = []; game.fx = []; game.pickups = [];
   game.pickT = 8;
-  game.malphas = { x: 768, y: 260, t: 0, atkT: 0, vuln: 0, dying: 0 };
+  if (ST.night === 2) { game.points = kp || 0; game.hearts = Math.max(3, kh || 3); game.reserve = 24; game.boss = 180; game.spawnT = 1.8; }
+  game.malphas = { x: 768, y: 260, t: 0, atkT: 0, vuln: 0, dying: 0, warnT: 0, atkAnim: 0 };
 }
 resetGame();
 
@@ -137,9 +148,11 @@ function onPress(code) {
   }
   if (ST.state === "cut" && code === "Enter") {
     ST.cut++;
-    if (ST.cut >= CUTSCENE.length) { ST.state = "play"; }
+    const arr = ST.night === 2 ? CUT2 : CUTSCENE;
+    if (ST.cut >= arr.length) { ST.state = "play"; }
     return;
   }
+  if (ST.state === "end1" && code === "Enter") { resetGame(2); ST.state = "cut"; ST.cut = 0; sfx.start(); return; }
   if (ST.state === "dead" && code === "Enter") {
     game.hearts = 3; game.invuln = 2; game.flashRed = 0;
     game.ghosts.forEach(g => g.dying = 0.01);
@@ -271,7 +284,7 @@ function update(dt) {
     g.dir = gx > 0 ? 1 : -1;
     const air = game.jumpT > 0.12;                          // pulo esquiva
     if (!air && game.invuln <= 0 && Math.abs(g.x - d.x) < 70 && Math.abs(g.y - (d.y - 80)) < 110) {
-      game.hearts--; game.invuln = 1.9; game.flashRed = 0.35; sfx.hurt(); shake = Math.max(shake, 8);
+      game.hearts--; game.invuln = 2.2; game.flashRed = 0.35; sfx.hurt(); shake = Math.max(shake, 8);
       if (game.hearts <= 0) { saveBest(); ST.state = "dead"; sfx.end(); }
     }
   }
@@ -279,7 +292,7 @@ function update(dt) {
 
   // spawn mix de inimigos
   game.spawnT -= dt;
-  if (game.spawnT <= 0 && game.ghosts.filter(g => !g.dying).length < 5) {
+  if (game.spawnT <= 0 && game.ghosts.filter(g => !g.dying).length < (ST.night === 2 ? 4 : 5)) {
     spawnGhost();
     game.spawnT = Math.max(1.3, 2.4 - game.kills * 0.035);
   }
@@ -309,7 +322,8 @@ function update(dt) {
 
   // Malphas
   const m = game.malphas;
-  if (!game.bossOn && game.kills >= 12) {
+  const BOSS_AT = ST.night === 2 ? 10 : 12;
+  if (!game.bossOn && game.kills >= BOSS_AT) {
     game.bossOn = true; sfx.boss(); shake = Math.max(shake, 12);
   }
   if (game.bossOn && !game.bossDead) {
@@ -317,13 +331,18 @@ function update(dt) {
     if (m.y < 560) { m.y += 60 * dt; }                      // desce
     else {
       m.atkT -= dt; m.vuln -= dt;
-      if (m.atkT <= 0 && m.vuln <= 0) {
-        m.atkT = 2.6; m.atkAnim = 0.7;
-        if (Math.abs(d.x - m.x) < 300 && !game.crouch && game.invuln <= 0) {
-          game.hearts--; game.invuln = 1.9; game.flashRed = 0.4; sfx.hurt(); shake = Math.max(shake, 10);
-          if (game.hearts <= 0) { saveBest(); ST.state = "dead"; sfx.end(); }
+      if (m.warnT > 0) {
+        m.warnT -= dt;                                      // telegraph visivel
+        if (m.warnT <= 0) {                                 // aviso acabou -> golpe esquivavel
+          m.atkAnim = 0.7;
+          if (Math.abs(d.x - m.x) < 300 && !game.crouch && game.invuln <= 0) {
+            game.hearts--; game.invuln = 2.2; game.flashRed = 0.4; sfx.hurt(); shake = Math.max(shake, 10);
+            if (game.hearts <= 0) { saveBest(); ST.state = "dead"; sfx.end(); }
+          }
+          m.vuln = 1.2;                                     // fica vulneravel depois
         }
-        m.vuln = 1.2;                                       // fica vulneravel depois
+      } else if (m.atkT <= 0 && m.vuln <= 0 && (m.atkAnim || 0) <= 0) {
+        m.atkT = 2.6; m.warnT = 0.6;
       }
       if (m.atkAnim > 0) m.atkAnim -= dt;
       // Luca golpeia quando vulneravel
@@ -334,7 +353,7 @@ function update(dt) {
   }
   if (game.bossDead) {
     m.dying += dt;
-    if (m.dying > 1.8) { saveBest(); ST.state = "end"; sfx.end(); }
+    if (m.dying > 1.8) { saveBest(); sfx.end(); ST.state = ST.night === 1 ? "end1" : "end"; }
   }
 
   // timers
@@ -363,6 +382,7 @@ function spawnGhost() {
   if (game.kills > 4 && r < 0.3) kind = "espectro";
   if (game.kills > 7 && r > 0.75) kind = "cao";
   if (game.kills > 9 && r > 0.92) kind = "vulto";
+  if (ST.night === 2 && r > 0.55 && r <= 0.78) kind = "neon";
   const side = Math.random();
   let x, y;
   if (side < 0.4) { x = -120; y = 700 + Math.random() * 260; }
@@ -372,8 +392,9 @@ function spawnGhost() {
     ghostA: { hp: 2, sp: 60, hw: 90, hh: 90 }, ghostB: { hp: 2, sp: 70, hw: 90, hh: 90 },
     espectro: { hp: 2, sp: 85, hw: 95, hh: 90 }, cao: { hp: 1, sp: 150, hw: 80, hh: 60 },
     vulto: { hp: 4, sp: 40, hw: 70, hh: 140 },
+    neon: { hp: 2, sp: 95, hw: 85, hh: 120 },
   }[kind];
-  const scale = 1 + Math.min(0.45, game.kills * 0.018);     // curva de dificuldade (calibrada pelo bot)
+  const scale = 1 + Math.min(0.35, game.kills * 0.012);     // curva de dificuldade (calibrada pelo bot)
   game.ghosts.push(Object.assign({ x, y, kind, dir: 1, seed: Math.random() * 7, dying: 0, atkT: 0 }, P, { sp: Math.round(P.sp * scale) }));
 }
 
@@ -430,14 +451,15 @@ function drawHUD() {
   if (game.reloadT > 0) px("RECARREGANDO…", 316, 96, 12, "#ffd75e");
   else if (nearImpala() && game.reserve < 24) px("R: PEGAR MUNICAO NO IMPALA", 316, 96, 12, "#8fd08f");
   ctx.drawImage(img.dagger, 450, 15);
-  ctx.drawImage(img.banner, 548, 12);
+  if (ST.night === 2) { ctx.fillStyle = "#0a0a12"; ctx.fillRect(548, 12, 560, 72); px("NOITE 2 - A CIDADE", 828, 48, 26, "#7fb2ff", "center"); }
+  else ctx.drawImage(img.banner, 548, 12);
   ctx.drawImage(img.pontos, 1272, 18);
   px(String(game.points).padStart(5, "0"), 1444, 70, 32, "#e8e8e8", "right");
   ctx.drawImage(img.skull, 472, 102);
   ctx.strokeStyle = "#cfcfcf"; ctx.lineWidth = 3;
   ctx.strokeRect(528, 110, 554, 40);
   ctx.fillStyle = "#000"; ctx.fillRect(531, 113, 548, 34);
-  const bw = Math.round(548 * game.boss / 160);
+  const bw = Math.round(548 * game.boss / (ST.night === 2 ? 180 : 160));
   if (bw > 0) {
     ctx.fillStyle = "#7d1fa2"; ctx.fillRect(531, 113, bw, 34);
     ctx.fillStyle = "#a44bd0"; ctx.fillRect(531, 113, bw, 8);
@@ -464,6 +486,7 @@ function enemyImgs(g) {
     case "espectro": return atk ? img.eEspAtk : img.eEsp;
     case "cao": return Math.floor(ST.t * 10) % 2 === 0 ? img.eCao : img.eCaoB;
     case "vulto": return atk ? img.eVultoAtk : img.eVulto;
+    case "neon": return img.eNeon;
     default: return g.kind === "ghostA" ? img.ghostA : img.ghostB;
   }
 }
@@ -471,7 +494,8 @@ function enemyImgs(g) {
 function drawWorld() {
   ctx.save();
   if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake * 2);
-  ctx.drawImage(img.plate, 0, 0);
+  ctx.drawImage(ST.night === 2 ? img.bgCidade : img.plate, 0, 0);
+  if (ST.night === 2) { ctx.fillStyle = "rgba(40,70,150,0.07)"; ctx.fillRect(0, 0, W, H); }
   drawMist();
 
   // pickups
@@ -484,10 +508,11 @@ function drawWorld() {
   // Malphas
   const m = game.malphas;
   if (game.bossOn) {
-    const im = game.bossDead ? img.mDef : (m.atkAnim > 0 ? img.mAtk : img.mIdle);
+    const im = game.bossDead ? img.mDef : (ST.night === 2 ? ((m.warnT > 0 || m.atkAnim > 0) ? img.mAtk : img.boss2) : ((m.warnT > 0 || m.atkAnim > 0) ? img.mAtk : img.mIdle));
     const bob = Math.sin(ST.t * 2) * 12;
     const alpha = game.bossDead ? Math.max(0.15, 1 - m.dying / 1.8) : 1;
     drawAt(im, m.x, m.y + 260 + bob, 1, 0, alpha);
+    if (m.warnT > 0 && Math.floor(ST.t * 12) % 2 === 0) px("!", m.x, m.y - 40, 44, "#ff3131", "center");
     if (game.bossDead && m.dying < 1.2) {
       ctx.save(); ctx.globalAlpha = 0.5 + 0.5 * Math.sin(ST.t * 30);
       ctx.fillStyle = "#cfe8ff";
@@ -588,7 +613,7 @@ function drawTitle() {
   ctx.fillStyle = titleBg; ctx.fillRect(bx, by, bw, bh);
   if ((ST.t % 1.1) < 0.72) px("PRESS START", bx + bw / 2, by + bh / 2, 44, "#f2f2f2", "center");
   px("SETAS/WASD · SHIFT correr · C agachar · K pular · ESPACO atirar · R recarregar · P pausa", W / 2, H - 24, 13, "#8f8f9a", "center");
-  px("ENGINE v3.0 — MODO ENGENHEIRO", 20, 30, 12, "#9a9aa8");
+  px("ENGINE v3.1 — NOITE 2: A CIDADE QUE NAO ACORDA", 20, 30, 12, "#9a9aa8");
   const rec = bestPoints();
   if (rec > 0) px("RECORDE " + rec + "   [M] som", 20, 54, 12, "#ff5050");
 }
@@ -628,17 +653,27 @@ function draw() {
     ], "PAUSA");
   } else if (ST.state === "dead") {
     centerBox(["ENTER — voltar à Relíquia"], "A NÉVOA TE LEVOU…");
-  } else if (ST.state === "end") {
+  } else if (ST.state === "end1") {
     drawCoverBg("bgFloresta");
     ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(0, 0, W, H);
     centerBox([
       '"Seu pai não tá perdido, meninos…"',
       '"…ele tá SEGURANDO A PORTA."',
-      "VOLTEM",
-      "NOITE 2 — A CIDADE QUE NÃO ACORDA",
+      "O CADEADO QUEBROU — A CIDADE CHAMA",
+      "PONTOS " + game.points + " · RECORDE " + bestPoints(),
+      "ENTER — NOITE 2: A CIDADE QUE NÃO ACORDA",
+    ], "MALPHAS SE DISSOLVE RINDO");
+  } else if (ST.state === "end") {
+    drawCoverBg("bgPorta");
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(0, 0, W, H);
+    centerBox([
+      '"Eu sabia que viriam, meninos."',
+      '"O Cornudo era o cadeado. Agora somos nós."',
+      "Álvaro: 'Ajudem o pai a SEGURAR A PORTA.'",
+      "NOITE 3 — A PORTA (em breve)",
       "PONTOS " + game.points + " · RECORDE " + bestPoints(),
       "ENTER — voltar ao título",
-    ], "MALPHAS SE DISSOLVE RINDO");
+    ], "3H07 — A CIDADE NÃO ACORDOU");
   }
 }
 

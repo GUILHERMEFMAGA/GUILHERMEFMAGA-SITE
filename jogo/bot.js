@@ -39,7 +39,7 @@ let ts = 0;
 function frame() { ts += 16.7; const cb = rafCb; rafCb = null; cb(ts); }
 
 /* ---------------- telemetria ---------------- */
-const M = {
+const M = { perNoite: {},
   tempo: 0, kills: 0, mortes: 0, tiros: 0, recargas: 0, pickups: 0, pontos: 0,
   danoRecebido: 0, bossDano: 0, pulos: 0, agaches: 0,
   chegouBoss: false, venceu: false, erros: [], score: 0,
@@ -71,18 +71,31 @@ let strafeDir = 1, strafeT = 0;
 function think(dt) {
   const g = T.game, d = g.dante, K = T.keys;
   if (T.ST.state === "title" || T.ST.state === "cut") { T.onPress("Enter"); return; }
-  if (T.ST.state === "dead") { M.mortes++; T.onPress("Enter"); return; }
+  if (T.ST.state === "dead") {
+    M.mortes++; (M.perNoite[T.ST.night] = (M.perNoite[T.ST.night] || 0) + 1);
+    const g2 = T.game, d2 = g2.dante;
+    let nk = "?", nd = 1e9;
+    for (const gh of g2.ghosts) { if (gh.dying) continue; const dd = Math.hypot(gh.x - d2.x, gh.y - d2.y); if (dd < nd) { nd = dd; nk = gh.kind; } }
+    const m2 = g2.malphas;
+    console.log("  MORTE noite", T.ST.night, "t=" + Math.round(M.tempo) + "s pos=" + Math.round(d2.x) + "," + Math.round(d2.y),
+      "| inimigo+proximo:", nk, Math.round(nd) + "px", "| boss atkAnim:", (m2.atkAnim || 0).toFixed(2), "| vuln:", (m2.vuln || 0).toFixed(2));
+    T.onPress("Enter"); return;
+  }
+  if (T.ST.state === "end1") { T.onPress("Enter"); return; }
   if (T.ST.state === "end") { M.venceu = true; return; }
   if (T.ST.paused) return;
 
   let alvo = null, best = 1e9;
   for (const gh of g.ghosts) {
     if (gh.dying) continue;
-    const dd = Math.hypot(gh.x - d.x, gh.y - d.y);
+    let dd = Math.hypot(gh.x - d.x, gh.y - d.y);
+    if (gh.kind === "cao" || gh.kind === "neon") dd *= 0.6; // prioriza rapidos
     if (dd < best) { best = dd; alvo = gh; }
   }
+  const realBest = alvo ? Math.hypot(alvo.x - d.x, alvo.y - d.y) : 1e9;
+  const cercado = g.ghosts.filter(gh => !gh.dying && Math.hypot(gh.x - d.x, gh.y - d.y) < 230).length >= 2;
   const m = g.malphas;
-  const agachar = g.bossOn && !g.bossDead && m.atkAnim > 0 && Math.hypot(m.x - d.x, m.y + 260 - d.y) < 340;
+  const agachar = g.bossOn && !g.bossDead && (m.warnT > 0 || m.atkAnim > 0) && Math.hypot(m.x - d.x, m.y + 260 - d.y) < 340;
   K.KeyC = agachar;
   if (agachar) M.agaches++;
   const caoPerto = g.ghosts.some(gh => !gh.dying && gh.kind === "cao" && Math.hypot(gh.x - d.x, gh.y - d.y) < 230);
@@ -94,12 +107,16 @@ function think(dt) {
     if (dd < pd) { pd = dd; pick = pk; }
   }
   let tx = null, ty = null;
-  if (pick && pd < 340) { tx = pick.x; ty = pick.y; }
+  if (cercado) {
+    const dx = d.x - alvo.x, dy = d.y - alvo.y, dl = Math.hypot(dx, dy) || 1;
+    tx = d.x + (dx / dl) * 300; ty = d.y + (dy / dl) * 200;
+  }
+  else if (pick && pd < 340) { tx = pick.x; ty = pick.y; }
   else if (alvo) {
     strafeT -= dt;
     if (strafeT <= 0) { strafeDir *= -1; strafeT = 1.2; }
     const dx = d.x - alvo.x, dy = d.y - alvo.y, dl = Math.hypot(dx, dy) || 1;
-    const aproxi = best > 380 ? -1 : best < 240 ? 1 : 0;
+    const aproxi = best > 430 ? -1 : best < 290 ? 1 : 0;
     tx = d.x + (dx / dl) * 100 * aproxi;
     ty = d.y + strafeDir * 80;
   }
@@ -107,9 +124,9 @@ function think(dt) {
   K.ArrowRight = !!(tx !== null && tx > d.x + 20);
   K.ArrowUp = !!(ty !== null && ty < d.y - 20);
   K.ArrowDown = !!(ty !== null && ty > d.y + 20);
-  K.ShiftLeft = !!(alvo && best > 520);
+  K.ShiftLeft = !!(cercado || (alvo && best > 520));
 
-  K.Space = !!alvo && best < 560 && !agachar && g.ammo > 0;
+  K.Space = !!alvo && realBest < 540 && !agachar && !cercado && g.ammo > 0;
   if (g.bossOn && !g.bossDead && m.vuln > 0 && Math.abs(d.y - (m.y + 60)) < 260 && g.ammo > 0) K.Space = true;
   if (g.ammo === 0 && g.reloadT <= 0 && (!alvo || best > 260)) T.onPress("KeyR");
 }
@@ -117,7 +134,7 @@ function think(dt) {
 /* ---------------- execucao ---------------- */
 (async () => {
   await new Promise(r => setTimeout(r, 60));
-  const LIMITE = 6 * 60;
+  const LIMITE = 15 * 60;
   let t = 0;
   while (t < LIMITE && !M.venceu) {
     try { think(1 / 60); frame(); telemetry(1 / 60); }
@@ -140,6 +157,7 @@ function think(dt) {
   console.log("===== RELATORIO DO BOT DE TESTE =====");
   console.log("tempo simulado:", Math.round(M.tempo) + "s | estado final:", T.ST.state);
   console.log("kills:", M.kills, "| pontos:", M.pontos, "| tiros:", M.tiros, "| precisao aprox:", precisao + "%");
+  console.log("mortes por noite:", JSON.stringify(M.perNoite));
   console.log("dano recebido:", M.danoRecebido, "(dano/min " + dpm + ") | mortes:", M.mortes);
   console.log("recargas:", M.recargas, "| pickups:", M.pickups, "| pulos:", M.pulos, "| agachoes:", M.agaches);
   console.log("dist. media ao inimigo:", distMedia + "px | chefe ativou:", M.chegouBoss, M.tempoAteBoss !== null ? "(em " + Math.round(M.tempoAteBoss) + "s)" : "");
