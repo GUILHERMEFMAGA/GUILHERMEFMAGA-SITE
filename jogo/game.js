@@ -451,6 +451,7 @@ function drawTesteHud() {
   px("MODO TESTE — SO PERSONAGENS (sem bichos, sem fundo)", 20, 30, 16, "#7cfc9b");
   px("dante " + Math.round(d.x) + "," + Math.round(d.y) + "  |  anim: " + fr + "  |  muni " + game.ammo + "/" + game.reserve, 20, 62, 12, "#9a9aa8");
   px("WASD mover - SHIFT correr - C agachar - K pular - ESPACO atirar - R recarregar", 20, 92, 12, "#9a9aa8");
+  if (typeof window !== "undefined") window.__ANIM = fr;
 }
 function drawHUD() {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, 104);
