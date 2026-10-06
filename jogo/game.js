@@ -1,4 +1,6 @@
-/* SOBRENATURAL — Noite 1: Estrada 66 (engine v2.1 com selo de versão)
+/* SOBRENATURAL — Noite 1: Estrada 66 (engine v3.0 — MODO ENGENHEIRO:
+ * fixed timestep 60Hz · screen shake · hitstop · IA de flanqueio · curva de
+ * dificuldade · recorde em localStorage · tecla M muta o som)
  * Controles: setas/WASD mover · SHIFT correr · C agachar · K pular ·
  * ESPAÇO/J atirar · R recarregar (perto do Impala reabastece) · P/ESC pausa · ENTER avança
  */
@@ -56,6 +58,7 @@ for (const [k, url] of Object.entries(SRC)) {
 let AC = null;
 function ac() { if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)(); return AC; }
 function beep(freq, dur, type = "square", vol = 0.12, slide = 0) {
+  if (muted) return;
   try {
     const a = ac(), o = a.createOscillator(), g = a.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, a.currentTime);
@@ -80,6 +83,10 @@ const sfx = {
   jump: () => beep(300, 0.12, "square", 0.08, 250),
 };
 
+let muted = false, shake = 0, hitstop = 0, acc = 0;
+function bestPoints() { try { return +localStorage.getItem("sobrenatural_best") || 0; } catch (e) { return 0; } }
+function saveBest() { try { const b = bestPoints(); if (game.points > b) localStorage.setItem("sobrenatural_best", game.points); } catch (e) {} }
+
 /* ---------- estado ---------- */
 const ST = { state: "title", paused: false, t: 0, cut: 0 };
 const game = {};
@@ -96,7 +103,7 @@ const CUTSCENE = [
 function resetGame() {
   game.hearts = 3; game.ammo = 6; game.reserve = 24;
   game.points = 1250; game.kills = 0;
-  game.boss = 100; game.bossOn = false; game.bossDead = false;
+  game.boss = 160; game.bossOn = false; game.bossDead = false;
   game.invuln = 0; game.reloadT = 0; game.shootCd = 0; game.shootAnim = 0;
   game.flashRed = 0; game.muzzle = 0; game.spawnT = 2.0; game.hintT = 8;
   game.jumpT = 0; game.crouch = false; game.step = 0;
@@ -114,6 +121,7 @@ const GAMEKEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space",
   "KeyW", "KeyA", "KeyS", "KeyD", "KeyJ", "KeyX", "KeyR", "KeyP", "Escape", "Enter",
   "ShiftLeft", "ShiftRight", "KeyC", "KeyK"];
 addEventListener("keydown", (e) => {
+  if (e.code === "KeyM") { muted = !muted; }
   if (GAMEKEYS.includes(e.code)) e.preventDefault();
   if (!keys[e.code]) onPress(e.code);
   keys[e.code] = true; ac();
@@ -161,6 +169,8 @@ function startReload() {
 /* ---------- update ---------- */
 function update(dt) {
   ST.t += dt;
+  if (shake > 0) shake = Math.max(0, shake - dt * 30);
+  if (game.fx.length > 220) game.fx.splice(0, game.fx.length - 220);
   if (ST.state !== "play" || ST.paused) return;
   const d = game.dante, l = game.luca;
 
@@ -195,7 +205,7 @@ function update(dt) {
   game.shootCd -= dt; game.shootAnim -= dt; game.muzzle -= dt;
   if ((keys.Space || keys.KeyJ || keys.KeyX) && game.shootCd <= 0 && game.reloadT <= 0 && !game.crouch) {
     if (game.ammo > 0) {
-      game.ammo--; game.shootCd = 0.5; game.shootAnim = 0.4; game.muzzle = 0.09; sfx.shot();
+      game.ammo--; game.shootCd = 0.5; game.shootAnim = 0.4; game.muzzle = 0.09; sfx.shot(); shake = Math.max(shake, 3);
       for (const s of [-0.09, 0, 0.09]) {
         game.pellets.push({ x: d.x + d.face * 70, y: d.y - 190, vx: d.face * 820, vy: s * 820, life: 0.8 });
       }
@@ -248,25 +258,28 @@ function update(dt) {
   for (const g of game.ghosts) {
     if (g.dying) { g.dying += dt; continue; }
     g.atkT = (g.atkT || 0) - dt;
-    const gx = d.x - g.x, gy = (d.y - 80) - g.y, gl = Math.hypot(gx, gy) || 1;
-    const near = gl < 150;
+    // IA de flanqueio: aproxima por ponto deslocado, converge de perto
+    const gx = d.x - g.x, gy0 = (d.y - 80) - g.y;
+    const near = Math.hypot(gx, gy0) < 150;
+    const gy = gy0 + (near ? 0 : (g.seed > 3.5 ? 70 : -70));
+    const gl = Math.hypot(gx, gy) || 1;
     if (near && g.atkT <= -0.4) g.atkT = 0.35;              // janela de ataque
     const sp = (g.atkT > 0 ? g.sp * 1.6 : g.sp);
     g.x += (gx / gl) * sp * dt; g.y += (gy / gl) * sp * 0.6 * dt;
     g.dir = gx > 0 ? 1 : -1;
     const air = game.jumpT > 0.12;                          // pulo esquiva
     if (!air && game.invuln <= 0 && Math.abs(g.x - d.x) < 70 && Math.abs(g.y - (d.y - 80)) < 110) {
-      game.hearts--; game.invuln = 1.6; game.flashRed = 0.35; sfx.hurt();
-      if (game.hearts <= 0) { ST.state = "dead"; sfx.end(); }
+      game.hearts--; game.invuln = 1.9; game.flashRed = 0.35; sfx.hurt(); shake = Math.max(shake, 8);
+      if (game.hearts <= 0) { saveBest(); ST.state = "dead"; sfx.end(); }
     }
   }
   game.ghosts = game.ghosts.filter(g => !(g.dying && g.dying > 0.6));
 
   // spawn mix de inimigos
   game.spawnT -= dt;
-  if (game.spawnT <= 0 && game.ghosts.filter(g => !g.dying).length < 6) {
+  if (game.spawnT <= 0 && game.ghosts.filter(g => !g.dying).length < 5) {
     spawnGhost();
-    game.spawnT = Math.max(1.1, 2.4 - game.kills * 0.04);
+    game.spawnT = Math.max(1.3, 2.4 - game.kills * 0.035);
   }
 
   // pickups
@@ -276,11 +289,14 @@ function update(dt) {
       kind: Math.random() < 0.5 ? "sal" : "diario",
       x: 200 + Math.random() * 1150, y: 700 + Math.random() * 260,
     });
-    game.pickT = 9;
+    game.pickT = 7;
   }
   game.pickups = game.pickups.filter(pk => {
     if (Math.abs(pk.x - d.x) < 50 && Math.abs(pk.y - d.y) < 60) {
-      if (pk.kind === "sal") { game.reserve = Math.min(24, game.reserve + 6); }
+      if (pk.kind === "sal") {
+        if (game.hearts < 3) game.hearts++;
+        else game.reserve = Math.min(24, game.reserve + 6);
+      }
       else { game.points += 500; }
       sfx.pick();
       game.fx.push({ kind: "puff", x: pk.x, y: pk.y - 30, t: 0.2 });
@@ -292,7 +308,7 @@ function update(dt) {
   // Malphas
   const m = game.malphas;
   if (!game.bossOn && game.kills >= 12) {
-    game.bossOn = true; sfx.boss();
+    game.bossOn = true; sfx.boss(); shake = Math.max(shake, 12);
   }
   if (game.bossOn && !game.bossDead) {
     m.t += dt;
@@ -302,8 +318,8 @@ function update(dt) {
       if (m.atkT <= 0 && m.vuln <= 0) {
         m.atkT = 2.6; m.atkAnim = 0.7;
         if (Math.abs(d.x - m.x) < 300 && !game.crouch && game.invuln <= 0) {
-          game.hearts--; game.invuln = 1.6; game.flashRed = 0.4; sfx.hurt();
-          if (game.hearts <= 0) { ST.state = "dead"; sfx.end(); }
+          game.hearts--; game.invuln = 1.9; game.flashRed = 0.4; sfx.hurt(); shake = Math.max(shake, 10);
+          if (game.hearts <= 0) { saveBest(); ST.state = "dead"; sfx.end(); }
         }
         m.vuln = 1.2;                                       // fica vulneravel depois
       }
@@ -316,7 +332,7 @@ function update(dt) {
   }
   if (game.bossDead) {
     m.dying += dt;
-    if (m.dying > 1.8) { ST.state = "end"; sfx.end(); }
+    if (m.dying > 1.8) { saveBest(); ST.state = "end"; sfx.end(); }
   }
 
   // timers
@@ -329,7 +345,7 @@ function damageGhost(g, dmg) {
   g.hp -= dmg; sfx.hit();
   game.fx.push({ kind: "puff", x: g.x, y: g.y - 60, t: 0.15 });
   if (g.hp <= 0 && !g.dying) {
-    g.dying = 0.001; game.kills++; game.points += 250; sfx.banish();
+    g.dying = 0.001; game.kills++; game.points += 250; sfx.banish(); hitstop = 0.05; shake = Math.max(shake, 5);
   }
 }
 function damageBoss(dmg) {
@@ -355,7 +371,8 @@ function spawnGhost() {
     espectro: { hp: 2, sp: 85, hw: 95, hh: 90 }, cao: { hp: 1, sp: 150, hw: 80, hh: 60 },
     vulto: { hp: 4, sp: 40, hw: 70, hh: 140 },
   }[kind];
-  game.ghosts.push(Object.assign({ x, y, kind, dir: 1, seed: Math.random() * 7, dying: 0, atkT: 0 }, P));
+  const scale = 1 + Math.min(0.45, game.kills * 0.018);     // curva de dificuldade (calibrada pelo bot)
+  game.ghosts.push(Object.assign({ x, y, kind, dir: 1, seed: Math.random() * 7, dying: 0, atkT: 0 }, P, { sp: Math.round(P.sp * scale) }));
 }
 
 /* ---------- draw ---------- */
@@ -419,7 +436,7 @@ function drawHUD() {
   ctx.strokeStyle = "#cfcfcf"; ctx.lineWidth = 3;
   ctx.strokeRect(528, 110, 554, 40);
   ctx.fillStyle = "#000"; ctx.fillRect(531, 113, 548, 34);
-  const bw = Math.round(548 * game.boss / 100);
+  const bw = Math.round(548 * game.boss / 160);
   if (bw > 0) {
     ctx.fillStyle = "#7d1fa2"; ctx.fillRect(531, 113, bw, 34);
     ctx.fillStyle = "#a44bd0"; ctx.fillRect(531, 113, bw, 8);
@@ -451,6 +468,8 @@ function enemyImgs(g) {
 }
 
 function drawWorld() {
+  ctx.save();
+  if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake * 2);
   ctx.drawImage(img.plate, 0, 0);
   drawMist();
 
@@ -529,6 +548,7 @@ function drawWorld() {
     px("WASD mover · SHIFT correr · C agachar · K pular · ESPACO atirar · R recarregar", W / 2, H - 26, 13, "#9a9aa8", "center");
     ctx.globalAlpha = 1;
   }
+  ctx.restore();
 }
 
 function drawCoverBg(key) {
@@ -565,7 +585,9 @@ function drawTitle() {
   ctx.fillStyle = titleBg; ctx.fillRect(bx, by, bw, bh);
   if ((ST.t % 1.1) < 0.72) px("PRESS START", bx + bw / 2, by + bh / 2, 44, "#f2f2f2", "center");
   px("SETAS/WASD · SHIFT correr · C agachar · K pular · ESPACO atirar · R recarregar · P pausa", W / 2, H - 24, 13, "#8f8f9a", "center");
-  px("ENGINE v2.1 — TODAS AS ANIMACOES", 20, 30, 12, "#9a9aa8");
+  px("ENGINE v3.0 — MODO ENGENHEIRO", 20, 30, 12, "#9a9aa8");
+  const rec = bestPoints();
+  if (rec > 0) px("RECORDE " + rec + "   [M] som", 20, 54, 12, "#ff5050");
 }
 
 function centerBox(lines, title) {
@@ -611,6 +633,7 @@ function draw() {
       '"…ele tá SEGURANDO A PORTA."',
       "VOLTEM",
       "NOITE 2 — A CIDADE QUE NÃO ACORDA",
+      "PONTOS " + game.points + " · RECORDE " + bestPoints(),
       "ENTER — voltar ao título",
     ], "MALPHAS SE DISSOLVE RINDO");
   }
@@ -619,9 +642,15 @@ function draw() {
 /* ---------- loop ---------- */
 let last = 0;
 function loop(ts) {
-  const dt = Math.min(0.033, (ts - last) / 1000 || 0.016);
+  // fixed timestep: logica sempre a 60Hz, independente do refresh do monitor
+  const realDt = Math.min(0.05, (ts - last) / 1000 || 0.016);
   last = ts;
-  update(dt);
+  if (hitstop > 0) hitstop -= realDt;
+  else {
+    acc += realDt;
+    const STEP = 1 / 60; let n = 0;
+    while (acc >= STEP && n < 5) { update(STEP); acc -= STEP; n++; }
+  }
   draw();
   requestAnimationFrame(loop);
 }
@@ -646,3 +675,6 @@ function boot() {
     Promise.race([document.fonts.load('16px "Press Start 2P"'), new Promise(r => setTimeout(r, 1500))]).then(start);
   } else start();
 }
+
+/* hook p/ pagina de testes da IA (aditivo) */
+if (typeof window !== "undefined") { window.__G = { ST, game, keys, onPress }; }
