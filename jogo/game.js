@@ -10,6 +10,7 @@ const W = 1536, H = 1024;
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 ctx.imageSmoothingEnabled = false;
+const TESTE = typeof window !== "undefined" && !!window.__TESTE;
 
 /* ---------- assets ---------- */
 const SRC = {
@@ -291,14 +292,14 @@ function update(dt) {
   game.ghosts = game.ghosts.filter(g => !(g.dying && g.dying > 0.6));
 
   // spawn mix de inimigos
-  game.spawnT -= dt;
+  if (!TESTE) { game.spawnT -= dt;
   if (game.spawnT <= 0 && game.ghosts.filter(g => !g.dying).length < (ST.night === 2 ? 4 : 5)) {
     spawnGhost();
     game.spawnT = Math.max(1.3, 2.4 - game.kills * 0.035);
-  }
+  } }
 
   // pickups
-  game.pickT -= dt;
+  if (!TESTE) { game.pickT -= dt;
   if (game.pickT <= 0 && game.pickups.length < 2) {
     game.pickups.push({
       kind: Math.random() < 0.5 ? "sal" : "diario",
@@ -318,10 +319,10 @@ function update(dt) {
       return false;
     }
     return true;
-  });
+  }); }
 
   // Malphas
-  const m = game.malphas;
+  if (!TESTE) { const m = game.malphas;
   const BOSS_AT = ST.night === 2 ? 10 : 12;
   if (!game.bossOn && game.kills >= BOSS_AT) {
     game.bossOn = true; sfx.boss(); shake = Math.max(shake, 12);
@@ -354,7 +355,7 @@ function update(dt) {
   if (game.bossDead) {
     m.dying += dt;
     if (m.dying > 1.8) { saveBest(); sfx.end(); ST.state = ST.night === 1 ? "end1" : "end"; }
-  }
+  } }
 
   // timers
   game.invuln -= dt; game.flashRed -= dt; game.hintT -= dt;
@@ -438,6 +439,19 @@ function lucaFrame() {
   return img.luca;
 }
 
+function drawTesteHud() {
+  const d = game.dante;
+  let fr = "parado";
+  if (game.reloadT > 0) fr = "recarga";
+  else if (game.shootAnim > 0) fr = "tiro " + (game.shootAnim > 0.25 ? "(mira)" : "(fogo)");
+  else if (game.jumpT > 0) fr = "pulo";
+  else if (game.crouch) fr = "agachado";
+  else if (game.moving) fr = game.run ? "CORRIDA fase " + ["A", "B", "C", "D"][Math.floor(game.step) % 4]
+                                      : "andada " + (Math.floor(game.step) % 2 === 0 ? "A" : "B");
+  px("MODO TESTE — SO PERSONAGENS (sem bichos, sem fundo)", 20, 30, 16, "#7cfc9b");
+  px("dante " + Math.round(d.x) + "," + Math.round(d.y) + "  |  anim: " + fr + "  |  muni " + game.ammo + "/" + game.reserve, 20, 62, 12, "#9a9aa8");
+  px("WASD mover - SHIFT correr - C agachar - K pular - ESPACO atirar - R recarregar", 20, 92, 12, "#9a9aa8");
+}
 function drawHUD() {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, 104);
   ctx.strokeStyle = "#b9b9b9"; ctx.lineWidth = 3;
@@ -494,9 +508,16 @@ function enemyImgs(g) {
 function drawWorld() {
   ctx.save();
   if (shake > 0) ctx.translate((Math.random() - 0.5) * shake * 2, (Math.random() - 0.5) * shake * 2);
-  ctx.drawImage(ST.night === 2 ? img.bgCidade : img.plate, 0, 0);
-  if (ST.night === 2) { ctx.fillStyle = "rgba(40,70,150,0.07)"; ctx.fillRect(0, 0, W, H); }
-  drawMist();
+  if (TESTE) {
+    ctx.fillStyle = "#101018"; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = "rgba(140,140,170,0.14)"; ctx.lineWidth = 2;
+    for (let gx = 0; gx <= W; gx += 128) { ctx.beginPath(); ctx.moveTo(gx, 560); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy = 640; gy <= H; gy += 80) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
+  } else {
+    ctx.drawImage(ST.night === 2 ? img.bgCidade : img.plate, 0, 0);
+    if (ST.night === 2) { ctx.fillStyle = "rgba(40,70,150,0.07)"; ctx.fillRect(0, 0, W, H); }
+    drawMist();
+  }
 
   // pickups
   for (const pk of game.pickups) {
@@ -566,12 +587,12 @@ function drawWorld() {
     }
   }
 
-  drawHUD();
+  if (TESTE) drawTesteHud(); else drawHUD();
   if (game.flashRed > 0) {
     ctx.fillStyle = "rgba(200,0,0," + (game.flashRed * 0.8) + ")";
     ctx.fillRect(0, 0, W, H);
   }
-  if (game.hintT > 0) {
+  if (game.hintT > 0 && !TESTE) {
     ctx.globalAlpha = Math.min(1, game.hintT);
     px("WASD mover · SHIFT correr · C agachar · K pular · ESPACO atirar · R recarregar", W / 2, H - 26, 13, "#9a9aa8", "center");
     ctx.globalAlpha = 1;
@@ -708,6 +729,7 @@ function boot() {
     const d = t.getImageData(900, 1470, 1, 1).data;
     titleBg = "rgb(" + d[0] + "," + d[1] + "," + d[2] + ")";
   } catch (e) { /* fallback */ }
+  if (TESTE) { resetGame(); ST.state = "play"; }
   const start = () => requestAnimationFrame(loop);
   if (document.fonts && document.fonts.load) {
     Promise.race([document.fonts.load('16px "Press Start 2P"'), new Promise(r => setTimeout(r, 1500))]).then(start);

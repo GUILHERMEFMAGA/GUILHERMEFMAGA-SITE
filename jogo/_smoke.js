@@ -51,10 +51,12 @@ function assert(c, m) { if (!c) { console.error("FALHOU:", m); process.exit(1); 
   assert(g.ammo < a0, "atirar gasta munição");
   g.ammo = 1; g.reserve = 12; T.onPress("KeyR"); frames(90);
   assert(g.ammo === 6 && g.reserve === 7, "recarga completa 1+5");
+  g.spawnT = 9999; g.ghosts.length = 0;           // congela spawns p/ teste deterministico
   const h0 = g.hearts;
   g.ghosts.push({ kind: "ghostA", x: g.dante.x + 10, y: g.dante.y - 80, hw: 90, hh: 90, hp: 2, sp: 0, dir: 1, seed: 1, dying: 0, atkT: 0 });
   frames(20);
   assert(g.hearts === h0 - 1, "contato tira coracao");
+  g.spawnT = 9999;
   g.ghosts.length = 0;
   while (g.kills < 12) {
     const gh = { kind: "ghostA", x: 700, y: 700, hw: 90, hh: 90, hp: 2, sp: 0, dir: 1, seed: 1, dying: 0, atkT: 0 };
