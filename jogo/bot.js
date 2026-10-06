@@ -164,5 +164,13 @@ function think(dt) {
   console.log("dano no chefe:", M.bossDano, "| venceu:", M.venceu);
   console.log("PROBLEMAS:", problemas.length ? "\n  - " + problemas.join("\n  - ") : " nenhum");
   console.log("PARECER:", bom ? "BOM" : "RUIM");
+  try {
+    require("fs").writeFileSync(__dirname + "/bot_telemetry.json", JSON.stringify({
+      tempo: Math.round(M.tempo), kills: M.kills, mortes: M.mortes, perNoite: M.perNoite,
+      tiros: M.tiros, precisao: precisao, pickups: M.pickups, danoRecebido: M.danoRecebido,
+      danoMin: dpm, venceu: M.venceu, chegouBoss: M.chegouBoss, pontos: M.pontos,
+      tempoAteBoss: M.tempoAteBoss !== null ? Math.round(M.tempoAteBoss) : null
+    }, null, 1));
+  } catch (e) {}
   process.exit(0);
 })();

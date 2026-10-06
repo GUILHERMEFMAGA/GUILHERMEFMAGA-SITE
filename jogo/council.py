@@ -92,6 +92,12 @@ try:
     else: diz("GAME", "OK", "campanha vencivel (2 noites) ✔")
     m = re.search(r"mortes: (\d+)", t)
     if m and int(m.group(1)) > 8: diz("GAME", "GRAVE", f"muito dificil: {m.group(1)} mortes da IA")
+    # telemetria da IA jogadora alimentando as demais
+    TJ = os.path.join(ROOT, "bot_telemetry.json")
+    if os.path.exists(TJ):
+        tj = json.load(open(TJ))
+        diz("GAME", "OK", f"telemetria da IA jogadora compartilhada: {tj['kills']} abates, {tj['tiros']} tiros, precisao {tj['precisao']}%, {tj['pickups']} itens, boss em {tj['tempoAteBoss']}s")
+        if float(tj["danoMin"]) > 12: diz("GAME", "GRAVE", "dano/min alto: " + str(tj["danoMin"]))
 except Exception as e: diz("GAME", "CRITICO", str(e))
 
 # ---------------- A3 · DIRETOR DE IMAGEM (planos de geracao) ----------------

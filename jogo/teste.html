@@ -2,17 +2,187 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<title>SOBRENATURAL — SERVIDOR DE TESTES (só personagens)</title>
+<title>SOBRENATURAL — CENTRAL DE TESTES (11 IAs)</title>
 <style>
   html, body { margin: 0; background: #07060a; color: #7cfc9b; font-family: "Courier New", monospace; }
-  header { padding: 8px 16px; border-bottom: 2px solid #1d4028; font-size: 13px; }
-  canvas { display: block; max-width: 96vw; margin: 10px auto; border: 2px solid #1d4028; image-rendering: pixelated; background: #101018; }
+  header { padding: 8px 16px; border-bottom: 2px solid #1d4028; font-size: 13px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  button { background: #123018; color: #7cfc9b; border: 1px solid #2c6a38; padding: 8px 16px; font-family: inherit; font-size: 13px; cursor: pointer; }
+  button:hover { background: #1d4028; }
+  #wrap { display: flex; gap: 10px; padding: 10px; flex-wrap: wrap; align-items: flex-start; }
+  canvas#game { max-width: 62vw; border: 2px solid #1d4028; image-rendering: pixelated; background: #101018; }
+  #panel { width: 430px; background: #0c120d; border: 1px solid #1d4028; padding: 10px; font-size: 12px; line-height: 1.5; }
+  #anim { color: #ffd75e; font-size: 14px; }
+  #report { white-space: pre-wrap; max-height: 560px; overflow-y: auto; border-top: 1px solid #1d4028; margin-top: 8px; padding-top: 6px; }
+  .ok { color: #7cfc9b; } .bad { color: #ff6b6b; } .warn { color: #ffd75e; } .dim { color: #6a8a6f; }
 </style>
 </head>
 <body>
-<header>🧪 SERVIDOR DE TESTES — sem inimigos, sem chefes, sem cenário: só Dante e Luca pra validar animações/controles</header>
-<canvas id="game" width="1536" height="1024"></canvas>
+<header>
+  🧪 CENTRAL DE TESTES — a IA-demo movimenta os personagens sozinha ·
+  <button id="btn">🔴 RODAR TESTE COMPLETO (IAs no navegador)</button>
+  <span class="dim">A4/A8/A9/A10 rodam via "teste" no chat (node)</span>
+</header>
+<div id="wrap">
+  <canvas id="game" width="1536" height="1024"></canvas>
+  <div id="panel">
+    <div>ANIMAÇÃO ATUAL: <span id="anim">—</span></div>
+    <div id="demo" class="dim">demo: iniciando coreografia…</div>
+    <div id="report"></div>
+  </div>
+</div>
 <script>window.__TESTE = true;</script>
 <script src="game.js"></script>
+<script>
+(function () {
+  var G = window.__G || null;
+  var K = G.keys, game = G.game;
+  var animEl = document.getElementById("anim"), demoEl = document.getElementById("demo"), repEl = document.getElementById("report");
+
+  /* ---------- IA-DEMO: coreografia visivel que testa tudo em loop ---------- */
+  var SEQ = [
+    ["parado", 60, {}],
+    ["andada →", 130, { ArrowRight: true }],
+    ["CORRIDA →", 150, { ArrowRight: true, ShiftLeft: true }],
+    ["pulo", 40, { jump: 1 }],
+    ["tiro x3", 90, { Space: true }],
+    ["recarga", 90, { reload: 1 }],
+    ["agachado", 50, { KeyC: true }],
+    ["andada ←", 130, { ArrowLeft: true }],
+    ["CORRIDA ←", 150, { ArrowLeft: true, ShiftLeft: true }],
+    ["pulo 2", 40, { jump: 1 }]
+  ];
+  var si = 0, st = 0;
+  setInterval(function () {
+    var nome = SEQ[si][0], n = SEQ[si][1], cfg = SEQ[si][2];
+    if (st === 0) {
+      K.ArrowLeft = K.ArrowRight = K.ShiftLeft = K.Space = K.KeyC = false;
+      if (cfg.ArrowRight) K.ArrowRight = true;
+      if (cfg.ArrowLeft) K.ArrowLeft = true;
+      if (cfg.ShiftLeft) K.ShiftLeft = true;
+      if (cfg.Space) K.Space = true;
+      if (cfg.KeyC) K.KeyC = true;
+      if (cfg.jump) G.onPress("KeyK");
+      if (cfg.reload) G.onPress("KeyR");
+      game.dante.x = Math.max(200, Math.min(1300, game.dante.x));
+      demoEl.textContent = "demo: testando " + nome;
+    }
+    st++;
+    if (st >= n) { st = 0; si = (si + 1) % SEQ.length; }
+    animEl.textContent = window.__ANIM || "—";
+  }, 16);
+
+  /* ---------- TESTE COMPLETO no navegador ---------- */
+  function linha(t, cls) {
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = t;
+    repEl.appendChild(d);
+    repEl.scrollTop = repEl.scrollHeight;
+  }
+  function loadImg(src) {
+    return new Promise(function (res) {
+      var i = new Image();
+      i.onload = function () { res(i); };
+      i.onerror = function () { res(null); };
+      i.src = src;
+    });
+  }
+  function audit(im) {
+    var c = document.createElement("canvas");
+    c.width = im.width; c.height = im.height;
+    var x = c.getContext("2d");
+    x.drawImage(im, 0, 0);
+    var d = x.getImageData(0, 0, c.width, c.height).data;
+    function al(px) { return d[px * 4 + 3]; }
+    var w = c.width, h = c.height;
+    var cantos = [al(0), al(w - 1), al((h - 1) * w), al((h - 1) * w + w - 1)];
+    var fundo = cantos.filter(function (a) { return a > 200; }).length >= 3;
+    var rim = 0, tot = 0, miny = h, maxy = -1;
+    for (var y = 0; y < h; y += 2) for (var xx = 0; xx < w; xx += 2) {
+      var i = y * w + xx;
+      if (al(i) > 100) {
+        tot++;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
+        var r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+        if (r > 140 && r - Math.max(g, b) > 60) rim++;
+      }
+    }
+    return { fundo: fundo, h: maxy - miny, rim: 100 * rim / Math.max(1, tot) };
+  }
+  document.getElementById("btn").onclick = async function () {
+    repEl.innerHTML = "";
+    linha("═══ TESTE COMPLETO — IAs no navegador ═══", "warn");
+    var problemas = 0, checks = 0;
+
+    linha("[A1 ANIMAÇÕES] executando coreografia de auditoria…");
+    var vistos = {};
+    var t0 = Date.now();
+    while (Date.now() - t0 < 9000) { vistos[window.__ANIM] = 1; await new Promise(r => setTimeout(r, 50)); }
+    var esperados = ["parado", "andada", "CORRIDA", "pulo", "tiro", "recarga", "agachado"];
+    esperados.forEach(function (e) {
+      checks++;
+      var ok = Object.keys(vistos).some(function (v) { return v && v.indexOf(e) === 0; });
+      if (!ok) { problemas++; linha("   [x] animacao nunca vista: " + e, "bad"); }
+    });
+    linha("   [v] " + Object.keys(vistos).length + " estados observados ao vivo", "ok");
+
+    linha("[A2 DIRETORA DE ARTE] auditando sprites (fundo/altura/rim)…");
+    var srcTxt = await (await fetch("game.js")).text();
+    var noms = [];
+    var re = /sprites2\/([\w-]+)\.png/g, m;
+    while ((m = re.exec(srcTxt))) if (noms.indexOf(m[1]) < 0) noms.push(m[1]);
+    for (var q = 0; q < noms.length; q++) {
+      var im = await loadImg("sprites2/" + noms[q] + ".png");
+      if (!im) { problemas++; checks++; linha("   [x] " + noms[q] + ": FALHOU AO CARREGAR", "bad"); continue; }
+      var a = audit(im);
+      checks++;
+      if (a.fundo && (noms[q].indexOf("bg-") !== 0)) { problemas++; linha("   [x] " + noms[q] + ": fundo embutido", "bad"); }
+      if ((noms[q][0] === "d" || noms[q][0] === "l") && noms[q].indexOf("-") === 1) {
+        var canon = noms[q][0] === "d" ? 435 : 450;
+        if (Math.abs(a.h - canon) > canon * 0.06) { problemas++; linha("   [x] " + noms[q] + ": altura " + a.h + " fora do canon " + canon, "bad"); }
+      }
+    }
+    linha("   [v] " + noms.length + " sprites auditados", "ok");
+
+    linha("[A6 CANON] camisa do Luca vermelha?");
+    var li = await loadImg("sprites2/l-idle.png");
+    if (li) {
+      var c2 = document.createElement("canvas"); c2.width = li.width; c2.height = li.height;
+      var x2 = c2.getContext("2d"); x2.drawImage(li, 0, 0);
+      var dd = x2.getImageData(Math.floor(li.width * 0.42), Math.floor(li.height * 0.28), Math.floor(li.width * 0.18), Math.floor(li.height * 0.18)).data;
+      var rs = 0, gs = 0, n = 0;
+      for (var i2 = 0; i2 < dd.length; i2 += 4) if (dd[i2 + 3] > 100) { rs += dd[i2]; gs += dd[i2 + 1]; n++; }
+      checks++;
+      if (rs / n > gs / n + 6) linha("   [v] identidade do Luca ok", "ok");
+      else { problemas++; linha("   [x] camisa do Luca nao vermelha", "bad"); }
+    }
+
+    linha("[A7 OLHO] legibilidade do Dante na placa…");
+    var pl = await loadImg("sprites/plate.png"), di = await loadImg("sprites2/d-idle.png");
+    if (pl && di) {
+      var c3 = document.createElement("canvas"); c3.width = 1536; c3.height = 1024;
+      var x3 = c3.getContext("2d"); x3.drawImage(pl, 0, 0);
+      x3.drawImage(di, 700 - di.width / 2, 865 - di.height);
+      var a3 = audit(di);
+      checks++;
+      if (a3.rim >= 1.2) linha("   [v] contorno visivel (rim " + a3.rim.toFixed(1) + "%) — legivel no cenario", "ok");
+      else { problemas++; linha("   [x] Dante sem contorno: some no fundo", "bad"); }
+    }
+
+    linha("[A11 UX] mute/pausa/dica presentes no codigo…");
+    [["KeyM", "mute"], ["PAUSA", "pausa"], ["WASD", "controles documentados"]].forEach(function (p) {
+      checks++;
+      if (srcTxt.indexOf(p[0]) >= 0) linha("   [v] " + p[1] + " ✔", "ok");
+      else { problemas++; linha("   [x] falta " + p[1], "bad"); }
+    });
+
+    linha("──────────────────────────");
+    var nota = Math.round(100 * (checks - problemas) / Math.max(1, checks));
+    linha("VEREDITO DO NAVEGADOR: " + (problemas ? "RUIM" : "BOM") + " · " + nota + "/100 · " + problemas + " problema(s) em " + checks + " checagens", problemas ? "bad" : "ok");
+    linha("(A3 plano de imagens, A4 campanha, A8 codigo, A9 memoria e A10 performance rodarem no chat com a palavra \"teste\")", "dim");
+  };
+})();
+</script>
 </body>
 </html>

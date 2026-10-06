@@ -1,0 +1,18 @@
+{
+ "tempo": 557,
+ "kills": 274,
+ "mortes": 4,
+ "perNoite": {
+  "1": 2,
+  "2": 2
+ },
+ "tiros": 206,
+ "precisao": "143.7",
+ "pickups": 38,
+ "danoRecebido": 22,
+ "danoMin": "2.37",
+ "venceu": true,
+ "chegouBoss": true,
+ "pontos": 89300,
+ "tempoAteBoss": 30
+}
