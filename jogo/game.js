@@ -54,7 +54,14 @@ function maybeBoot() { if (!booted) { booted = true; boot(); } }
 for (const [k, url] of Object.entries(SRC)) {
   const i = new Image();
   i.onload = () => { if (++loaded === total) maybeBoot(); };
-  i.onerror = () => { loadError = url; maybeBoot(); };
+  i.onerror = () => {
+    // resiliente: sprite que falhar no CDN vira placeholder e o jogo carrega mesmo assim
+    const c = document.createElement("canvas"); c.width = 64; c.height = 64;
+    const g = c.getContext("2d");
+    g.fillStyle = "#2a1028"; g.fillRect(0, 0, 64, 64);
+    g.strokeStyle = "#ff4a4a"; g.lineWidth = 3; g.strokeRect(2, 2, 60, 60);
+    img[k] = c; maybeBoot();
+  };
   i.src = url;
   img[k] = i;
 }
