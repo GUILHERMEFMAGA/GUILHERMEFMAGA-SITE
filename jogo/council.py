@@ -241,10 +241,40 @@ for f_ in sorted({a for (a, n, m, as_) in F if n in ("CRITICO", "GRAVE") and a a
     prom_rows.append((f_, ident, pose, motivos, ref))
 with open(os.path.join(ROOT, "council_prompts.md"), "w") as pf:
     pf.write("# PROMPTS SINTETIZADOS PELA A13 (cruzamento de MILIMETRO+ARTE+CANON+OLHO+POSES)\n")
+    pf.write("\n## 1) CORRECOES DESTA RODADA (sprites com achado CRITICO/GRAVE)\n")
     for f_, ident, pose, motivos, ref in prom_rows:
         pf.write(f"\n## {f_}.png\n- problemas cruzados: " + "; ".join(motivos) +
                  f"\n- prompt: \"{ident}. POSE: {pose}, full body head to boots. {CHROMA}\"\n")
-diz("SINT", "OK", f"A13 cruzou {len(cruza)} achados de {len({a for a,_,_ in cruza})} IAs e escreveu council_prompts.md ({len(prom_rows)} prompts prontos)")
+    # catalogo canon completo: prompt pronto p/ qualquer sprite de personagem,
+    # sempre com ancora de rosto no sprite aprovado (consistencia garantida)
+    pf.write("\n## 2) CATALOGO CANON COMPLETO (prompt pronto de cada personagem/pose)\n")
+    POSES = {"idle": "standing idle, relaxed alert pose",
+             "walkA": "walking mid-stride, one foot flat on ground, other heel raised",
+             "walkB": "walking alternate phase, opposite foot forward",
+             "runA": "running extended stride phase, front leg reaching forward",
+             "runB": "running passing phase, back knee raised, legs crossed under body",
+             "runC": "running extended stride, opposite leg forward",
+             "runD": "running high-knee passing phase, body sprung upward",
+             "jump": "jumping mid-air, knees tucked",
+             "crouch": "deep low tactical crouch, knees bent sharply, body compact",
+             "aim": "shouldering the weapon aiming forward",
+             "fire": "firing recoil, weapon leveled forward",
+             "reload": "reloading, working the pump / inserting shell",
+             "hurt": "hurt recoil stumbling back in pain",
+             "prep": "raising the glowing blade preparing a slash",
+             "thrust": "lunging thrust with the glowing blade"}
+    ncat = 0
+    for f_ in sorted(os.listdir(S2)):
+        if not f_.endswith(".png") or f_[:2] not in ("d-", "l-"): continue
+        nome = f_[:-4]; sufix = nome[2:]
+        ident = IDENT_D if f_[0] == "d" else IDENT_L
+        ancora = "assets/old-d-walkB.png" if f_[0] == "d" else "assets/old-l-walkA.png"
+        pose = POSES.get(sufix, "pose following canon")
+        pf.write(f"\n## {nome}.png  [ancora de rosto: {ancora}]\n"
+                 f"- prompt: \"Using reference {ancora} keep pixel-identical face/hair/clothes/style. "
+                 f"{ident}. POSE: {pose}, full body head to boots. {CHROMA}\"\n")
+        ncat += 1
+diz("SINT", "OK", f"A13 cruzou {len(cruza)} achados e manteve catalogo canon de {ncat} prompts prontos em council_prompts.md")
 
 # ---------------- A14 · ESPELHO (sprites virados p/ esquerda) ----------------
 flip_bad = 0

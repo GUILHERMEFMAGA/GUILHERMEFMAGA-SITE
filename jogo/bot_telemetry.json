@@ -1,21 +1,21 @@
 {
- "tempo": 727,
- "kills": 379,
- "mortes": 3,
+ "tempo": 558,
+ "kills": 304,
+ "mortes": 2,
  "perNoite": {
   "1": 1,
-  "2": 2
+  "2": 1
  },
- "tiros": 245,
- "recargas": 39,
- "precisao": "149.4",
- "pickups": 37,
- "danoRecebido": 13,
- "danoMin": "1.07",
+ "tiros": 252,
+ "recargas": 40,
+ "precisao": "125.4",
+ "pickups": 40,
+ "danoRecebido": 16,
+ "danoMin": "1.72",
  "venceu": true,
  "chegouBoss": true,
- "pontos": 111650,
- "tempoAteBoss": 33,
+ "pontos": 94350,
+ "tempoAteBoss": 34,
  "superior": {
   "coberturaDante": 100,
   "coberturaLuca": 100,
