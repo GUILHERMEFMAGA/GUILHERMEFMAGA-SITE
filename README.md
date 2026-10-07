@@ -12,6 +12,18 @@ Ele tem rede neural (feita do zero), memória, ferramentas e automações no est
 
 📘 Documentação técnica: **[agente-ia/LEIA-ME.md](agente-ia/LEIA-ME.md)**
 
+## Site Brasa Burger
+
+O repositório também inclui uma página inicial responsiva para uma hamburgueria fictícia, feita sem dependências. O burger principal se desmonta em camadas com o movimento do mouse; no celular, use o botão de interação. O cardápio tem filtros e uma sacola demonstrativa com opção de compartilhar o pedido.
+
+Para abrir o site na raiz do repositório:
+
+```bash
+python3 -m http.server 8000 --bind 0.0.0.0
+```
+
+Os arquivos do site são `index.html`, `styles.css`, `script.js` e os assets em `public/images/`.
+
 ## Rodar em 10 segundos
 
 ```bash
