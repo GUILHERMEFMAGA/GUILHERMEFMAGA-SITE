@@ -18,7 +18,7 @@
 </head>
 <body>
 <header>
-  🧪 CENTRAL DE TESTES — os DOIS irmaos fazem TODAS as animacoes + 4 cantos ·
+  🧪 CENTRAL DE TESTES — os DOIS irmaos varrem o palco inteiro em TODA animacao + 4 cantos ·
   <button id="btn">🔴 RODAR TESTE COMPLETO (IAs no navegador)</button>
   <span class="dim">A4/A8/A9/A10 rodam via "teste" no chat (node)</span>
 </header>
@@ -38,21 +38,31 @@
   var K = G.keys, game = G.game;
   var animEl = document.getElementById("anim"), demoEl = document.getElementById("demo"), repEl = document.getElementById("report");
 
-  /* ---------- IA-DEMO v3: os DOIS irmaos fazem TODAS as animacoes + 4 cantos ----------
-     A lista vem de G.anims (fonte unica): animacoes novas entram no loop sozinhas. */
+  /* ---------- IA-DEMO v4: TODA fase atravessa o palco inteiro + 4 cantos ----------
+     Nada de ficar num canto so: cada animacao roda enquanto os irmaos varrem
+     o mapa de ponta a ponta (virando nas bordas), e o "parado" reveza 5 pontos. */
   window.__LUCA_CTRL = true;
   var AD = (G.anims && G.anims.dante) || ["idle","walkA","walkB","runA","runB","runC","runD","jump","crouch","aim","fire","reload","hurt"];
   var AL = (G.anims && G.anims.luca) || ["idle","runA","runB","runC","runD","prep","thrust"];
+  var dir = 1;
+  var SPOTS = [220, 768, 1300, 160, 1420];
+  function borda() { if (game.dante.x >= 1380) dir = -1; if (game.dante.x <= 160) dir = 1; }
+  function moveKeys() { K.ArrowLeft = dir < 0; K.ArrowRight = dir > 0; }
   function setD(name) {
     K.ArrowLeft = K.ArrowRight = K.ShiftLeft = K.Space = K.KeyC = false;
-    if (name === "walkA" || name === "walkB") { K.ArrowRight = true; game.step = name === "walkB" ? 1 : 0; }
-    else if (name.indexOf("run") === 0) { K.ArrowRight = true; K.ShiftLeft = true; game.step = "ABCD".indexOf(name[3]); }
-    else if (name === "jump") G.onPress("KeyK");
-    else if (name === "crouch") K.KeyC = true;
-    else if (name === "aim") game.shootAnim = 0.4;
+    if (name === "walkA" || name === "walkB") { moveKeys(); game.step = name === "walkB" ? 1 : 0; }
+    else if (name.indexOf("run") === 0) { moveKeys(); K.ShiftLeft = true; game.step = "ABCD".indexOf(name[3]); }
+    else if (name === "jump") { moveKeys(); G.onPress("KeyK"); }
+    else if (name === "crouch") { moveKeys(); K.KeyC = true; }
+    else if (name === "aim") { moveKeys(); game.shootAnim = 0.4; }
+    else if (name === "fire") { moveKeys(); game.shootAnim = 0.1; }
+    else if (name === "reload") { moveKeys(); game.reloadT = 1.0; }
+    else if (name === "hurt") { moveKeys(); game.invuln = 1.5; }
+  }
+  function statD(name) {   // estados sem deslocamento (usado nos cantos)
+    K.ArrowLeft = K.ArrowRight = K.ShiftLeft = K.Space = K.KeyC = false;
+    if (name === "crouch") K.KeyC = true;
     else if (name === "fire") game.shootAnim = 0.1;
-    else if (name === "reload") game.reloadT = 1.0;
-    else if (name === "hurt") game.invuln = 1.5;
   }
   function setL(name) {
     var l = game.luca; l.moving = false; l.atkT = 0;
@@ -61,11 +71,12 @@
     else if (name === "thrust") l.atkT = 0.1;
   }
   var phases = [];
-  for (var i0 = 0; i0 < AD.length; i0++) phases.push({ t: 48, d: AD[i0], l: AL[i0 % AL.length] });
+  for (var i0 = 0; i0 < AD.length; i0++) phases.push({ t: 64, d: AD[i0], l: AL[i0 % AL.length] });
   phases.push({ t: 220, d: "__CORNERS", l: "runA" });
   var pi = 0, pt = 0, cStep = 0;
   setInterval(function () {
     var ph = phases[pi];
+    borda();
     if (ph.d === "__CORNERS") {
       var CS = [[160, 650], [1420, 650], [160, 980], [1420, 980]];
       var c = CS[Math.floor(cStep / 55) % 4], sub = cStep % 55;
@@ -74,15 +85,21 @@
       if (sub === 20) K.KeyC = true;  if (sub === 30) K.KeyC = false;
       if (sub === 35) K.Space = true; if (sub === 45) K.Space = false;
       game.dante.face = c[0] < 768 ? 1 : -1;
-      setD(sub >= 20 && sub < 30 ? "crouch" : (sub >= 35 && sub < 45 ? "fire" : "idle"));
+      statD(sub >= 20 && sub < 30 ? "crouch" : (sub >= 35 && sub < 45 ? "fire" : "idle"));
       setL(sub < 28 ? "runB" : "thrust");
       demoEl.textContent = "demo: cantos do mapa (" + (Math.floor(cStep / 55) + 1) + "/4) — pulo+agacha+tiro";
       cStep = (cStep + 1) % 220;
+    } else if (ph.d === "idle") {
+      K.ArrowLeft = K.ArrowRight = K.ShiftLeft = K.Space = K.KeyC = false;
+      if (pt % 16 === 0) game.dante.x = SPOTS[Math.floor(pt / 16) % SPOTS.length];  // parado em cada lado
+      game.dante.face = dir;
+      setL(ph.l);
+      game.luca.x = Math.max(160, Math.min(1420, game.dante.x + 175)); game.luca.y = game.dante.y; game.luca.face = dir;
+      demoEl.textContent = "demo: Dante→idle (" + Math.round(game.dante.x) + ") · Luca→" + ph.l;
     } else {
       setD(ph.d); setL(ph.l);
-      game.dante.x = Math.max(200, Math.min(1300, game.dante.x));
-      game.luca.x = game.dante.x + 175; game.luca.y = game.dante.y; game.luca.face = game.dante.face;
-      demoEl.textContent = "demo: Dante→" + ph.d + " · Luca→" + ph.l;
+      game.luca.x = Math.max(160, Math.min(1420, game.dante.x + 175 * dir)); game.luca.y = game.dante.y; game.luca.face = dir;
+      demoEl.textContent = "demo: Dante→" + ph.d + " (" + (dir > 0 ? "→" : "←") + " " + Math.round(game.dante.x) + ") · Luca→" + ph.l;
     }
     pt++;
     if (pt >= ph.t) { pt = 0; pi = (pi + 1) % phases.length; }
