@@ -57,6 +57,8 @@ c = plate.copy(); b = {"dante": paste_feet(c, d_j, 700, 865, 70)}
 if 865 - 70 - d_j.size[1] + d_j.size[1] >= 990: R.append(("pulo", ["pulo nao sai do chao"]))
 analisa("f4_pulo", c, b)
 c = plate.copy(); b = {"dante": paste_feet(c, d_f, 700, 865)}; analisa("f5_tiro", c, b)
+c = plate.copy(); b = {"dante": paste_feet(c, spr("d-crouch"), 640, 865), "luca": paste_feet(c, spr("l-crouch"), 950, 865)}; analisa("f7_agachado", c, b)
+c = plate.copy(); b = {"dante": paste_feet(c, spr("d-walkA"), 620, 865), "luca": paste_feet(c, spr("l-walkA"), 920, 865)}; analisa("f8_andada", c, b)
 c = plate.copy(); b = {"dante": paste_feet(c, d_a, 600, 880)}
 b["espectro"] = paste_feet(c, spr("e-espectro"), 1000, 780)
 b["cao"] = paste_feet(c, spr("e-cao"), 350, 840)

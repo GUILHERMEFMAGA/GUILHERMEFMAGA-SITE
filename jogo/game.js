@@ -237,21 +237,27 @@ function update(dt) {
     } else { game.shootCd = 0.3; sfx.empty(); }
   }
 
-  // Luca IA
-  l.slashCd -= dt; l.atkT -= dt;
+  // Luca IA (em modo teste as IAs podem dirigir o Luca diretamente via __LUCA_CTRL)
+  l.slashCd -= dt;
+  if (!(typeof window !== "undefined" && window.__LUCA_CTRL)) l.atkT -= dt;
   let target = null, best = 1e9;
   for (const g of game.ghosts) {
     if (g.dying) continue;
     const dist = Math.hypot(g.x - l.x, g.y - l.y);
     if (dist < best) { best = dist; target = g; }
   }
-  let tx = d.x + 150, ty = d.y;
-  if (target && best < 340) { tx = target.x; ty = target.y; }
-  const dx = tx - l.x, dy = ty - l.y, dl = Math.hypot(dx, dy) || 1;
-  l.moving = dl > 24;
-  if (dl > 24) {
-    l.x += (dx / dl) * 250 * dt; l.y += (dy / dl) * 220 * dt;
-    l.face = dx > 0 ? 1 : -1; l.step += dt * (l.moving && best < 340 ? 11 : 6);
+  if (typeof window !== "undefined" && window.__LUCA_CTRL) {
+    // dirigido pelas IAs de teste: campos moving/step/atkT/face vem de fora; so avanca step
+    if (l.moving) l.step += dt * 10;
+  } else {
+    let tx = d.x + 150, ty = d.y;
+    if (target && best < 340) { tx = target.x; ty = target.y; }
+    const dx = tx - l.x, dy = ty - l.y, dl = Math.hypot(dx, dy) || 1;
+    l.moving = dl > 24;
+    if (dl > 24) {
+      l.x += (dx / dl) * 250 * dt; l.y += (dy / dl) * 220 * dt;
+      l.face = dx > 0 ? 1 : -1; l.step += dt * (l.moving && best < 340 ? 11 : 6);
+    }
   }
   l.x = Math.max(140, Math.min(1440, l.x));
   l.y = Math.max(640, Math.min(990, l.y));
@@ -747,4 +753,10 @@ function boot() {
 }
 
 /* hook p/ pagina de testes da IA (aditivo) */
-if (typeof window !== "undefined") { window.__G = { ST, game, keys, onPress }; }
+/* Fonte unica de verdade das animacoes: bot, demo e QA iteram sobre esta lista.
+   Animacoes novas adicionadas aqui sao testadas automaticamente por todas as IAs. */
+const ANIMS = {
+  dante: ["idle", "walkA", "walkB", "runA", "runB", "runC", "runD", "jump", "crouch", "aim", "fire", "reload", "hurt"],
+  luca: ["idle", "runA", "runB", "runC", "runD", "prep", "thrust"],
+};
+if (typeof window !== "undefined") { window.__G = { ST, game, keys, onPress, anims: ANIMS, danteFrame, lucaFrame }; }

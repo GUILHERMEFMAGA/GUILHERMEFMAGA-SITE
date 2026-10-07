@@ -1,18 +1,58 @@
 {
- "tempo": 557,
- "kills": 274,
- "mortes": 4,
+ "tempo": 571,
+ "kills": 332,
+ "mortes": 2,
  "perNoite": {
-  "1": 2,
-  "2": 2
+  "1": 1,
+  "2": 1
  },
- "tiros": 206,
- "precisao": "143.7",
+ "tiros": 260,
+ "recargas": 42,
+ "precisao": "128.7",
  "pickups": 38,
- "danoRecebido": 22,
- "danoMin": "2.37",
+ "danoRecebido": 14,
+ "danoMin": "1.47",
  "venceu": true,
  "chegouBoss": true,
- "pontos": 89300,
- "tempoAteBoss": 30
+ "pontos": 100600,
+ "tempoAteBoss": 29,
+ "superior": {
+  "coberturaDante": 100,
+  "coberturaLuca": 100,
+  "spritesDante": [
+   "d-idle",
+   "d-walkA",
+   "d-walkB",
+   "d-runA",
+   "d-runB",
+   "d-runC",
+   "d-runD",
+   "d-jump",
+   "d-crouch",
+   "d-aim",
+   "d-fire",
+   "d-reload",
+   "d-hurt"
+  ],
+  "spritesLuca": [
+   "l-idle",
+   "l-runA",
+   "l-runB",
+   "l-runC",
+   "l-runD",
+   "l-prep",
+   "l-thrust"
+  ],
+  "faltamDante": [],
+  "faltamLuca": [],
+  "cantos": 4,
+  "espelhadas": 13,
+  "alcance": {
+   "xMin": 140,
+   "xMax": 1440,
+   "yMin": 640,
+   "yMax": 990
+  },
+  "animsTestadas": 20
+ }
 }

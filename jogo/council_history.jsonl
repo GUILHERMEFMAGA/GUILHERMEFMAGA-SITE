@@ -2,3 +2,11 @@
 {"nota": 79.02439024390245, "veredito": "HORRIVEL", "problemas": ["f1_idle: dante INVISIVEL no fundo (contraste 2)", "f2_corridaA: dante INVISIVEL no fundo (contraste 2)", "f3_corridaC: dante INVISIVEL no fundo (contraste 2)", "f4_pulo: dante INVISIVEL no fundo (contraste 3)", "f5_tiro: dante INVISIVEL no fundo (contraste 8)", "f6_batalha: dante INVISIVEL no fundo (contraste 7)"]}
 {"nota": 90.63829787234044, "veredito": "BOM", "problemas": []}
 {"nota": 89.52380952380955, "veredito": "BOM", "problemas": []}
+{"nota": 87.8125, "veredito": "HORRIVEL", "problemas": ["d-crouch.png: altura # != canon #", "l-crouch.png: altura # != canon #"]}
+{"nota": 90.64516129032258, "veredito": "REGULAR", "problemas": ["d-crouch.png: altura # != canon #", "l-crouch.png: altura # != canon #"]}
+{"nota": 89.83870967741936, "veredito": "REGULAR", "problemas": ["d-crouch.png: altura # != canon #", "l-crouch.png: altura # != canon #"]}
+{"nota": 89.52380952380953, "veredito": "HORRIVEL", "problemas": ["campanha invencivel"]}
+{"nota": 90.66666666666669, "veredito": "HORRIVEL", "problemas": ["campanha invencivel"]}
+{"nota": 91.6393442622951, "veredito": "REGULAR", "problemas": []}
+{"nota": 88.36065573770493, "veredito": "HORRIVEL", "problemas": ["campanha invencivel"]}
+{"nota": 92.45901639344264, "veredito": "BOM", "problemas": []}

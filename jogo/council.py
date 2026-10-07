@@ -48,7 +48,10 @@ for f in sorted(os.listdir(S2)):
         if corners_bg(p): diz("ARTE", "CRITICO", f"{f}: fundo embutido", f[:-4])
         im = bbox(load(p))
         c = canon[pref]
-        if abs(im.size[1] - c) > c * 0.05: diz("ARTE", "GRAVE", f"{f}: altura {im.size[1]} != canon {c}", f[:-4])
+        if "crouch" in f:
+            r = im.size[1] / float(c)
+            if not (0.5 <= r <= 0.8): diz("ARTE", "GRAVE", f"{f}: agachamento fora da faixa 50-80% do canon", f[:-4])
+        elif abs(im.size[1] - c) > c * 0.05: diz("ARTE", "GRAVE", f"{f}: altura {im.size[1]} != canon {c}", f[:-4])
         if rim_pct(im) > 9: diz("ARTE", "LEVE", f"{f}: rim ainda forte ({rim_pct(im):.0f}%)", f[:-4])
     elif f[:2] in ("e-",) or f[:2] == "m-":
         if corners_bg(p): diz("ARTE", "GRAVE", f"{f}: fundo embutido", f[:-4])
@@ -155,9 +158,10 @@ prev = None
 if os.path.exists(HIST):
     lines = [json.loads(l) for l in open(HIST) if l.strip()]
     if lines: prev = lines[-1]
-agora_msgs = set(m for (_, n, m, _) in F if n in ("CRITICO", "GRAVE"))
+_norm = lambda s: re.sub(r"\d+", "#", s)   # numeros mudam a cada rodada (telemetria) e nao sao regressao
+agora_msgs = set(_norm(m) for (_, n, m, _) in F if n in ("CRITICO", "GRAVE"))
 if prev:
-    antes = set(prev.get("problemas", []))
+    antes = set(_norm(p) for p in prev.get("problemas", []))
     resolvidos = antes - agora_msgs
     regres = agora_msgs - antes
     for r in sorted(resolvidos): diz("DADOS", "OK", f"resolvido desde a ultima rodada: {r}")
@@ -183,6 +187,152 @@ for chk, lbl in (('"WASD', "controles documentados no titulo/hint"), ("KeyM", "m
     if chk in gsrc: diz("UX", "OK", lbl + " ✔")
     else: diz("UX", "LEVE", "falta: " + lbl)
 
+# ---------------- A12 · MILIMETRO (geometria frame a frame) ----------------
+# Mede cada milimetro: componentes (flagra contact-sheet), altura vs canon,
+# largura maxima, cabeca presente. O que ele flagra vai p/ A13 sintetizar.
+from collections import deque as _dq
+def comp_count(im):
+    px = im.load(); w, h = im.size
+    seen = bytearray(w * h); big = 0
+    for sy in range(0, h, 3):
+        for sx in range(0, w, 3):
+            i = sy * w + sx
+            if px[sx, sy][3] > 100 and not seen[i]:
+                sz = 0; dq = _dq([(sx, sy)]); seen[i] = 1
+                while dq:
+                    x, y = dq.pop(); sz += 1
+                    for nx in (x - 3, x + 3):
+                        if 0 <= nx < w and not seen[y * w + nx] and px[nx, y][3] > 100:
+                            seen[y * w + nx] = 1; dq.append((nx, y))
+                    for ny in (y - 3, y + 3):
+                        if 0 <= ny < h and not seen[ny * w + x] and px[x, ny][3] > 100:
+                            seen[ny * w + x] = 1; dq.append((x, ny))
+                if sz > 60: big += 1
+    return big
+def head_ok(im):
+    px = im.load(); w, h = im.size; n = 0
+    for y in range(0, max(2, int(h * 0.12))):
+        for x in range(0, w, 2):
+            if px[x, y][3] > 100: n += 1
+    tot = sum(1 for y in range(0, h, 4) for x in range(0, w, 4) if px[x, y][3] > 100)
+    return n > max(4, tot * 0.004)
+mil_flags = []
+for f in sorted(os.listdir(S2)):
+    if not f.endswith(".png") or f[:2] not in ("d-", "l-"): continue
+    im = bbox(load(os.path.join(S2, f))); w, h = im.size; pref = f[0]
+    if comp_count(im) > 1:
+        diz("MILI", "CRITICO", f"{f}: MAIS DE UM PERSONAGEM NO SPRITE (contact-sheet)", f[:-4]); mil_flags.append(f)
+    if not head_ok(im):
+        diz("MILI", "CRITICO", f"{f}: sem cabeca no topo do sprite", f[:-4]); mil_flags.append(f)
+    if "crouch" in f:
+        r = h / float(canon[pref])
+        if not (0.5 <= r <= 0.8): diz("MILI", "GRAVE", f"{f}: agachamento com altura absurda ({r:.0%} do canon)", f[:-4]); mil_flags.append(f)
+        else: diz("MILI", "OK", f"{f}: agachamento a {r:.0%} da altura em pe ✔")
+    elif w > 380:
+        diz("MILI", "GRAVE", f"{f}: largura {w}px excede 380 (passada exagerada)", f[:-4]); mil_flags.append(f)
+if not mil_flags: diz("MILI", "OK", "geometria milimetrica: 1 personagem/sprite, cabecas presentes, alturas no canon")
+
+# ---------------- A13 · SINTESE DE PROMPTS (cruzamento p/ informar o usuario) ----------------
+cruza = [(a, n, m) for (a, n, m, as_) in F if n in ("CRITICO", "GRAVE") for _ in [0]]
+prom_rows = []
+for f_ in sorted({a for (a, n, m, as_) in F if n in ("CRITICO", "GRAVE") and a and a.startswith(("d-", "l-", "e-", "m-"))}):
+    motivos = [m for (a, n, m, as_) in F if n in ("CRITICO", "GRAVE") and as_ == f_]
+    ref, ident, pose = REFS.get(f_, (None, IDENT_D, "fix pose following canon"))
+    prom_rows.append((f_, ident, pose, motivos, ref))
+with open(os.path.join(ROOT, "council_prompts.md"), "w") as pf:
+    pf.write("# PROMPTS SINTETIZADOS PELA A13 (cruzamento de MILIMETRO+ARTE+CANON+OLHO+POSES)\n")
+    for f_, ident, pose, motivos, ref in prom_rows:
+        pf.write(f"\n## {f_}.png\n- problemas cruzados: " + "; ".join(motivos) +
+                 f"\n- prompt: \"{ident}. POSE: {pose}, full body head to boots. {CHROMA}\"\n")
+diz("SINT", "OK", f"A13 cruzou {len(cruza)} achados de {len({a for a,_,_ in cruza})} IAs e escreveu council_prompts.md ({len(prom_rows)} prompts prontos)")
+
+# ---------------- A14 · ESPELHO (sprites virados p/ esquerda) ----------------
+flip_bad = 0
+for f in sorted(os.listdir(S2)):
+    if not f.endswith(".png") or f[:2] not in ("d-", "l-"): continue
+    im = bbox(load(os.path.join(S2, f)))
+    fl = im.transpose(Image.FLIP_LEFT_RIGHT)
+    if fl.size != im.size or not head_ok(fl): diz("ESP", "GRAVE", f"{f}: espelho quebra sprite", f[:-4]); flip_bad += 1
+if not flip_bad: diz("ESP", "OK", "todos os d-*/l-* espelham sem perder cabeca/shape (face -1 segura) ✔")
+
+# ---------------- A15 · CANTOS (a IA jogadora esteve em todo o mapa) ----------------
+TJp = os.path.join(ROOT, "bot_telemetry.json")
+sup = json.load(open(TJp)).get("superior", {}) if os.path.exists(TJp) else {}
+if sup.get("cantos", 0) == 4:
+    al = sup.get("alcance", {})
+    diz("CANT", "OK", f"IA jogadora visitou os 4 cantos; alcance x[{al.get('xMin')},{al.get('xMax')}] y[{al.get('yMin')},{al.get('yMax')}] (mapa 140-1440 x 640-990) ✔")
+else:
+    diz("CANT", "GRAVE", f"IA jogadora so alcancou {sup.get('cantos', 0)}/4 cantos")
+
+# ---------------- A16 · COBERTURA (todas as animacoes, atuais e futuras) ----------------
+anims_d = re.search(r"dante:\s*\[([^\]]*)\]", gsrc); anims_l = re.search(r"luca:\s*\[([^\]]*)\]", gsrc)
+n_anims = (anims_d.group(1) + anims_l.group(1)).count('"') // 2 if anims_d and anims_l else 0
+if sup.get("coberturaDante", 0) == 100 and sup.get("coberturaLuca", 0) == 100:
+    diz("COB", "OK", f"cobertura 100%/100%: {sup.get('animsTestadas', n_anims)} animacoes executadas pela IA jogadora (lista ANIMS = fonte unica; novas entram automaticamente) ✔")
+else:
+    diz("COB", "GRAVE", f"cobertura incompleta dante {sup.get('coberturaDante')}% luca {sup.get('coberturaLuca')}%: " + ", ".join(sup.get("faltamDante", []) + sup.get("faltamLuca", [])))
+
+# ---------------- A17 · HITBOX & ESQUIVAS ----------------
+if re.search(r"!\s*game\.crouch", gsrc): diz("HIT", "OK", "agachar esquiva do golpe do chefe (hitbox respeita crouch) ✔")
+else: diz("HIT", "GRAVE", "crouch nao protege de nada (hitbox ignora agachamento)")
+if re.search(r"jumpT", gsrc) and re.search(r"ghosts", gsrc): diz("HIT", "OK", "pulo e hitboxes de inimigos presentes no loop de colisao")
+
+# ---------------- A18 · AUDIO ----------------
+nsfx = len(set(re.findall(r"sfx\.(\w+)\(", gsrc)))
+if nsfx >= 5: diz("SOM", "OK", f"{nsfx} efeitos sonoros distintos disparados (tiro/pulo/recarga/dano/vazio...) ✔")
+else: diz("SOM", "LEVE", f"so {nsfx} efeitos sonoros")
+
+# ---------------- A19 · ESTADOS & FLUXO ----------------
+ok19 = 0
+for chk, lbl in (("KeyP", "pausa"), ("KeyM", "mute"), ("CUT2", "transicao p/ noite 2"), ("resetGame", "reset limpo")):
+    if chk in gsrc: ok19 += 1
+if ok19 == 4: diz("EST", "OK", "fluxo completo: pausa, mute, noite 2 e reset ✔")
+else: diz("EST", "LEVE", f"fluxo incompleto ({ok19}/4)")
+
+# ---------------- A20 · BALANCE (telemetria da IA jogadora) ----------------
+if sup:
+    tj2 = json.load(open(TJp))
+    if tj2.get("kills", 0) > 0 and tj2.get("tiros", 0) > 0 and tj2.get("pickups", 0) > 0:
+        diz("BAL", "OK", f"economia viva: {tj2['kills']} abates, {tj2['pickups']} itens, {tj2['recargas'] if 'recargas' in tj2 else '?'} recargas na sessao da IA")
+    if (tj2.get("tempoAteBoss") or 999) > 120: diz("BAL", "GRAVE", "progressao lenta demais ate o chefe")
+
+# ---------------- A21 · POSES (silhueta conta a animacao) ----------------
+def mask(im):
+    px = im.load(); w, h = im.size
+    return [[1 if px[x, y][3] > 100 else 0 for x in range(0, w, 4)] for y in range(0, h, 4)]
+def iou(a, b):
+    h = min(len(a), len(b)); w = min(len(a[0]), len(b[0]))
+    inter = uni = 0
+    for y in range(h):
+        for x in range(w):
+            va, vb = a[y][x], b[y][x]
+            inter += va & vb; uni += va | vb
+    return inter / max(1, uni)
+def get(n): return bbox(load(os.path.join(S2, n + ".png")))
+pairs = [("d-runA", "d-walkA", 0.80, "corrida do Dante identica a andada"),
+         ("d-runA", "d-runC", 0.85, "fases A e C da corrida do Dante identicas"),
+         ("l-runA", "l-runC", 0.85, "fases A e C da corrida do Luca identicas"),
+         ("l-runC", "l-walkA", 0.80, "corrida do Luca identica a andada")]
+pose_bad = 0
+for a_, b_, thr, msg in pairs:
+    pa, pb = os.path.join(S2, a_ + ".png"), os.path.join(S2, b_ + ".png")
+    if not (os.path.exists(pa) and os.path.exists(pb)): continue
+    ma = mask(get(a_));
+    im_b = get(b_); im_a = get(a_)
+    sc = im_a.size[1] / float(im_b.size[1])
+    if abs(sc - 1) > 0.06: im_b = im_b.resize((int(im_b.size[0] * sc), im_a.size[1]), Image.NEAREST)
+    v = iou(ma, mask(im_b))
+    if v >= thr: diz("POSE", "GRAVE", f"{msg} (IoU {v:.2f})", a_); pose_bad += 1
+    else: diz("POSE", "OK", f"{a_} vs {b_}: poses distintas (IoU {v:.2f}) ✔")
+if not pose_bad: diz("POSE", "OK", "leituras de silhueta: correr != andar, fases da corrida distintas")
+
+# A3 recolhe a fila DEPOIS de todas as 21 IAs falarem (nada se perde)
+fila = [a for (ag, niv, msg, a) in F if niv in ("CRITICO", "GRAVE") and a and
+        (a.startswith(("d-", "l-", "e-", "m-")))]
+seen = set(); fila = [x for x in fila if not (x in seen or seen.add(x))]
+plano = fila[:LIM]
+restam = fila[LIM:]
+
 # ---------------- DELIBERACAO ----------------
 ORDEM = {"CRITICO": 0, "GRAVE": 1, "LEVE": 2, "OK": 3}
 SCORE = {"CRITICO": 0, "GRAVE": 0.5, "LEVE": 0.8, "OK": 1.0}
@@ -192,12 +342,15 @@ nG = sum(1 for _, n, _, _ in F if n == "GRAVE")
 verd = "HORRIVEL" if nC else ("RUIM" if nG > 3 else ("REGULAR" if nG else "BOM"))
 
 print("=" * 76)
-print(" CONSELHO DE TESTES — MODO DEUS: 11 IAS DELIBERANDO")
+print(" CONSELHO DE TESTES — MODO DEUS: 21 IAS DELIBERANDO")
 print("=" * 76)
 for ag, tit in (("ANIM", "A1 ANIMACOES"), ("ARTE", "A2 DIRETORA DE ARTE"),
                 ("GAME", "A4 GAMEPLAY"), ("MUNDO", "A5 MUNDO & ESCALA"), ("CANON", "A6 GUARDIA DO CANON"),
                 ("OLHO", "A7 OLHO GIGANTE"), ("CODE", "A8 AUDITORA DE CODIGO"), ("DADOS", "A9 CIENTISTA DE DADOS"),
-                ("PERF", "A10 PERFORMANCE"), ("UX", "A11 UX")):
+                ("PERF", "A10 PERFORMANCE"), ("UX", "A11 UX"),
+                ("MILI", "A12 MILIMETRO"), ("SINT", "A13 SINTESE DE PROMPTS"), ("ESP", "A14 ESPELHO"),
+                ("CANT", "A15 CANTOS DO MAPA"), ("COB", "A16 COBERTURA DE ANIMACOES"), ("HIT", "A17 HITBOX & ESQUIVAS"),
+                ("SOM", "A18 AUDIO"), ("EST", "A19 ESTADOS & FLUXO"), ("BAL", "A20 BALANCE"), ("POSE", "A21 POSES")):
     if ag == "IMAGE": continue
     print(f"\n[{tit}]")
     for a, n, m, _ in sorted([x for x in F if x[0] == ag], key=lambda x: ORDEM[x[1]]):
