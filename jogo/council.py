@@ -309,9 +309,17 @@ def iou(a, b):
             inter += va & vb; uni += va | vb
     return inter / max(1, uni)
 def get(n): return bbox(load(os.path.join(S2, n + ".png")))
-pairs = [("d-runA", "d-walkA", 0.80, "corrida do Dante identica a andada"),
-         ("d-runA", "d-runC", 0.85, "fases A e C da corrida do Dante identicas"),
-         ("l-runA", "l-runC", 0.85, "fases A e C da corrida do Luca identicas"),
+# fases adjacentes do ciclo precisam diferir (estendida vs passagem);
+# A vs C sao fases espelhadas do mesmo gesto => parecidas por natureza, nao contar.
+pairs = [("d-runA", "d-runB", 0.80, "corrida do Dante nao anima (A==B)"),
+         ("d-runB", "d-runC", 0.80, "corrida do Dante nao anima (B==C)"),
+         ("d-runC", "d-runD", 0.80, "corrida do Dante nao anima (C==D)"),
+         ("d-runD", "d-runA", 0.80, "corrida do Dante nao anima (D==A)"),
+         ("l-runA", "l-runB", 0.80, "corrida do Luca nao anima (A==B)"),
+         ("l-runB", "l-runC", 0.80, "corrida do Luca nao anima (B==C)"),
+         ("l-runC", "l-runD", 0.80, "corrida do Luca nao anima (C==D)"),
+         ("l-runD", "l-runA", 0.80, "corrida do Luca nao anima (D==A)"),
+         ("d-runA", "d-walkA", 0.80, "corrida do Dante identica a andada"),
          ("l-runC", "l-walkA", 0.80, "corrida do Luca identica a andada")]
 pose_bad = 0
 for a_, b_, thr, msg in pairs:
