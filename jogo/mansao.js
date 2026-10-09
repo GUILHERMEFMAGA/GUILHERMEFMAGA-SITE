@@ -43,6 +43,7 @@
   };
 
   // Pontos de interesse na propriedade
+  const P_CHECKPOINT = { x: (MG + 14 * PITCH + ROAD) * T + 90, y: (MG + 2 * PITCH + ROAD + 10) * T }; // Posto do Segurança Principal na entrada da estrada
   const P_MANSAO = { x: estate.cx, y: (ty0 + 10) * T + 20 };       // Porta principal da Mansão
   const P_FONTE = { x: estate.cx, y: (ty0 + 14) * T };             // Pátio da Fonte Central
   const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 30 }; // Portão Principal / Guaritas
@@ -53,7 +54,7 @@
   const P_HELI = { x: estate.cx - 190, y: (ty0 + 13) * T };        // Heliponto Privativo
 
   M.estate = estate;
-  M.pontos = { P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };
+  M.pontos = { P_CHECKPOINT, P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };
 
   // ---------- ESTADO GLOBAL DA MANSÃO (salvo ou dinâmico) ----------
   M.estado = {
@@ -85,42 +86,34 @@
 
   // ---------- SEGURANÇA ESTRATÉGICA PERIMETRAL (LONGE DA CASA, SEM AMONTOAR) ----------
   const GUARDAS_POS = [
-    // 1. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros)
+    // 1. Posto de Bloqueio da Estrada Única (Capitão Salvatore - Segurança Principal)
+    { x: P_CHECKPOINT.x, y: P_CHECKPOINT.y - 25, h: 0, tag: 'capitao_salvatore', arma: 'smg', fala: 'Don Guilherme! Bloqueio 100% ativo. Nenhum carro civil ou policial passa por esta estrada!' },
+    { x: P_CHECKPOINT.x - 35, y: P_CHECKPOINT.y + 25, h: 0.2, tag: 'bloqueio_guarda_1', arma: 'shotgun', fala: 'Acesso liberado apenas para o Don e sua comitiva.' },
+    { x: P_CHECKPOINT.x + 35, y: P_CHECKPOINT.y + 25, h: -0.2, tag: 'bloqueio_guarda_2', arma: 'shotgun', fala: 'Estrada particular monitorada 24 horas por dia.' },
+
+    // 2. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros da propriedade)
     { x: estate.x0 + 40, y: estate.y0 + 40, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
     { x: estate.x0 + estate.w - 40, y: estate.y0 + 40, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' },
     { x: estate.x0 + 40, y: estate.y0 + estate.h - 40, h: 3 * Math.PI / 4, tag: 'torre_so', arma: 'sniper' },
     { x: estate.x0 + estate.w - 40, y: estate.y0 + estate.h - 40, h: -3 * Math.PI / 4, tag: 'torre_se', arma: 'sniper' },
 
-    // 2. Posto de Controle da Estrada Sul (Guaritas e Bloqueio Rodoviário Distante)
-    { x: P_PORTAO.x - 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_e', arma: 'smg' },
-    { x: P_PORTAO.x + 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_d', arma: 'smg' },
-    { x: P_PORTAO.x - 130, y: P_PORTAO.y + 35, h: 0.1, tag: 'estrada_bloqueio_e', arma: 'shotgun' },
-    { x: P_PORTAO.x + 130, y: P_PORTAO.y + 35, h: -0.1, tag: 'estrada_bloqueio_d', arma: 'shotgun' },
-
-    // 3. Patrulhas Distantes nos Muros Laterais Externos
-    { x: estate.x0 + 35, y: estate.cy - 140, h: Math.PI / 2, tag: 'patrulha_oeste_1', arma: 'smg' },
-    { x: estate.x0 + 35, y: estate.cy + 140, h: Math.PI / 2, tag: 'patrulha_oeste_2', arma: 'smg' },
-    { x: estate.x0 + estate.w - 35, y: estate.cy - 140, h: -Math.PI / 2, tag: 'patrulha_leste_1', arma: 'smg' },
-    { x: estate.x0 + estate.w - 35, y: estate.cy + 140, h: -Math.PI / 2, tag: 'patrulha_leste_2', arma: 'smg' },
-
-    // 4. Instalações Externas Afastadas
+    // 3. Instalações Externas Afastadas
     { x: P_HELI.x - 45, y: P_HELI.y - 25, h: 0.8, tag: 'guarda_heli', arma: 'smg' },
     { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y + 40, h: -0.5, tag: 'guarda_golfe', arma: 'pistol' },
     { x: P_PISCINA.x + 65, y: P_PISCINA.y + 40, h: -0.8, tag: 'guarda_piscina', arma: 'pistol' },
 
-    // 5. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
+    // 4. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
     { x: P_MANSAO.x - 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_e', arma: 'pistol' },
     { x: P_MANSAO.x + 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_d', arma: 'pistol' }
   ];
 
   // ---------- CÃES DE GUARDA (PATRULHA EXCLUSIVA NO PERÍMETRO EXTERNO) ----------
   const CAES_POS = [
+    { x: P_CHECKPOINT.x - 65, y: P_CHECKPOINT.y - 20, ang: 0, r: 25, latT: 0, nome: 'Cerberus (Guarda da Estrada)' },
     { x: estate.x0 + 50, y: estate.cy - 80, ang: 1.5, r: 35, latT: 0, nome: 'Brutus' },
     { x: estate.x0 + 50, y: estate.cy + 80, ang: 1.5, r: 35, latT: 0, nome: 'Titan' },
     { x: estate.x0 + estate.w - 50, y: estate.cy - 80, ang: -1.5, r: 35, latT: 0, nome: 'Nero' },
-    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' },
-    { x: P_PORTAO.x - 105, y: P_PORTAO.y - 25, ang: 0, r: 25, latT: 0, nome: 'Rex' },
-    { x: P_PORTAO.x + 105, y: P_PORTAO.y - 25, ang: Math.PI, r: 25, latT: 0, nome: 'Apolo' }
+    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' }
   ];
 
   // Falas dos seguranças da máfia

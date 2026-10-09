@@ -51,6 +51,68 @@
     const ax = Math.max(m.x, x0), ay = Math.max(m.y, y0), bx = Math.min(m.x + m.w, x1), by = Math.min(m.y + m.h, y1);
     if (bx <= ax || by <= ay) return;
     ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(ax, ay, bx - ax, by - ay);
+
+    // Se for o Domínio Aberto do Chefão: puro campo aberto sem floresta, sem agricultura e com a estrada única
+    if (m.aberto || m.id === 'campos_chefao') {
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      for (let yy = Math.floor(ay / 32) * 32; yy <= by; yy += 32) {
+        if ((Math.floor(yy / 32)) % 2 === 0) ctx.fillRect(ax, yy, bx - ax, 32);
+      }
+
+      // Desenho da Estrada Única Particular da Mansão do Chefão (de bx=14 até bx=24)
+      const PR_Y = (6 + 2 * 28 + 8 + 10) * 32; // y = 2560 (linha de acesso nobre)
+      const PR_X0 = (6 + 14 * 28 + 8) * 32;    // x = 13056 (entrada do domínio)
+      const PR_X1 = (6 + 24 * 28 + 8 + 10) * 32; // x = 22272 (mansão)
+      const PR_W = PR_X1 - PR_X0;
+
+      if (PR_X1 >= ax && PR_X0 <= bx && PR_Y + 64 >= ay && PR_Y - 64 <= by) {
+        ctx.save();
+        // Asfalto nobre escuro da estrada privativa
+        ctx.fillStyle = '#22252e';
+        ctx.fillRect(PR_X0, PR_Y - 48, PR_W, 96);
+        // Guias de mármore claro nas bordas
+        ctx.fillStyle = '#dfd8c8';
+        ctx.fillRect(PR_X0, PR_Y - 50, PR_W, 3);
+        ctx.fillRect(PR_X0, PR_Y + 47, PR_W, 3);
+        // Linha tracejada dourada / amarela no centro
+        ctx.fillStyle = '#ffd54f';
+        for (let xx = PR_X0 + 20; xx < PR_X1 - 20; xx += 80) {
+          ctx.fillRect(xx, PR_Y - 2, 48, 4);
+        }
+        // Postes de iluminação dourados ao longo da estrada
+        for (let xx = PR_X0 + 60; xx < PR_X1 - 40; xx += 160) {
+          ctx.fillStyle = '#37474f'; ctx.fillRect(xx - 2, PR_Y - 56, 4, 7);
+          ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(xx, PR_Y - 58, 3, 0, TAU); ctx.fill();
+        }
+
+        // Posto de Segurança Principal e Bloqueio na Entrada da Estrada (bx=14)
+        const ckX = PR_X0 + 90;
+        // Cabine blindada de controle do Capitão Salvatore
+        ctx.fillStyle = '#1c1f26';
+        ctx.fillRect(ckX - 35, PR_Y - 90, 70, 36);
+        ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 1.8;
+        ctx.strokeRect(ckX - 35, PR_Y - 90, 70, 36);
+        // Vidros fumê blindados
+        ctx.fillStyle = '#42a5f5'; ctx.fillRect(ckX - 25, PR_Y - 82, 50, 12);
+        // Barricada de concreto com listras de bloqueio rodoviário
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(ckX + 45, PR_Y - 44, 18, 88);
+        ctx.fillStyle = '#ffd600';
+        for (let yy = PR_Y - 44; yy < PR_Y + 44; yy += 16) {
+          ctx.fillRect(ckX + 45, yy, 18, 8);
+        }
+        // Placa Monumental de Bloqueio Rodoviário
+        ctx.fillStyle = '#111215';
+        ctx.fillRect(ckX - 140, PR_Y + 54, 280, 22);
+        ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 2;
+        ctx.strokeRect(ckX - 140, PR_Y + 54, 280, 22);
+        ctx.fillStyle = '#ff5252'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('🛑 DOMÍNIO PRIVADO DO PODEROSO CHEFÃO — ENTRADA PROIBIDA A CIVIS E POLÍCIA 🛑', ckX, PR_Y + 68);
+        ctx.restore();
+      }
+      return;
+    }
+
     ctx.fillStyle = 'rgba(5,32,12,0.52)'; ctx.fillRect(ax, ay, bx - ax, by - ay);
     const cs = 128, sd = m.id.length * 131 + m.bx0;
     for (let gy = Math.floor(ay / cs); gy <= Math.floor(by / cs); gy++) for (let gx = Math.floor(ax / cs); gx <= Math.floor(bx / cs); gx++) {

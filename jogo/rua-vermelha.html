@@ -877,6 +877,68 @@
     const ax = Math.max(m.x, x0), ay = Math.max(m.y, y0), bx = Math.min(m.x + m.w, x1), by = Math.min(m.y + m.h, y1);
     if (bx <= ax || by <= ay) return;
     ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(ax, ay, bx - ax, by - ay);
+
+    // Se for o Domínio Aberto do Chefão: puro campo aberto sem floresta, sem agricultura e com a estrada única
+    if (m.aberto || m.id === 'campos_chefao') {
+      ctx.fillStyle = 'rgba(255,255,255,0.03)';
+      for (let yy = Math.floor(ay / 32) * 32; yy <= by; yy += 32) {
+        if ((Math.floor(yy / 32)) % 2 === 0) ctx.fillRect(ax, yy, bx - ax, 32);
+      }
+
+      // Desenho da Estrada Única Particular da Mansão do Chefão (de bx=14 até bx=24)
+      const PR_Y = (6 + 2 * 28 + 8 + 10) * 32; // y = 2560 (linha de acesso nobre)
+      const PR_X0 = (6 + 14 * 28 + 8) * 32;    // x = 13056 (entrada do domínio)
+      const PR_X1 = (6 + 24 * 28 + 8 + 10) * 32; // x = 22272 (mansão)
+      const PR_W = PR_X1 - PR_X0;
+
+      if (PR_X1 >= ax && PR_X0 <= bx && PR_Y + 64 >= ay && PR_Y - 64 <= by) {
+        ctx.save();
+        // Asfalto nobre escuro da estrada privativa
+        ctx.fillStyle = '#22252e';
+        ctx.fillRect(PR_X0, PR_Y - 48, PR_W, 96);
+        // Guias de mármore claro nas bordas
+        ctx.fillStyle = '#dfd8c8';
+        ctx.fillRect(PR_X0, PR_Y - 50, PR_W, 3);
+        ctx.fillRect(PR_X0, PR_Y + 47, PR_W, 3);
+        // Linha tracejada dourada / amarela no centro
+        ctx.fillStyle = '#ffd54f';
+        for (let xx = PR_X0 + 20; xx < PR_X1 - 20; xx += 80) {
+          ctx.fillRect(xx, PR_Y - 2, 48, 4);
+        }
+        // Postes de iluminação dourados ao longo da estrada
+        for (let xx = PR_X0 + 60; xx < PR_X1 - 40; xx += 160) {
+          ctx.fillStyle = '#37474f'; ctx.fillRect(xx - 2, PR_Y - 56, 4, 7);
+          ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(xx, PR_Y - 58, 3, 0, TAU); ctx.fill();
+        }
+
+        // Posto de Segurança Principal e Bloqueio na Entrada da Estrada (bx=14)
+        const ckX = PR_X0 + 90;
+        // Cabine blindada de controle do Capitão Salvatore
+        ctx.fillStyle = '#1c1f26';
+        ctx.fillRect(ckX - 35, PR_Y - 90, 70, 36);
+        ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 1.8;
+        ctx.strokeRect(ckX - 35, PR_Y - 90, 70, 36);
+        // Vidros fumê blindados
+        ctx.fillStyle = '#42a5f5'; ctx.fillRect(ckX - 25, PR_Y - 82, 50, 12);
+        // Barricada de concreto com listras de bloqueio rodoviário
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(ckX + 45, PR_Y - 44, 18, 88);
+        ctx.fillStyle = '#ffd600';
+        for (let yy = PR_Y - 44; yy < PR_Y + 44; yy += 16) {
+          ctx.fillRect(ckX + 45, yy, 18, 8);
+        }
+        // Placa Monumental de Bloqueio Rodoviário
+        ctx.fillStyle = '#111215';
+        ctx.fillRect(ckX - 140, PR_Y + 54, 280, 22);
+        ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 2;
+        ctx.strokeRect(ckX - 140, PR_Y + 54, 280, 22);
+        ctx.fillStyle = '#ff5252'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('🛑 DOMÍNIO PRIVADO DO PODEROSO CHEFÃO — ENTRADA PROIBIDA A CIVIS E POLÍCIA 🛑', ckX, PR_Y + 68);
+        ctx.restore();
+      }
+      return;
+    }
+
     ctx.fillStyle = 'rgba(5,32,12,0.52)'; ctx.fillRect(ax, ay, bx - ax, by - ay);
     const cs = 128, sd = m.id.length * 131 + m.bx0;
     for (let gy = Math.floor(ay / cs); gy <= Math.floor(by / cs); gy++) for (let gx = Math.floor(ax / cs); gx <= Math.floor(bx / cs); gx++) {
@@ -1234,8 +1296,9 @@
   const URB = new Uint8Array((COLS + 1) * (ROWS + 1));
   CIDADES.forEach(c => { if (!c.urb) return; for (let i = c.urb[0]; i <= c.urb[1] + 1; i++) for (let j = c.urb[2]; j <= c.urb[3] + 1; j++) URB[j * (COLS + 1) + i] = 1; });
   const urbano = (i, j) => i >= 0 && j >= 0 && i <= COLS && j <= ROWS && URB[j * (COLS + 1) + i] === 1;
-  // florestas gigantes: as ruas de dentro NÃO existem (só a rodovia e as ruas das bordas)
+  // domínios gigantes: as ruas de dentro NÃO existem (só a estrada particular e rodovias externas)
   const MEGAS = [
+    { id: 'campos_chefao', nome: 'DOMÍNIO DO PODEROSO CHEFÃO', bx0: 14, bx1: 33, by0: 0, by1: 9, aberto: true },
     { id: 'gav1', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 0, by1: 4 },
     { id: 'gav2', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 5, by1: 9 }
   ];
@@ -1247,11 +1310,15 @@
     for (let j = m.by0 + 1; j <= m.by1; j++) for (let s = m.bx0; s <= m.bx1; s++) semH[j * COLS + s] = 1;
     for (let i = m.bx0 + 1; i <= m.bx1; i++) for (let s = m.by0; s <= m.by1; s++) semV[i * ROWS + s] = 1;
   });
+  // Define os tiles de asfalto da Estrada Única Particular da Mansão (de bx=14 até bx=24)
+  setRect(MG + 14 * PITCH + ROAD, MG + 2 * PITCH + ROAD + 8, (24 - 14) * PITCH + 10, 4, TILE.ROAD);
+
   const viaH = (j, s) => !(j >= 0 && j <= ROWS && s >= 0 && s < COLS && semH[j * COLS + s]);   // existe a rua horizontal j entre os cruzamentos s e s+1?
   const viaV = (i, s) => !(i >= 0 && i <= COLS && s >= 0 && s < ROWS && semV[i * ROWS + s]);   // idem para a rua vertical i entre s e s+1
   const megaDe = (bx, by) => MEGAS.find(m => bx >= m.bx0 && bx <= m.bx1 && by >= m.by0 && by <= m.by1);
   // estradas de terra que cortam as florestas (no lugar das ruas apagadas)
   MEGAS.forEach(m => {
+    if (m.aberto) return; // Campos do Chefão usam a estrada única pavimentada de asfalto nobre
     const nj = m.by0 === 0 ? 2 : 7, mid = [45];
     const yy = (MG + nj * PITCH + ROAD / 2) * T;
     trilhas.push({ x: m.x, y: yy - 1.5 * T, w: m.w, h: 3 * T, mega: m.id, eixo: 'h' });
@@ -1272,6 +1339,7 @@
     if (RIVERS.includes(bx)) return 'river';
     if (bx === 24 && by === 2) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
+    if (c.id === 'campos_chefao') return 'campo_aberto'; // Vasto campo aberto sem floresta e sem agricultura
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';
     if (c.tipo === 'campo' || !dentroUrb(c, bx, by)) return ruralKind(bx, by);
@@ -1514,6 +1582,11 @@
     }
     for (let k = 0; k < 4; k++) { const a = 1.5 + rr() * 17; trees.push({ x: (tx + a) * T, y: (ty + 0.7) * T, r: 14 + rr() * 5 }); }
   };
+  // ----- campos abertos do poderoso chefão (sem floresta, sem agricultura) -----
+  BUILDERS.campo_aberto = blk => {
+    setRect(blk.tx, blk.ty, BLOCK, BLOCK, TILE.GRASS);
+  };
+
   // ----- mansão do poderoso chefão: quartel-general da máfia -----
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
@@ -12220,6 +12293,7 @@
   };
 
   // Pontos de interesse na propriedade
+  const P_CHECKPOINT = { x: (MG + 14 * PITCH + ROAD) * T + 90, y: (MG + 2 * PITCH + ROAD + 10) * T }; // Posto do Segurança Principal na entrada da estrada
   const P_MANSAO = { x: estate.cx, y: (ty0 + 10) * T + 20 };       // Porta principal da Mansão
   const P_FONTE = { x: estate.cx, y: (ty0 + 14) * T };             // Pátio da Fonte Central
   const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 30 }; // Portão Principal / Guaritas
@@ -12230,7 +12304,7 @@
   const P_HELI = { x: estate.cx - 190, y: (ty0 + 13) * T };        // Heliponto Privativo
 
   M.estate = estate;
-  M.pontos = { P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };
+  M.pontos = { P_CHECKPOINT, P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };
 
   // ---------- ESTADO GLOBAL DA MANSÃO (salvo ou dinâmico) ----------
   M.estado = {
@@ -12262,42 +12336,34 @@
 
   // ---------- SEGURANÇA ESTRATÉGICA PERIMETRAL (LONGE DA CASA, SEM AMONTOAR) ----------
   const GUARDAS_POS = [
-    // 1. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros)
+    // 1. Posto de Bloqueio da Estrada Única (Capitão Salvatore - Segurança Principal)
+    { x: P_CHECKPOINT.x, y: P_CHECKPOINT.y - 25, h: 0, tag: 'capitao_salvatore', arma: 'smg', fala: 'Don Guilherme! Bloqueio 100% ativo. Nenhum carro civil ou policial passa por esta estrada!' },
+    { x: P_CHECKPOINT.x - 35, y: P_CHECKPOINT.y + 25, h: 0.2, tag: 'bloqueio_guarda_1', arma: 'shotgun', fala: 'Acesso liberado apenas para o Don e sua comitiva.' },
+    { x: P_CHECKPOINT.x + 35, y: P_CHECKPOINT.y + 25, h: -0.2, tag: 'bloqueio_guarda_2', arma: 'shotgun', fala: 'Estrada particular monitorada 24 horas por dia.' },
+
+    // 2. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros da propriedade)
     { x: estate.x0 + 40, y: estate.y0 + 40, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
     { x: estate.x0 + estate.w - 40, y: estate.y0 + 40, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' },
     { x: estate.x0 + 40, y: estate.y0 + estate.h - 40, h: 3 * Math.PI / 4, tag: 'torre_so', arma: 'sniper' },
     { x: estate.x0 + estate.w - 40, y: estate.y0 + estate.h - 40, h: -3 * Math.PI / 4, tag: 'torre_se', arma: 'sniper' },
 
-    // 2. Posto de Controle da Estrada Sul (Guaritas e Bloqueio Rodoviário Distante)
-    { x: P_PORTAO.x - 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_e', arma: 'smg' },
-    { x: P_PORTAO.x + 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_d', arma: 'smg' },
-    { x: P_PORTAO.x - 130, y: P_PORTAO.y + 35, h: 0.1, tag: 'estrada_bloqueio_e', arma: 'shotgun' },
-    { x: P_PORTAO.x + 130, y: P_PORTAO.y + 35, h: -0.1, tag: 'estrada_bloqueio_d', arma: 'shotgun' },
-
-    // 3. Patrulhas Distantes nos Muros Laterais Externos
-    { x: estate.x0 + 35, y: estate.cy - 140, h: Math.PI / 2, tag: 'patrulha_oeste_1', arma: 'smg' },
-    { x: estate.x0 + 35, y: estate.cy + 140, h: Math.PI / 2, tag: 'patrulha_oeste_2', arma: 'smg' },
-    { x: estate.x0 + estate.w - 35, y: estate.cy - 140, h: -Math.PI / 2, tag: 'patrulha_leste_1', arma: 'smg' },
-    { x: estate.x0 + estate.w - 35, y: estate.cy + 140, h: -Math.PI / 2, tag: 'patrulha_leste_2', arma: 'smg' },
-
-    // 4. Instalações Externas Afastadas
+    // 3. Instalações Externas Afastadas
     { x: P_HELI.x - 45, y: P_HELI.y - 25, h: 0.8, tag: 'guarda_heli', arma: 'smg' },
     { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y + 40, h: -0.5, tag: 'guarda_golfe', arma: 'pistol' },
     { x: P_PISCINA.x + 65, y: P_PISCINA.y + 40, h: -0.8, tag: 'guarda_piscina', arma: 'pistol' },
 
-    // 5. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
+    // 4. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
     { x: P_MANSAO.x - 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_e', arma: 'pistol' },
     { x: P_MANSAO.x + 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_d', arma: 'pistol' }
   ];
 
   // ---------- CÃES DE GUARDA (PATRULHA EXCLUSIVA NO PERÍMETRO EXTERNO) ----------
   const CAES_POS = [
+    { x: P_CHECKPOINT.x - 65, y: P_CHECKPOINT.y - 20, ang: 0, r: 25, latT: 0, nome: 'Cerberus (Guarda da Estrada)' },
     { x: estate.x0 + 50, y: estate.cy - 80, ang: 1.5, r: 35, latT: 0, nome: 'Brutus' },
     { x: estate.x0 + 50, y: estate.cy + 80, ang: 1.5, r: 35, latT: 0, nome: 'Titan' },
     { x: estate.x0 + estate.w - 50, y: estate.cy - 80, ang: -1.5, r: 35, latT: 0, nome: 'Nero' },
-    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' },
-    { x: P_PORTAO.x - 105, y: P_PORTAO.y - 25, ang: 0, r: 25, latT: 0, nome: 'Rex' },
-    { x: P_PORTAO.x + 105, y: P_PORTAO.y - 25, ang: Math.PI, r: 25, latT: 0, nome: 'Apolo' }
+    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' }
   ];
 
   // Falas dos seguranças da máfia

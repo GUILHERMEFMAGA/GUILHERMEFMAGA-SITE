@@ -152,8 +152,9 @@
   const URB = new Uint8Array((COLS + 1) * (ROWS + 1));
   CIDADES.forEach(c => { if (!c.urb) return; for (let i = c.urb[0]; i <= c.urb[1] + 1; i++) for (let j = c.urb[2]; j <= c.urb[3] + 1; j++) URB[j * (COLS + 1) + i] = 1; });
   const urbano = (i, j) => i >= 0 && j >= 0 && i <= COLS && j <= ROWS && URB[j * (COLS + 1) + i] === 1;
-  // florestas gigantes: as ruas de dentro NÃO existem (só a rodovia e as ruas das bordas)
+  // domínios gigantes: as ruas de dentro NÃO existem (só a estrada particular e rodovias externas)
   const MEGAS = [
+    { id: 'campos_chefao', nome: 'DOMÍNIO DO PODEROSO CHEFÃO', bx0: 14, bx1: 33, by0: 0, by1: 9, aberto: true },
     { id: 'gav1', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 0, by1: 4 },
     { id: 'gav2', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 5, by1: 9 }
   ];
@@ -165,11 +166,15 @@
     for (let j = m.by0 + 1; j <= m.by1; j++) for (let s = m.bx0; s <= m.bx1; s++) semH[j * COLS + s] = 1;
     for (let i = m.bx0 + 1; i <= m.bx1; i++) for (let s = m.by0; s <= m.by1; s++) semV[i * ROWS + s] = 1;
   });
+  // Define os tiles de asfalto da Estrada Única Particular da Mansão (de bx=14 até bx=24)
+  setRect(MG + 14 * PITCH + ROAD, MG + 2 * PITCH + ROAD + 8, (24 - 14) * PITCH + 10, 4, TILE.ROAD);
+
   const viaH = (j, s) => !(j >= 0 && j <= ROWS && s >= 0 && s < COLS && semH[j * COLS + s]);   // existe a rua horizontal j entre os cruzamentos s e s+1?
   const viaV = (i, s) => !(i >= 0 && i <= COLS && s >= 0 && s < ROWS && semV[i * ROWS + s]);   // idem para a rua vertical i entre s e s+1
   const megaDe = (bx, by) => MEGAS.find(m => bx >= m.bx0 && bx <= m.bx1 && by >= m.by0 && by <= m.by1);
   // estradas de terra que cortam as florestas (no lugar das ruas apagadas)
   MEGAS.forEach(m => {
+    if (m.aberto) return; // Campos do Chefão usam a estrada única pavimentada de asfalto nobre
     const nj = m.by0 === 0 ? 2 : 7, mid = [45];
     const yy = (MG + nj * PITCH + ROAD / 2) * T;
     trilhas.push({ x: m.x, y: yy - 1.5 * T, w: m.w, h: 3 * T, mega: m.id, eixo: 'h' });
@@ -190,6 +195,7 @@
     if (RIVERS.includes(bx)) return 'river';
     if (bx === 24 && by === 2) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
+    if (c.id === 'campos_chefao') return 'campo_aberto'; // Vasto campo aberto sem floresta e sem agricultura
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';
     if (c.tipo === 'campo' || !dentroUrb(c, bx, by)) return ruralKind(bx, by);
@@ -432,6 +438,11 @@
     }
     for (let k = 0; k < 4; k++) { const a = 1.5 + rr() * 17; trees.push({ x: (tx + a) * T, y: (ty + 0.7) * T, r: 14 + rr() * 5 }); }
   };
+  // ----- campos abertos do poderoso chefão (sem floresta, sem agricultura) -----
+  BUILDERS.campo_aberto = blk => {
+    setRect(blk.tx, blk.ty, BLOCK, BLOCK, TILE.GRASS);
+  };
+
   // ----- mansão do poderoso chefão: quartel-general da máfia -----
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
