@@ -16,7 +16,7 @@
 (function (G) {
   'use strict';
   const VW = 800, VH = 600, TAU = Math.PI * 2;
-  const L = G.luz = { nivel: 2 };   // 2 = pixel art (padrão); V troca
+  const L = G.luz = { nivel: 1 };   // 1 = Cinema Nítido (alta definição, limpo e rápido)
 
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));

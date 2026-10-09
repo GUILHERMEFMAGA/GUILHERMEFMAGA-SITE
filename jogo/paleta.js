@@ -17,8 +17,8 @@
 (function (G) {
   'use strict';
   const VW = 800, VH = 600, PW = VW / 2, PH = VH / 2, DEG = Math.PI / 180;
-  const P = G.paleta = { cfg: { dither: 0.10, nitidez: 0.40, sat: 1.10, contraste: 1.04, tinta: 1, brancos: 0.6 },
-    cfgSala: { nitidez: 0.30, sat: 1.06, dither: 0.08 },      // dentro dos lugares: menos nitidez e menos saturação (muitos detalhes finos)
+  const P = G.paleta = { cfg: { dither: 0.0, nitidez: 0.20, sat: 1.05, contraste: 1.02, tinta: 0.5, brancos: 0.8 },
+    cfgSala: { nitidez: 0.15, sat: 1.02, dither: 0.0 },      // dentro dos lugares: menos nitidez e menos saturação
     cores: [] };
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
 

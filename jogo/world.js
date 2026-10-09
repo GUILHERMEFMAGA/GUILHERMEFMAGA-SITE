@@ -1579,8 +1579,11 @@
   const PRE = []; for (let cy = 0; cy <= 2; cy++) for (let cx = 0; cx <= 3; cx++) PRE.push([cx, cy]);
   let preN = 0;
   function buildSome(n) {
-    for (let k = 0; k < n && preN < PRE.length; k++, preN++) pegaChunk(PRE[preN][0], PRE[preN][1], true);
-    return preN / PRE.length;
+    if (preN >= PRE.length) return 1;
+    for (let k = 0; k < (n || 16) && preN < PRE.length; k++, preN++) {
+      try { pegaChunk(PRE[preN][0], PRE[preN][1], true); } catch (e) { }
+    }
+    return preN >= PRE.length ? 1 : preN / PRE.length;
   }
   function drawChunks(ctx, vx0, vy0, vx1, vy1) {
     const a = Math.max(0, Math.floor(vx0 / CH)), b = Math.min(NCX - 1, Math.floor(vx1 / CH));

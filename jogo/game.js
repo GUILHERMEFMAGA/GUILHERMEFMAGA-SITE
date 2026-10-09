@@ -635,7 +635,7 @@
 
   let last = 0, titleCam = 0;
   function startGame(fresh) {
-    if (fresh) { S.save = { money: 0, done: 0, paint: 0, king: false, mapaV: 2, arms: { own: { fist: 1 }, ammo: {} } }; G.save(); }
+    if (fresh) { S.save = { money: 50000, done: 12, paint: 0, king: true, mapaV: 2, arms: { own: { fist: 1, smg: 300, pistol: 150, shotgun: 50, grenade: 10, bat: 1 } }, spawnMansao: true }; G.save(); }
     G.snd.init(); newWorld(); S.mode = 'play';
     G.cidade.carregar(S);   // a cidade continua de onde parou
   }
@@ -643,26 +643,26 @@
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     if (S.mode === 'loading') {
-      const pr = W.buildSome(3);
+      const pr = W.buildSome(16);
       ctx.fillStyle = '#14101f'; ctx.fillRect(0, 0, VW, VH);
       G.hud.txt(ctx, 'CARREGANDO A CIDADE...', 400, 290, 28, '#ffe04a', 'center');
-      ctx.fillStyle = '#000'; ctx.fillRect(250, 310, 300, 22); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(253, 313, 294 * pr, 16);
-      if (pr >= 1) { loadSave(); S.mode = 'title'; newWorld(); S.cam.z = 1.4; }
+      ctx.fillStyle = '#000'; ctx.fillRect(250, 310, 300, 22); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(253, 313, 294 * Math.min(1, pr), 16);
+      if (pr >= 1) { loadSave(); startGame(false); }
       return;
     }
     if (S.mode === 'title') {
       titleCam += dt * 60;
       S.time += dt; S.dayT += dt / 300;
       const ang = titleCam / 400;
-      S.cam.x = W.nodeX(2) + Math.cos(ang) * 500 + 300; S.cam.y = W.nodeY(1) + Math.sin(ang * 0.7) * 380; S.cam.z = 1.3;
+      S.cam.x = W.nodeX(20) || (S.player.x); S.cam.y = W.nodeY(1) || (S.player.y); S.cam.z = 1.3;
       S.player.x = -9999; S.player.y = -9999; S.player.iframes = 0;
       // o tráfego corre em volta da câmera
       const fake = S.player; fake.x = S.cam.x; fake.y = S.cam.y;
       updateCars(dt); managePopulation(dt); G.detalhes.update(S, W, dt); updateParticles(dt);
       fake.x = -9999; fake.y = -9999;
       drawWorld(); drawTitle(S.time);
-      if (Kp('Enter')) startGame(false);
-      else if (Kp('KeyN') && hasSave()) startGame(true);
+      if (Kp('Enter') || Kp('Space') || Kp('KeyE')) startGame(false);
+      else if (Kp('KeyN')) startGame(true);
       for (const k in pressed) delete pressed[k];
       return;
     }
