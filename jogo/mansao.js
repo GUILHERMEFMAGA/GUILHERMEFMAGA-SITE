@@ -386,6 +386,30 @@
           G.snd.bonk();
           return 'fechar';
         }
+      },
+      {
+        n: '🏰 7. Renascimento na Mansão: ' + (S.save && S.save.spawnMansao === false ? 'DESATIVADO' : 'ATIVADO (PADRÃO)'),
+        desc: 'Ao morrer ou ser preso, Dr. Salvatore e a escolta levam o Don direto para a Mansão com vida cheia',
+        fn: S2 => {
+          S2.save.spawnMansao = S2.save.spawnMansao === false ? true : false;
+          G.save();
+          G.say('Renascimento na Mansão definido como: ' + (S2.save.spawnMansao ? 'ATIVADO' : 'DESATIVADO') + '!', 4);
+          return 'fechar';
+        }
+      },
+      {
+        n: '⚡ 8. Teletransportar Imediatamente para a Mansão do Don',
+        desc: 'Viagem instantânea de volta para a sua Villa Mafiosa',
+        fn: S2 => {
+          L.trans(S2, () => {
+            S2.player.x = P_MANSAO.x;
+            S2.player.y = P_MANSAO.y + 12;
+            S2.cam.x = S2.player.x;
+            S2.cam.y = S2.player.y;
+            G.say('Teletransportado com segurança para a Mansão do Poderoso Chefão!', 4);
+          });
+          return 'fechar';
+        }
       }
     ];
 
@@ -1695,5 +1719,53 @@
       G.say('A festa terminou! Os convidados foram embora e a equipe de faxineiras limpou toda a mansão.', 6);
     }
   });
+
+  // ---------- SPAWN INICIAL E RENASCIMENTO NA MANSÃO ----------
+  L.extrasAtualizar.push((S, dt) => {
+    if (!S || S.mode === 'title' || S._mansaoSpawnFeito) return;
+    S._mansaoSpawnFeito = true;
+    if (S.save && S.save.spawnMansao !== false) {
+      // Se acabou de iniciar na garagem padrão da cidade, move o Don para sua Mansão
+      if (Math.hypot(S.player.x - 680, S.player.y - 720) < 300) {
+        S.player.x = P_MANSAO.x;
+        S.player.y = P_MANSAO.y + 12;
+        S.cam.x = S.player.x;
+        S.cam.y = S.player.y;
+        G.say('👑 Bem-vindo à sua Mansão, Don Guilherme! O império está sob seu comando.', 6);
+      }
+    }
+  });
+
+  // Intercepta G.respawn para renascimento VIP do Don na Mansão
+  const origRespawn = G.respawn;
+  G.respawn = function (where, loss) {
+    const S = G.S;
+    if (S && S.save && S.save.spawnMansao !== false) {
+      const P = S.player;
+      P.hp = 100;
+      P.armor = 100;
+      P.car = null;
+      P.x = P_MANSAO.x;
+      P.y = P_MANSAO.y + 12;
+      P.vx = P.vy = 0;
+      P.iframes = 3;
+      S.lastHp = 100;
+      S.heat = 0;
+      S.heatLevel = 0;
+      S.heli = null;
+      S.bustT = 0;
+      S.cam.x = P.x;
+      S.cam.y = P.y;
+      S.mode = 'play';
+      if (S.cars) {
+        S.cars = S.cars.filter(c => !(c.kind === 'police' && (c.mode === 'chase' || c.mode === 'block' || c.mode === 'leave')));
+      }
+      garanteVeiculos(S);
+      G.say('🏰 RESGATE DA MÁFIA! Dr. Salvatore e a escolta pessoal trouxeram o Don são e salvo para a Mansão!', 6);
+      G.save();
+      return;
+    }
+    if (origRespawn) origRespawn(where, loss);
+  };
 
 })(window.G = window.G || {});
