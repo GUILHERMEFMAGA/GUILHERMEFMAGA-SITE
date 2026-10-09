@@ -189,7 +189,7 @@
   }
   function kindDe(bx, by) {
     if (RIVERS.includes(bx)) return 'river';
-    if (bx === 20 && by === 1) return 'mansao_chefao';
+    if (bx === 13 && by === 1) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';
@@ -1327,7 +1327,64 @@
     ctx.fillStyle = '#d8b02a'; ctx.fillRect(x + 11.2 * T, y + 9 * T, 3, 90); ctx.fillRect(x + 11.2 * T, y + 9 * T, 78, 5); ctx.fillStyle = '#c0392b'; ctx.fillRect(x + 11.2 * T + 70, y + 9 * T + 5, 8, 26);
     if (blk.by === 3) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.fillText('CAIS — BALSA PARA A ILHA', x + 5.4 * T, y + 9.3 * T); ctx.textAlign = 'left'; }
   }
-  const SEM_ANEL = { floresta: 1, bosque: 1, campo: 1, fazenda: 1, porto: 1 };
+  function drawMansaoGround(ctx, blk) {
+    const { x, y, w, h } = blk;
+    const TAU = Math.PI * 2;
+    // 1. Gramado nobre de fundo
+    ctx.fillStyle = '#3a7d32';
+    ctx.fillRect(x, y, w, h);
+
+    // 2. Chão de Tijolos Nobres Terracota cobrindo a propriedade
+    const bx0 = x + 24, by0 = y + 240, bw = w - 48, bh = h - 250;
+    ctx.fillStyle = '#8f3a28';
+    ctx.fillRect(bx0, by0, bw, bh);
+
+    // Padrão detalhado de amarração dos tijolos
+    ctx.strokeStyle = 'rgba(40,15,10,0.30)';
+    ctx.lineWidth = 1;
+    for (let py = by0; py < by0 + bh; py += 10) {
+      ctx.beginPath(); ctx.moveTo(bx0, py); ctx.lineTo(bx0 + bw, py); ctx.stroke();
+      const row = Math.floor((py - by0) / 10);
+      const shift = (row % 2) * 10;
+      for (let px = bx0 + shift; px < bx0 + bw; px += 20) {
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + 10); ctx.stroke();
+      }
+    }
+
+    // Moldura de granito dourado
+    ctx.strokeStyle = '#d4af37';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(bx0, by0, bw, bh);
+
+    // 3. Pátio circular da fonte em mármore
+    const fcx = x + w / 2, fcy = y + 420;
+    ctx.fillStyle = '#7a3220';
+    ctx.beginPath(); ctx.arc(fcx, fcy, 52, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#b0bec5'; ctx.beginPath(); ctx.arc(fcx, fcy, 36, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#00bcd4'; ctx.beginPath(); ctx.arc(fcx, fcy, 30, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#eceff1'; ctx.beginPath(); ctx.arc(fcx, fcy, 10, 0, TAU); ctx.fill();
+
+    // 4. Deck e Piscina Olímpica de Luxo
+    const px0 = x + w - 190, py0 = y + 360;
+    ctx.fillStyle = '#eae6dc';
+    ctx.fillRect(px0 - 10, py0 - 10, 180, 120);
+    const gw = ctx.createLinearGradient(0, py0, 0, py0 + 100);
+    gw.addColorStop(0, '#00b0ff'); gw.addColorStop(1, '#0077c2');
+    ctx.fillStyle = gw;
+    ctx.fillRect(px0, py0, 160, 100);
+    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.5; ctx.strokeRect(px0 - 10, py0 - 10, 180, 120);
+
+    // 5. Heliponto
+    const hx = x + 110, hy = y + 370;
+    ctx.fillStyle = '#37474f';
+    ctx.beginPath(); ctx.arc(hx, hy, 44, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('H', hx, hy + 11); ctx.textAlign = 'left';
+  }
+
+  const SEM_ANEL = { floresta: 1, bosque: 1, campo: 1, fazenda: 1, porto: 1, mansao_chefao: 1 };
   function drawBlockGround(ctx, blk, x0, y0, x1, y1) {
     const { x, y, w, h, kind } = blk;
     if (kind === 'river') {
@@ -1367,7 +1424,7 @@
       return;
     }
     if (SEM_ANEL[kind]) {
-      if (kind === 'porto') drawPorto(ctx, blk); else G.rural.desenhaBloco(ctx, blk, tex, x0, y0, x1, y1, AR.drawQuintal);
+      if (kind === 'mansao_chefao') drawMansaoGround(ctx, blk); else if (kind === 'porto') drawPorto(ctx, blk); else G.rural.desenhaBloco(ctx, blk, tex, x0, y0, x1, y1, AR.drawQuintal);
       return;
     }
     // calçada com cantos arredondados

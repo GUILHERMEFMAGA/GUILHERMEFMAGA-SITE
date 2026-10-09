@@ -9,6 +9,7 @@
   const PAD = 8;
 
   function shade(hex, amt) {
+    if (!hex || typeof hex !== 'string' || hex[0] !== '#') return hex || '#c8955a';
     const n = parseInt(hex.slice(1), 16);
     let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
     const f = amt < 0 ? 0 : 255, p = Math.abs(amt);
@@ -306,6 +307,8 @@
   }
 
   function drawPed(ctx, p, time) {
+    if (!p) return;
+    if (!p.skin) p.skin = '#e0b896';
     const r = 7;
     if (p.state === 'dead') {
       if (p.pv == null) p.pv = Math.floor(Math.random() * 6);

@@ -101,9 +101,9 @@
     S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
 
-    // Coordenadas do Portão Monumental da Mansão (Mata Escura)
+    // Coordenadas do Portão Monumental da Mansão (Residência do Chefão)
     const { MG, ROAD, PITCH, T } = W;
-    const gateX = (MG + ROAD + 20 * PITCH + 10) * T;
+    const gateX = (MG + ROAD + 13 * PITCH + 10) * T;
     const gateY = (MG + ROAD + 1 * PITCH + 20) * T - 35;
     const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: gateX, y: (MG + ROAD + 1 * PITCH + 10) * T + 20 };
 

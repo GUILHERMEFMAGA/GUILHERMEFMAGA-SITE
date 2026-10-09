@@ -31,7 +31,7 @@
   // ---------- COORDENADAS DA PROPRIEDADE NO MAPA MUNDIAL ----------
   // Localizada na Mata Escura (coluna 20, linha 1) — isolada e cercada por floresta nativa
   const T = W.T || 32, ROAD = 8, BLOCK = 20, PITCH = ROAD + BLOCK, MG = 6;
-  const bx = 20, by = 1;
+  const bx = 13, by = 1;
   const tx0 = MG + ROAD + bx * PITCH, ty0 = MG + ROAD + by * PITCH;
   const estate = {
     x0: tx0 * T,
@@ -1449,28 +1449,7 @@
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 1. Pavimentação com Chão de Tijolos Nobres (Pátio & Alameda de Acesso)
-    if (inV({ x: estate.cx, y: estate.cy })) {
-      ctx.save();
-      const brickX0 = estate.x0 + 16, brickY0 = estate.y0 + 280, brickW = estate.w - 32, brickH = estate.h - 300;
-      ctx.fillStyle = '#8f3a28';
-      ctx.fillRect(brickX0, brickY0, brickW, brickH);
-
-      // Padrão de amarração de tijolos
-      ctx.strokeStyle = 'rgba(40,15,10,0.28)';
-      ctx.lineWidth = 0.9;
-      for (let by = brickY0; by < brickY0 + brickH; by += 10) {
-        ctx.beginPath(); ctx.moveTo(brickX0, by); ctx.lineTo(brickX0 + brickW, by); ctx.stroke();
-        const row = Math.floor((by - brickY0) / 10);
-        const shift = (row % 2) * 10;
-        for (let bx = brickX0 + shift; bx < brickX0 + brickW; bx += 20) {
-          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by + 10); ctx.stroke();
-        }
-      }
-      ctx.restore();
-    }
-
-    // 2. Desenho da Entrada Monumental, Muros de Tijolos, Pilares e Portão
+    // 1. Desenho da Entrada Monumental, Muros de Tijolos, Pilares e Portão
     if (inV(P_PORTAO)) {
       ctx.save();
       ctx.translate(P_PORTAO.x, P_PORTAO.y);
@@ -1534,7 +1513,7 @@
       drawDogHouse(-125, -45);
       drawDogHouse(97, -45);
 
-      // Portão Monumental de ferro forjado e dourado (entre os pilares de -60 a +60)
+      // Portão Monumental de ferro forjado e dourado
       ctx.strokeStyle = '#d4af37';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(-60, -7, 120, 14);
@@ -1558,7 +1537,7 @@
       ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
       ctx.strokeStyle = '#8b6f20'; ctx.lineWidth = 1; ctx.stroke();
 
-      // Placa Monumental Dourada (elegante e compacta)
+      // Placa Monumental Dourada
       ctx.fillStyle = '#111215';
       ctx.fillRect(-65, -30, 130, 15);
       ctx.strokeStyle = '#d4af37';
@@ -1571,74 +1550,26 @@
       ctx.restore();
     }
 
-    // 3. Grande Piscina Olímpica com LEDs Noturnos
-    if (inV(P_PISCINA)) {
+    // 2. LEDs Noturnos da Piscina
+    if (inV(P_PISCINA) && isNight) {
       ctx.save();
       ctx.translate(P_PISCINA.x, P_PISCINA.y);
-
-      // Deck de mármore claro
-      ctx.fillStyle = '#eae6dc';
-      ctx.fillRect(-90, -60, 180, 120);
-
-      // Água cristalina da piscina
-      const gw = ctx.createLinearGradient(0, -50, 0, 50);
-      gw.addColorStop(0, '#00b0ff');
-      gw.addColorStop(1, '#0077c2');
-      ctx.fillStyle = gw;
-      ctx.fillRect(-80, -50, 160, 100);
-
-      // LEDs subaquáticos que acendem e mudam de cor à noite
-      if (isNight) {
-        const ledHue = Math.floor((time * 40) % 360);
-        ctx.fillStyle = 'hsla(' + ledHue + ', 95%, 60%, 0.45)';
-        ctx.fillRect(-80, -50, 160, 100);
-
-        for (let lx = -70; lx <= 70; lx += 35) {
-          [-45, 45].forEach(ly => {
-            const gr = ctx.createRadialGradient(lx, ly, 1, lx, ly, 25);
-            gr.addColorStop(0, 'hsla(' + ledHue + ', 100%, 75%, 0.8)');
-            gr.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = gr;
-            ctx.beginPath();
-            ctx.arc(lx, ly, 25, 0, TAU);
-            ctx.fill();
-          });
-        }
+      const ledHue = Math.floor((time * 40) % 360);
+      for (let lx = -70; lx <= 70; lx += 35) {
+        [-45, 45].forEach(ly => {
+          const gr = ctx.createRadialGradient(lx, ly, 1, lx, ly, 25);
+          gr.addColorStop(0, 'hsla(' + ledHue + ', 100%, 75%, 0.8)');
+          gr.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gr;
+          ctx.beginPath();
+          ctx.arc(lx, ly, 25, 0, TAU);
+          ctx.fill();
+        });
       }
-
       ctx.restore();
     }
 
-    // 4. Fonte Central em Cascata sobre Pátio de Tijolos
-    if (inV(P_FONTE)) {
-      ctx.save();
-      ctx.translate(P_FONTE.x, P_FONTE.y);
-      // Pátio circular de tijolos em volta da fonte
-      ctx.fillStyle = '#7d3222';
-      ctx.beginPath();
-      ctx.arc(0, 0, 48, 0, TAU);
-      ctx.fill();
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.fillStyle = '#b0bec5';
-      ctx.beginPath();
-      ctx.arc(0, 0, 36, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = '#00bcd4';
-      ctx.beginPath();
-      ctx.arc(0, 0, 30, 0, TAU);
-      ctx.fill();
-      // Estátua central
-      ctx.fillStyle = '#eceff1';
-      ctx.beginPath();
-      ctx.arc(0, 0, 10, 0, TAU);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // 5. Desenho dos Seguranças da Máfia com modelo completo
+    // 3. Desenho dos Seguranças da Máfia com modelo completo
     GUARDAS_POS.forEach((g, idx) => {
       if (!g.ped) {
         g.ped = {
@@ -1675,7 +1606,7 @@
       ctx.restore();
     });
 
-    // 6. Desenho dos Cães de Guarda (Rottweilers / Dobermans)
+    // 4. Desenho dos Cães de Guarda (Rottweilers / Dobermans)
     CAES_POS.forEach(dog => {
       if (!inV(dog)) return;
       ctx.save();
