@@ -1518,10 +1518,10 @@
   // ----- mansão do poderoso chefão: quartel-general da máfia -----
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
-    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
-    // Pátio frontal e alameda de acesso pavimentada
+    // Todo o terreno é calçado com Chão de Tijolos Nobres e Pátio Pavimentado
+    setRect(tx, ty, BLOCK, BLOCK, TILE.LOT);
     setRect(tx + 2, ty + 10, 16, 9, TILE.SIDE);
-    setRect(tx + 8, ty + 12, 4, 8, TILE.LOT);
+    setRect(tx + 6, ty + 11, 8, 8, TILE.LOT);
     // Prédio da Mansão Monumental (16x8 tiles)
     setRect(tx + 2, ty + 2, 16, 8, TILE.BUILD);
     const mb = mkBuilding((tx + 2) * T + 4, (ty + 2) * T + 4, 16 * T - 8, 8 * T - 8, 2, rr);
@@ -1532,12 +1532,12 @@
     setRect(tx + 13, ty + 11, 5, 4, TILE.WATER);
     ponds.push({ x: (tx + 15.5) * T, y: (ty + 13) * T, rx: 2.5 * T, ry: 2 * T });
     // Heliponto (à esquerda)
-    setRect(tx + 2, ty + 11, 4, 4, TILE.LOT);
+    setRect(tx + 2, ty + 11, 4, 4, TILE.SIDE);
     blk.heli = { x: (tx + 4) * T, y: (ty + 13) * T };
-    // Árvores nobres
+    // Palmeiras Imperiais
     [3, 7, 12, 16].forEach(a => {
-      trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 16 });
-      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 16 });
+      trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 14 });
+      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 14 });
     });
     // Registra lugar
     const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'MANSÃO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Quartel-General do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 46 };
@@ -13428,15 +13428,87 @@
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 1. Desenho do Portão e Placa Monumental
+    // 1. Pavimentação com Chão de Tijolos Nobres (Pátio & Alameda de Acesso)
+    if (inV({ x: estate.cx, y: estate.cy })) {
+      ctx.save();
+      // Chão de tijolos terracota na alameda e pátio frontal
+      const brickX0 = estate.x0 + 40, brickY0 = estate.y0 + 260, brickW = estate.w - 80, brickH = estate.h - 280;
+      ctx.fillStyle = '#8f3a28';
+      ctx.fillRect(brickX0, brickY0, brickW, brickH);
+
+      // Padrão de amarração de tijolos
+      ctx.strokeStyle = 'rgba(40,15,10,0.35)';
+      ctx.lineWidth = 1;
+      for (let by = brickY0; by < brickY0 + brickH; by += 10) {
+        ctx.beginPath();
+        ctx.moveTo(brickX0, by);
+        ctx.lineTo(brickX0 + brickW, by);
+        ctx.stroke();
+        const row = Math.floor((by - brickY0) / 10);
+        const shift = (row % 2) * 10;
+        for (let bx = brickX0 + shift; bx < brickX0 + brickW; bx += 20) {
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(bx, by + 10);
+          ctx.stroke();
+        }
+      }
+
+      // Moldura de granito nobre ao redor do calçamento de tijolos
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(brickX0, brickY0, brickW, brickH);
+      ctx.restore();
+    }
+
+    // 2. Desenho da Entrada Monumental, Muros de Tijolos e Portão
     if (inV(P_PORTAO)) {
       ctx.save();
       ctx.translate(P_PORTAO.x, P_PORTAO.y);
 
-      // Pilares de granito laterais
-      ctx.fillStyle = '#1c1d22';
-      ctx.fillRect(-150, -10, 90, 20);
-      ctx.fillRect(60, -10, 90, 20);
+      // Muros em alvenaria de tijolos à vista vermelhos
+      const drawBrickWall = (wx, wy, ww, wh) => {
+        ctx.fillStyle = '#8c2e1f';
+        ctx.fillRect(wx, wy, ww, wh);
+        // Frisos de tijolos
+        ctx.strokeStyle = 'rgba(30,10,5,0.4)';
+        ctx.lineWidth = 0.8;
+        for (let y = wy + 4; y < wy + wh; y += 4) {
+          ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx + ww, y); ctx.stroke();
+          const r = Math.floor((y - wy) / 4);
+          for (let x = wx + (r % 2) * 6; x < wx + ww; x += 12) {
+            ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x, y); ctx.stroke();
+          }
+        }
+        // Topo em cantaria de pedra nobre
+        ctx.fillStyle = '#ded4c2';
+        ctx.fillRect(wx - 2, wy - 3, ww + 4, 3.5);
+        ctx.strokeStyle = '#2a1a12';
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(wx - 2, wy - 3, ww + 4, 3.5);
+      };
+
+      drawBrickWall(-160, -10, 100, 20);
+      drawBrickWall(60, -10, 100, 20);
+
+      // Casinhas de tijolos para os cães de guarda nas laterais
+      const drawDogHouse = (hx, hy) => {
+        ctx.fillStyle = '#7a2818';
+        ctx.fillRect(hx, hy, 28, 24);
+        ctx.fillStyle = '#3e150d';
+        ctx.fillRect(hx + 7, hy + 8, 14, 16); // Porta da casinha
+        // Telhado de telha terracota
+        ctx.fillStyle = '#a63e26';
+        ctx.beginPath();
+        ctx.moveTo(hx - 3, hy);
+        ctx.lineTo(hx + 14, hy - 8);
+        ctx.lineTo(hx + 31, hy);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
+      };
+      drawDogHouse(-105, -34);
+      drawDogHouse(77, -34);
 
       // Portão de ferro forjado e dourado
       ctx.strokeStyle = '#d4af37';
@@ -13449,20 +13521,27 @@
         ctx.stroke();
       }
 
+      // Brasão dourado da Família Mafiosa no centro do portão
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#8b6f20'; ctx.lineWidth = 1; ctx.stroke();
+
       // Placa Monumental Dourada
       ctx.fillStyle = '#111215';
-      ctx.fillRect(-130, -38, 260, 20);
+      ctx.fillRect(-130, -42, 260, 20);
       ctx.strokeStyle = '#d4af37';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(-130, -38, 260, 20);
+      ctx.strokeRect(-130, -42, 260, 20);
       ctx.fillStyle = '#e5b834';
       ctx.font = 'bold 8px Georgia';
       ctx.textAlign = 'center';
-      ctx.fillText('⚜️ PROPRIEDADE PRIVADA — VILLA DO PODEROSO CHEFÃO ⚜️', 0, -25);
+      ctx.fillText('⚜️ PROPRIEDADE PRIVADA — VILLA DO PODEROSO CHEFÃO ⚜️', 0, -29);
       ctx.restore();
     }
 
-    // 2. Grande Piscina Olímpica com LEDs Noturnos
+    // 3. Grande Piscina Olímpica com LEDs Noturnos
     if (inV(P_PISCINA)) {
       ctx.save();
       ctx.translate(P_PISCINA.x, P_PISCINA.y);
@@ -13500,10 +13579,19 @@
       ctx.restore();
     }
 
-    // 3. Fonte Central em Cascata
+    // 4. Fonte Central em Cascata sobre Pátio de Tijolos
     if (inV(P_FONTE)) {
       ctx.save();
       ctx.translate(P_FONTE.x, P_FONTE.y);
+      // Pátio circular de tijolos em volta da fonte
+      ctx.fillStyle = '#7d3222';
+      ctx.beginPath();
+      ctx.arc(0, 0, 48, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#d4af37';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
       ctx.fillStyle = '#b0bec5';
       ctx.beginPath();
       ctx.arc(0, 0, 36, 0, TAU);
@@ -13520,7 +13608,7 @@
       ctx.restore();
     }
 
-    // 4. Desenho dos Seguranças da Máfia com modelo completo
+    // 5. Desenho dos Seguranças da Máfia com modelo completo
     GUARDAS_POS.forEach((g, idx) => {
       if (!g.ped) {
         g.ped = {
@@ -13557,7 +13645,7 @@
       ctx.restore();
     });
 
-    // 5. Desenho dos Cães de Guarda (Rottweilers)
+    // 6. Desenho dos Cães de Guarda (Rottweilers / Dobermans)
     CAES_POS.forEach(dog => {
       if (!inV(dog)) return;
       ctx.save();

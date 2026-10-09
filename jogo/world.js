@@ -436,10 +436,10 @@
   // ----- mansão do poderoso chefão: quartel-general da máfia -----
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
-    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
-    // Pátio frontal e alameda de acesso pavimentada
+    // Todo o terreno é calçado com Chão de Tijolos Nobres e Pátio Pavimentado
+    setRect(tx, ty, BLOCK, BLOCK, TILE.LOT);
     setRect(tx + 2, ty + 10, 16, 9, TILE.SIDE);
-    setRect(tx + 8, ty + 12, 4, 8, TILE.LOT);
+    setRect(tx + 6, ty + 11, 8, 8, TILE.LOT);
     // Prédio da Mansão Monumental (16x8 tiles)
     setRect(tx + 2, ty + 2, 16, 8, TILE.BUILD);
     const mb = mkBuilding((tx + 2) * T + 4, (ty + 2) * T + 4, 16 * T - 8, 8 * T - 8, 2, rr);
@@ -450,12 +450,12 @@
     setRect(tx + 13, ty + 11, 5, 4, TILE.WATER);
     ponds.push({ x: (tx + 15.5) * T, y: (ty + 13) * T, rx: 2.5 * T, ry: 2 * T });
     // Heliponto (à esquerda)
-    setRect(tx + 2, ty + 11, 4, 4, TILE.LOT);
+    setRect(tx + 2, ty + 11, 4, 4, TILE.SIDE);
     blk.heli = { x: (tx + 4) * T, y: (ty + 13) * T };
-    // Árvores nobres
+    // Palmeiras Imperiais
     [3, 7, 12, 16].forEach(a => {
-      trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 16 });
-      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 16 });
+      trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 14 });
+      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 14 });
     });
     // Registra lugar
     const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'MANSÃO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Quartel-General do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 46 };
