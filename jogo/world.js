@@ -194,6 +194,9 @@
   function kindDe(bx, by) {
     if (RIVERS.includes(bx)) return 'river';
     if (bx === 24 && by === 2) return 'mansao_chefao';
+    if (bx === 23 && by === 2) return 'mansao_oeste';
+    if (bx === 25 && by === 2) return 'mansao_leste';
+    if ((bx >= 23 && bx <= 25) && by === 1) return 'mansao_norte';
     const c = regiaoDe(bx), key = bx + ',' + by;
     if (c.id === 'campos_chefao') return 'campo_aberto'; // Vasto campo aberto sem floresta e sem agricultura
     if (c.tipo === 'mata') return 'floresta';
@@ -443,35 +446,77 @@
     setRect(blk.tx, blk.ty, BLOCK, BLOCK, TILE.GRASS);
   };
 
-  // ----- mansão do poderoso chefão: quartel-general da máfia -----
+  // ----- mansão do poderoso chefão: palácio central monumental -----
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
-    // Todo o terreno é calçado com Chão de Tijolos Nobres e Pátio Pavimentado
     setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
     setRect(tx + 8, ty + 10, 4, 10, TILE.LOT);
-    setRect(tx + 2, ty + 10, 16, 9, TILE.SIDE);
-    // Prédio da Mansão Monumental (16x8 tiles)
-    setRect(tx + 2, ty + 2, 16, 8, TILE.BUILD);
-    const mb = mkBuilding((tx + 2) * T + 4, (ty + 2) * T + 4, 16 * T - 8, 8 * T - 8, 2, rr);
+    setRect(tx + 1, ty + 10, 18, 9, TILE.SIDE);
+    // Prédio do Palácio Central Monumental (18x8 tiles)
+    setRect(tx + 1, ty + 2, 18, 8, TILE.BUILD);
+    const mb = mkBuilding((tx + 1) * T + 4, (ty + 2) * T + 4, 18 * T - 8, 8 * T - 8, 2, rr);
     mb.mansao = true; mb.andares = 2; mb.det = [];
     mb.p = { kind: 'tile', base: '#8b141a', edge: '#d4af37', dark: '#50080e' };
     buildings.push(mb);
-    // Grande Piscina Olímpica (à direita)
-    setRect(tx + 13, ty + 11, 5, 4, TILE.WATER);
-    ponds.push({ x: (tx + 15.5) * T, y: (ty + 13) * T, rx: 2.5 * T, ry: 2 * T });
-    // Heliponto (à esquerda)
-    setRect(tx + 2, ty + 11, 4, 4, TILE.SIDE);
-    blk.heli = { x: (tx + 4) * T, y: (ty + 13) * T };
-    // Palmeiras Imperiais nas extremidades dos muros (longe do meio)
-    [1, 19].forEach(a => {
+    // Palmeiras Imperiais nas bordas dos muros
+    [0, 19].forEach(a => {
       trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 14 });
       trees.push({ x: (tx + a) * T, y: (ty + 16) * T, r: 14 });
     });
     // Registra lugar
-    const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'MANSÃO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Quartel-General do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 46 };
+    const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'PALÁCIO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Sede Central do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 52 };
     mb.place = pl;
     places.push(pl);
     blk.mansao = pl;
+  };
+
+  // ----- ala oeste: heliponto duplo, hangar de supercarros e campo de golfe -----
+  BUILDERS.mansao_oeste = blk => {
+    const { tx, ty, rr } = blk;
+    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
+    // Hangar e Showroom de Supercarros
+    setRect(tx + 1, ty + 2, 10, 7, TILE.BUILD);
+    const hb = mkBuilding((tx + 1) * T + 4, (ty + 2) * T + 4, 10 * T - 8, 7 * T - 8, 1, rr);
+    hb.mansao = true; hb.det = []; hb.p = { kind: 'tile', base: '#1a222e', edge: '#69f0ae', dark: '#0d131a' };
+    buildings.push(hb);
+    // Helipontos H1 e H2
+    setRect(tx + 12, ty + 3, 6, 6, TILE.SIDE);
+    setRect(tx + 12, ty + 12, 6, 6, TILE.SIDE);
+    blk.heli1 = { x: (tx + 15) * T, y: (ty + 6) * T };
+    blk.heli2 = { x: (tx + 15) * T, y: (ty + 15) * T };
+    // Registra lugar
+    const pl = { id: 'mansao_oeste', tipo: 'mansao', nome: 'ALA OESTE — HELIPONTO DUPLO & SUPERCARROS', sub: 'Hangar de Luxo e Campo de Golfe Privativo', cor: '#69f0ae', x: (tx + 8) * T, y: (ty + 10) * T, r: 48 };
+    hb.place = pl;
+    places.push(pl);
+    blk.mansao_oeste = pl;
+  };
+
+  // ----- ala leste: resort aquático duplo e praia particular do don -----
+  BUILDERS.mansao_leste = blk => {
+    const { tx, ty, rr } = blk;
+    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
+    // Pavilhão / Salão Dourado de Festas Imperial
+    setRect(tx + 8, ty + 2, 11, 6, TILE.BUILD);
+    const pb = mkBuilding((tx + 8) * T + 4, (ty + 2) * T + 4, 11 * T - 8, 6 * T - 8, 1, rr);
+    pb.mansao = true; pb.det = []; pb.p = { kind: 'tile', base: '#8b141a', edge: '#00e5ff', dark: '#50080e' };
+    buildings.push(pb);
+    // Piscinas Olímpicas Duplas
+    setRect(tx + 2, ty + 3, 5, 4, TILE.WATER);
+    setRect(tx + 2, ty + 12, 5, 4, TILE.WATER);
+    ponds.push({ x: (tx + 4.5) * T, y: (ty + 5) * T, rx: 2.5 * T, ry: 2 * T });
+    ponds.push({ x: (tx + 4.5) * T, y: (ty + 14) * T, rx: 2.5 * T, ry: 2 * T });
+    // Registra lugar
+    const pl = { id: 'mansao_leste', tipo: 'mansao', nome: 'ALA LESTE — RESORT AQUÁTICO & PRAIA DO DON', sub: 'Piscinas Olímpicas Duplas, Praia Privada e Lounges VIP', cor: '#00e5ff', x: (tx + 13) * T, y: (ty + 10) * T, r: 48 };
+    pb.place = pl;
+    places.push(pl);
+    blk.mansao_leste = pl;
+  };
+
+  // ----- ala norte: jardins franceses de versalhes & bosque real -----
+  BUILDERS.mansao_norte = blk => {
+    const { tx, ty } = blk;
+    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
+    setRect(tx + 6, ty + 6, 8, 8, TILE.SIDE);
   };
 
   // ----- fazenda de bilionário: mansão enorme, piscina, heliponto, estábulo e alameda -----
@@ -1338,20 +1383,19 @@
     if (blk.by === 3) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; ctx.fillText('CAIS — BALSA PARA A ILHA', x + 5.4 * T, y + 9.3 * T); ctx.textAlign = 'left'; }
   }
   function drawMansaoGround(ctx, blk) {
-    const { x, y, w, h } = blk;
+    const { x, y, w, h, kind } = blk;
     const TAU = Math.PI * 2;
     const cx = x + w / 2;
+    const cy = y + h / 2;
     const gateY = y + h;
     const fontY = y + 448;
     const porticoY = y + 328;
-    const heliX = x + 130, heliY = y + 448;
-    const poolX = x + 490, poolY = y + 448;
 
     // 1. Gramado nobre esmeralda exuberante da propriedade
     ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat');
     ctx.fillRect(x, y, w, h);
     // Faixas suaves de corte de grama profissional
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
     for (let yy = 0, k = 0; yy < h; yy += 24, k++) {
       if (k % 2 === 0) ctx.fillRect(x, y + yy, w, 24);
     }
@@ -1379,158 +1423,11 @@
         ctx.fillRect(bx + bw, by, 3, bh);
       } else {
         ctx.fillRect(bx, by - 3, bw, 3);
-        ctx.fillRect(bx, by + bh, bw, 3);
+        ctx.fillRect(bx + bw, by, 3, bw);
       }
     };
 
-    // 2. Alameda de Entrada Sul (de tijolos nobres, 96px de largura)
-    drawNobleBrickRect(cx - 48, fontY + 50, 96, (gateY - fontY - 40), true);
-
-    // 3. Alameda Norte (Conexão da Rotatória até o Portiqueiro da Mansão)
-    drawNobleBrickRect(cx - 52, porticoY, 104, fontY - porticoY - 40, true);
-
-    // 4. Alameda Oeste (Conexão até o Heliponto e Golfe)
-    drawNobleBrickRect(heliX + 40, fontY - 26, (cx - 48) - (heliX + 40), 52, false);
-
-    // 5. Alameda Leste (Conexão até o Deck da Piscina)
-    drawNobleBrickRect(cx + 48, fontY - 26, (poolX - 60) - (cx + 48), 52, false);
-
-    // 6. Rotatória Circular de Tijolos Nobres ao redor da Fonte
-    ctx.save();
-    ctx.fillStyle = '#9e4230';
-    ctx.beginPath(); ctx.arc(cx, fontY, 76, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 3.5; ctx.stroke();
-    // Padrão circular de calçamento de pedras/tijolos
-    ctx.strokeStyle = 'rgba(50,18,10,0.30)'; ctx.lineWidth = 1;
-    for (let r = 44; r < 76; r += 8) {
-      ctx.beginPath(); ctx.arc(cx, fontY, r, 0, TAU); ctx.stroke();
-    }
-    // Ilha central de gramado da rotatória
-    ctx.fillStyle = '#3a8030';
-    ctx.beginPath(); ctx.arc(cx, fontY, 40, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 2.5; ctx.stroke();
-    // Borda de flores na rotatória (rosas vermelhas e amarelas)
-    for (let a = 0; a < TAU; a += 0.4) {
-      const fx = cx + Math.cos(a) * 36, fy = fontY + Math.sin(a) * 36;
-      ctx.fillStyle = (Math.sin(a * 4) > 0 ? '#e53935' : '#fbc02d');
-      ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
-    }
-
-    // Fonte de mármore clássico no centro
-    ctx.fillStyle = '#cfd8dc';
-    ctx.beginPath(); ctx.arc(cx, fontY, 26, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 2; ctx.stroke();
-    // Espelho d'água azul turquesa cristalino
-    ctx.fillStyle = '#00bcd4';
-    ctx.beginPath(); ctx.arc(cx, fontY, 22, 0, TAU); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.beginPath(); ctx.arc(cx - 5, fontY - 5, 8, 0, TAU); ctx.fill();
-    // Pedestal central com estátua e repuxo dourado
-    ctx.fillStyle = '#b0bec5'; ctx.beginPath(); ctx.arc(cx, fontY, 9, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(cx, fontY, 5, 0, TAU); ctx.fill();
-    ctx.restore();
-
-    // 7. Grande Deck e Piscina Olímpica de Luxo
-    ctx.save();
-    // Deck de mármore travertino
-    ctx.fillStyle = '#ece8dc';
-    ctx.fillRect(poolX - 70, poolY - 55, 140, 110);
-    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.5;
-    ctx.strokeRect(poolX - 70, poolY - 55, 140, 110);
-    // Borda de pastilhas azuis escuras
-    ctx.fillStyle = '#0d47a1';
-    ctx.fillRect(poolX - 60, poolY - 45, 120, 90);
-    // Água cristalina com degradê aquático
-    const gw = ctx.createLinearGradient(0, poolY - 42, 0, poolY + 42);
-    gw.addColorStop(0, '#00e5ff');
-    gw.addColorStop(0.5, '#00b0ff');
-    gw.addColorStop(1, '#0288d1');
-    ctx.fillStyle = gw;
-    ctx.fillRect(poolX - 58, poolY - 43, 116, 86);
-    // Raias olímpicas brancas no fundo da piscina
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.2;
-    for (let ly = poolY - 26; ly <= poolY + 26; ly += 26) {
-      ctx.beginPath(); ctx.moveTo(poolX - 54, ly); ctx.lineTo(poolX + 54, ly); ctx.stroke();
-    }
-    // Espreguiçadeiras no deck
-    const drawLounger = (lx, ly) => {
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(lx - 5, ly - 10, 10, 20);
-      ctx.fillStyle = '#37474f'; ctx.fillRect(lx - 4, ly - 9, 8, 6);
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 5, ly - 10, 10, 20);
-    };
-    drawLounger(poolX - 45, poolY - 48);
-    drawLounger(poolX - 25, poolY - 48);
-    drawLounger(poolX + 25, poolY - 48);
-    drawLounger(poolX + 45, poolY - 48);
-    ctx.restore();
-
-    // 8. Heliponto Executivo da Máfia
-    ctx.save();
-    ctx.fillStyle = '#263238';
-    ctx.beginPath(); ctx.arc(heliX, heliY, 46, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 3; ctx.stroke();
-    // Círculo interno tracejado
-    ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(heliX, heliY, 36, 0, TAU); ctx.stroke();
-    ctx.setLineDash([]);
-    // Letra 'H' em relevo
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 34px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('H', heliX, heliY + 12); ctx.textAlign = 'left';
-    ctx.restore();
-
-    // 9. Muros Nobres de Alvenaria e Entrada Monumental com Pilares de Pedra
-    ctx.save();
-    const wallCol = '#8c2e1f', capCol = '#ded4c2';
-    const drawWallSec = (wx, wy, ww, wh) => {
-      ctx.fillStyle = wallCol; ctx.fillRect(wx, wy, ww, wh);
-      ctx.fillStyle = capCol; ctx.fillRect(wx - 1, wy - 2, ww + 2, 3);
-      ctx.strokeStyle = 'rgba(30,10,5,0.4)'; ctx.lineWidth = 0.8; ctx.strokeRect(wx, wy, ww, wh);
-    };
-    // Muro Sul (com vão livre de 104px para a entrada de carros no centro)
-    drawWallSec(x + 10, gateY - 14, (cx - 52) - (x + 10), 10);
-    drawWallSec(cx + 52, gateY - 14, (x + w - 10) - (cx + 52), 10);
-    // Muros Oeste, Leste e Norte
-    drawWallSec(x + 10, y + 10, 10, h - 24);
-    drawWallSec(x + w - 20, y + 10, 10, h - 24);
-    drawWallSec(x + 10, y + 10, w - 20, 10);
-
-    // Pilares nobres nas bordas do portão
-    const drawPillar = px => {
-      ctx.fillStyle = '#7a2818'; ctx.fillRect(px - 9, gateY - 20, 18, 22);
-      ctx.fillStyle = capCol; ctx.fillRect(px - 11, gateY - 23, 22, 4);
-      ctx.fillRect(px - 11, gateY, 22, 4);
-      // Luminária dourada no topo do pilar
-      ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(px, gateY - 26, 4, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
-    };
-    drawPillar(cx - 54);
-    drawPillar(cx + 54);
-
-    // Placa monumental montada no pilar esquerdo (sem atrapalhar a pista)
-    ctx.fillStyle = '#111215'; ctx.fillRect(cx - 150, gateY - 28, 90, 18);
-    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.2; ctx.strokeRect(cx - 150, gateY - 28, 90, 18);
-    ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 8px Georgia'; ctx.textAlign = 'center';
-    ctx.fillText('⚜️ VILLA DEL DON ⚜️', cx - 105, gateY - 16); ctx.textAlign = 'left';
-
-    // Casinhas de tijolos para os cães de guarda (dentro do pátio nas laterais)
-    const drawDogHouse = (hx, hy) => {
-      ctx.fillStyle = '#7a2818';
-      ctx.fillRect(hx, hy, 28, 24);
-      ctx.fillStyle = '#2a0e08';
-      ctx.fillRect(hx + 7, hy + 8, 14, 16);
-      ctx.fillStyle = '#a63e26';
-      ctx.beginPath();
-      ctx.moveTo(hx - 3, hy);
-      ctx.lineTo(hx + 14, hy - 8);
-      ctx.lineTo(hx + 31, hy);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
-    };
-    drawDogHouse(cx - 120, gateY - 55);
-    drawDogHouse(cx + 92, gateY - 55);
-
-    // 10. Fileiras Majestosas de Coqueiros e Palmeiras Imperiais na Entrada
+    // Helper: Coqueiro e Palmeira Imperial
     const drawCoqueiro = (px, py, scale) => {
       ctx.save();
       ctx.translate(px, py);
@@ -1566,24 +1463,298 @@
       ctx.restore();
     };
 
-    // Coqueiros ao longo da Alameda Sul (em ambos os lados da estrada de tijolos)
-    for (let py = gateY - 60; py >= fontY + 70; py -= 48) {
-      drawCoqueiro(cx - 68, py, 1.1);
-      drawCoqueiro(cx + 68, py, 1.1);
-    }
-    // Coqueiros ao redor da Rotatória da Fonte
-    for (let a = 0; a < TAU; a += TAU / 6) {
-      drawCoqueiro(cx + Math.cos(a) * 88, fontY + Math.sin(a) * 88, 1.05);
-    }
-    // Coqueiros na Fachada da Mansão
-    [-180, -120, -60, 60, 120, 180].forEach(ox => {
-      drawCoqueiro(cx + ox, porticoY - 8, 1.15);
-    });
+    // Helper: Muros nobres
+    const wallCol = '#8c2e1f', capCol = '#ded4c2';
+    const drawWallSec = (wx, wy, ww, wh) => {
+      ctx.fillStyle = wallCol; ctx.fillRect(wx, wy, ww, wh);
+      ctx.fillStyle = capCol; ctx.fillRect(wx - 1, wy - 2, ww + 2, 3);
+      ctx.strokeStyle = 'rgba(30,10,5,0.4)'; ctx.lineWidth = 0.8; ctx.strokeRect(wx, wy, ww, wh);
+    };
 
-    ctx.restore();
+    // ========== 1. PALÁCIO CENTRAL DO PODEROSO CHEFÃO ==========
+    if (kind === 'mansao_chefao') {
+      // Alameda Sul de Entrada Expressa (112px de largura, conecta com as duas pistas da rodovia)
+      drawNobleBrickRect(cx - 56, fontY + 50, 112, (gateY - fontY - 40), true);
+
+      // Alameda Norte até o Pórtico do Palácio
+      drawNobleBrickRect(cx - 60, porticoY, 120, fontY - porticoY - 40, true);
+
+      // Conexão Oeste com a Ala Oeste (Hangar e Helipontos)
+      drawNobleBrickRect(x, fontY - 32, (cx - 56) - x, 64, false);
+
+      // Conexão Leste com a Ala Leste (Resort Aquático e Praia)
+      drawNobleBrickRect(cx + 56, fontY - 32, (x + w) - (cx + 56), 64, false);
+
+      // Rotatória Circular da Fonte Monumental
+      ctx.save();
+      ctx.fillStyle = '#9e4230';
+      ctx.beginPath(); ctx.arc(cx, fontY, 78, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 3.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(50,18,10,0.30)'; ctx.lineWidth = 1;
+      for (let r = 44; r < 78; r += 8) {
+        ctx.beginPath(); ctx.arc(cx, fontY, r, 0, TAU); ctx.stroke();
+      }
+      ctx.fillStyle = '#3a8030'; ctx.beginPath(); ctx.arc(cx, fontY, 40, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 2.5; ctx.stroke();
+      for (let a = 0; a < TAU; a += 0.4) {
+        const fx = cx + Math.cos(a) * 36, fy = fontY + Math.sin(a) * 36;
+        ctx.fillStyle = (Math.sin(a * 4) > 0 ? '#e53935' : '#fbc02d');
+        ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = '#cfd8dc'; ctx.beginPath(); ctx.arc(cx, fontY, 26, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#00bcd4'; ctx.beginPath(); ctx.arc(cx, fontY, 22, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(cx - 5, fontY - 5, 8, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#b0bec5'; ctx.beginPath(); ctx.arc(cx, fontY, 9, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(cx, fontY, 5, 0, TAU); ctx.fill();
+      ctx.restore();
+
+      // Muro Sul com Portão Aberto Monumental (112px de vão livre)
+      drawWallSec(x + 10, gateY - 14, (cx - 56) - (x + 10), 10);
+      drawWallSec(cx + 56, gateY - 14, (x + w - 10) - (cx + 56), 10);
+
+      // Pilares com Iluminação Dourada
+      const drawPillar = px => {
+        ctx.fillStyle = '#7a2818'; ctx.fillRect(px - 10, gateY - 22, 20, 24);
+        ctx.fillStyle = capCol; ctx.fillRect(px - 12, gateY - 25, 24, 4);
+        ctx.fillRect(px - 12, gateY, 24, 4);
+        ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(px, gateY - 28, 4.5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
+      };
+      drawPillar(cx - 58);
+      drawPillar(cx + 58);
+
+      // Placa Monumental
+      ctx.fillStyle = '#111215'; ctx.fillRect(cx - 160, gateY - 28, 95, 18);
+      ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.2; ctx.strokeRect(cx - 160, gateY - 28, 95, 18);
+      ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 8px Georgia'; ctx.textAlign = 'center';
+      ctx.fillText('⚜️ PALÁCIO DO DON ⚜️', cx - 112, gateY - 16); ctx.textAlign = 'left';
+
+      // Coqueiros ao longo da Alameda Sul
+      for (let py = gateY - 60; py >= fontY + 70; py -= 48) {
+        drawCoqueiro(cx - 74, py, 1.1);
+        drawCoqueiro(cx + 74, py, 1.1);
+      }
+      // Coqueiros ao redor da Rotatória
+      for (let a = 0; a < TAU; a += TAU / 6) {
+        drawCoqueiro(cx + Math.cos(a) * 92, fontY + Math.sin(a) * 92, 1.05);
+      }
+      // Coqueiros na Fachada da Mansão
+      [-220, -160, -100, 100, 160, 220].forEach(ox => {
+        drawCoqueiro(cx + ox, porticoY - 8, 1.15);
+      });
+      return;
+    }
+
+    // ========== 2. ALA OESTE: HELIPONTO DUPLO & SUPERCARROS & GOLFE ==========
+    if (kind === 'mansao_oeste') {
+      drawNobleBrickRect(x + 50, cy - 32, w - 50, 64, false);
+      drawNobleBrickRect(x + 320, y + 40, 52, h - 80, true);
+
+      // 1. Pátio do Showroom de Supercarros
+      ctx.save();
+      ctx.fillStyle = '#161920';
+      ctx.fillRect(x + 30, y + 60, 270, 190);
+      ctx.strokeStyle = '#69f0ae'; ctx.lineWidth = 1.8;
+      ctx.strokeRect(x + 30, y + 60, 270, 190);
+      for (let vx = x + 50; vx < x + 280; vx += 55) {
+        ctx.strokeStyle = 'rgba(255,214,100,0.6)'; ctx.lineWidth = 1.5;
+        ctx.strokeRect(vx, y + 150, 45, 90);
+      }
+      ctx.fillStyle = '#69f0ae'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('🏎️ HANGAR & SHOWROOM DE SUPERCARROS DO CHEFÃO 🏎️', x + 165, y + 80);
+      ctx.restore();
+
+      // 2. Heliponto 1 (Norte - H1)
+      const h1X = x + 480, h1Y = y + 170;
+      ctx.save();
+      ctx.fillStyle = '#263238'; ctx.beginPath(); ctx.arc(h1X, h1Y, 48, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#69f0ae'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(h1X, h1Y, 38, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('H1', h1X, h1Y + 11);
+      for (let a = 0; a < TAU; a += TAU / 8) {
+        ctx.fillStyle = '#00e676'; ctx.beginPath(); ctx.arc(h1X + Math.cos(a) * 52, h1Y + Math.sin(a) * 52, 3, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+
+      // 3. Heliponto 2 (Sul - H2)
+      const h2X = x + 480, h2Y = y + 470;
+      ctx.save();
+      ctx.fillStyle = '#263238'; ctx.beginPath(); ctx.arc(h2X, h2Y, 48, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 3; ctx.stroke();
+      ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(h2X, h2Y, 38, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('H2', h2X, h2Y + 11);
+      for (let a = 0; a < TAU; a += TAU / 8) {
+        ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(h2X + Math.cos(a) * 52, h2Y + Math.sin(a) * 52, 3, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+
+      // 4. Campo de Golfe Privativo (Putting Green & Fairway)
+      ctx.save();
+      const gx0 = x + 40, gy0 = y + 310, gw = 260, gh = 280;
+      ctx.fillStyle = '#2e7d32';
+      ctx.fillRect(gx0, gy0, gw, gh);
+      ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 2; ctx.strokeRect(gx0, gy0, gw, gh);
+
+      // Sand Bunker
+      ctx.fillStyle = '#f7e8c8';
+      ctx.beginPath();
+      ctx.ellipse(gx0 + 60, gy0 + 90, 42, 28, 0.4, 0, TAU);
+      ctx.fill();
+      ctx.strokeStyle = '#d7c4a0'; ctx.lineWidth = 1.5; ctx.stroke();
+
+      // Putting Green
+      ctx.fillStyle = '#43a047';
+      ctx.beginPath();
+      ctx.arc(gx0 + 170, gy0 + 170, 50, 0, TAU);
+      ctx.fill();
+
+      // Buraco e bandeira
+      const holeX = gx0 + 170, holeY = gy0 + 170;
+      ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(holeX, holeY, 4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(holeX, holeY); ctx.lineTo(holeX, holeY - 26); ctx.stroke();
+      ctx.fillStyle = '#d32f2f';
+      ctx.beginPath(); ctx.moveTo(holeX, holeY - 26); ctx.lineTo(holeX + 16, holeY - 20); ctx.lineTo(holeX, holeY - 14); ctx.fill();
+
+      ctx.fillStyle = '#e8f5e9'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('⛳ CAMPO DE GOLFE PRIVATIVO DO CHEFÃO ⛳', gx0 + gw / 2, gy0 + 20);
+      ctx.restore();
+
+      // Muros nobres
+      drawWallSec(x + 10, y + 10, 10, h - 20);
+      drawWallSec(x + 10, y + 10, w - 10, 10);
+      drawWallSec(x + 10, y + h - 14, w - 10, 10);
+
+      // Coqueiros ornamentais
+      [y + 80, y + 200, y + 420, y + 540].forEach(py => {
+        drawCoqueiro(x + 390, py, 1.05);
+      });
+      return;
+    }
+
+    // ========== 3. ALA LESTE: RESORT AQUÁTICO DUPLO & PRAIA PRIVADA ==========
+    if (kind === 'mansao_leste') {
+      drawNobleBrickRect(x, cy - 32, w - 50, 64, false);
+      drawNobleBrickRect(x + 180, y + 40, 52, h - 80, true);
+
+      const drawPiscina = (px, py, titulo) => {
+        ctx.save();
+        ctx.fillStyle = '#ece8dc';
+        ctx.fillRect(px - 75, py - 55, 150, 110);
+        ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1.8;
+        ctx.strokeRect(px - 75, py - 55, 150, 110);
+        ctx.fillStyle = '#0d47a1';
+        ctx.fillRect(px - 65, py - 45, 130, 90);
+        const gw = ctx.createLinearGradient(0, py - 42, 0, py + 42);
+        gw.addColorStop(0, '#00e5ff'); gw.addColorStop(0.5, '#00b0ff'); gw.addColorStop(1, '#0288d1');
+        ctx.fillStyle = gw;
+        ctx.fillRect(px - 63, py - 43, 126, 86);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.2;
+        for (let ly = py - 26; ly <= py + 26; ly += 26) {
+          ctx.beginPath(); ctx.moveTo(px - 58, ly); ctx.lineTo(px + 58, ly); ctx.stroke();
+        }
+        const drawLounger = (lx, ly) => {
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(lx - 5, ly - 10, 10, 20);
+          ctx.fillStyle = '#0288d1'; ctx.fillRect(lx - 4, ly - 9, 8, 6);
+          ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 5, ly - 10, 10, 20);
+        };
+        drawLounger(px - 50, py - 48);
+        drawLounger(px - 25, py - 48);
+        drawLounger(px + 25, py - 48);
+        drawLounger(px + 50, py - 48);
+        ctx.fillStyle = '#00e5ff'; ctx.font = 'bold 8.5px Arial'; ctx.textAlign = 'center';
+        ctx.fillText(titulo, px, py + 52);
+        ctx.restore();
+      };
+
+      drawPiscina(x + 95, y + 160, '🏊 PISCINA OLÍMPICA NORTE');
+      drawPiscina(x + 95, y + 460, '🏊 PISCINA OLÍMPICA SUL');
+
+      // Ponte de Pedra / Cascata unindo as duas piscinas
+      ctx.fillStyle = '#dfd8c8';
+      ctx.fillRect(x + 60, cy - 25, 70, 50);
+      ctx.strokeStyle = '#bcaaa4'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + 60, cy - 25, 70, 50);
+      ctx.fillStyle = '#00e5ff'; ctx.font = 'bold 8px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('🌊 CASCATAS 🌊', x + 95, cy + 3);
+
+      // Praia Privada de Areia Dourada do Don
+      ctx.save();
+      const bx0 = x + 370, by0 = y + 60, bw = 250, bh = 520;
+      ctx.fillStyle = '#ecd599';
+      ctx.fillRect(bx0, by0, bw, bh);
+      ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 2; ctx.strokeRect(bx0, by0, bw, bh);
+
+      const drawTikiHut = (tx, ty, nome) => {
+        ctx.fillStyle = '#6d4c41'; ctx.beginPath(); ctx.arc(tx, ty, 24, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#a1887f'; ctx.beginPath(); ctx.arc(tx, ty, 20, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#d7ccc8'; ctx.beginPath(); ctx.arc(tx, ty, 8, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ff6d00'; ctx.beginPath(); ctx.arc(tx + 22, ty - 18, 4, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffd600'; ctx.beginPath(); ctx.arc(tx + 22, ty - 18, 2, 0, TAU); ctx.fill();
+        if (nome) {
+          ctx.fillStyle = '#3e2723'; ctx.font = 'bold 7.5px Arial'; ctx.textAlign = 'center';
+          ctx.fillText(nome, tx, ty + 32);
+        }
+      };
+
+      drawTikiHut(bx0 + 60, by0 + 90, 'BAR MOLHADO');
+      drawTikiHut(bx0 + 190, by0 + 90, 'LOUNGE VIP');
+      drawTikiHut(bx0 + 60, by0 + 430, 'CABANA TROPICAL');
+      drawTikiHut(bx0 + 190, by0 + 430, 'DECK PRAIA');
+
+      // Gazebo Imperial
+      ctx.fillStyle = '#f5f5f5'; ctx.beginPath(); ctx.arc(bx0 + 125, by0 + 260, 36, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 2.5; ctx.stroke();
+      ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(bx0 + 125, by0 + 260, 16, 0, TAU); ctx.fill();
+
+      ctx.fillStyle = '#bf360c'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
+      ctx.fillText('🏖️ PRAIA PRIVATIVA DE AREIA DOURADA DO DON 🏖️', bx0 + bw / 2, by0 + 25);
+      ctx.restore();
+
+      // Muros nobres
+      drawWallSec(x + w - 20, y + 10, 10, h - 20);
+      drawWallSec(x, y + 10, w - 10, 10);
+      drawWallSec(x, y + h - 14, w - 10, 10);
+
+      // Coqueiros tropicais
+      [y + 80, y + 200, y + 420, y + 540].forEach(py => {
+        drawCoqueiro(x + 250, py, 1.1);
+        drawCoqueiro(x + 350, py, 1.1);
+      });
+      return;
+    }
+
+    // ========== 4. ALA NORTE: JARDINS FRANCESES & VERSALHES ==========
+    if (kind === 'mansao_norte') {
+      ctx.fillStyle = '#1b5e20';
+      for (let sx = x + 60; sx < x + w - 60; sx += 120) {
+        ctx.fillRect(sx, y + 60, 80, 20);
+        ctx.fillRect(sx, y + h - 80, 80, 20);
+      }
+      ctx.fillStyle = '#cfd8dc'; ctx.beginPath(); ctx.arc(cx, cy, 32, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#00bcd4'; ctx.beginPath(); ctx.arc(cx, cy, 26, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(cx, cy, 8, 0, TAU); ctx.fill();
+
+      for (let px = x + 80; px < x + w - 60; px += 140) {
+        drawCoqueiro(px, cy - 80, 1.15);
+        drawCoqueiro(px, cy + 80, 1.15);
+      }
+
+      ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 9.5px Georgia'; ctx.textAlign = 'center';
+      ctx.fillText('⚜️ JARDINS REAIS FRANCESES & BOSQUE DO CHEFÃO ⚜️', cx, cy + 50);
+      return;
+    }
   }
 
-  const SEM_ANEL = { floresta: 1, bosque: 1, campo: 1, fazenda: 1, porto: 1, mansao_chefao: 1 };
+  const SEM_ANEL = { floresta: 1, bosque: 1, campo: 1, fazenda: 1, porto: 1, mansao_chefao: 1, mansao_oeste: 1, mansao_leste: 1, mansao_norte: 1 };
   function drawBlockGround(ctx, blk, x0, y0, x1, y1) {
     const { x, y, w, h, kind } = blk;
     if (kind === 'river') {
@@ -1623,7 +1794,7 @@
       return;
     }
     if (SEM_ANEL[kind]) {
-      if (kind === 'mansao_chefao') drawMansaoGround(ctx, blk); else if (kind === 'porto') drawPorto(ctx, blk); else G.rural.desenhaBloco(ctx, blk, tex, x0, y0, x1, y1, AR.drawQuintal);
+      if (kind.startsWith('mansao_')) drawMansaoGround(ctx, blk); else if (kind === 'porto') drawPorto(ctx, blk); else G.rural.desenhaBloco(ctx, blk, tex, x0, y0, x1, y1, AR.drawQuintal);
       return;
     }
     // calçada com cantos arredondados

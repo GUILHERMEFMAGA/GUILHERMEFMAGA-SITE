@@ -59,55 +59,86 @@
         if ((Math.floor(yy / 32)) % 2 === 0) ctx.fillRect(ax, yy, bx - ax, 32);
       }
 
-      // Desenho da Estrada Única Particular da Mansão do Chefão (de bx=14 até bx=24)
-      const PR_Y = (6 + 2 * 28 + 8 + 10) * 32; // y = 2560 (linha de acesso nobre)
+      // Desenho da Rodovia Privativa de Pista Dupla (Entrada e Saída Expressa da Cidade)
+      const PR_Y = (6 + 2 * 28 + 8 + 10) * 32; // y = 2560 (eixo central da rodovia)
       const PR_X0 = (6 + 14 * 28 + 8) * 32;    // x = 13056 (entrada do domínio)
       const PR_X1 = (6 + 24 * 28 + 8 + 10) * 32; // x = 22272 (mansão)
       const PR_W = PR_X1 - PR_X0;
 
-      if (PR_X1 >= ax && PR_X0 <= bx && PR_Y + 64 >= ay && PR_Y - 64 <= by) {
+      if (PR_X1 >= ax && PR_X0 <= bx && PR_Y + 90 >= ay && PR_Y - 90 <= by) {
         ctx.save();
-        // Asfalto nobre escuro da estrada privativa
-        ctx.fillStyle = '#22252e';
-        ctx.fillRect(PR_X0, PR_Y - 48, PR_W, 96);
-        // Guias de mármore claro nas bordas
+        // 1. Pista Norte (ENTRADA: Cidade ➔ Mansão)
+        ctx.fillStyle = '#1c1e24';
+        ctx.fillRect(PR_X0, PR_Y - 72, PR_W, 60);
         ctx.fillStyle = '#dfd8c8';
-        ctx.fillRect(PR_X0, PR_Y - 50, PR_W, 3);
-        ctx.fillRect(PR_X0, PR_Y + 47, PR_W, 3);
-        // Linha tracejada dourada / amarela no centro
-        ctx.fillStyle = '#ffd54f';
-        for (let xx = PR_X0 + 20; xx < PR_X1 - 20; xx += 80) {
-          ctx.fillRect(xx, PR_Y - 2, 48, 4);
-        }
-        // Postes de iluminação dourados ao longo da estrada
-        for (let xx = PR_X0 + 60; xx < PR_X1 - 40; xx += 160) {
-          ctx.fillStyle = '#37474f'; ctx.fillRect(xx - 2, PR_Y - 56, 4, 7);
-          ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(xx, PR_Y - 58, 3, 0, TAU); ctx.fill();
+        ctx.fillRect(PR_X0, PR_Y - 74, PR_W, 3);
+        ctx.fillRect(PR_X0, PR_Y - 13, PR_W, 3);
+        // Faixas e setas verdes de Entrada
+        ctx.fillStyle = '#69f0ae';
+        for (let xx = PR_X0 + 30; xx < PR_X1 - 20; xx += 120) {
+          ctx.fillRect(xx, PR_Y - 44, 40, 4);
         }
 
-        // Posto de Segurança Principal e Bloqueio na Entrada da Estrada (bx=14)
-        const ckX = PR_X0 + 90;
-        // Cabine blindada de controle do Capitão Salvatore
-        ctx.fillStyle = '#1c1f26';
-        ctx.fillRect(ckX - 35, PR_Y - 90, 70, 36);
-        ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 1.8;
-        ctx.strokeRect(ckX - 35, PR_Y - 90, 70, 36);
-        // Vidros fumê blindados
-        ctx.fillStyle = '#42a5f5'; ctx.fillRect(ckX - 25, PR_Y - 82, 50, 12);
-        // Barricada de concreto com listras de bloqueio rodoviário
-        ctx.fillStyle = '#37474f';
-        ctx.fillRect(ckX + 45, PR_Y - 44, 18, 88);
-        ctx.fillStyle = '#ffd600';
-        for (let yy = PR_Y - 44; yy < PR_Y + 44; yy += 16) {
-          ctx.fillRect(ckX + 45, yy, 18, 8);
+        // 2. Canteiro Central com Coqueiros e Iluminação
+        ctx.fillStyle = '#2e7d32';
+        ctx.fillRect(PR_X0, PR_Y - 10, PR_W, 20);
+        ctx.fillStyle = '#dfd8c8';
+        ctx.fillRect(PR_X0, PR_Y - 11, PR_W, 2);
+        ctx.fillRect(PR_X0, PR_Y + 9, PR_W, 2);
+        for (let xx = PR_X0 + 40; xx < PR_X1 - 20; xx += 80) {
+          // Mini-coqueiros no canteiro central
+          ctx.fillStyle = '#6d4c41'; ctx.beginPath(); ctx.arc(xx, PR_Y, 3, 0, TAU); ctx.fill();
+          ctx.fillStyle = '#43a047'; ctx.beginPath(); ctx.arc(xx, PR_Y, 7, 0, TAU); ctx.fill();
+          // Lâmpada de iluminação dourada
+          ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(xx + 15, PR_Y, 2.5, 0, TAU); ctx.fill();
         }
-        // Placa Monumental de Bloqueio Rodoviário
-        ctx.fillStyle = '#111215';
-        ctx.fillRect(ckX - 140, PR_Y + 54, 280, 22);
-        ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 2;
-        ctx.strokeRect(ckX - 140, PR_Y + 54, 280, 22);
-        ctx.fillStyle = '#ff5252'; ctx.font = 'bold 9px Arial'; ctx.textAlign = 'center';
-        ctx.fillText('🛑 DOMÍNIO PRIVADO DO PODEROSO CHEFÃO — ENTRADA PROIBIDA A CIVIS E POLÍCIA 🛑', ckX, PR_Y + 68);
+
+        // 3. Pista Sul (SAÍDA: Mansão ➔ Cidade)
+        ctx.fillStyle = '#1c1e24';
+        ctx.fillRect(PR_X0, PR_Y + 12, PR_W, 60);
+        ctx.fillStyle = '#dfd8c8';
+        ctx.fillRect(PR_X0, PR_Y + 11, PR_W, 3);
+        ctx.fillRect(PR_X0, PR_Y + 72, PR_W, 3);
+        // Faixas e setas vermelhas de Saída
+        ctx.fillStyle = '#ff5252';
+        for (let xx = PR_X0 + 30; xx < PR_X1 - 20; xx += 120) {
+          ctx.fillRect(xx, PR_Y + 40, 40, 4);
+        }
+
+        // 4. Posto de Controle e Bloqueio Duplo do Capitão Salvatore (bx=14)
+        const ckX = PR_X0 + 90;
+        // Cabine blindada central de comando
+        ctx.fillStyle = '#111318';
+        ctx.fillRect(ckX - 35, PR_Y - 26, 70, 52);
+        ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 2;
+        ctx.strokeRect(ckX - 35, PR_Y - 26, 70, 52);
+        // Vidros espelhados azuis
+        ctx.fillStyle = '#42a5f5'; ctx.fillRect(ckX - 25, PR_Y - 18, 50, 36);
+
+        // Cancelas automáticas de Entrada e Saída
+        ctx.fillStyle = '#ffeb3b';
+        ctx.fillRect(ckX + 40, PR_Y - 65, 12, 50); // Cancela Entrada
+        ctx.fillRect(ckX + 40, PR_Y + 15, 12, 50); // Cancela Saída
+        ctx.fillStyle = '#d32f2f';
+        for (let k = 0; k < 4; k++) {
+          ctx.fillRect(ckX + 40, PR_Y - 65 + k * 12, 12, 6);
+          ctx.fillRect(ckX + 40, PR_Y + 15 + k * 12, 12, 6);
+        }
+
+        // Placas Luminosas de Entrada e Saída
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(ckX - 130, PR_Y - 98, 260, 20);
+        ctx.strokeStyle = '#00e676'; ctx.lineWidth = 1.8;
+        ctx.strokeRect(ckX - 130, PR_Y - 98, 260, 20);
+        ctx.fillStyle = '#00e676'; ctx.font = 'bold 8.5px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('🟢 PISTA DE ENTRADA EXPRESSA: PALÁCIO DO CHEFÃO ➔', ckX, PR_Y - 84);
+
+        ctx.fillStyle = '#0a0c10';
+        ctx.fillRect(ckX - 130, PR_Y + 78, 260, 20);
+        ctx.strokeStyle = '#ff1744'; ctx.lineWidth = 1.8;
+        ctx.strokeRect(ckX - 130, PR_Y + 78, 260, 20);
+        ctx.fillStyle = '#ff5252'; ctx.font = 'bold 8.5px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('⬅ PISTA DE SAÍDA EXPRESSA: CENTRO DA CIDADE 🔴', ckX, PR_Y + 92);
         ctx.restore();
       }
       return;

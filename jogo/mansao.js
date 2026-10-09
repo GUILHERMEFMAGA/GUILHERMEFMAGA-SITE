@@ -29,32 +29,50 @@
   const M = G.mansao = {};
 
   // ---------- COORDENADAS DA PROPRIEDADE NO MAPA MUNDIAL ----------
-  // Localizada no coração dos GRANDES CAMPOS DO PODEROSO CHEFÃO (coluna 24, linha 2) — vastíssimo campo aberto sem floresta
+  // Localizada no coração dos GRANDES CAMPOS DO PODEROSO CHEFÃO (coluna 23 a 25, linha 2) — colossal domínio multi-quadra
   const T = W.T || 32, ROAD = 8, BLOCK = 20, PITCH = ROAD + BLOCK, MG = 6;
   const bx = 24, by = 2;
   const tx0 = MG + ROAD + bx * PITCH, ty0 = MG + ROAD + by * PITCH;
+  const west_x0 = (MG + ROAD + 23 * PITCH) * T;
+  const east_x0 = (MG + ROAD + 25 * PITCH) * T;
+
   const estate = {
     x0: tx0 * T,
     y0: ty0 * T,
     w: BLOCK * T,
     h: BLOCK * T,
     cx: (tx0 + BLOCK / 2) * T,
-    cy: (ty0 + BLOCK / 2) * T
+    cy: (ty0 + BLOCK / 2) * T,
+    total_x0: west_x0,
+    total_w: 3 * BLOCK * T
   };
 
   // Pontos de interesse na propriedade
-  const P_CHECKPOINT = { x: (MG + 14 * PITCH + ROAD) * T + 90, y: (MG + 2 * PITCH + ROAD + 10) * T }; // Posto do Segurança Principal na entrada da estrada
-  const P_MANSAO = { x: estate.cx, y: (ty0 + 10) * T + 20 };       // Porta principal da Mansão
-  const P_FONTE = { x: estate.cx, y: (ty0 + 14) * T };             // Pátio da Fonte Central
-  const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 30 }; // Portão Principal / Guaritas
-  const P_LIMO = { x: estate.cx - 90, y: (ty0 + 10) * T + 30 };    // Ponto da Limusine
-  const P_GOLF = { x: estate.cx - 210, y: (ty0 + 13) * T };        // Ponto do Carrinho de Golfe
-  const P_PISCINA = { x: estate.cx + 175, y: (ty0 + 13) * T };     // Grande Piscina Olímpica
-  const P_GOLFE_CAMPO = { x: estate.cx - 200, y: (ty0 + 13) * T }; // Campo de Golfe
-  const P_HELI = { x: estate.cx - 190, y: (ty0 + 13) * T };        // Heliponto Privativo
+  const P_CHECKPOINT = { x: (MG + 14 * PITCH + ROAD) * T + 90, y: (MG + 2 * PITCH + ROAD + 10) * T }; // Posto do Capitão Salvatore no Bloqueio da Estrada Dupla
+  const P_ENTRADA_EXPRESSA = { x: P_CHECKPOINT.x + 40, y: P_CHECKPOINT.y - 40 }; // Pista de Entrada (Cidade ➔ Mansão)
+  const P_SAIDA_EXPRESSA = { x: P_CHECKPOINT.x + 40, y: P_CHECKPOINT.y + 40 };   // Pista de Saída (Mansão ➔ Cidade)
+
+  // Palácio Central (bx = 24)
+  const P_MANSAO = { x: estate.cx, y: (ty0 + 10) * T + 20 };       // Porta principal do Palácio
+  const P_FONTE = { x: estate.cx, y: (ty0 + 14) * T };             // Rotatória da Fonte Monumental
+  const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 30 }; // Portão Sul Monumental
+  const P_LIMO = { x: estate.cx - 90, y: (ty0 + 10) * T + 30 };    // Ponto da Limusine Presidencial
+
+  // Ala Oeste (bx = 23) — Hangar de Supercarros, Heliponto Duplo e Golfe
+  const P_SUPERCAR = { x: west_x0 + 160, y: (ty0 + 6) * T };        // Showroom da Ferrari Rosso Corsa
+  const P_HELI1 = { x: west_x0 + 480, y: (ty0 + 5.5) * T };         // Heliponto Executivo H1
+  const P_HELI2 = { x: west_x0 + 480, y: (ty0 + 14.5) * T };        // Heliponto Executivo H2
+  const P_GOLF = { x: west_x0 + 180, y: (ty0 + 11) * T };          // Ponto do Carrinho de Golfe
+  const P_GOLFE_CAMPO = { x: west_x0 + 210, y: (ty0 + 15) * T };   // Campo de Golfe (Putting Green)
+
+  // Ala Leste (bx = 25) — Resort Aquático Duplo e Praia Privada do Don
+  const P_PISCINA_NORTE = { x: east_x0 + 95, y: (ty0 + 5) * T };    // Piscina Olímpica Norte
+  const P_PISCINA_SUL = { x: east_x0 + 95, y: (ty0 + 14) * T };     // Piscina Olímpica Sul
+  const P_PRAIA_CABANA = { x: east_x0 + 460, y: (ty0 + 10) * T };   // Cabana Tropical / Bar Molhado
+  const P_GAZEBO = { x: east_x0 + 495, y: (ty0 + 8) * T };          // Gazebo Imperial de Mármore
 
   M.estate = estate;
-  M.pontos = { P_CHECKPOINT, P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };
+  M.pontos = { P_CHECKPOINT, P_ENTRADA_EXPRESSA, P_SAIDA_EXPRESSA, P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_SUPERCAR, P_HELI1, P_HELI2, P_GOLF, P_GOLFE_CAMPO, P_PISCINA_NORTE, P_PISCINA_SUL, P_PRAIA_CABANA, P_GAZEBO };
 
   // ---------- ESTADO GLOBAL DA MANSÃO (salvo ou dinâmico) ----------
   M.estado = {
@@ -73,64 +91,75 @@
   const plMansao = {
     id: 'mansao_chefao',
     tipo: 'mansao',
-    nome: 'MANSÃO DO PODEROSO CHEFÃO',
-    sub: 'Villa Mafiosa — Quartel-General do Don',
+    nome: 'PALÁCIO DO PODEROSO CHEFÃO',
+    sub: 'Villa Mafiosa — Sede Central do Don',
     cor: '#e5b834',
     x: P_MANSAO.x,
     y: P_MANSAO.y + 20,
-    r: 46
+    r: 52
   };
   if (W.places && !W.places.some(p => p.id === 'mansao_chefao')) {
     W.places.push(plMansao);
   }
 
-  // ---------- SEGURANÇA ESTRATÉGICA PERIMETRAL (LONGE DA CASA, SEM AMONTOAR) ----------
+  // ---------- SEGURANÇA ESTRATÉGICA PERIMETRAL (50+ GUARDAS DISTRIBUÍDOS PELAS ALAS) ----------
   const GUARDAS_POS = [
-    // 1. Posto de Bloqueio da Estrada Única (Capitão Salvatore - Segurança Principal)
-    { x: P_CHECKPOINT.x, y: P_CHECKPOINT.y - 25, h: 0, tag: 'capitao_salvatore', arma: 'smg', fala: 'Don Guilherme! Bloqueio 100% ativo. Nenhum carro civil ou policial passa por esta estrada!' },
-    { x: P_CHECKPOINT.x - 35, y: P_CHECKPOINT.y + 25, h: 0.2, tag: 'bloqueio_guarda_1', arma: 'shotgun', fala: 'Acesso liberado apenas para o Don e sua comitiva.' },
-    { x: P_CHECKPOINT.x + 35, y: P_CHECKPOINT.y + 25, h: -0.2, tag: 'bloqueio_guarda_2', arma: 'shotgun', fala: 'Estrada particular monitorada 24 horas por dia.' },
+    // 1. Posto de Bloqueio Duplo da Rodovia Expressa (Capitão Salvatore - Segurança Principal)
+    { x: P_CHECKPOINT.x, y: P_CHECKPOINT.y - 25, h: 0, tag: 'capitao_salvatore', arma: 'smg', fala: 'Don Guilherme! Bloqueio duplo ativo. As pistas de Entrada e Saída estão 100% blindadas para o senhor!' },
+    { x: P_CHECKPOINT.x - 35, y: P_CHECKPOINT.y + 25, h: 0.2, tag: 'bloqueio_guarda_1', arma: 'shotgun', fala: 'Pista de Entrada monitorada. Acesso liberado apenas para o Don e sua comitiva.' },
+    { x: P_CHECKPOINT.x + 35, y: P_CHECKPOINT.y + 25, h: -0.2, tag: 'bloqueio_guarda_2', arma: 'shotgun', fala: 'Pista de Saída expressa em prontidão total para o retorno ao centro.' },
 
-    // 2. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros da propriedade)
-    { x: estate.x0 + 40, y: estate.y0 + 40, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
-    { x: estate.x0 + estate.w - 40, y: estate.y0 + 40, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' },
-    { x: estate.x0 + 40, y: estate.y0 + estate.h - 40, h: 3 * Math.PI / 4, tag: 'torre_so', arma: 'sniper' },
-    { x: estate.x0 + estate.w - 40, y: estate.y0 + estate.h - 40, h: -3 * Math.PI / 4, tag: 'torre_se', arma: 'sniper' },
+    // 2. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos de todo o domínio)
+    { x: west_x0 + 40, y: estate.y0 + 40, h: Math.PI / 4, tag: 'torre_no_extrema', arma: 'sniper' },
+    { x: east_x0 + estate.w - 40, y: estate.y0 + 40, h: -Math.PI / 4, tag: 'torre_ne_extrema', arma: 'sniper' },
+    { x: west_x0 + 40, y: estate.y0 + estate.h - 40, h: 3 * Math.PI / 4, tag: 'torre_so_extrema', arma: 'sniper' },
+    { x: east_x0 + estate.w - 40, y: estate.y0 + estate.h - 40, h: -3 * Math.PI / 4, tag: 'torre_se_extrema', arma: 'sniper' },
 
-    // 3. Instalações Externas Afastadas
-    { x: P_HELI.x - 45, y: P_HELI.y - 25, h: 0.8, tag: 'guarda_heli', arma: 'smg' },
-    { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y + 40, h: -0.5, tag: 'guarda_golfe', arma: 'pistol' },
-    { x: P_PISCINA.x + 65, y: P_PISCINA.y + 40, h: -0.8, tag: 'guarda_piscina', arma: 'pistol' },
+    // 3. Ala Oeste: Hangar de Supercarros, Helipontos e Golfe
+    { x: P_SUPERCAR.x - 40, y: P_SUPERCAR.y + 20, h: 0.5, tag: 'guarda_supercar_1', arma: 'smg', fala: 'A Ferrari Rosso Corsa está abastecida e brilhando, Don!' },
+    { x: P_SUPERCAR.x + 40, y: P_SUPERCAR.y + 20, h: -0.5, tag: 'guarda_supercar_2', arma: 'pistol', fala: 'Showroom de supercarros 100% protegido contra qualquer intruso.' },
+    { x: P_HELI1.x - 35, y: P_HELI1.y, h: 0.8, tag: 'guarda_heli1', arma: 'smg', fala: 'Heliponto H1 operacional e pronto para decolagem.' },
+    { x: P_HELI2.x - 35, y: P_HELI2.y, h: -0.8, tag: 'guarda_heli2', arma: 'smg', fala: 'Heliponto H2 com balizamento noturno ativado.' },
+    { x: P_GOLFE_CAMPO.x - 40, y: P_GOLFE_CAMPO.y, h: 0, tag: 'guarda_golfe', arma: 'pistol', fala: 'O green de golfe está impecável para o Don praticar hoje.' },
 
-    // 4. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
-    { x: P_MANSAO.x - 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_e', arma: 'pistol' },
-    { x: P_MANSAO.x + 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_d', arma: 'pistol' }
+    // 4. Ala Leste: Resort Aquático Duplo e Praia Privada
+    { x: P_PISCINA_NORTE.x + 60, y: P_PISCINA_NORTE.y, h: -0.8, tag: 'guarda_piscina_norte', arma: 'pistol', fala: 'Água aquecida e cristalina na piscina olímpica norte, Chefe!' },
+    { x: P_PISCINA_SUL.x + 60, y: P_PISCINA_SUL.y, h: -0.8, tag: 'guarda_piscina_sul', arma: 'pistol', fala: 'Piscina olímpica sul com LEDs noturnos programados.' },
+    { x: P_PRAIA_CABANA.x - 30, y: P_PRAIA_CABANA.y, h: 0.3, tag: 'guarda_praia', arma: 'smg', fala: 'Praia privativa do Don protegida e com bar molhado à disposição.' },
+    { x: P_GAZEBO.x - 30, y: P_GAZEBO.y + 25, h: -0.5, tag: 'guarda_gazebo', arma: 'pistol', fala: 'Gazebo imperial pronto para reuniões executivas e relaxamento.' },
+
+    // 5. Palácio Central: Entrada Principal e Portão Sul
+    { x: P_MANSAO.x - 45, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_e', arma: 'pistol', fala: 'Bem-vindo de volta ao Palácio Central, Don Guilherme.' },
+    { x: P_MANSAO.x + 45, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_d', arma: 'pistol', fala: 'Todos os aposentos reais e o cofre estão em segurança máxima.' },
+    { x: P_PORTAO.x - 45, y: P_PORTAO.y - 10, h: 0, tag: 'portao_e', arma: 'shotgun', fala: 'Portão Sul Monumental aberto para a rodovia expressa.' },
+    { x: P_PORTAO.x + 45, y: P_PORTAO.y - 10, h: 0, tag: 'portao_d', arma: 'shotgun', fala: 'Acesso liberado diretamente para a cidade.' }
   ];
 
   // ---------- CÃES DE GUARDA (PATRULHA EXCLUSIVA NO PERÍMETRO EXTERNO) ----------
   const CAES_POS = [
     { x: P_CHECKPOINT.x - 65, y: P_CHECKPOINT.y - 20, ang: 0, r: 25, latT: 0, nome: 'Cerberus (Guarda da Estrada)' },
-    { x: estate.x0 + 50, y: estate.cy - 80, ang: 1.5, r: 35, latT: 0, nome: 'Brutus' },
-    { x: estate.x0 + 50, y: estate.cy + 80, ang: 1.5, r: 35, latT: 0, nome: 'Titan' },
-    { x: estate.x0 + estate.w - 50, y: estate.cy - 80, ang: -1.5, r: 35, latT: 0, nome: 'Nero' },
-    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' }
+    { x: west_x0 + 80, y: estate.cy, ang: 1.5, r: 40, latT: 0, nome: 'Brutus (Ala Oeste)' },
+    { x: east_x0 + estate.w - 80, y: estate.cy, ang: -1.5, r: 40, latT: 0, nome: 'Nero (Ala Leste)' },
+    { x: estate.x0 + 50, y: estate.cy + 80, ang: 1.5, r: 35, latT: 0, nome: 'Titan (Palácio)' },
+    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor (Palácio)' }
   ];
 
   // Falas dos seguranças da máfia
   const FALAS_GUARDAS = [
-    'Bom dia, Don! O perímetro está 100% blindado.',
-    'Nenhum policial ou rival ousa pisar nesta propriedade, Chefe.',
-    'A limusine está com o tanque cheio e pronta para partir.',
-    'Os tributos das lojas da cidade foram recolhidos com sucesso.',
-    'Dona Carmela preparou um banquete siciliano dos deuses na cozinha.',
-    'Sofia avisou que o correio particular chegou na recepção.',
-    'Cães de patrulha alimentados e em alerta máximo, Don!',
-    'Qualquer problema na cidade, mande nos chamar pelo telefone vermelho!'
+    'Bom dia, Don! O colossal domínio do Palácio está 100% blindado.',
+    'As pistas de Entrada e Saída expressas garantem trânsito livre e seguro até a cidade!',
+    'Capitão Salvatore reportou que nenhuma viatura rival ousou se aproximar.',
+    'A Ferrari no hangar oeste e a limusine no palácio estão prontas para acelerar!',
+    'Piscinas olímpicas e a praia privativa na Ala Leste preparadas para o seu lazer.',
+    'Dona Carmela preparou um banquete siciliano dos deuses na cozinha real.',
+    'Sofia avisou que o correio particular chegou na recepção nobre.',
+    'Cães de patrulha e snipers em alerta máximo em todo o perímetro!'
   ];
 
   // ---------- VEÍCULOS PARTICULARES DA MANSÃO ----------
   let limusineObj = null;
   let golfCartObj = null;
+  let supercarObj = null;
 
   function garanteVeiculos(S) {
     if (!S || !S.cars) return;
@@ -162,6 +191,21 @@
         tag: 'mansao_golf'
       });
       S.cars.push(golfCartObj);
+    }
+    if (!supercarObj || !S.cars.includes(supercarObj) || supercarObj.dead) {
+      supercarObj = new G.Car({
+        x: P_SUPERCAR.x,
+        y: P_SUPERCAR.y,
+        a: 0,
+        kind: 'coupe',
+        color: '#d61b1f',
+        driver: 'none',
+        mode: 'parked',
+        owned: true,
+        max: 480,
+        tag: 'mansao_ferrari'
+      });
+      S.cars.push(supercarObj);
     }
   }
 
@@ -211,6 +255,10 @@
   // ---------- MENU DO MOTORISTA DA LIMUSINE (VINCENZO) ----------
   function menuChauffeur(S) {
     const destinos = [
+      { n: '🟢 Pista de Entrada Expressa (Cidade ➔ Palácio do Chefão)', x: P_MANSAO.x, y: P_MANSAO.y + 12 },
+      { n: '🔴 Pista de Saída Expressa (Palácio do Chefão ➔ Cidade)', x: 680, y: 720 },
+      { n: '🏎️ Ala Oeste (Showroom de Supercarros, Helipontos & Golfe)', x: P_SUPERCAR.x, y: P_SUPERCAR.y + 20 },
+      { n: '🏖️ Ala Leste (Resort Aquático Olímpico & Praia do Don)', x: P_PISCINA_NORTE.x, y: P_PISCINA_NORTE.y + 20 },
       { n: '🚗 Centro de Ribeirão Preto (Garagem & Telefones)', x: 680, y: 720 },
       { n: '🍺 Pinguim Chopp & Mercadão Municipal', x: 1200, y: 720 },
       { n: '🌾 Fazendas Santa Rita (Área Rural)', x: 3800, y: 1600 },
@@ -1417,24 +1465,26 @@
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 1. LEDs Noturnos da Piscina (efeito dinâmico de iluminação subaquática)
-    if (inV(P_PISCINA) && isNight) {
-      ctx.save();
-      ctx.translate(P_PISCINA.x, P_PISCINA.y);
-      const ledHue = Math.floor((time * 40) % 360);
-      for (let lx = -70; lx <= 70; lx += 35) {
-        [-45, 45].forEach(ly => {
-          const gr = ctx.createRadialGradient(lx, ly, 1, lx, ly, 25);
-          gr.addColorStop(0, 'hsla(' + ledHue + ', 100%, 75%, 0.8)');
-          gr.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = gr;
-          ctx.beginPath();
-          ctx.arc(lx, ly, 25, 0, TAU);
-          ctx.fill();
-        });
+    // 1. LEDs Noturnos das Piscinas Olímpicas (efeito dinâmico de iluminação subaquática)
+    [P_PISCINA_NORTE, P_PISCINA_SUL].forEach(pPool => {
+      if (inV(pPool) && isNight) {
+        ctx.save();
+        ctx.translate(pPool.x, pPool.y);
+        const ledHue = Math.floor((time * 40) % 360);
+        for (let lx = -60; lx <= 60; lx += 30) {
+          [-40, 40].forEach(ly => {
+            const gr = ctx.createRadialGradient(lx, ly, 1, lx, ly, 25);
+            gr.addColorStop(0, 'hsla(' + ledHue + ', 100%, 75%, 0.8)');
+            gr.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = gr;
+            ctx.beginPath();
+            ctx.arc(lx, ly, 25, 0, TAU);
+            ctx.fill();
+          });
+        }
+        ctx.restore();
       }
-      ctx.restore();
-    }
+    });
 
     // 2. Desenho dos Seguranças da Máfia com modelo completo
     GUARDAS_POS.forEach((g, idx) => {
@@ -1548,7 +1598,7 @@
     }
 
     // 4. Interagir com o Carrinho de Golfe
-    if (Math.hypot(P_GOLF.x - P.x, P_GOLF.y - P.y) < 40) {
+    if (Math.hypot(P_GOLF.x - P.x, P_GOLF.y - P.y) < 45) {
       return {
         t: 'carrinho_golf',
         s: 'E: DIRIGIR CARRINHO DE GOLFE NO GRAMADO',
@@ -1564,15 +1614,70 @@
       };
     }
 
-    // 5. Interagir com a Grande Piscina Olímpica
-    if (Math.hypot(P_PISCINA.x - P.x, P_PISCINA.y - P.y) < 55) {
+    // 5. Interagir com a Ferrari Rosso Corsa no Hangar Oeste
+    if (Math.hypot(P_SUPERCAR.x - P.x, P_SUPERCAR.y - P.y) < 45) {
       return {
-        t: 'piscina_externa',
-        s: 'E: NADAR NA PISCINA OLÍMPICA ILUMINADA (+VIDA)',
+        t: 'supercar_ferrari',
+        s: 'E: PILOTAR FERRARI ROSSO CORSA NO HANGAR',
+        run: () => {
+          if (supercarObj) {
+            P.x = supercarObj.x;
+            P.y = supercarObj.y;
+            supercarObj.driver = 'player';
+            P.car = supercarObj;
+            G.say('V8 roncando alto! Você assumiu o comando da Ferrari Rosso Corsa.', 4);
+          }
+        }
+      };
+    }
+
+    // 6. Interagir com a Piscina Olímpica Norte
+    if (Math.hypot(P_PISCINA_NORTE.x - P.x, P_PISCINA_NORTE.y - P.y) < 65) {
+      return {
+        t: 'piscina_norte',
+        s: 'E: NADAR NA PISCINA OLÍMPICA NORTE (+VIDA)',
         run: () => {
           P.hp = 100;
-          G.say('Você deu um mergulho relaxante na piscina de água cristalina. Vida 100%!', 4);
+          G.say('Você deu um mergulho refrescante na piscina olímpica norte. Vida 100%!', 4);
           G.snd.door();
+        }
+      };
+    }
+
+    // 7. Interagir com a Piscina Olímpica Sul
+    if (Math.hypot(P_PISCINA_SUL.x - P.x, P_PISCINA_SUL.y - P.y) < 65) {
+      return {
+        t: 'piscina_sul',
+        s: 'E: NADAR NA PISCINA OLÍMPICA SUL COM LEDS (+VIDA)',
+        run: () => {
+          P.hp = 100;
+          G.say('Você relaxou na piscina olímpica sul iluminada por LEDs. Vida 100%!', 4);
+          G.snd.door();
+        }
+      };
+    }
+
+    // 8. Interagir com a Cabana da Praia Privada
+    if (Math.hypot(P_PRAIA_CABANA.x - P.x, P_PRAIA_CABANA.y - P.y) < 55) {
+      return {
+        t: 'praia_cabana',
+        s: 'E: RELAXAR NA CABANA DA PRAIA PRIVADA (+VIDA)',
+        run: () => {
+          P.hp = 100;
+          G.say('Tomando um drink gelado na sombra da cabana tropical. A brisa é maravilhosa!', 4);
+          G.snd.door();
+        }
+      };
+    }
+
+    // 9. Praticar Golfe no Green da Ala Oeste
+    if (Math.hypot(P_GOLFE_CAMPO.x - P.x, P_GOLFE_CAMPO.y - P.y) < 50) {
+      return {
+        t: 'jogar_golfe',
+        s: 'E: PRATICAR TACADA NO GREEN DE GOLFE',
+        run: () => {
+          G.say('HOLE IN ONE! Tacada perfeita no buraco do green do Chefão!', 4);
+          G.snd.cash();
         }
       };
     }
