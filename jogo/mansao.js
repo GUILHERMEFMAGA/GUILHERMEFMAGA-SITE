@@ -85,27 +85,27 @@
 
   // ---------- LISTA ESTRATÉGICA DOS SEGURANÇAS DA MÁFIA ----------
   const GUARDAS_POS = [
-    // 1. Portão Principal Sul & Guaritas (6 guardas)
-    { x: P_PORTAO.x - 75, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e1', arma: 'smg' },
-    { x: P_PORTAO.x - 40, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e2', arma: 'shotgun' },
-    { x: P_PORTAO.x + 40, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d1', arma: 'shotgun' },
-    { x: P_PORTAO.x + 75, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d2', arma: 'smg' },
-    { x: P_PORTAO.x - 130, y: P_PORTAO.y + 5, h: -0.3, tag: 'guarita_torre_e', arma: 'sniper' },
-    { x: P_PORTAO.x + 130, y: P_PORTAO.y + 5, h: 0.3, tag: 'guarita_torre_d', arma: 'sniper' },
+    // 1. Portão Principal Sul & Guaritas (6 guardas - fora e dentro da entrada)
+    { x: P_PORTAO.x - 95, y: P_PORTAO.y + 25, h: 0, tag: 'portao_e1', arma: 'smg' },
+    { x: P_PORTAO.x + 95, y: P_PORTAO.y + 25, h: 0, tag: 'portao_d1', arma: 'smg' },
+    { x: P_PORTAO.x - 45, y: P_PORTAO.y - 35, h: 0, tag: 'portao_e2', arma: 'shotgun' },
+    { x: P_PORTAO.x + 45, y: P_PORTAO.y - 35, h: 0, tag: 'portao_d2', arma: 'shotgun' },
+    { x: P_PORTAO.x - 145, y: P_PORTAO.y + 15, h: -0.3, tag: 'guarita_torre_e', arma: 'sniper' },
+    { x: P_PORTAO.x + 145, y: P_PORTAO.y + 15, h: 0.3, tag: 'guarita_torre_d', arma: 'sniper' },
 
-    // 2. Alameda Nobre (6 guardas espaçados)
-    { x: estate.cx - 45, y: P_PORTAO.y - 65, h: -Math.PI / 2, tag: 'alameda_1', arma: 'smg' },
-    { x: estate.cx + 45, y: P_PORTAO.y - 65, h: Math.PI / 2, tag: 'alameda_2', arma: 'smg' },
-    { x: estate.cx - 45, y: P_PORTAO.y - 125, h: -Math.PI / 2, tag: 'alameda_3', arma: 'pistol' },
-    { x: estate.cx + 45, y: P_PORTAO.y - 125, h: Math.PI / 2, tag: 'alameda_4', arma: 'pistol' },
-    { x: estate.cx - 55, y: P_FONTE.y + 60, h: -0.4, tag: 'alameda_5', arma: 'shotgun' },
-    { x: estate.cx + 55, y: P_FONTE.y + 60, h: 0.4, tag: 'alameda_6', arma: 'shotgun' },
+    // 2. Alameda Nobre de Tijolos (6 guardas espaçados)
+    { x: estate.cx - 50, y: P_PORTAO.y - 75, h: -Math.PI / 2, tag: 'alameda_1', arma: 'smg' },
+    { x: estate.cx + 50, y: P_PORTAO.y - 75, h: Math.PI / 2, tag: 'alameda_2', arma: 'smg' },
+    { x: estate.cx - 50, y: P_PORTAO.y - 135, h: -Math.PI / 2, tag: 'alameda_3', arma: 'pistol' },
+    { x: estate.cx + 50, y: P_PORTAO.y - 135, h: Math.PI / 2, tag: 'alameda_4', arma: 'pistol' },
+    { x: estate.cx - 60, y: P_FONTE.y + 65, h: -0.4, tag: 'alameda_5', arma: 'shotgun' },
+    { x: estate.cx + 60, y: P_FONTE.y + 65, h: 0.4, tag: 'alameda_6', arma: 'shotgun' },
 
     // 3. Pátio da Fonte Central (4 guardas ao redor)
-    { x: P_FONTE.x - 55, y: P_FONTE.y, h: Math.PI / 2, tag: 'fonte_o', arma: 'pistol' },
-    { x: P_FONTE.x + 55, y: P_FONTE.y, h: -Math.PI / 2, tag: 'fonte_l', arma: 'pistol' },
-    { x: P_FONTE.x, y: P_FONTE.y - 55, h: Math.PI, tag: 'fonte_n', arma: 'smg' },
-    { x: P_FONTE.x, y: P_FONTE.y + 55, h: 0, tag: 'fonte_s', arma: 'smg' },
+    { x: P_FONTE.x - 60, y: P_FONTE.y, h: Math.PI / 2, tag: 'fonte_o', arma: 'pistol' },
+    { x: P_FONTE.x + 60, y: P_FONTE.y, h: -Math.PI / 2, tag: 'fonte_l', arma: 'pistol' },
+    { x: P_FONTE.x, y: P_FONTE.y - 60, h: Math.PI, tag: 'fonte_n', arma: 'smg' },
+    { x: P_FONTE.x, y: P_FONTE.y + 60, h: 0, tag: 'fonte_s', arma: 'smg' },
 
     // 4. Fachada Principal da Mansão (4 guardas)
     { x: P_MANSAO.x - 70, y: P_MANSAO.y + 20, h: Math.PI, tag: 'fachada_e', arma: 'smg' },
@@ -138,14 +138,14 @@
     { x: estate.cx + 240, y: estate.y0 + 70, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' }
   ];
 
-  // ---------- CÃES DE GUARDA (ROTTWEILERS) ----------
+  // ---------- CÃES DE GUARDA (ROTTWEILERS / DOBERMANS) ----------
   const CAES_POS = [
-    { x: P_PORTAO.x - 90, y: P_PORTAO.y - 30, ang: 0, r: 40, latT: 0, nome: 'Brutus' },
-    { x: P_PORTAO.x + 90, y: P_PORTAO.y - 30, ang: Math.PI, r: 40, latT: 0, nome: 'Nero' },
-    { x: estate.cx - 130, y: estate.cy + 60, ang: 1.2, r: 50, latT: 0, nome: 'Titan' },
-    { x: estate.cx + 130, y: estate.cy + 60, ang: -1.2, r: 50, latT: 0, nome: 'Thor' },
-    { x: P_GOLFE_CAMPO.x - 40, y: P_GOLFE_CAMPO.y, ang: 0.5, r: 45, latT: 0, nome: 'Rex' },
-    { x: P_PISCINA.x + 80, y: P_PISCINA.y - 60, ang: -0.7, r: 45, latT: 0, nome: 'Apolo' }
+    { x: P_PORTAO.x - 110, y: P_PORTAO.y - 45, ang: 0, r: 25, latT: 0, nome: 'Brutus' },
+    { x: P_PORTAO.x + 110, y: P_PORTAO.y - 45, ang: Math.PI, r: 25, latT: 0, nome: 'Nero' },
+    { x: estate.cx - 110, y: estate.cy + 50, ang: 1.2, r: 35, latT: 0, nome: 'Titan' },
+    { x: estate.cx + 110, y: estate.cy + 50, ang: -1.2, r: 35, latT: 0, nome: 'Thor' },
+    { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y, ang: 0.5, r: 35, latT: 0, nome: 'Rex' },
+    { x: P_PISCINA.x + 60, y: P_PISCINA.y - 40, ang: -0.7, r: 35, latT: 0, nome: 'Apolo' }
   ];
 
   // Falas dos seguranças da máfia
@@ -1452,37 +1452,25 @@
     // 1. Pavimentação com Chão de Tijolos Nobres (Pátio & Alameda de Acesso)
     if (inV({ x: estate.cx, y: estate.cy })) {
       ctx.save();
-      // Chão de tijolos terracota na alameda e pátio frontal
-      const brickX0 = estate.x0 + 40, brickY0 = estate.y0 + 260, brickW = estate.w - 80, brickH = estate.h - 280;
+      const brickX0 = estate.x0 + 16, brickY0 = estate.y0 + 280, brickW = estate.w - 32, brickH = estate.h - 300;
       ctx.fillStyle = '#8f3a28';
       ctx.fillRect(brickX0, brickY0, brickW, brickH);
 
       // Padrão de amarração de tijolos
-      ctx.strokeStyle = 'rgba(40,15,10,0.35)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(40,15,10,0.28)';
+      ctx.lineWidth = 0.9;
       for (let by = brickY0; by < brickY0 + brickH; by += 10) {
-        ctx.beginPath();
-        ctx.moveTo(brickX0, by);
-        ctx.lineTo(brickX0 + brickW, by);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(brickX0, by); ctx.lineTo(brickX0 + brickW, by); ctx.stroke();
         const row = Math.floor((by - brickY0) / 10);
         const shift = (row % 2) * 10;
         for (let bx = brickX0 + shift; bx < brickX0 + brickW; bx += 20) {
-          ctx.beginPath();
-          ctx.moveTo(bx, by);
-          ctx.lineTo(bx, by + 10);
-          ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx, by + 10); ctx.stroke();
         }
       }
-
-      // Moldura de granito nobre ao redor do calçamento de tijolos
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(brickX0, brickY0, brickW, brickH);
       ctx.restore();
     }
 
-    // 2. Desenho da Entrada Monumental, Muros de Tijolos e Portão
+    // 2. Desenho da Entrada Monumental, Muros de Tijolos, Pilares e Portão
     if (inV(P_PORTAO)) {
       ctx.save();
       ctx.translate(P_PORTAO.x, P_PORTAO.y);
@@ -1491,7 +1479,6 @@
       const drawBrickWall = (wx, wy, ww, wh) => {
         ctx.fillStyle = '#8c2e1f';
         ctx.fillRect(wx, wy, ww, wh);
-        // Frisos de tijolos
         ctx.strokeStyle = 'rgba(30,10,5,0.4)';
         ctx.lineWidth = 0.8;
         for (let y = wy + 4; y < wy + wh; y += 4) {
@@ -1503,21 +1490,37 @@
         }
         // Topo em cantaria de pedra nobre
         ctx.fillStyle = '#ded4c2';
-        ctx.fillRect(wx - 2, wy - 3, ww + 4, 3.5);
+        ctx.fillRect(wx - 1, wy - 3, ww + 2, 3.5);
         ctx.strokeStyle = '#2a1a12';
         ctx.lineWidth = 0.8;
-        ctx.strokeRect(wx - 2, wy - 3, ww + 4, 3.5);
+        ctx.strokeRect(wx - 1, wy - 3, ww + 2, 3.5);
       };
 
-      drawBrickWall(-160, -10, 100, 20);
-      drawBrickWall(60, -10, 100, 20);
+      // Muros laterais
+      drawBrickWall(-240, -10, 172, 20);
+      drawBrickWall(68, -10, 172, 20);
 
-      // Casinhas de tijolos para os cães de guarda nas laterais
+      // Pilares nobres nas extremidades do portão
+      const drawPillar = px => {
+        ctx.fillStyle = '#7a2818';
+        ctx.fillRect(px - 7, -13, 14, 26);
+        ctx.fillStyle = '#ded4c2';
+        ctx.fillRect(px - 8.5, -16, 17, 3.5);
+        ctx.fillRect(px - 8.5, 12, 17, 3.5);
+        // Luminária dourada no topo
+        ctx.fillStyle = '#ffd54f';
+        ctx.beginPath(); ctx.arc(px, -18, 3.5, 0, TAU); ctx.fill();
+        ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
+      };
+      drawPillar(-68);
+      drawPillar(68);
+
+      // Casinhas de tijolos para os cães de guarda (dentro do pátio nas laterais)
       const drawDogHouse = (hx, hy) => {
         ctx.fillStyle = '#7a2818';
         ctx.fillRect(hx, hy, 28, 24);
-        ctx.fillStyle = '#3e150d';
-        ctx.fillRect(hx + 7, hy + 8, 14, 16); // Porta da casinha
+        ctx.fillStyle = '#2a0e08';
+        ctx.fillRect(hx + 7, hy + 8, 14, 16); // Entrada da casinha
         // Telhado de telha terracota
         ctx.fillStyle = '#a63e26';
         ctx.beginPath();
@@ -1528,37 +1531,43 @@
         ctx.fill();
         ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
       };
-      drawDogHouse(-105, -34);
-      drawDogHouse(77, -34);
+      drawDogHouse(-125, -45);
+      drawDogHouse(97, -45);
 
-      // Portão de ferro forjado e dourado
+      // Portão Monumental de ferro forjado e dourado (entre os pilares de -60 a +60)
       ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(-50, -8, 100, 16);
-      for (let k = -42; k <= 42; k += 7) {
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(-60, -7, 120, 14);
+      for (let k = -54; k <= 54; k += 6) {
         ctx.beginPath();
-        ctx.moveTo(k, -8);
-        ctx.lineTo(k, 8);
+        ctx.moveTo(k, -7);
+        ctx.lineTo(k, 7);
         ctx.stroke();
+        // Pontas de lança douradas
+        ctx.fillStyle = '#ffd54f';
+        ctx.beginPath();
+        ctx.moveTo(k - 1.5, -7);
+        ctx.lineTo(k, -10);
+        ctx.lineTo(k + 1.5, -7);
+        ctx.closePath();
+        ctx.fill();
       }
 
       // Brasão dourado da Família Mafiosa no centro do portão
       ctx.fillStyle = '#ffd54f';
-      ctx.beginPath();
-      ctx.arc(0, 0, 7, 0, TAU);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
       ctx.strokeStyle = '#8b6f20'; ctx.lineWidth = 1; ctx.stroke();
 
-      // Placa Monumental Dourada
+      // Placa Monumental Dourada (elegante e compacta)
       ctx.fillStyle = '#111215';
-      ctx.fillRect(-130, -42, 260, 20);
+      ctx.fillRect(-65, -30, 130, 15);
       ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(-130, -42, 260, 20);
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(-65, -30, 130, 15);
       ctx.fillStyle = '#e5b834';
-      ctx.font = 'bold 8px Georgia';
+      ctx.font = 'bold 7px Georgia';
       ctx.textAlign = 'center';
-      ctx.fillText('⚜️ PROPRIEDADE PRIVADA — VILLA DO PODEROSO CHEFÃO ⚜️', 0, -29);
+      ctx.fillText('⚜️ VILLA DEL DON ⚜️', 0, -20);
       ctx.restore();
     }
 
