@@ -700,8 +700,8 @@
       h: 460,
       nome: 'MANSÃO DO CHEFÃO — HALL NOBRE',
       cor: '#e5b834',
-      piso: 'marmore',
-      pisoCores: ['#f8f6f0', '#e2ddd2'],
+      piso: 'marmore_imperial',
+      pisoCores: ['#faf8f5', 'rgba(212,175,55,0.45)'],
       parede: '#302636'
     });
 
@@ -1131,8 +1131,8 @@
       h: 400,
       nome: 'MANSÃO — CORREDOR PRIVATIVO SUPERIOR',
       cor: '#e5b834',
-      piso: 'marmore',
-      pisoCores: ['#f8f6f0', '#ded8cb'],
+      piso: 'marmore_imperial',
+      pisoCores: ['#faf8f5', 'rgba(212,175,55,0.45)'],
       parede: '#2c2030'
     });
 
@@ -1334,8 +1334,8 @@
       h: 400,
       nome: 'MANSÃO — BANHEIRO MASTER & JACUZZI SPA',
       cor: '#42a5f5',
-      piso: 'marmore',
-      pisoCores: ['#ffffff', '#e0e6ed'],
+      piso: 'marmore_imperial',
+      pisoCores: ['#e0f7fa', 'rgba(0,188,212,0.35)'],
       parede: '#203244'
     });
 

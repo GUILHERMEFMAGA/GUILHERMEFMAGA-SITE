@@ -1530,6 +1530,56 @@
     drawDogHouse(cx - 120, gateY - 55);
     drawDogHouse(cx + 92, gateY - 55);
 
+    // 10. Fileiras Majestosas de Coqueiros e Palmeiras Imperiais na Entrada
+    const drawCoqueiro = (px, py, scale) => {
+      ctx.save();
+      ctx.translate(px, py);
+      const sc = scale || 1;
+      ctx.scale(sc, sc);
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      ctx.beginPath(); ctx.ellipse(4, 5, 20, 10, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,214,100,0.30)';
+      ctx.beginPath(); ctx.arc(0, 0, 14, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#dfd8c8'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#bcaaa4'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.fillStyle = '#6d4c41'; ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#8d6e63'; ctx.beginPath(); ctx.arc(-0.8, -0.8, 3.2, 0, TAU); ctx.fill();
+      const folhagens = 10;
+      for (let i = 0; i < folhagens; i++) {
+        const ang = (i * TAU) / folhagens;
+        const len = 22;
+        ctx.save();
+        ctx.rotate(ang);
+        ctx.strokeStyle = '#2e7d32';
+        ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(8, 3, len, 0); ctx.stroke();
+        ctx.fillStyle = i % 2 === 0 ? '#43a047' : '#388e3c';
+        ctx.beginPath();
+        ctx.moveTo(3, -1);
+        ctx.quadraticCurveTo(len * 0.5, 4, len, 0);
+        ctx.quadraticCurveTo(len * 0.5, -4, 3, -1);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = '#558b2f';
+      ctx.beginPath(); ctx.arc(-2, -2, 2.2, 0, TAU); ctx.arc(2, -1, 2.2, 0, TAU); ctx.arc(0, 2.2, 2.2, 0, TAU); ctx.fill();
+      ctx.restore();
+    };
+
+    // Coqueiros ao longo da Alameda Sul (em ambos os lados da estrada de tijolos)
+    for (let py = gateY - 60; py >= fontY + 70; py -= 48) {
+      drawCoqueiro(cx - 68, py, 1.1);
+      drawCoqueiro(cx + 68, py, 1.1);
+    }
+    // Coqueiros ao redor da Rotatória da Fonte
+    for (let a = 0; a < TAU; a += TAU / 6) {
+      drawCoqueiro(cx + Math.cos(a) * 88, fontY + Math.sin(a) * 88, 1.05);
+    }
+    // Coqueiros na Fachada da Mansão
+    [-180, -120, -60, 60, 120, 180].forEach(ox => {
+      drawCoqueiro(cx + ox, porticoY - 8, 1.15);
+    });
+
     ctx.restore();
   }
 

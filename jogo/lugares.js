@@ -444,6 +444,21 @@
     else if (R.piso === 'madeira') { for (let j = 0; j * 24 < h; j++) { for (let i = -1; i * 110 < w; i++) { const off = hh(j, 3) * 110, px = FX0 + i * 110 + off; x.fillStyle = hh(i, j) > 0.5 ? cs[0] : cs[1]; x.fillRect(px, FY0 + j * 24, 110, 24); x.fillStyle = 'rgba(255,255,255,' + (0.03 + hh(j, i) * 0.06) + ')'; x.fillRect(px, FY0 + j * 24, 110, 8); x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = 1; x.strokeRect(px + 0.5, FY0 + j * 24 + 0.5, 110, 24); } } }
     else if (R.piso === 'carpete') { x.fillStyle = cs[0]; x.fillRect(FX0, FY0, w, h); x.fillStyle = cs[1]; for (let j = 0; j * 20 < h; j++) for (let i = 0; i * 20 < w; i++) if ((i + j) % 2 === 0) { x.beginPath(); x.moveTo(FX0 + i * 20 + 10, FY0 + j * 20 + 4); x.lineTo(FX0 + i * 20 + 16, FY0 + j * 20 + 10); x.lineTo(FX0 + i * 20 + 10, FY0 + j * 20 + 16); x.lineTo(FX0 + i * 20 + 4, FY0 + j * 20 + 10); x.fill(); } }
     else if (R.piso === 'borracha') { x.fillStyle = cs[0]; x.fillRect(FX0, FY0, w, h); x.strokeStyle = cs[1]; x.lineWidth = 2; x.beginPath(); for (let i = 0; i * 60 <= w; i++) { x.moveTo(FX0 + i * 60, FY0); x.lineTo(FX0 + i * 60, FY1); } for (let j = 0; j * 60 <= h; j++) { x.moveTo(FX0, FY0 + j * 60); x.lineTo(FX1, FY0 + j * 60); } x.stroke(); x.fillStyle = 'rgba(255,255,255,0.05)'; for (let k = 0; k < 160; k++) x.fillRect(FX0 + hh(k, 1) * w, FY0 + hh(k, 2) * h, 2, 2); }
+    else if (R.piso === 'marmore_imperial') {
+      x.fillStyle = cs[0] || '#f5f4f0'; x.fillRect(FX0, FY0, w, h);
+      const tileS = 60;
+      for (let j = 0; j * tileS < h; j++) {
+        for (let i = 0; i * tileS < w; i++) {
+          const tx = FX0 + i * tileS, ty = FY0 + j * tileS;
+          x.strokeStyle = cs[1] || 'rgba(212,175,55,0.35)'; x.lineWidth = 1.2;
+          x.strokeRect(tx + 0.5, ty + 0.5, tileS, tileS);
+          x.fillStyle = '#d4af37'; x.beginPath();
+          x.moveTo(tx, ty - 3.5); x.lineTo(tx + 3.5, ty); x.lineTo(tx, ty + 3.5); x.lineTo(tx - 3.5, ty); x.closePath(); x.fill();
+        }
+      }
+      x.strokeStyle = '#d4af37'; x.lineWidth = 3; x.strokeRect(FX0 + 16, FY0 + 16, w - 32, h - 32);
+      x.strokeStyle = 'rgba(20,20,25,0.5)'; x.lineWidth = 1.5; x.strokeRect(FX0 + 20, FY0 + 20, w - 40, h - 40);
+    }
     else { for (let j = 0; j * 66 < h + 66; j++) for (let i = -1; i * 88 < w; i++) { const off = (j % 2) * 44; x.fillStyle = hh(i, j) > 0.5 ? cs[0] : cs[1]; x.fillRect(FX0 + i * 88 + off, FY0 + j * 66, 88, 66); x.strokeStyle = 'rgba(0,0,0,0.3)'; x.lineWidth = 1.5; x.strokeRect(FX0 + i * 88 + off + 0.5, FY0 + j * 66 + 0.5, 88, 66); } }
     const g = x.createLinearGradient(0, FY0, 0, FY1); g.addColorStop(0, 'rgba(0,0,0,0.38)'); g.addColorStop(0.35, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(0,0,0,0.28)');
     x.fillStyle = g; x.fillRect(FX0, FY0, w, h); x.restore();
