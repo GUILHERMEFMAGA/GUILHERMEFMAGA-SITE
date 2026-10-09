@@ -1,14 +1,16 @@
 /* =====================================================================
    LUZ.JS — visual "cinematográfico": pixel art 2.5D com luz dinâmica
    Tudo é desenhado DEPOIS do mundo, por cima, em camadas:
-     1) pixelização      -> deixa o mundo com pixels grandes (pixel art)
-     2) neblina          -> nuvens de névoa que andam devagar (volumétrica)
-     3) mapa de luz      -> escurece pela hora do dia e "acende" faróis,
+     1) neblina          -> nuvens de névoa que andam devagar (volumétrica)
+     2) mapa de luz      -> escurece pela hora do dia e "acende" faróis,
                             postes, janelas, sirenes e explosões
-     4) brilho (glow)    -> as luzes brilham e criam feixes de luz
-     5) bloom            -> as partes claras "vazam" luz em volta
-     6) cor de cinema    -> contraste e tom azul/laranja
-     7) vinheta          -> cantos mais escuros
+     3) brilho (glow)    -> as luzes brilham e criam feixes de luz
+     4) bloom            -> as partes claras "vazam" luz em volta (menos de dia)
+     5) cor de cinema    -> contraste e tom azul/laranja
+     6) vinheta          -> cantos mais escuros
+     7) PIXEL ART (por último, em paleta.js): pixels grandes, nitidez, tramado e
+        paleta fixa. Como é o último passo, a luz, a neblina e o brilho também
+        viram pixel art (degradês em tramado) em vez de borrões lisos.
    Tecla V troca o nível: 2 = completo, 1 = sem pixelização, 0 = clássico.
    ===================================================================== */
 (function (G) {
@@ -23,7 +25,6 @@
   const luzC = mk(VW, VH), lx = luzC.getContext('2d');      // mapa de luz
   const nevC = mk(VW, VH), nx = nevC.getContext('2d');      // neblina
   const copiaC = mk(VW, VH), cx = copiaC.getContext('2d');  // cópia da imagem (cor de cinema)
-  const pixC = mk(VW / 2, VH / 2), pxx = pixC.getContext('2d'); // pixelização
   const bl1 = mk(200, 150), b1x = bl1.getContext('2d');     // bloom (1/4)
   const bl2 = mk(200, 150), b2x = bl2.getContext('2d');
   const bl3 = mk(100, 75), b3x = bl3.getContext('2d');      // bloom (1/8)
@@ -101,23 +102,7 @@
   }
 
   // ---- chamado pelo game.js depois que o mundo foi desenhado ----
-  // PALETA: poucas cores por canal + tramado em xadrez (matriz de Bayer 4x4) = cara de pixel art de verdade
-  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-  function paleta(g) {
-    const w = VW / 2, h = VH / 2, im = g.getImageData(0, 0, w, h), d = im.data, N = 14, st = 255 / (N - 1);
-    for (let y = 0, i = 0; y < h; y++) {
-      for (let x = 0; x < w; x++, i += 4) {
-        const t = (BAYER[(y & 3) * 4 + (x & 3)] / 16 - 0.47) * st * 0.45;
-        // realce leve de saturação para as cores ficarem vibrantes
-        const r = d[i], gg = d[i + 1], b = d[i + 2], m = (r + gg + b) / 3;
-        const rr = m + (r - m) * 1.12, g2 = m + (gg - m) * 1.12, bb = m + (b - m) * 1.12;
-        d[i] = Math.max(0, Math.min(255, Math.round((rr + t) / st) * st));
-        d[i + 1] = Math.max(0, Math.min(255, Math.round((g2 + t) / st) * st));
-        d[i + 2] = Math.max(0, Math.min(255, Math.round((bb + t) / st) * st));
-      }
-    }
-    g.putImageData(im, 0, 0);
-  }
+  // (a paleta fixa e o tramado agora ficam em paleta.js: G.paleta.pixelar)
   // devolve true se desenhou os efeitos (senão o game.js usa o visual clássico)
   L.desenhar = function (ctx, S, W, cam, z, inV) {
     if (L.nivel === 0) return false;
@@ -127,14 +112,7 @@
     const noite = clamp(1.12 - lum * 1.28, 0, 1);            // 0 = dia claro, ~1 = noite fechada
     const t = S.time;
 
-    // 1) pixel art: reduz pela metade e amplia sem suavizar
-    if (L.nivel >= 2) {
-      pxx.imageSmoothingEnabled = true; pxx.drawImage(ctx.canvas, 0, 0, VW / 2, VH / 2);
-      paleta(pxx);   // reduz as cores e tramado (dither) como nos jogos de 16 bits
-      ctx.imageSmoothingEnabled = false; ctx.drawImage(pixC, 0, 0, VW, VH); ctx.imageSmoothingEnabled = true;
-    }
-
-    // 2) neblina volumétrica (duas camadas com velocidades diferentes = profundidade)
+    // 1) neblina volumétrica (duas camadas com velocidades diferentes = profundidade)
     if (!nevPat) nevPat = nx.createPattern(fazNeblina(), 'repeat');
     const dens = 0.025 + noite * 0.10 + (f > 0.92 || f < 0.06 ? 0.06 : 0);
     nx.globalCompositeOperation = 'source-over'; nx.clearRect(0, 0, VW, VH);
@@ -147,7 +125,7 @@
     nx.globalCompositeOperation = 'source-in'; nx.fillStyle = '#c4cee4'; nx.fillRect(0, 0, VW, VH);
     ctx.globalAlpha = clamp(dens * 2, 0, 0.4); ctx.drawImage(nevC, 0, 0); ctx.globalAlpha = 1;
 
-    // 3) mapa de luz: começa com a cor do ambiente e soma as luzes
+    // 2) mapa de luz: começa com a cor do ambiente e soma as luzes
     lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = 'source-over';
     lx.fillStyle = 'rgb(' + (amb[0] | 0) + ',' + (amb[1] | 0) + ',' + (amb[2] | 0) + ')'; lx.fillRect(0, 0, VW, VH);
     const luzes = juntarLuzes(S, W, cam, z, inV, noite);
@@ -170,7 +148,7 @@
     lx.restore();
     ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(luzC, 0, 0); ctx.globalCompositeOperation = 'source-over';
 
-    // 4) brilho das luzes por cima (feixes visíveis na neblina)
+    // 3) brilho das luzes por cima (feixes visíveis na neblina)
     ctx.save(); ctx.setTransform(z, 0, 0, z, VW / 2 - cam.x * z, VH / 2 - cam.y * z);
     ctx.globalCompositeOperation = 'lighter';
     const forca = 0.02 + noite * 0.09;
@@ -189,28 +167,35 @@
       ctx.restore();
     }
 
-    // 5) bloom: encolhe, "eleva" os claros (multiplicando por si mesmo) e soma de volta
+    // 4) bloom: encolhe, "eleva" os claros (multiplicando por si mesmo) e soma de volta (de dia é bem mais fraco: senão lava as cores)
     b1x.imageSmoothingEnabled = true; b1x.drawImage(ctx.canvas, 0, 0, 200, 150);
     b2x.globalCompositeOperation = 'source-over'; b2x.drawImage(bl1, 0, 0);
     b2x.globalCompositeOperation = 'multiply'; b2x.drawImage(bl1, 0, 0); b2x.drawImage(bl1, 0, 0); b2x.drawImage(bl1, 0, 0); b2x.globalCompositeOperation = 'source-over';
     b3x.drawImage(bl2, 0, 0, 100, 75);
     ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.imageSmoothingEnabled = true;
-    ctx.globalAlpha = 0.16; ctx.drawImage(bl2, 0, 0, VW, VH);
-    ctx.globalAlpha = 0.24; ctx.drawImage(bl3, 0, 0, VW, VH);
+    const kb = 0.22 + 0.78 * noite;
+    ctx.globalAlpha = 0.16 * kb; ctx.drawImage(bl2, 0, 0, VW, VH);
+    ctx.globalAlpha = 0.24 * kb; ctx.drawImage(bl3, 0, 0, VW, VH);
     ctx.restore();
 
-    // 6) cor de cinema: mais contraste/saturação + sombras azuis e luzes laranja
+    // 5) cor de cinema: mais contraste/saturação + sombras azuis e luzes laranja (no nível 2 isso é feito por pixel, em paleta.js)
+    if (L.nivel < 2) {
     cx.globalCompositeOperation = 'source-over'; cx.drawImage(ctx.canvas, 0, 0);
     ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.3; ctx.drawImage(copiaC, 0, 0);
     ctx.globalAlpha = 0.09;
     const gr = ctx.createLinearGradient(0, 0, VW, VH); gr.addColorStop(0, '#1fa6c8'); gr.addColorStop(0.5, '#8a6fd0'); gr.addColorStop(1, '#ff9a3c');
     ctx.fillStyle = gr; ctx.fillRect(0, 0, VW, VH);
     ctx.restore();
+    }
 
-    // 7) vinheta
+    // 6) vinheta
     const vg = ctx.createRadialGradient(VW / 2, VH / 2, 220, VW / 2, VH / 2, 590);
     vg.addColorStop(0, 'rgba(0,0,12,0)'); vg.addColorStop(1, 'rgba(0,0,14,' + (0.42 + noite * 0.12) + ')');
     ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
+
+    // 7) pixel art de verdade (paleta fixa + tramado), por último
+    // (de dia as cores ficam bem vivas; de noite menos saturadas, senão o azul da lua vira ciano)
+    if (L.nivel >= 2 && G.paleta) G.paleta.pixelar(ctx, { sat: 1.22 - 0.34 * noite, contraste: 1.06 - 0.02 * noite, tinta: 1 - 0.4 * noite });
     return true;
   };
 

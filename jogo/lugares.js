@@ -940,11 +940,14 @@
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     R.luzes.forEach(l => { if (Math.abs(l.x - R.cx - 400) > l.r + 450 || Math.abs(l.y - R.cy - 300) > l.r + 350) return; const g = ctx.createRadialGradient(l.x, l.y, 10, l.x, l.y, l.r); g.addColorStop(0, 'rgba(255,214,150,0.13)'); g.addColorStop(1, 'rgba(255,214,150,0)'); ctx.fillStyle = g; ctx.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2); });
     ctx.restore();
+    // vinheta + PIXEL ART da sala (paleta fixa, igual à do mundo). Balões, título e menus vêm depois, nítidos.
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const v = ctx.createRadialGradient(400, 320, 220, 400, 320, 520); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+    if (G.paleta && G.luz && G.luz.nivel >= 2) G.paleta.pixelar(ctx, G.paleta.cfgSala);
     // balões de fala (no mundo da sala)
     R.npcs.forEach(n => { if (n.p.bub) desenhaBolha(ctx, n.x, n.y - 30, n.p.bub.txt, clamp(n.p.bub.t * 2, 0, 1)); else if (n.nome && Math.hypot(n.x - R.px, n.y - R.py) < 64 && !n.dorme) { ctx.save(); ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.6)'; const w = ctx.measureText(n.nome).width + 10; ctx.fillRect(n.x - w / 2, n.y - 50, w, 14); ctx.fillStyle = '#fff'; ctx.fillText(n.nome, n.x, n.y - 40); ctx.restore(); } });
     ctx.restore();
-    // vinheta
-    const v = ctx.createRadialGradient(400, 320, 220, 400, 320, 520); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
     // cartão do visual (barbearia / shopping)
     if (R.preview) {
       ctx.save(); ctx.fillStyle = 'rgba(8,6,16,0.82)'; W.rrect(ctx, 590, 215, 135, 180, 8); ctx.fill(); ctx.strokeStyle = R.cor; ctx.lineWidth = 2; ctx.stroke();
