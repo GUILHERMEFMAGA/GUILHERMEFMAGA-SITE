@@ -22,7 +22,7 @@
   const CIDADES = [
     { id: 'ribeirao', nome: 'RIBEIRÃO PRETO', sub: 'a cidade grande', ate: 9, estilo: 'classica', tipo: 'cidade', urb: [0, 8, 0, 9] },
     { id: 'santarita', nome: 'FAZENDAS SANTA RITA', sub: 'plantações e fazendas de bilionários', ate: 14, estilo: 'rustica', tipo: 'campo' },
-    { id: 'mata', nome: 'MATA ESCURA', sub: 'a floresta gigante', ate: 34, estilo: 'mata', tipo: 'mata' },
+    { id: 'campos_chefao', nome: 'GRANDES CAMPOS DO PODEROSO CHEFÃO', sub: 'vastas planícies abertas e domínio rural do Don (sem florestas)', ate: 34, estilo: 'rustica', tipo: 'campo' },
     { id: 'interior', nome: 'NOVO HORIZONTE', sub: 'interior — cidade em construção', ate: 41, estilo: 'moderna', tipo: 'cidade', urb: [35, 40, 2, 7] },
     { id: 'gaviao', nome: 'MATA DO GAVIÃO', sub: 'floresta fechada, sem sinal de celular', ate: 49, estilo: 'mata', tipo: 'mata' },
     { id: 'vale', nome: 'VALE VERDE', sub: 'cidade ecológica e aeroporto', ate: 57, estilo: 'ecologica', tipo: 'cidade', urb: [50, 56, 2, 7] },
@@ -154,8 +154,6 @@
   const urbano = (i, j) => i >= 0 && j >= 0 && i <= COLS && j <= ROWS && URB[j * (COLS + 1) + i] === 1;
   // florestas gigantes: as ruas de dentro NÃO existem (só a rodovia e as ruas das bordas)
   const MEGAS = [
-    { id: 'mata1', nome: 'MATA ESCURA', bx0: 14, bx1: 33, by0: 0, by1: 4 },
-    { id: 'mata2', nome: 'MATA ESCURA', bx0: 14, bx1: 33, by0: 5, by1: 9 },
     { id: 'gav1', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 0, by1: 4 },
     { id: 'gav2', nome: 'MATA DO GAVIÃO', bx0: 41, bx1: 48, by0: 5, by1: 9 }
   ];
@@ -172,7 +170,7 @@
   const megaDe = (bx, by) => MEGAS.find(m => bx >= m.bx0 && bx <= m.bx1 && by >= m.by0 && by <= m.by1);
   // estradas de terra que cortam as florestas (no lugar das ruas apagadas)
   MEGAS.forEach(m => {
-    const nj = m.by0 === 0 ? 2 : 7, mid = m.bx0 === 14 ? [20, 28] : [45];
+    const nj = m.by0 === 0 ? 2 : 7, mid = [45];
     const yy = (MG + nj * PITCH + ROAD / 2) * T;
     trilhas.push({ x: m.x, y: yy - 1.5 * T, w: m.w, h: 3 * T, mega: m.id, eixo: 'h' });
     mid.forEach(i => { const xx = (MG + i * PITCH + ROAD / 2) * T; trilhas.push({ x: xx - 1.5 * T, y: m.y, w: 3 * T, h: m.h, mega: m.id, eixo: 'v' }); });
@@ -182,7 +180,7 @@
   // ---------- que tipo de quadra fica em cada lugar ----------
   const hash2 = (bx, by, k) => mulberry32(bx * 7919 + by * 104729 + (k || 0) * 31 + 7)();
   function ruralKind(bx, by) {
-    if (Math.abs(bx - 11) <= 2 && Math.abs(by - 2) <= 2) return 'campo'; // Vasto campo aberto ao redor da mansão do Don
+    if (bx >= 14 && bx <= 33) return 'campo'; // Toda a mega-região dos Grandes Campos do Don (sem florestas)
     const q = hash2(bx, by, 5), viz = (bx > 0 && hash2(bx - 1, by, 5) < 0.22) || (by > 0 && hash2(bx, by - 1, 5) < 0.22);
     if (q < 0.22 && !viz) return 'fazenda';      // fazendas de bilionário (nunca coladas uma na outra)
     if (q > 0.88) return 'bosque';
@@ -190,7 +188,7 @@
   }
   function kindDe(bx, by) {
     if (RIVERS.includes(bx)) return 'river';
-    if (bx === 11 && by === 2) return 'mansao_chefao';
+    if (bx === 24 && by === 2) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';

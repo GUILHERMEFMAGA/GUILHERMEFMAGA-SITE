@@ -29,9 +29,9 @@
   const M = G.mansao = {};
 
   // ---------- COORDENADAS DA PROPRIEDADE NO MAPA MUNDIAL ----------
-  // Localizada nas Fazendas Santa Rita (coluna 11, linha 2) — vasto campo aberto de luxo
+  // Localizada no coração dos GRANDES CAMPOS DO PODEROSO CHEFÃO (coluna 24, linha 2) — vastíssimo campo aberto sem floresta
   const T = W.T || 32, ROAD = 8, BLOCK = 20, PITCH = ROAD + BLOCK, MG = 6;
-  const bx = 11, by = 2;
+  const bx = 24, by = 2;
   const tx0 = MG + ROAD + bx * PITCH, ty0 = MG + ROAD + by * PITCH;
   const estate = {
     x0: tx0 * T,
