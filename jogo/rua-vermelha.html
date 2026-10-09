@@ -2412,58 +2412,197 @@
   function drawMansaoGround(ctx, blk) {
     const { x, y, w, h } = blk;
     const TAU = Math.PI * 2;
-    // 1. Gramado nobre de fundo
-    ctx.fillStyle = '#3a7d32';
+    const cx = x + w / 2;
+    const gateY = y + h;
+    const fontY = y + 448;
+    const porticoY = y + 328;
+    const heliX = x + 130, heliY = y + 448;
+    const poolX = x + 490, poolY = y + 448;
+
+    // 1. Gramado nobre esmeralda exuberante da propriedade
+    ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat');
     ctx.fillRect(x, y, w, h);
-
-    // 2. Chão de Tijolos Nobres Terracota cobrindo a propriedade
-    const bx0 = x + 24, by0 = y + 240, bw = w - 48, bh = h - 250;
-    ctx.fillStyle = '#8f3a28';
-    ctx.fillRect(bx0, by0, bw, bh);
-
-    // Padrão detalhado de amarração dos tijolos
-    ctx.strokeStyle = 'rgba(40,15,10,0.30)';
-    ctx.lineWidth = 1;
-    for (let py = by0; py < by0 + bh; py += 10) {
-      ctx.beginPath(); ctx.moveTo(bx0, py); ctx.lineTo(bx0 + bw, py); ctx.stroke();
-      const row = Math.floor((py - by0) / 10);
-      const shift = (row % 2) * 10;
-      for (let px = bx0 + shift; px < bx0 + bw; px += 20) {
-        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + 10); ctx.stroke();
-      }
+    // Faixas suaves de corte de grama profissional
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let yy = 0, k = 0; yy < h; yy += 24, k++) {
+      if (k % 2 === 0) ctx.fillRect(x, y + yy, w, 24);
     }
 
-    // Moldura de granito dourado
-    ctx.strokeStyle = '#d4af37';
-    ctx.lineWidth = 2.5;
-    ctx.strokeRect(bx0, by0, bw, bh);
+    // Helper: Desenho de piso de tijolinhos nobres terracota com amarração e guia de mármore
+    const drawNobleBrickRect = (bx, by, bw, bh, vert) => {
+      ctx.fillStyle = '#9e4230';
+      ctx.fillRect(bx, by, bw, bh);
+      // Textura suave de tijolos com frisos escuros
+      ctx.strokeStyle = 'rgba(50,18,10,0.30)';
+      ctx.lineWidth = 1;
+      const step = 8;
+      for (let py = by; py < by + bh; py += step) {
+        ctx.beginPath(); ctx.moveTo(bx, py); ctx.lineTo(bx + bw, py); ctx.stroke();
+        const row = Math.floor((py - by) / step);
+        const shift = (row % 2) * 8;
+        for (let px = bx + shift; px < bx + bw; px += 16) {
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + step); ctx.stroke();
+        }
+      }
+      // Meio-fio de mármore claro / cantaria travertino
+      ctx.fillStyle = '#dfd8c8';
+      if (vert) {
+        ctx.fillRect(bx - 3, by, 3, bh);
+        ctx.fillRect(bx + bw, by, 3, bh);
+      } else {
+        ctx.fillRect(bx, by - 3, bw, 3);
+        ctx.fillRect(bx, by + bh, bw, 3);
+      }
+    };
 
-    // 3. Pátio circular da fonte em mármore
-    const fcx = x + w / 2, fcy = y + 420;
-    ctx.fillStyle = '#7a3220';
-    ctx.beginPath(); ctx.arc(fcx, fcy, 52, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = '#b0bec5'; ctx.beginPath(); ctx.arc(fcx, fcy, 36, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#00bcd4'; ctx.beginPath(); ctx.arc(fcx, fcy, 30, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#eceff1'; ctx.beginPath(); ctx.arc(fcx, fcy, 10, 0, TAU); ctx.fill();
+    // 2. Alameda de Entrada Sul (de tijolos nobres, 96px de largura)
+    drawNobleBrickRect(cx - 48, fontY + 50, 96, (gateY - fontY - 40), true);
 
-    // 4. Deck e Piscina Olímpica de Luxo
-    const px0 = x + w - 190, py0 = y + 360;
-    ctx.fillStyle = '#eae6dc';
-    ctx.fillRect(px0 - 10, py0 - 10, 180, 120);
-    const gw = ctx.createLinearGradient(0, py0, 0, py0 + 100);
-    gw.addColorStop(0, '#00b0ff'); gw.addColorStop(1, '#0077c2');
+    // 3. Alameda Norte (Conexão da Rotatória até o Portiqueiro da Mansão)
+    drawNobleBrickRect(cx - 52, porticoY, 104, fontY - porticoY - 40, true);
+
+    // 4. Alameda Oeste (Conexão até o Heliponto e Golfe)
+    drawNobleBrickRect(heliX + 40, fontY - 26, (cx - 48) - (heliX + 40), 52, false);
+
+    // 5. Alameda Leste (Conexão até o Deck da Piscina)
+    drawNobleBrickRect(cx + 48, fontY - 26, (poolX - 60) - (cx + 48), 52, false);
+
+    // 6. Rotatória Circular de Tijolos Nobres ao redor da Fonte
+    ctx.save();
+    ctx.fillStyle = '#9e4230';
+    ctx.beginPath(); ctx.arc(cx, fontY, 76, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 3.5; ctx.stroke();
+    // Padrão circular de calçamento de pedras/tijolos
+    ctx.strokeStyle = 'rgba(50,18,10,0.30)'; ctx.lineWidth = 1;
+    for (let r = 44; r < 76; r += 8) {
+      ctx.beginPath(); ctx.arc(cx, fontY, r, 0, TAU); ctx.stroke();
+    }
+    // Ilha central de gramado da rotatória
+    ctx.fillStyle = '#3a8030';
+    ctx.beginPath(); ctx.arc(cx, fontY, 40, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#dfd8c8'; ctx.lineWidth = 2.5; ctx.stroke();
+    // Borda de flores na rotatória (rosas vermelhas e amarelas)
+    for (let a = 0; a < TAU; a += 0.4) {
+      const fx = cx + Math.cos(a) * 36, fy = fontY + Math.sin(a) * 36;
+      ctx.fillStyle = (Math.sin(a * 4) > 0 ? '#e53935' : '#fbc02d');
+      ctx.beginPath(); ctx.arc(fx, fy, 3, 0, TAU); ctx.fill();
+    }
+
+    // Fonte de mármore clássico no centro
+    ctx.fillStyle = '#cfd8dc';
+    ctx.beginPath(); ctx.arc(cx, fontY, 26, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#90a4ae'; ctx.lineWidth = 2; ctx.stroke();
+    // Espelho d'água azul turquesa cristalino
+    ctx.fillStyle = '#00bcd4';
+    ctx.beginPath(); ctx.arc(cx, fontY, 22, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.beginPath(); ctx.arc(cx - 5, fontY - 5, 8, 0, TAU); ctx.fill();
+    // Pedestal central com estátua e repuxo dourado
+    ctx.fillStyle = '#b0bec5'; ctx.beginPath(); ctx.arc(cx, fontY, 9, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(cx, fontY, 5, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    // 7. Grande Deck e Piscina Olímpica de Luxo
+    ctx.save();
+    // Deck de mármore travertino
+    ctx.fillStyle = '#ece8dc';
+    ctx.fillRect(poolX - 70, poolY - 55, 140, 110);
+    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(poolX - 70, poolY - 55, 140, 110);
+    // Borda de pastilhas azuis escuras
+    ctx.fillStyle = '#0d47a1';
+    ctx.fillRect(poolX - 60, poolY - 45, 120, 90);
+    // Água cristalina com degradê aquático
+    const gw = ctx.createLinearGradient(0, poolY - 42, 0, poolY + 42);
+    gw.addColorStop(0, '#00e5ff');
+    gw.addColorStop(0.5, '#00b0ff');
+    gw.addColorStop(1, '#0288d1');
     ctx.fillStyle = gw;
-    ctx.fillRect(px0, py0, 160, 100);
-    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.5; ctx.strokeRect(px0 - 10, py0 - 10, 180, 120);
+    ctx.fillRect(poolX - 58, poolY - 43, 116, 86);
+    // Raias olímpicas brancas no fundo da piscina
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.2;
+    for (let ly = poolY - 26; ly <= poolY + 26; ly += 26) {
+      ctx.beginPath(); ctx.moveTo(poolX - 54, ly); ctx.lineTo(poolX + 54, ly); ctx.stroke();
+    }
+    // Espreguiçadeiras no deck
+    const drawLounger = (lx, ly) => {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(lx - 5, ly - 10, 10, 20);
+      ctx.fillStyle = '#37474f'; ctx.fillRect(lx - 4, ly - 9, 8, 6);
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 5, ly - 10, 10, 20);
+    };
+    drawLounger(poolX - 45, poolY - 48);
+    drawLounger(poolX - 25, poolY - 48);
+    drawLounger(poolX + 25, poolY - 48);
+    drawLounger(poolX + 45, poolY - 48);
+    ctx.restore();
 
-    // 5. Heliponto
-    const hx = x + 110, hy = y + 370;
-    ctx.fillStyle = '#37474f';
-    ctx.beginPath(); ctx.arc(hx, hy, 44, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 3; ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 32px Arial'; ctx.textAlign = 'center';
-    ctx.fillText('H', hx, hy + 11); ctx.textAlign = 'left';
+    // 8. Heliponto Executivo da Máfia
+    ctx.save();
+    ctx.fillStyle = '#263238';
+    ctx.beginPath(); ctx.arc(heliX, heliY, 46, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffd54f'; ctx.lineWidth = 3; ctx.stroke();
+    // Círculo interno tracejado
+    ctx.setLineDash([8, 6]); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(heliX, heliY, 36, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    // Letra 'H' em relevo
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 34px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('H', heliX, heliY + 12); ctx.textAlign = 'left';
+    ctx.restore();
+
+    // 9. Muros Nobres de Alvenaria e Entrada Monumental com Pilares de Pedra
+    ctx.save();
+    const wallCol = '#8c2e1f', capCol = '#ded4c2';
+    const drawWallSec = (wx, wy, ww, wh) => {
+      ctx.fillStyle = wallCol; ctx.fillRect(wx, wy, ww, wh);
+      ctx.fillStyle = capCol; ctx.fillRect(wx - 1, wy - 2, ww + 2, 3);
+      ctx.strokeStyle = 'rgba(30,10,5,0.4)'; ctx.lineWidth = 0.8; ctx.strokeRect(wx, wy, ww, wh);
+    };
+    // Muro Sul (com vão livre de 104px para a entrada de carros no centro)
+    drawWallSec(x + 10, gateY - 14, (cx - 52) - (x + 10), 10);
+    drawWallSec(cx + 52, gateY - 14, (x + w - 10) - (cx + 52), 10);
+    // Muros Oeste, Leste e Norte
+    drawWallSec(x + 10, y + 10, 10, h - 24);
+    drawWallSec(x + w - 20, y + 10, 10, h - 24);
+    drawWallSec(x + 10, y + 10, w - 20, 10);
+
+    // Pilares nobres nas bordas do portão
+    const drawPillar = px => {
+      ctx.fillStyle = '#7a2818'; ctx.fillRect(px - 9, gateY - 20, 18, 22);
+      ctx.fillStyle = capCol; ctx.fillRect(px - 11, gateY - 23, 22, 4);
+      ctx.fillRect(px - 11, gateY, 22, 4);
+      // Luminária dourada no topo do pilar
+      ctx.fillStyle = '#ffd54f'; ctx.beginPath(); ctx.arc(px, gateY - 26, 4, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
+    };
+    drawPillar(cx - 54);
+    drawPillar(cx + 54);
+
+    // Placa monumental montada no pilar esquerdo (sem atrapalhar a pista)
+    ctx.fillStyle = '#111215'; ctx.fillRect(cx - 150, gateY - 28, 90, 18);
+    ctx.strokeStyle = '#d4af37'; ctx.lineWidth = 1.2; ctx.strokeRect(cx - 150, gateY - 28, 90, 18);
+    ctx.fillStyle = '#ffd54f'; ctx.font = 'bold 8px Georgia'; ctx.textAlign = 'center';
+    ctx.fillText('⚜️ VILLA DEL DON ⚜️', cx - 105, gateY - 16); ctx.textAlign = 'left';
+
+    // Casinhas de tijolos para os cães de guarda (dentro do pátio nas laterais)
+    const drawDogHouse = (hx, hy) => {
+      ctx.fillStyle = '#7a2818';
+      ctx.fillRect(hx, hy, 28, 24);
+      ctx.fillStyle = '#2a0e08';
+      ctx.fillRect(hx + 7, hy + 8, 14, 16);
+      ctx.fillStyle = '#a63e26';
+      ctx.beginPath();
+      ctx.moveTo(hx - 3, hy);
+      ctx.lineTo(hx + 14, hy - 8);
+      ctx.lineTo(hx + 31, hy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
+    };
+    drawDogHouse(cx - 120, gateY - 55);
+    drawDogHouse(cx + 92, gateY - 55);
+
+    ctx.restore();
   }
 
   const SEM_ANEL = { floresta: 1, bosque: 1, campo: 1, fazenda: 1, porto: 1, mansao_chefao: 1 };
@@ -13488,108 +13627,7 @@
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 1. Desenho da Entrada Monumental, Muros de Tijolos, Pilares e Portão
-    if (inV(P_PORTAO)) {
-      ctx.save();
-      ctx.translate(P_PORTAO.x, P_PORTAO.y);
-
-      // Muros em alvenaria de tijolos à vista vermelhos
-      const drawBrickWall = (wx, wy, ww, wh) => {
-        ctx.fillStyle = '#8c2e1f';
-        ctx.fillRect(wx, wy, ww, wh);
-        ctx.strokeStyle = 'rgba(30,10,5,0.4)';
-        ctx.lineWidth = 0.8;
-        for (let y = wy + 4; y < wy + wh; y += 4) {
-          ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx + ww, y); ctx.stroke();
-          const r = Math.floor((y - wy) / 4);
-          for (let x = wx + (r % 2) * 6; x < wx + ww; x += 12) {
-            ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x, y); ctx.stroke();
-          }
-        }
-        // Topo em cantaria de pedra nobre
-        ctx.fillStyle = '#ded4c2';
-        ctx.fillRect(wx - 1, wy - 3, ww + 2, 3.5);
-        ctx.strokeStyle = '#2a1a12';
-        ctx.lineWidth = 0.8;
-        ctx.strokeRect(wx - 1, wy - 3, ww + 2, 3.5);
-      };
-
-      // Muros laterais
-      drawBrickWall(-240, -10, 172, 20);
-      drawBrickWall(68, -10, 172, 20);
-
-      // Pilares nobres nas extremidades do portão
-      const drawPillar = px => {
-        ctx.fillStyle = '#7a2818';
-        ctx.fillRect(px - 7, -13, 14, 26);
-        ctx.fillStyle = '#ded4c2';
-        ctx.fillRect(px - 8.5, -16, 17, 3.5);
-        ctx.fillRect(px - 8.5, 12, 17, 3.5);
-        // Luminária dourada no topo
-        ctx.fillStyle = '#ffd54f';
-        ctx.beginPath(); ctx.arc(px, -18, 3.5, 0, TAU); ctx.fill();
-        ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
-      };
-      drawPillar(-68);
-      drawPillar(68);
-
-      // Casinhas de tijolos para os cães de guarda (dentro do pátio nas laterais)
-      const drawDogHouse = (hx, hy) => {
-        ctx.fillStyle = '#7a2818';
-        ctx.fillRect(hx, hy, 28, 24);
-        ctx.fillStyle = '#2a0e08';
-        ctx.fillRect(hx + 7, hy + 8, 14, 16); // Entrada da casinha
-        // Telhado de telha terracota
-        ctx.fillStyle = '#a63e26';
-        ctx.beginPath();
-        ctx.moveTo(hx - 3, hy);
-        ctx.lineTo(hx + 14, hy - 8);
-        ctx.lineTo(hx + 31, hy);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
-      };
-      drawDogHouse(-125, -45);
-      drawDogHouse(97, -45);
-
-      // Portão Monumental de ferro forjado e dourado
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(-60, -7, 120, 14);
-      for (let k = -54; k <= 54; k += 6) {
-        ctx.beginPath();
-        ctx.moveTo(k, -7);
-        ctx.lineTo(k, 7);
-        ctx.stroke();
-        // Pontas de lança douradas
-        ctx.fillStyle = '#ffd54f';
-        ctx.beginPath();
-        ctx.moveTo(k - 1.5, -7);
-        ctx.lineTo(k, -10);
-        ctx.lineTo(k + 1.5, -7);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Brasão dourado da Família Mafiosa no centro do portão
-      ctx.fillStyle = '#ffd54f';
-      ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#8b6f20'; ctx.lineWidth = 1; ctx.stroke();
-
-      // Placa Monumental Dourada
-      ctx.fillStyle = '#111215';
-      ctx.fillRect(-65, -30, 130, 15);
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(-65, -30, 130, 15);
-      ctx.fillStyle = '#e5b834';
-      ctx.font = 'bold 7px Georgia';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚜️ VILLA DEL DON ⚜️', 0, -20);
-      ctx.restore();
-    }
-
-    // 2. LEDs Noturnos da Piscina
+    // 1. LEDs Noturnos da Piscina (efeito dinâmico de iluminação subaquática)
     if (inV(P_PISCINA) && isNight) {
       ctx.save();
       ctx.translate(P_PISCINA.x, P_PISCINA.y);
@@ -13608,7 +13646,7 @@
       ctx.restore();
     }
 
-    // 3. Desenho dos Seguranças da Máfia com modelo completo
+    // 2. Desenho dos Seguranças da Máfia com modelo completo
     GUARDAS_POS.forEach((g, idx) => {
       if (!g.ped) {
         g.ped = {

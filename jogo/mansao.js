@@ -1449,108 +1449,7 @@
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 1. Desenho da Entrada Monumental, Muros de Tijolos, Pilares e Portão
-    if (inV(P_PORTAO)) {
-      ctx.save();
-      ctx.translate(P_PORTAO.x, P_PORTAO.y);
-
-      // Muros em alvenaria de tijolos à vista vermelhos
-      const drawBrickWall = (wx, wy, ww, wh) => {
-        ctx.fillStyle = '#8c2e1f';
-        ctx.fillRect(wx, wy, ww, wh);
-        ctx.strokeStyle = 'rgba(30,10,5,0.4)';
-        ctx.lineWidth = 0.8;
-        for (let y = wy + 4; y < wy + wh; y += 4) {
-          ctx.beginPath(); ctx.moveTo(wx, y); ctx.lineTo(wx + ww, y); ctx.stroke();
-          const r = Math.floor((y - wy) / 4);
-          for (let x = wx + (r % 2) * 6; x < wx + ww; x += 12) {
-            ctx.beginPath(); ctx.moveTo(x, y - 4); ctx.lineTo(x, y); ctx.stroke();
-          }
-        }
-        // Topo em cantaria de pedra nobre
-        ctx.fillStyle = '#ded4c2';
-        ctx.fillRect(wx - 1, wy - 3, ww + 2, 3.5);
-        ctx.strokeStyle = '#2a1a12';
-        ctx.lineWidth = 0.8;
-        ctx.strokeRect(wx - 1, wy - 3, ww + 2, 3.5);
-      };
-
-      // Muros laterais
-      drawBrickWall(-240, -10, 172, 20);
-      drawBrickWall(68, -10, 172, 20);
-
-      // Pilares nobres nas extremidades do portão
-      const drawPillar = px => {
-        ctx.fillStyle = '#7a2818';
-        ctx.fillRect(px - 7, -13, 14, 26);
-        ctx.fillStyle = '#ded4c2';
-        ctx.fillRect(px - 8.5, -16, 17, 3.5);
-        ctx.fillRect(px - 8.5, 12, 17, 3.5);
-        // Luminária dourada no topo
-        ctx.fillStyle = '#ffd54f';
-        ctx.beginPath(); ctx.arc(px, -18, 3.5, 0, TAU); ctx.fill();
-        ctx.strokeStyle = '#b8860b'; ctx.lineWidth = 1; ctx.stroke();
-      };
-      drawPillar(-68);
-      drawPillar(68);
-
-      // Casinhas de tijolos para os cães de guarda (dentro do pátio nas laterais)
-      const drawDogHouse = (hx, hy) => {
-        ctx.fillStyle = '#7a2818';
-        ctx.fillRect(hx, hy, 28, 24);
-        ctx.fillStyle = '#2a0e08';
-        ctx.fillRect(hx + 7, hy + 8, 14, 16); // Entrada da casinha
-        // Telhado de telha terracota
-        ctx.fillStyle = '#a63e26';
-        ctx.beginPath();
-        ctx.moveTo(hx - 3, hy);
-        ctx.lineTo(hx + 14, hy - 8);
-        ctx.lineTo(hx + 31, hy);
-        ctx.closePath();
-        ctx.fill();
-        ctx.strokeStyle = '#3a120a'; ctx.lineWidth = 1; ctx.stroke();
-      };
-      drawDogHouse(-125, -45);
-      drawDogHouse(97, -45);
-
-      // Portão Monumental de ferro forjado e dourado
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(-60, -7, 120, 14);
-      for (let k = -54; k <= 54; k += 6) {
-        ctx.beginPath();
-        ctx.moveTo(k, -7);
-        ctx.lineTo(k, 7);
-        ctx.stroke();
-        // Pontas de lança douradas
-        ctx.fillStyle = '#ffd54f';
-        ctx.beginPath();
-        ctx.moveTo(k - 1.5, -7);
-        ctx.lineTo(k, -10);
-        ctx.lineTo(k + 1.5, -7);
-        ctx.closePath();
-        ctx.fill();
-      }
-
-      // Brasão dourado da Família Mafiosa no centro do portão
-      ctx.fillStyle = '#ffd54f';
-      ctx.beginPath(); ctx.arc(0, 0, 7, 0, TAU); ctx.fill();
-      ctx.strokeStyle = '#8b6f20'; ctx.lineWidth = 1; ctx.stroke();
-
-      // Placa Monumental Dourada
-      ctx.fillStyle = '#111215';
-      ctx.fillRect(-65, -30, 130, 15);
-      ctx.strokeStyle = '#d4af37';
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(-65, -30, 130, 15);
-      ctx.fillStyle = '#e5b834';
-      ctx.font = 'bold 7px Georgia';
-      ctx.textAlign = 'center';
-      ctx.fillText('⚜️ VILLA DEL DON ⚜️', 0, -20);
-      ctx.restore();
-    }
-
-    // 2. LEDs Noturnos da Piscina
+    // 1. LEDs Noturnos da Piscina (efeito dinâmico de iluminação subaquática)
     if (inV(P_PISCINA) && isNight) {
       ctx.save();
       ctx.translate(P_PISCINA.x, P_PISCINA.y);
@@ -1569,7 +1468,7 @@
       ctx.restore();
     }
 
-    // 3. Desenho dos Seguranças da Máfia com modelo completo
+    // 2. Desenho dos Seguranças da Máfia com modelo completo
     GUARDAS_POS.forEach((g, idx) => {
       if (!g.ped) {
         g.ped = {
