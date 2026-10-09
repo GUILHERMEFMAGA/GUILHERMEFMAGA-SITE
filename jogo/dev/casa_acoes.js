@@ -16,6 +16,7 @@ function rodaSalas(rot) {
     for (const o of R.objs.slice()) {
       if (!o.act || o.t === 'porta') continue;
       try { n++; o.act(S, R, o); for (let i = 0; i < 40 && S.trans; i++) step(1); } catch (e) { erros.push(rot + ' ' + id + ' ' + o.t + ': ' + e.message); }
+      if (S.inside !== R && o.t === 'placa_venda' && S.inside.id === R.id) break;   // comprar a casa refaz a sala (normal): para de apertar nesta sala
       if (S.inside !== R) { erros.push(rot + ' ' + id + ' ' + o.t + ' mudou de sala'); break; }
       R.mini = null; R.menu = null; S.inside.sentado = null;
     }
