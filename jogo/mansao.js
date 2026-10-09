@@ -1720,23 +1720,22 @@
     }
   });
 
-  // ---------- SPAWN INICIAL E RENASCIMENTO NA MANSÃO ----------
+  // ---------- SPAWN INICIAL E RENASCIMENTO NO PORTÃO DA MANSÃO ----------
   L.extrasAtualizar.push((S, dt) => {
     if (!S || S.mode === 'title' || S._mansaoSpawnFeito) return;
     S._mansaoSpawnFeito = true;
     if (S.save && S.save.spawnMansao !== false) {
-      // Se acabou de iniciar na garagem padrão da cidade, move o Don para sua Mansão
-      if (Math.hypot(S.player.x - 680, S.player.y - 720) < 300) {
-        S.player.x = P_MANSAO.x;
-        S.player.y = P_MANSAO.y + 12;
-        S.cam.x = S.player.x;
-        S.cam.y = S.player.y;
-        G.say('👑 Bem-vindo à sua Mansão, Don Guilherme! O império está sob seu comando.', 6);
-      }
+      // Força o spawn inicial direto no portão monumental da Mansão
+      S.player.x = P_PORTAO.x;
+      S.player.y = P_PORTAO.y - 15;
+      S.player.h = 0; // virado para o norte (olhando para a alameda da mansão)
+      S.cam.x = S.player.x;
+      S.cam.y = S.player.y;
+      G.say('👑 BEM-VINDO AO PORTÃO DA SUA MANSÃO, DON GUILHERME!', 7);
     }
   });
 
-  // Intercepta G.respawn para renascimento VIP do Don na Mansão
+  // Intercepta G.respawn para renascimento VIP do Don no Portão da Mansão
   const origRespawn = G.respawn;
   G.respawn = function (where, loss) {
     const S = G.S;
@@ -1745,8 +1744,8 @@
       P.hp = 100;
       P.armor = 100;
       P.car = null;
-      P.x = P_MANSAO.x;
-      P.y = P_MANSAO.y + 12;
+      P.x = P_PORTAO.x;
+      P.y = P_PORTAO.y - 15;
       P.vx = P.vy = 0;
       P.iframes = 3;
       S.lastHp = 100;

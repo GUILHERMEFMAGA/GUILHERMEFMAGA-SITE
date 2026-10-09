@@ -13692,23 +13692,22 @@
     }
   });
 
-  // ---------- SPAWN INICIAL E RENASCIMENTO NA MANSÃO ----------
+  // ---------- SPAWN INICIAL E RENASCIMENTO NO PORTÃO DA MANSÃO ----------
   L.extrasAtualizar.push((S, dt) => {
     if (!S || S.mode === 'title' || S._mansaoSpawnFeito) return;
     S._mansaoSpawnFeito = true;
     if (S.save && S.save.spawnMansao !== false) {
-      // Se acabou de iniciar na garagem padrão da cidade, move o Don para sua Mansão
-      if (Math.hypot(S.player.x - 680, S.player.y - 720) < 300) {
-        S.player.x = P_MANSAO.x;
-        S.player.y = P_MANSAO.y + 12;
-        S.cam.x = S.player.x;
-        S.cam.y = S.player.y;
-        G.say('👑 Bem-vindo à sua Mansão, Don Guilherme! O império está sob seu comando.', 6);
-      }
+      // Força o spawn inicial direto no portão monumental da Mansão
+      S.player.x = P_PORTAO.x;
+      S.player.y = P_PORTAO.y - 15;
+      S.player.h = 0; // virado para o norte (olhando para a alameda da mansão)
+      S.cam.x = S.player.x;
+      S.cam.y = S.player.y;
+      G.say('👑 BEM-VINDO AO PORTÃO DA SUA MANSÃO, DON GUILHERME!', 7);
     }
   });
 
-  // Intercepta G.respawn para renascimento VIP do Don na Mansão
+  // Intercepta G.respawn para renascimento VIP do Don no Portão da Mansão
   const origRespawn = G.respawn;
   G.respawn = function (where, loss) {
     const S = G.S;
@@ -13717,8 +13716,8 @@
       P.hp = 100;
       P.armor = 100;
       P.car = null;
-      P.x = P_MANSAO.x;
-      P.y = P_MANSAO.y + 12;
+      P.x = P_PORTAO.x;
+      P.y = P_PORTAO.y - 15;
       P.vx = P.vy = 0;
       P.iframes = 3;
       S.lastHp = 100;
@@ -16764,11 +16763,13 @@
     S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
 
-    // Localização da Mansão do Don na Mata Escura
-    const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: (MG + ROAD + 20 * PITCH + 10) * T, y: (MG + ROAD + 1 * PITCH + 10) * T + 20 };
+    // Coordenadas do Portão Monumental da Mansão (Mata Escura)
+    const gateX = (MG + ROAD + 20 * PITCH + 10) * T;
+    const gateY = (MG + ROAD + 1 * PITCH + 20) * T - 35;
+    const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: gateX, y: (MG + ROAD + 1 * PITCH + 10) * T + 20 };
 
-    // Limusine do Chefão na fachada
-    const limo = new G.Car({ x: plM.x - 70, y: plM.y + 10, a: 0, kind: 'limo', color: '#111216', driver: 'none', mode: 'parked', owned: true });
+    // Limusine do Chefão pronta na alameda
+    const limo = new G.Car({ x: gateX - 45, y: gateY - 60, a: 0, kind: 'limo', color: '#111216', driver: 'none', mode: 'parked', owned: true });
     limo.hp = 250;
     S.cars.push(limo);
     S.limo = limo;
@@ -16778,7 +16779,7 @@
     const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
 
-    // Jogador nasce direto como O PODEROSO CHEFÃO em frente à sua Mansão
+    // Jogador nasce direto como O PODEROSO CHEFÃO no Portão Principal da Mansão
     S.save.money = Math.max(50000, S.save.money || 0);
     S.save.done = Math.max(12, S.save.done || 0);
     S.save.king = true;
@@ -16786,8 +16787,8 @@
     S.save.look = Object.assign({ corte: 0, cor: 4, roupa: 1, calca: 1, tenis: 1, acess: 0 }, S.save.look || {});
 
     S.player = Object.assign({
-      x: plM.x,
-      y: plM.y + 15,
+      x: gateX,
+      y: gateY,
       vx: 0,
       vy: 0,
       h: 0,
@@ -16832,7 +16833,7 @@
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
 
-    G.say('👑 BEM-VINDO À SUA MANSÃO, DON GUILHERME! Você é o PODEROSO CHEFÃO.', 8);
+    G.say('👑 BEM-VINDO AO PORTÃO DA SUA MANSÃO, DON GUILHERME! O império é seu.', 8);
   }
 
   // ---------- Entrar / sair de carros ----------
