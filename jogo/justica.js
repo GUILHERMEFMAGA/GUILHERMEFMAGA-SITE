@@ -380,9 +380,9 @@
       const x = 100 + k * 240;
       add(O('grade', x, 330, 200, 14, { e: 90 }));
       add(O('beliche', x + 14, 250, 90, 46, { e: 24, label: k === 0 ? 'DORMIR (passa o dia)' : 'BELICHE DE OUTRO PRESO', r: 46, act: k === 0 ? dormir : (S => G.say('Esse beliche tem dono. Melhor não mexer.', 3)) }));
-      add(O('vaso', x + 140, 230, 36, 28, { e: 14 }));
+      add(O('vaso_sanitario', x + 142, 236, 34, 40, {}));
     });
-    add(O('banco_espera', 560, 420, 120, 22, { e: 16, label: 'SENTAR NO CORREDOR', r: 30, act: S => { K.cura(S, 3); G.say('Você respirou fundo. (+3 vida)', 3); } }));
+    add(O('banco_aco', 560, 424, 120, 20, { e: 14, label: 'SENTAR NO CORREDOR', r: 30, act: S => { K.cura(S, 3); G.say('Você respirou fundo. (+3 vida)', 3); } }));
     add(porta(740, 96, 60, { cor: '#4a4e58', placa: 'RECEPÇÃO', label: 'VOLTAR À RECEPÇÃO', act: S => { if (S.detido) G.say('Os policiais não deixam você sair da carceragem.', 3); else L.irSala(S, 'entrada', 780, 215, Math.PI); } }));
     R.porta = { para: 'entrada', px: 780, py: 215, ph: Math.PI, label: 'VOLTAR À RECEPÇÃO', rotulo: 'RECEPÇÃO' };
     R.npcs.push({ x: 340, y: 290, p: preso({ hairStyle: 'raspado' }), falas: ['Fica quieto que o delegado é brabo.', 'Fui pego com a mão na massa, fazer o quê...', 'Quem passa de 4 estrelas vai pra Serra Dura. Aí é outra vida.'], h: Math.PI, fixo: true, nome: 'Detento Beto', dinheiro: 0, label: 'CONVERSAR' });
@@ -420,7 +420,9 @@
       const w = R.x1 - R.x0;
       add(R, O('cesta', R.x0 + 120, 280, 70, 14, { e: 0, label: 'JOGAR BASQUETE', r: 70, act: S => bomComportamento(S, 'basquete', 'BASQUETE NO PÁTIO', 1) }));
       add(R, O('halter', R.x0 + 330, 350, 90, 18, { e: 10, label: 'LEVANTAR PESO', r: 50, act: S => bomComportamento(S, 'peso', 'LEVANTAMENTO DE PESO', 1, S2 => { S2.save.forca = (S2.save.forca || 0); return ''; }) }));
-      add(R, O('banco_espera', R.x0 + 560, 380, 150, 22, { e: 16, label: 'TOMAR SOL', r: 36, act: S => { K.cura(S, 6); G.say('Sol no pátio, a única liberdade do dia. (+6 vida)', 3.5); } }));
+      add(R, O('supino', R.x0 + 470, 300, 150, 60, { e: 14, solid: true }), O('saco', R.x0 + 690, 290, 30, 30, { e: 0 }), O('mesa', R.x0 + 120, 400, 54, 44, { e: 18, estilo: 'bar' }), O('banqueta', R.x0 + 80, 408, 26, 26, { cor: '#7a7e86' }), O('banqueta', R.x0 + 180, 408, 26, 26, { cor: '#7a7e86' }));
+      add(R, O('banco_aco', R.x0 + 330, 420, 150, 20, { e: 14, solid: true }));
+      add(R, O('banco_aco', R.x0 + 560, 400, 150, 20, { e: 14, label: 'TOMAR SOL', r: 36, act: S => { K.cura(S, 6); G.say('Sol no pátio, a única liberdade do dia. (+6 vida)', 3.5); } }));
       // o muro: tentativa de fuga (impossível)
       add(R, O('arame', R.x0 + 20, 190, w - 40, 14, { e: 0, label: 'TENTAR FUGIR PELO MURO', r: 46, act: S => fuga(S) }));
       add(R, O('torre', R.x0 + 20, 190, 40, 14, { e: 0, solid: false })); add(R, O('torre', R.x1 - 70, 190, 40, 14, { e: 0, solid: false }));
@@ -429,32 +431,39 @@
       R.npcs.push({ x: R.x0 + 190, y: 330, p: preso({}), falas: ['Joga bem, hein? Faz tempo que não vejo gente nova aqui.', 'Aqui dentro cada dia vale por três.'], h: 0, fixo: true, nome: 'Detento Mingau', dinheiro: 0, label: 'CONVERSAR' });
       R.npcs.push({ x: R.x0 + 600, y: 330, p: preso({ fem: false }), falas: ['Eu era da Mata Escura. Lá um homem some na floresta e ninguém acha. Dizem que tem um assassino por lá...', 'O FBI já esteve aqui perguntando sobre os desaparecidos.', 'Quer um conselho? Faz tudo certinho e sai antes.'], h: 0, fixo: true, nome: 'Detento Velho Tião', dinheiro: 0, label: 'CONVERSAR' });
       voltar(R, 'patio');
-      R.deco = x => { x.fillStyle = '#6a6e78'; x.fillRect(R.x0, 130, w, 22); x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('PÁTIO — BANHO DE SOL', R.x0 + w / 2, 86); x.restore(); };
+      R.pisoExtra = x => {   // meia quadra de basquete e faixa de corrida pintadas no chão
+        x.strokeStyle = 'rgba(255,255,255,0.55)'; x.lineWidth = 3; x.strokeRect(R.x0 + 40, 240, 330, 170); x.strokeRect(R.x0 + 40, 280, 110, 90); x.beginPath(); x.arc(R.x0 + 150, 325, 45, -Math.PI / 2, Math.PI / 2); x.stroke(); x.beginPath(); x.arc(R.x0 + 40, 325, 150, -0.9, 0.9); x.stroke();
+        x.strokeStyle = 'rgba(255,224,74,0.45)'; x.setLineDash([14, 10]); x.strokeRect(R.x0 + 14, 214, w - 28, 250); x.setLineDash([]);
+      };
+      R.deco = x => { x.fillStyle = '#6a6e78'; x.fillRect(R.x0, 130, w, 22); x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('PÁTIO — BANHO DE SOL', R.x0 + 225, 100); x.restore(); };
       return R;
     }
     if (sid === 'refeitorio') {
       const R = base(760, 380, 'REFEITÓRIO', { piso: 'ladrilho' });
       add(R, O('balcao', 130, 190, 260, 40, { e: 28, label: 'PEGAR A BANDEJA (grátis)', r: 50, act: S => { if (S.detido && S.detido.feito.comer) { G.say('Uma bandeja por refeição, preso.', 3); return; } if (S.detido) S.detido.feito.comer = true; K.cura(S, 30); G.say('Arroz, feijão e um ovo. Comida de presídio: (+30 vida)', 4); } }));
-      [[180, 330], [380, 330], [580, 330]].forEach(([a, b]) => add(R, O('mesa', a, b, 110, 40, { e: 18, top: '#8a8e98', front: '#5a5e68' }), O('cadeira', a - 24, b + 8, 22, 22, { solid: false }), O('cadeira', a + 112, b + 8, 22, 22, { solid: false })));
+      [[130, 300], [420, 300], [130, 410], [420, 410]].forEach(([a, b]) => add(R, O('banco_aco', a, b - 24, 220, 16, { e: 10, solid: false }), O('banco_aco', a, b, 220, 34, { e: 22, cor: '#b0b4bc' }), O('banco_aco', a, b + 46, 220, 16, { e: 10, solid: false })));
+      add(R, O('panelao', 430, 196, 100, 44, { e: 30 }), O('panelao', 540, 196, 100, 44, { e: 30 }), O('bebedouro', 668, 196, 36, 36, { e: 62, label: 'BEBER ÁGUA', r: 40, act: S => { K.cura(S, 2); G.say('Água gelada do bebedouro. (+2 vida)', 2.5); } }));
       add(R, volta(R.portaX, 'refeitorio'));
-      R.npcs.push({ x: 260, y: 215, p: preso({ shirt: '#f2f2f2', cap: 'none', acc: 'hat', accCol: '#f2f2f2' }), falas: ['Hoje tem feijão com ovo, como todo dia.'], h: Math.PI, fixo: true, nome: 'Cozinheiro', dinheiro: 0, label: 'CONVERSAR' }, guarda(640, 300, 'Guarda Nunes'), { x: 440, y: 290, p: preso({}), falas: ['Respeita a fila.', 'Quem tem advogado sai antes.'], h: 0, fixo: true, nome: 'Detento Cabo', dinheiro: 0, label: 'CONVERSAR' });
+      R.npcs.push({ x: 260, y: 215, k: 600, p: preso({ shirt: '#f2f2f2', cap: 'none', acc: 'hat', accCol: '#f2f2f2' }), falas: ['Hoje tem feijão com ovo, como todo dia.'], h: Math.PI, fixo: true, nome: 'Cozinheiro', dinheiro: 0, label: 'CONVERSAR' }, guarda(700, 340, 'Guarda Nunes'), { x: 400, y: 262, p: preso({}), falas: ['Respeita a fila.', 'Quem tem advogado sai antes.'], h: 0, fixo: true, nome: 'Detento Cabo', dinheiro: 0, label: 'CONVERSAR' });
       voltar(R, 'refeitorio');
-      R.deco = x => { x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('REFEITÓRIO', 450, 86); x.restore(); };
+      R.deco = x => { x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('REFEITÓRIO', 190, 100); x.restore(); G.deco.quadroNegro(x, 296, 92, 110, 44, [['Segunda', 'feijão'], ['Terça', 'macarrão']], 'CARDÁPIO'); };
       return R;
     }
     if (sid === 'oficina') {
       const R = base(760, 380, 'OFICINA DE TRABALHO', {});
       add(R, O('bancada', 150, 250, 180, 44, { e: 26, label: 'TRABALHAR (reduz a pena)', r: 52, act: S => bomComportamento(S, 'trabalho', 'COSTURA NA OFICINA', 2, S2 => { S2.save.money += 12; G.save(); return 'Salário: +$12.'; }) }));
       add(R, O('bancada', 400, 250, 180, 44, { e: 26, label: 'TRABALHAR (reduz a pena)', r: 52, act: S => bomComportamento(S, 'trabalho', 'COSTURA NA OFICINA', 2, S2 => { S2.save.money += 12; G.save(); return 'Salário: +$12.'; }) }));
+      add(R, O('bancada', 150, 340, 180, 44, { e: 26, label: 'TRABALHAR (reduz a pena)', r: 52, act: S => bomComportamento(S, 'trabalho', 'COSTURA NA OFICINA', 2, S2 => { S2.save.money += 12; G.save(); return 'Salário: +$12.'; }) }), O('bancada', 400, 340, 180, 44, { e: 26, solid: true }));
+      add(R, O('prateleira', 100, 192, 120, 36, { e: 52, tema: 'caixas' }), O('prateleira', 240, 192, 120, 36, { e: 52, tema: 'roupas' }), O('arara', 540, 196, 110, 30, { e: 40, tema: 'camisa' }), O('pilha_caixas', 680, 200, 70, 44, { e: 30 }), O('pilha_caixas', 20 + 640, 300, 70, 44, { e: 30 }));
       add(R, volta(R.portaX, 'oficina'));
       R.npcs.push(guarda(640, 330, 'Guarda Peres'), { x: 250, y: 280, p: preso({}), falas: ['Cada dia de trabalho vale um dia a menos... se for bom.'], h: Math.PI, fixo: true, nome: 'Detento Nei', dinheiro: 0, label: 'CONVERSAR' });
       voltar(R, 'oficina');
-      R.deco = x => { x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('OFICINA — TRABALHO REMUNERADO', 450, 86); x.restore(); };
+      R.deco = x => { x.save(); x.font = 'bold 24px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText('OFICINA', 150, 100); x.font = '14px Arial'; x.fillStyle = '#ffe04a'; x.fillText('Trabalho remunerado', 150, 122); x.restore(); };
       return R;
     }
     if (sid === 'solitaria') {
       const R = base(360, 260, 'SOLITÁRIA', { piso: 'ladrilho', pisoCores: ['#30343c', '#24282e'], parede: '#1a1d22', luzes: [{ x: 250, y: 280, r: 120 }] });
-      add(R, O('beliche', 130, 260, 80, 44, { e: 20, solid: true }), O('vaso', 330, 240, 34, 26, { e: 12 }));
+      add(R, O('beliche', 130, 260, 80, 44, { e: 20, solid: true }), O('vaso_sanitario', 316, 236, 34, 40, {}));
       R.deco = x => { x.save(); x.font = 'bold 18px Arial'; x.fillStyle = '#7a808c'; x.textAlign = 'center'; x.fillText('SOLITÁRIA', 250, 120); x.restore(); };
       R.aoEntrar = S => { R.t0 = 0; R.restante = 9; G.say('SOLITÁRIA: você vai ficar aqui sozinho um tempo...', 5); };
       R.onUpdate = (S, R2, dt) => { R2.restante -= dt; if (R2.restante <= 0 && !S.trans) { L.irSala(S, 'celas', 150, 440, Math.PI); } };
@@ -467,10 +476,10 @@
     add(R, O('grade', 100, 340, 190, 14, { e: 90 }), O('beliche', 114, 262, 90, 46, { e: 24, label: 'DORMIR (passa o dia)', r: 50, act: S => {
       const d = S.detido; if (!d) return;
       passaDia(S, (S2, d2) => { if (d2.dias <= 0) J.solto(S2, 'pena'); });
-    } }), O('vaso', 236, 244, 36, 28, { e: 14 }));
-    for (let k = 1; k <= (ilha ? 4 : 3); k++) { const x = 100 + k * 210; add(R, O('grade', x, 340, 190, 14, { e: 90 }), O('beliche', x + 14, 262, 90, 46, { e: 24, solid: true })); }
-    add(R, O('banco_espera', 100, 450, 130, 22, { e: 16, label: 'DESCANSAR', r: 30, act: S => { K.cura(S, 3); G.say('Você respirou fundo. (+3 vida)', 3); } }));
-    add(R, O('recepcao', R.x1 - 200, 220, 120, 40, { e: 26, label: 'TELEFONE DO ADVOGADO', r: 50, act: S => {
+    } }), O('vaso_sanitario', 238, 240, 34, 40, {}), O('pia', 196, 224, 30, 30, { e: 18, solid: false }));
+    for (let k = 1; k <= 3; k++) { const x = 100 + k * 210; add(R, O('grade', x, 340, 190, 14, { e: 90 }), O('beliche', x + 14, 262, 90, 46, { e: 24, solid: true }), O('vaso_sanitario', x + 138, 240, 34, 40, {})); }
+    add(R, O('banco_aco', 100, 456, 130, 20, { e: 14, label: 'DESCANSAR', r: 30, act: S => { K.cura(S, 3); G.say('Você respirou fundo. (+3 vida)', 3); } }));
+    add(R, O('recepcao', R.x1 - 210, 440, 120, 40, { e: 26, label: 'TELEFONE DO ADVOGADO', r: 50, act: S => {
       const d = S.detido; if (!d) return; if (d.advogado) { G.say('O advogado já está cuidando do seu caso.', 3); return; }
       L.abrirMenu(S, { titulo: 'TELEFONE — ADVOGADO', itens: [
         { n: 'Contratar advogado (-2 dias)', preco: ilha ? 1500 : 600, desc: ilha ? 'recurso na Suprema Corte' : 'pedido de progressão de pena', fn: S2 => { const pr = ilha ? 1500 : 600; if (!K.gasta(S2, pr)) return; d.advogado = true; d.dias = Math.max(1, d.dias - 2); G.say('O advogado conseguiu reduzir a pena: ' + d.dias + ' dia(s).', 5); return 'fechar'; } },
@@ -480,7 +489,7 @@
     add(R, porta(R.x0 + w * 0.62, 96, 70, { cor: '#4a4e58', placa: 'REFEITÓRIO', label: 'IR AO REFEITÓRIO', act: S => L.irSala(S, 'refeitorio', 450, 215, Math.PI) }));
     add(R, porta(R.x0 + w * 0.78, 96, 70, { cor: '#4a4e58', placa: 'OFICINA', label: 'IR À OFICINA', act: S => L.irSala(S, 'oficina', 450, 215, Math.PI) }));
     R.npcs.push(guarda(R.x0 + w * 0.5, 440, 'Guarda Barros', true), { x: 460, y: 300, p: preso({}), falas: ['Novato, né? Bom comportamento reduz a pena.', 'Treina no pátio e trabalha na oficina: três pontos e a pena cai dois dias de uma vez.', ilha ? 'Dizem que o FBI mantém aqui os piores do país.' : 'Aqui é Serra Dura. O nome já diz tudo.'], h: 0, fixo: true, nome: 'Detento Rato', dinheiro: 0, label: 'CONVERSAR' });
-    R.deco = x => { x.save(); x.font = 'bold 26px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText(pl.nome, R.x0 + w / 2, 70); x.font = '14px Arial'; x.fillStyle = '#ffe04a'; x.fillText('Cumpra a pena em silêncio', R.x0 + w / 2, 90); x.restore(); };
+    R.deco = x => { x.save(); x.font = 'bold 22px Arial'; x.fillStyle = '#d8dce6'; x.textAlign = 'center'; x.fillText(pl.nome, R.x0 + 215, 96); x.font = '14px Arial'; x.fillStyle = '#ffe04a'; x.fillText('Cumpra a pena em silêncio', R.x0 + 215, 118); x.restore(); };
     R.luzes = [{ x: 250, y: 320, r: 280 }, { x: R.x0 + w * 0.7, y: 300, r: 340 }];
     return R;
   }

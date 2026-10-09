@@ -447,6 +447,16 @@
     }
   });
 
+
+  // banco de concreto com pernas de aço (pátio e corredor da prisão, estádio, praça)
+  reg('banco_aco', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 12, cor = o.cor || '#9a9ea6';
+    [x + 6, x + w - 12].forEach(px => { c.fillStyle = '#3a3e46'; c.fillRect(px, y + h - e + 2, 6, e - 2); });
+    caixa(c, x, y, w, h, e * 0.55, cor, shade(cor, -0.3), { r: 2 });
+    c.fillStyle = 'rgba(255,255,255,0.35)'; c.fillRect(x + 3, y - e * 0.55 + 2, w - 6, 1.4);
+    for (let k = 12; k < w - 8; k += 26) circ(c, x + k, y - e * 0.55 + h / 2, 1.3, '#555a62');
+  }, { alto: 4 });
+
   // =====================================================================
   //  CHÃO DE GRAMADO + LINHAS DO CAMPO
   // =====================================================================

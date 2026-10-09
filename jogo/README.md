@@ -149,6 +149,15 @@ Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes d
 | `hoteis.js` | quatro hotéis: recepção, quartos, restaurante com garçom, piscina, cozinha, hóspedes |
 | `academia.js` | academia com passe, treino em mini-jogo e lanchonete |
 | `comercios.js` | banco, padaria, pizzaria e os 14 tipos de comércio comum (cardápios, atendentes, extras) |
+| `interiores.js` | a "casca" das salas: pisos, paredes, rodapé, janelas com vista, claridade; guarda o kit de desenho `G.deco` |
+| `mobilia.js` | ~45 móveis de casa pintados com volume e sombra (sofá, cama, fogão, geladeira, TV, banheira...) |
+| `mobilia2.js` | prateleiras temáticas, vitrines, araras, manequins, quadro-negro de cardápio, filas |
+| `mobilia3.js` | recepção, computador, balcão de padaria, panelões, supino e outros objetos de comércio |
+| `mobilia4.js` | hospital (maca, soro, raio-X, biombo...), estádio (campo de futebol, traves, placar, arquibancada, holofote), barbearia, shopping e `banco_aco` |
+| `casas_salas.js` | sala com cozinha, quartos e banheiro de cada casa |
+| `lojas_novas.js` | os 14 tipos de comércio comum, cada um com interior próprio |
+| `publicos.js` | **hospital** (recepção, enfermaria, consultório) e **estádio** (saguão e campo com partida de verdade) |
+| `enriquece.js` | acrescenta detalhes às salas antigas (farmácia, barbearia, shopping, banco, padaria, pizzaria, delegacia, prefeitura, saguão dos hotéis) |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |
@@ -193,3 +202,12 @@ Na Prefeitura, a **mesa do prefeito** deixa você decidir: obras (escola, hospit
 - **Janelas realistas**: moldura, vidro com reflexo do céu, travessas, peitoril, verga, cortinas, persianas, venezianas, jardineiras, grades, ar-condicionado, sacadas, janelas em arco e redondas. À noite, só as janelas acesas brilham. Os prédios têm vários andares, as lojas têm vitrine, toldo e letreiro.
 - **Interiores realistas**: `interiores.js` (a "casca" da sala: pisos de madeira/taco/porcelanato/cimento, paredes com lambri e sanca, janelas com vista, cortinas e raios de sol, quadros), `mobilia.js` (móveis pintados com volume e sombra: sofá, cama com travesseiro, fogão, geladeira, TV, planta, lareira, banheira...) e `casas_salas.js` (cada casa tem **sala com cozinha, quartos e banheiro**; o tamanho e o luxo mudam entre casa simples, média e rica, e cada casa tem cores próprias). A família senta no sofá à noite e dorme na cama.
 - **Ferramentas de teste** em `jogo/dev/` (precisam de `npm install @napi-rs/canvas`): `tp2.js` (fotos), `reach.js` (confere se toda porta é alcançável a pé), `stab.js` (roda o jogo e procura erros), `interior.js` (entra num lugar e tira foto), `galeria.js` (foto de cada móvel), `casa_teste.js` e `casa_acoes.js` (testam a vida e os botões dentro das casas), `splice.py` (monta o `world.js` a partir das peças em `dev/pieces/`) e `build.py` (gera o `rua-vermelha.html`).
+
+## Interiores de todos os lugares (hospital, estádio, prisão...)
+Nenhum lugar é mais um "quadrado vazio": cada sala tem piso, parede, móveis, gente e botões que funcionam.
+- **Hospital** (`publicos.js`): *recepção* (balcão com triagem: **tratamento grátis do SUS** cura tudo, check-up por $120, sala de espera, máquina de lanches, bebedouro), *enfermaria* (leitos com pacientes, soro, monitor, enfermeira; descansar no leito recupera vida e passa o tempo) e *consultório* (Dra. Helena: consulta por $120, maca, raio-X, balança, tabela de Snellen).
+- **Estádio Municipal** (`publicos.js`): no *saguão* ficam a bilheteria (arquibancada $30 ou camarote $100), as catracas, a lanchonete, a loja oficial do time e o telão. No *campo* há gramado com linhas de verdade, traves, arquibancadas com torcida (muda com a hora), bancos de reservas e placar. **De 13h às 19h rola uma partida** com 22 jogadores e árbitro, gols, intervalo e placar ao vivo; de manhã é treino aberto. Invadir o gramado por mais de 2 segundos faz os seguranças te levarem até o portão e cobrarem **$50**.
+- **Prisão** (`justica.js`): celas com vaso sanitário e pia atrás das grades, banco de concreto no corredor, pátio com meia quadra de basquete pintada no chão, supino, saco de pancada e mesa de baralho, refeitório com mesas de aço, panelões e cardápio, e oficina de costura com estantes, araras e caixas.
+- **Quartos de hotel**: cama de casal, criado-mudo, TV na cômoda, guarda-roupa, tapete, planta e janela com vista.
+- **Como acrescentar uma sala nova**: crie o interior com `L.novaSala(...)` e registre `L.construtores['tipo:meu_lugar'] = { criar(idSala, lg) { ... return R; } }`. Para só **acrescentar detalhes** a uma sala que já existe, use `L.enriquecer['<idDoLugar>:<sala>'] = (R, pl) => { R.objs.push(...) }` (roda uma vez, logo depois da sala ser criada; veja `enriquece.js`).
+- **Ferramentas**: `dev/sala.js` (foto da sala inteira: `OUTDIR=$PWD/out/ node sala.js hosp tipo:hospital entrada enfermaria consultorio`), `dev/sala_prisao.js` (o mesmo para as salas da penitenciária e da ilha), `dev/publicos_teste.js` (entra no hospital e no estádio, aperta todos os botões e itens de menu, compra o ingresso, assiste à partida e invade o campo para conferir a multa de $50).
