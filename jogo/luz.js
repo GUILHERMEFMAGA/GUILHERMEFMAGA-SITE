@@ -48,7 +48,7 @@
   // ---- cor do ambiente conforme a hora (f = 0..1; 0.55-0.65 entardecer, 0.65-0.92 noite) ----
   const CORES = [
     [0.00, 236, 208, 176], [0.08, 238, 232, 220], [0.40, 238, 236, 228], [0.52, 238, 208, 166],
-    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 190, 130, 140], [1.00, 236, 208, 176]
+    [0.60, 255, 170, 130], [0.67, 165, 175, 215], [0.90, 165, 175, 215], [0.96, 210, 165, 175], [1.00, 236, 208, 176]
   ];
   function ambiente(f) {
     for (let i = 1; i < CORES.length; i++) {
@@ -109,7 +109,7 @@
     const f = ((S.dayT % 1) + 1) % 1;
     const amb = ambiente(f);
     const lum = (amb[0] * 0.3 + amb[1] * 0.59 + amb[2] * 0.11) / 255;
-    const noite = clamp(1.12 - lum * 1.28, 0, 1);            // 0 = dia claro, ~1 = noite fechada
+    const noite = clamp(0.7 - lum * 0.7, 0, 0.45);            // noite suave e nítida, nunca bloqueia a visibilidade
     const t = S.time;
 
     // 1) neblina volumétrica (duas camadas com velocidades diferentes = profundidade)

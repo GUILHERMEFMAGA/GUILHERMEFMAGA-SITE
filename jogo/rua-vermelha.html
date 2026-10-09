@@ -5353,7 +5353,7 @@
   // ---- cor do ambiente conforme a hora (f = 0..1; 0.55-0.65 entardecer, 0.65-0.92 noite) ----
   const CORES = [
     [0.00, 236, 208, 176], [0.08, 238, 232, 220], [0.40, 238, 236, 228], [0.52, 238, 208, 166],
-    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 190, 130, 140], [1.00, 236, 208, 176]
+    [0.60, 255, 170, 130], [0.67, 165, 175, 215], [0.90, 165, 175, 215], [0.96, 210, 165, 175], [1.00, 236, 208, 176]
   ];
   function ambiente(f) {
     for (let i = 1; i < CORES.length; i++) {
@@ -5414,7 +5414,7 @@
     const f = ((S.dayT % 1) + 1) % 1;
     const amb = ambiente(f);
     const lum = (amb[0] * 0.3 + amb[1] * 0.59 + amb[2] * 0.11) / 255;
-    const noite = clamp(1.12 - lum * 1.28, 0, 1);            // 0 = dia claro, ~1 = noite fechada
+    const noite = clamp(0.7 - lum * 0.7, 0, 0.45);            // noite suave e nítida, nunca bloqueia a visibilidade
     const t = S.time;
 
     // 1) neblina volumétrica (duas camadas com velocidades diferentes = profundidade)
@@ -12062,73 +12062,59 @@
     W.places.push(plMansao);
   }
 
-  // ---------- LISTA ESTRATÉGICA DOS 50+ SEGURANÇAS DA MÁFIA ----------
+  // ---------- LISTA ESTRATÉGICA DOS SEGURANÇAS DA MÁFIA ----------
   const GUARDAS_POS = [
-    // Guaritas e Portão Principal de Entrada (8 guardas)
-    { x: P_PORTAO.x - 70, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e1', arma: 'smg' },
-    { x: P_PORTAO.x - 45, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e2', arma: 'shotgun' },
-    { x: P_PORTAO.x + 45, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d1', arma: 'shotgun' },
-    { x: P_PORTAO.x + 70, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d2', arma: 'smg' },
-    { x: P_PORTAO.x - 120, y: P_PORTAO.y + 10, h: -0.3, tag: 'guarita_torre_e', arma: 'sniper' },
-    { x: P_PORTAO.x + 120, y: P_PORTAO.y + 10, h: 0.3, tag: 'guarita_torre_d', arma: 'sniper' },
-    { x: P_PORTAO.x - 20, y: P_PORTAO.y + 15, h: 0, tag: 'cancela_e', arma: 'pistol' },
-    { x: P_PORTAO.x + 20, y: P_PORTAO.y + 15, h: 0, tag: 'cancela_d', arma: 'pistol' },
+    // 1. Portão Principal Sul & Guaritas (6 guardas)
+    { x: P_PORTAO.x - 75, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e1', arma: 'smg' },
+    { x: P_PORTAO.x - 40, y: P_PORTAO.y - 15, h: 0, tag: 'portao_e2', arma: 'shotgun' },
+    { x: P_PORTAO.x + 40, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d1', arma: 'shotgun' },
+    { x: P_PORTAO.x + 75, y: P_PORTAO.y - 15, h: 0, tag: 'portao_d2', arma: 'smg' },
+    { x: P_PORTAO.x - 130, y: P_PORTAO.y + 5, h: -0.3, tag: 'guarita_torre_e', arma: 'sniper' },
+    { x: P_PORTAO.x + 130, y: P_PORTAO.y + 5, h: 0.3, tag: 'guarita_torre_d', arma: 'sniper' },
 
-    // Alameda Nobre e Estrada Central de Acesso (10 guardas)
-    { x: estate.cx - 40, y: P_PORTAO.y - 70, h: -Math.PI / 2, tag: 'alameda_1', arma: 'smg' },
-    { x: estate.cx + 40, y: P_PORTAO.y - 70, h: Math.PI / 2, tag: 'alameda_2', arma: 'smg' },
-    { x: estate.cx - 40, y: P_PORTAO.y - 130, h: -Math.PI / 2, tag: 'alameda_3', arma: 'pistol' },
-    { x: estate.cx + 40, y: P_PORTAO.y - 130, h: Math.PI / 2, tag: 'alameda_4', arma: 'pistol' },
-    { x: estate.cx - 40, y: P_PORTAO.y - 190, h: -Math.PI / 2, tag: 'alameda_5', arma: 'smg' },
-    { x: estate.cx + 40, y: P_PORTAO.y - 190, h: Math.PI / 2, tag: 'alameda_6', arma: 'smg' },
-    { x: estate.cx - 60, y: estate.cy + 110, h: -0.4, tag: 'cruzamento_1', arma: 'shotgun' },
-    { x: estate.cx + 60, y: estate.cy + 110, h: 0.4, tag: 'cruzamento_2', arma: 'shotgun' },
-    { x: estate.cx - 100, y: estate.cy + 140, h: -Math.PI / 2, tag: 'jardim_s1', arma: 'pistol' },
-    { x: estate.cx + 100, y: estate.cy + 140, h: Math.PI / 2, tag: 'jardim_s2', arma: 'pistol' },
+    // 2. Alameda Nobre (6 guardas espaçados)
+    { x: estate.cx - 45, y: P_PORTAO.y - 65, h: -Math.PI / 2, tag: 'alameda_1', arma: 'smg' },
+    { x: estate.cx + 45, y: P_PORTAO.y - 65, h: Math.PI / 2, tag: 'alameda_2', arma: 'smg' },
+    { x: estate.cx - 45, y: P_PORTAO.y - 125, h: -Math.PI / 2, tag: 'alameda_3', arma: 'pistol' },
+    { x: estate.cx + 45, y: P_PORTAO.y - 125, h: Math.PI / 2, tag: 'alameda_4', arma: 'pistol' },
+    { x: estate.cx - 55, y: P_FONTE.y + 60, h: -0.4, tag: 'alameda_5', arma: 'shotgun' },
+    { x: estate.cx + 55, y: P_FONTE.y + 60, h: 0.4, tag: 'alameda_6', arma: 'shotgun' },
 
-    // Pátio da Fonte e Fachada Frontal da Mansão (8 guardas)
-    { x: P_FONTE.x - 65, y: P_FONTE.y, h: Math.PI / 2, tag: 'fonte_o', arma: 'pistol' },
-    { x: P_FONTE.x + 65, y: P_FONTE.y, h: -Math.PI / 2, tag: 'fonte_l', arma: 'pistol' },
-    { x: P_FONTE.x, y: P_FONTE.y - 65, h: Math.PI, tag: 'fonte_n', arma: 'smg' },
-    { x: P_FONTE.x, y: P_FONTE.y + 65, h: 0, tag: 'fonte_s', arma: 'smg' },
-    { x: P_MANSAO.x - 55, y: P_MANSAO.y + 15, h: Math.PI, tag: 'fachada_e', arma: 'smg' },
-    { x: P_MANSAO.x + 55, y: P_MANSAO.y + 15, h: Math.PI, tag: 'fachada_d', arma: 'smg' },
-    { x: P_MANSAO.x - 25, y: P_MANSAO.y + 5, h: Math.PI, tag: 'porta_e', arma: 'pistol' },
-    { x: P_MANSAO.x + 25, y: P_MANSAO.y + 5, h: Math.PI, tag: 'porta_d', arma: 'pistol' },
+    // 3. Pátio da Fonte Central (4 guardas ao redor)
+    { x: P_FONTE.x - 55, y: P_FONTE.y, h: Math.PI / 2, tag: 'fonte_o', arma: 'pistol' },
+    { x: P_FONTE.x + 55, y: P_FONTE.y, h: -Math.PI / 2, tag: 'fonte_l', arma: 'pistol' },
+    { x: P_FONTE.x, y: P_FONTE.y - 55, h: Math.PI, tag: 'fonte_n', arma: 'smg' },
+    { x: P_FONTE.x, y: P_FONTE.y + 55, h: 0, tag: 'fonte_s', arma: 'smg' },
 
-    // Estacionamento da Limusine e Garagem VIP (6 guardas)
-    { x: P_LIMO.x - 30, y: P_LIMO.y - 20, h: 0.8, tag: 'limo_guarda_1', arma: 'smg' },
-    { x: P_LIMO.x + 40, y: P_LIMO.y - 20, h: -0.8, tag: 'limo_guarda_2', arma: 'pistol' },
-    { x: P_LIMO.x - 45, y: P_LIMO.y + 35, h: 0.2, tag: 'garagem_1', arma: 'shotgun' },
-    { x: P_LIMO.x + 45, y: P_LIMO.y + 35, h: -0.2, tag: 'garagem_2', arma: 'smg' },
-    { x: estate.cx - 150, y: estate.cy - 120, h: Math.PI / 4, tag: 'ala_oeste_1', arma: 'pistol' },
-    { x: estate.cx - 150, y: estate.cy - 60, h: -Math.PI / 4, tag: 'ala_oeste_2', arma: 'smg' },
+    // 4. Fachada Principal da Mansão (4 guardas)
+    { x: P_MANSAO.x - 70, y: P_MANSAO.y + 20, h: Math.PI, tag: 'fachada_e', arma: 'smg' },
+    { x: P_MANSAO.x + 70, y: P_MANSAO.y + 20, h: Math.PI, tag: 'fachada_d', arma: 'smg' },
+    { x: P_MANSAO.x - 30, y: P_MANSAO.y + 10, h: Math.PI, tag: 'porta_e', arma: 'pistol' },
+    { x: P_MANSAO.x + 30, y: P_MANSAO.y + 10, h: Math.PI, tag: 'porta_d', arma: 'pistol' },
 
-    // Grande Área de Lazer Externa e Piscina Olímpica (8 guardas)
-    { x: P_PISCINA.x - 70, y: P_PISCINA.y - 45, h: Math.PI / 2, tag: 'piscina_no', arma: 'pistol' },
-    { x: P_PISCINA.x + 70, y: P_PISCINA.y - 45, h: -Math.PI / 2, tag: 'piscina_ne', arma: 'pistol' },
-    { x: P_PISCINA.x - 70, y: P_PISCINA.y + 45, h: Math.PI / 2, tag: 'piscina_so', arma: 'smg' },
-    { x: P_PISCINA.x + 70, y: P_PISCINA.y + 45, h: -Math.PI / 2, tag: 'piscina_se', arma: 'smg' },
-    { x: P_PISCINA.x + 95, y: P_PISCINA.y, h: -Math.PI / 2, tag: 'bar_piscina_1', arma: 'pistol' },
-    { x: P_PISCINA.x + 95, y: P_PISCINA.y + 30, h: -Math.PI / 2, tag: 'bar_piscina_2', arma: 'smg' },
-    { x: P_PISCINA.x, y: P_PISCINA.y + 70, h: 0, tag: 'deck_piscina', arma: 'pistol' },
-    { x: P_PISCINA.x, y: P_PISCINA.y - 70, h: Math.PI, tag: 'lounge_externo', arma: 'smg' },
+    // 5. Garagem & Estacionamento da Limusine (4 guardas)
+    { x: P_LIMO.x - 40, y: P_LIMO.y - 25, h: 0.8, tag: 'limo_guarda_1', arma: 'smg' },
+    { x: P_LIMO.x + 40, y: P_LIMO.y - 25, h: -0.8, tag: 'limo_guarda_2', arma: 'pistol' },
+    { x: P_LIMO.x - 50, y: P_LIMO.y + 35, h: 0.2, tag: 'garagem_1', arma: 'shotgun' },
+    { x: P_LIMO.x + 50, y: P_LIMO.y + 35, h: -0.2, tag: 'garagem_2', arma: 'smg' },
 
-    // Campo de Golfe e Jardins Periféricos (6 guardas)
-    { x: P_GOLFE_CAMPO.x - 60, y: P_GOLFE_CAMPO.y - 50, h: 0.5, tag: 'golfe_1', arma: 'smg' },
-    { x: P_GOLFE_CAMPO.x + 60, y: P_GOLFE_CAMPO.y - 50, h: -0.5, tag: 'golfe_2', arma: 'pistol' },
-    { x: P_GOLFE_CAMPO.x - 60, y: P_GOLFE_CAMPO.y + 50, h: 0.8, tag: 'golfe_3', arma: 'shotgun' },
-    { x: P_GOLFE_CAMPO.x + 60, y: P_GOLFE_CAMPO.y + 50, h: -0.8, tag: 'golfe_4', arma: 'smg' },
-    { x: P_GOLF.x - 25, y: P_GOLF.y, h: Math.PI / 2, tag: 'carrinho_guarda_1', arma: 'pistol' },
-    { x: P_GOLF.x + 25, y: P_GOLF.y, h: -Math.PI / 2, tag: 'carrinho_guarda_2', arma: 'pistol' },
+    // 6. Deck & Piscina de Luxo (4 guardas)
+    { x: P_PISCINA.x - 65, y: P_PISCINA.y - 45, h: Math.PI / 2, tag: 'piscina_no', arma: 'pistol' },
+    { x: P_PISCINA.x + 65, y: P_PISCINA.y - 45, h: -Math.PI / 2, tag: 'piscina_ne', arma: 'pistol' },
+    { x: P_PISCINA.x - 65, y: P_PISCINA.y + 45, h: Math.PI / 2, tag: 'piscina_so', arma: 'smg' },
+    { x: P_PISCINA.x + 65, y: P_PISCINA.y + 45, h: -Math.PI / 2, tag: 'piscina_se', arma: 'smg' },
 
-    // Heliponto e Perímetro Norte (6 guardas)
-    { x: P_HELI.x - 45, y: P_HELI.y - 35, h: 0.6, tag: 'heli_1', arma: 'smg' },
-    { x: P_HELI.x + 45, y: P_HELI.y - 35, h: -0.6, tag: 'heli_2', arma: 'smg' },
-    { x: P_HELI.x - 45, y: P_HELI.y + 35, h: 1.2, tag: 'heli_3', arma: 'shotgun' },
-    { x: P_HELI.x + 45, y: P_HELI.y + 35, h: -1.2, tag: 'heli_4', arma: 'sniper' },
-    { x: estate.cx - 240, y: estate.y0 + 80, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
-    { x: estate.cx + 240, y: estate.y0 + 80, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' }
+    // 7. Campo de Golfe (4 guardas)
+    { x: P_GOLFE_CAMPO.x - 50, y: P_GOLFE_CAMPO.y - 40, h: 0.5, tag: 'golfe_1', arma: 'smg' },
+    { x: P_GOLFE_CAMPO.x + 50, y: P_GOLFE_CAMPO.y - 40, h: -0.5, tag: 'golfe_2', arma: 'pistol' },
+    { x: P_GOLFE_CAMPO.x - 50, y: P_GOLFE_CAMPO.y + 40, h: 0.8, tag: 'golfe_3', arma: 'shotgun' },
+    { x: P_GOLFE_CAMPO.x + 50, y: P_GOLFE_CAMPO.y + 40, h: -0.8, tag: 'golfe_4', arma: 'smg' },
+
+    // 8. Heliponto & Torres de Vigia Norte (4 guardas)
+    { x: P_HELI.x - 40, y: P_HELI.y - 30, h: 0.6, tag: 'heli_1', arma: 'smg' },
+    { x: P_HELI.x + 40, y: P_HELI.y - 30, h: -0.6, tag: 'heli_2', arma: 'smg' },
+    { x: estate.cx - 240, y: estate.y0 + 70, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
+    { x: estate.cx + 240, y: estate.y0 + 70, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' }
   ];
 
   // ---------- CÃES DE GUARDA (ROTTWEILERS) ----------
@@ -12731,14 +12717,14 @@
     });
 
     // Tapete vermelho central e lustre de cristal
-    R.objs.push(O('porta', 400, 150, 60, 20, { para: 'corredor_superior', rotulo: 'ELEVADOR / ESCADARIA NOBRE (ANDAR SUPERIOR)', px: 400, py: 480 }));
-    R.objs.push(O('porta', 100, 260, 20, 50, { para: 'bar', rotulo: 'BAR & LOUNGE', px: 680, py: 320 }));
-    R.objs.push(O('porta', 100, 380, 20, 50, { para: 'biblioteca', rotulo: 'BIBLIOTECA GIGANTE', px: 680, py: 320 }));
-    R.objs.push(O('porta', 760, 260, 20, 50, { para: 'cinema', rotulo: 'CINEMA PARTICULAR', px: 120, py: 320 }));
-    R.objs.push(O('porta', 760, 380, 20, 50, { para: 'cozinha', rotulo: 'COZINHA GOURMET', px: 120, py: 320 }));
-    R.objs.push(O('porta', 240, 150, 40, 20, { para: 'hospedes', rotulo: 'SUÍTE HÓSPEDES', px: 400, py: 420 }));
-    R.objs.push(O('porta', 560, 150, 40, 20, { para: 'faxineiras', rotulo: 'ALA FUNCIONÁRIOS', px: 400, py: 420 }));
-    R.objs.push(O('porta', 140, 150, 30, 20, { para: 'interrogatorio', rotulo: 'SUBSOLO SECRETO', px: 400, py: 420 }));
+    R.objs.push(O('porta', 400, 150, 60, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: ELEVADOR / ESCADARIA NOBRE', placa: 'ELEVADOR / ESCADARIA NOBRE', para: 'corredor_superior', rotulo: 'ELEVADOR / ESCADARIA NOBRE (ANDAR SUPERIOR)', px: 400, py: 480, act: S => L.irSala(S, 'corredor_superior', 400, 480) }));
+    R.objs.push(O('porta', 100, 260, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: BAR & LOUNGE', placa: 'BAR & LOUNGE', para: 'bar', rotulo: 'BAR & LOUNGE', px: 680, py: 320, act: S => L.irSala(S, 'bar', 680, 320) }));
+    R.objs.push(O('porta', 100, 380, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: BIBLIOTECA GIGANTE', placa: 'BIBLIOTECA GIGANTE', para: 'biblioteca', rotulo: 'BIBLIOTECA GIGANTE', px: 680, py: 320, act: S => L.irSala(S, 'biblioteca', 680, 320) }));
+    R.objs.push(O('porta', 760, 260, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: CINEMA PARTICULAR', placa: 'CINEMA PARTICULAR', para: 'cinema', rotulo: 'CINEMA PARTICULAR', px: 120, py: 320, act: S => L.irSala(S, 'cinema', 120, 320) }));
+    R.objs.push(O('porta', 760, 380, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: COZINHA GOURMET', placa: 'COZINHA GOURMET', para: 'cozinha', rotulo: 'COZINHA GOURMET', px: 120, py: 320, act: S => L.irSala(S, 'cozinha', 120, 320) }));
+    R.objs.push(O('porta', 240, 150, 40, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: SUÍTE HÓSPEDES', placa: 'SUÍTE HÓSPEDES', para: 'hospedes', rotulo: 'SUÍTE HÓSPEDES', px: 400, py: 420, act: S => L.irSala(S, 'hospedes', 400, 420) }));
+    R.objs.push(O('porta', 560, 150, 40, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: ALA FUNCIONÁRIOS', placa: 'ALA FUNCIONÁRIOS', para: 'faxineiras', rotulo: 'ALA FUNCIONÁRIOS', px: 400, py: 420, act: S => L.irSala(S, 'faxineiras', 400, 420) }));
+    R.objs.push(O('porta', 140, 150, 30, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: SUBSOLO SECRETO', placa: 'SUBSOLO SECRETO', para: 'interrogatorio', rotulo: 'SUBSOLO SECRETO', px: 400, py: 420, act: S => L.irSala(S, 'interrogatorio', 400, 420) }));
 
     // Balcão de Recepção de Sofia
     R.objs.push(O('balcao', 330, 280, 140, 40, {
@@ -13161,10 +13147,10 @@
       parede: '#2c2030'
     });
 
-    R.objs.push(O('porta', 400, 360, 60, 20, { para: 'entrada', rotulo: 'DESCER PARA O HALL NOBRE (TÉRREO)', px: 400, py: 190 }));
-    R.objs.push(O('porta', 160, 160, 50, 20, { para: 'escritorio', rotulo: 'MEGA ESCRITÓRIO DO CHEFÃO', px: 400, py: 420 }));
-    R.objs.push(O('porta', 640, 160, 50, 20, { para: 'quarto_master', rotulo: 'SUÍTE MASTER DO DON', px: 400, py: 440 }));
-    R.objs.push(O('porta', 400, 160, 50, 20, { para: 'varanda', rotulo: 'VARANDA PANORÂMICA', px: 400, py: 360 }));
+    R.objs.push(O('porta', 400, 360, 60, 20, { solid: false, k: 10, r: 50, label: 'DESCER PARA O HALL NOBRE (TÉRREO)', placa: 'DESCER PARA O HALL NOBRE', para: 'entrada', rotulo: 'DESCER PARA O HALL NOBRE (TÉRREO)', px: 400, py: 190, act: S => L.irSala(S, 'entrada', 400, 190) }));
+    R.objs.push(O('porta', 160, 160, 50, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: MEGA ESCRITÓRIO DO CHEFÃO', placa: 'MEGA ESCRITÓRIO DO CHEFÃO', para: 'escritorio', rotulo: 'MEGA ESCRITÓRIO DO CHEFÃO', px: 400, py: 420, act: S => L.irSala(S, 'escritorio', 400, 420) }));
+    R.objs.push(O('porta', 640, 160, 50, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: SUÍTE MASTER DO DON', placa: 'SUÍTE MASTER DO DON', para: 'quarto_master', rotulo: 'SUÍTE MASTER DO DON', px: 400, py: 440, act: S => L.irSala(S, 'quarto_master', 400, 440) }));
+    R.objs.push(O('porta', 400, 160, 50, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: VARANDA PANORÂMICA', placa: 'VARANDA PANORÂMICA', para: 'varanda', rotulo: 'VARANDA PANORÂMICA', px: 400, py: 360, act: S => L.irSala(S, 'varanda', 400, 360) }));
 
     // Guardas de elite nas portas
     R.npcs.push({ x: 230, y: 190, p: { shirt: '#141416', pants: '#141416', acc: 'shades', hairStyle: 'curto' }, falas: ['Acesso ao escritório 100% protegido, Don.'], h: Math.PI, fixo: true });
@@ -13264,10 +13250,10 @@
       parede: '#281a24'
     });
 
-    R.objs.push(O('porta', 400, 440, 60, 20, { para: 'corredor_superior', rotulo: 'CORREDOR SUPERIOR', px: 640, py: 200 }));
-    R.objs.push(O('porta', 120, 260, 20, 50, { para: 'closet', rotulo: 'CLOSET & QUARTO DE JOIAS', px: 500, py: 360 }));
-    R.objs.push(O('porta', 740, 260, 20, 50, { para: 'banheiro_master', rotulo: 'BANHEIRO MASTER & JACUZZI SPA', px: 140, py: 360 }));
-    R.objs.push(O('porta', 400, 160, 60, 20, { para: 'varanda', rotulo: 'VARANDA PANORÂMICA', px: 400, py: 360 }));
+    R.objs.push(O('porta', 400, 440, 60, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: CORREDOR SUPERIOR', placa: 'CORREDOR SUPERIOR', para: 'corredor_superior', rotulo: 'CORREDOR SUPERIOR', px: 640, py: 200, act: S => L.irSala(S, 'corredor_superior', 640, 200) }));
+    R.objs.push(O('porta', 120, 260, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: CLOSET & QUARTO DE JOIAS', placa: 'CLOSET & QUARTO DE JOIAS', para: 'closet', rotulo: 'CLOSET & QUARTO DE JOIAS', px: 500, py: 360, act: S => L.irSala(S, 'closet', 500, 360) }));
+    R.objs.push(O('porta', 740, 260, 20, 50, { solid: false, k: 10, r: 50, label: 'ENTRAR: BANHEIRO MASTER & JACUZZI SPA', placa: 'BANHEIRO MASTER & JACUZZI SPA', para: 'banheiro_master', rotulo: 'BANHEIRO MASTER & JACUZZI SPA', px: 140, py: 360, act: S => L.irSala(S, 'banheiro_master', 140, 360) }));
+    R.objs.push(O('porta', 400, 160, 60, 20, { solid: false, k: 10, r: 50, label: 'ENTRAR: VARANDA PANORÂMICA', placa: 'VARANDA PANORÂMICA', para: 'varanda', rotulo: 'VARANDA PANORÂMICA', px: 400, py: 360, act: S => L.irSala(S, 'varanda', 400, 360) }));
 
     // Cama King Size Monumental (Deitar / Dormir)
     R.objs.push(O('cama', 340, 200, 140, 120, {
@@ -13439,54 +13425,53 @@
   L.extrasDesenho.push((ctx, S, inV) => {
     if (!S || S.mode === 'title') return;
 
-    // 1. Estrada e Alameda da Mansão com Asfalto Nobre e Faixa Dupla Ouro
     const isNight = G.darkness ? G.darkness() > 0.25 : false;
     const time = S.time || 0;
 
-    // 2. Desenho do Portão e Guaritas
+    // 1. Desenho do Portão e Placa Monumental
     if (inV(P_PORTAO)) {
       ctx.save();
       ctx.translate(P_PORTAO.x, P_PORTAO.y);
 
-      // Muros de granito e portão dourado
-      ctx.fillStyle = '#26262a';
-      ctx.fillRect(-140, -10, 90, 20);
-      ctx.fillRect(50, -10, 90, 20);
+      // Pilares de granito laterais
+      ctx.fillStyle = '#1c1d22';
+      ctx.fillRect(-150, -10, 90, 20);
+      ctx.fillRect(60, -10, 90, 20);
 
       // Portão de ferro forjado e dourado
       ctx.strokeStyle = '#d4af37';
       ctx.lineWidth = 3;
-      ctx.strokeRect(-48, -8, 96, 16);
-      for (let k = -40; k <= 40; k += 8) {
+      ctx.strokeRect(-50, -8, 100, 16);
+      for (let k = -42; k <= 42; k += 7) {
         ctx.beginPath();
         ctx.moveTo(k, -8);
         ctx.lineTo(k, 8);
         ctx.stroke();
       }
 
-      // Placa Monumental
-      ctx.fillStyle = '#151518';
-      ctx.fillRect(-110, -28, 220, 16);
+      // Placa Monumental Dourada
+      ctx.fillStyle = '#111215';
+      ctx.fillRect(-130, -38, 260, 20);
       ctx.strokeStyle = '#d4af37';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(-110, -28, 220, 16);
+      ctx.strokeRect(-130, -38, 260, 20);
       ctx.fillStyle = '#e5b834';
-      ctx.font = 'bold 7px Georgia';
+      ctx.font = 'bold 8px Georgia';
       ctx.textAlign = 'center';
-      ctx.fillText('⚜️ PROPRIEDADE PRIVADA — VILLA DO PODEROSO CHEFÃO ⚜️', 0, -17);
+      ctx.fillText('⚜️ PROPRIEDADE PRIVADA — VILLA DO PODEROSO CHEFÃO ⚜️', 0, -25);
       ctx.restore();
     }
 
-    // 3. Grande Piscina Olímpica com LEDs Noturnos
+    // 2. Grande Piscina Olímpica com LEDs Noturnos
     if (inV(P_PISCINA)) {
       ctx.save();
       ctx.translate(P_PISCINA.x, P_PISCINA.y);
 
-      // Deck de mármore
+      // Deck de mármore claro
       ctx.fillStyle = '#eae6dc';
       ctx.fillRect(-90, -60, 180, 120);
 
-      // Água da piscina
+      // Água cristalina da piscina
       const gw = ctx.createLinearGradient(0, -50, 0, 50);
       gw.addColorStop(0, '#00b0ff');
       gw.addColorStop(1, '#0077c2');
@@ -13499,7 +13484,6 @@
         ctx.fillStyle = 'hsla(' + ledHue + ', 95%, 60%, 0.45)';
         ctx.fillRect(-80, -50, 160, 100);
 
-        // Pontos de luz subaquáticos
         for (let lx = -70; lx <= 70; lx += 35) {
           [-45, 45].forEach(ly => {
             const gr = ctx.createRadialGradient(lx, ly, 1, lx, ly, 25);
@@ -13516,7 +13500,7 @@
       ctx.restore();
     }
 
-    // 4. Fonte Central em Cascata
+    // 3. Fonte Central em Cascata
     if (inV(P_FONTE)) {
       ctx.save();
       ctx.translate(P_FONTE.x, P_FONTE.y);
@@ -13536,57 +13520,71 @@
       ctx.restore();
     }
 
-    // 5. Desenho dos 50+ Seguranças da Máfia no Mapa
-    GUARDAS_POS.forEach(g => {
+    // 4. Desenho dos Seguranças da Máfia com modelo completo
+    GUARDAS_POS.forEach((g, idx) => {
+      if (!g.ped) {
+        g.ped = {
+          x: g.x, y: g.y, h: g.h,
+          skin: ['#f1c9a0', '#d9a06e', '#a86d42', '#7a4b2a'][idx % 4],
+          hair: ['#111', '#2c1a0e', '#1a1a1a'][idx % 3],
+          hairStyle: 'curto',
+          shirt: '#121316', pants: '#121316', shoe: '#0a0a0c',
+          acc: 'shades', weapon: g.arma || 'pistol',
+          walk: 0, state: 'walk', hp: 200, noRing: true
+        };
+      }
       if (!inV(g)) return;
+      g.ped.x = g.x; g.ped.y = g.y; g.ped.h = g.h;
+      SP.drawPed(ctx, g.ped, time);
+
+      // Arma segurada
       ctx.save();
       ctx.translate(g.x, g.y);
       ctx.rotate(g.h);
-
-      // Terno preto e sapatos
-      ctx.fillStyle = '#111215';
-      ctx.beginPath();
-      ctx.arc(0, 0, 7.5, 0, TAU);
-      ctx.fill();
-
-      // Gravata vermelha
-      ctx.fillStyle = '#d32f2f';
-      ctx.fillRect(-1.2, 0, 2.4, 5);
-
-      // Óculos escuros
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(-4, -6, 8, 2.5);
-
-      // Arma na mão
-      ctx.fillStyle = '#37474f';
-      ctx.fillRect(5, -2, 7, 3);
-
+      ctx.fillStyle = '#263238';
+      if (g.arma === 'smg') {
+        ctx.fillRect(4, -13, 3.2, 12);
+        ctx.fillStyle = '#546e7a'; ctx.fillRect(4.5, -9, 2.2, 6);
+      } else if (g.arma === 'shotgun') {
+        ctx.fillRect(4, -18, 3.5, 17);
+        ctx.fillStyle = '#8d6e63'; ctx.fillRect(3.5, -6, 4.5, 6);
+      } else if (g.arma === 'sniper') {
+        ctx.fillRect(4, -22, 3.2, 21);
+        ctx.fillStyle = '#37474f'; ctx.fillRect(3.5, -12, 4.2, 8);
+      } else {
+        ctx.fillRect(4, -10, 2.6, 7.5);
+      }
       ctx.restore();
     });
 
-    // 6. Desenho dos Cães de Guarda (Rottweilers)
+    // 5. Desenho dos Cães de Guarda (Rottweilers)
     CAES_POS.forEach(dog => {
       if (!inV(dog)) return;
       ctx.save();
       ctx.translate(dog.x, dog.y);
-
-      // Corpo do cão (preto e marrom com coleira vermelha)
-      ctx.fillStyle = '#1c1815';
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 8, 5, dog.ang, 0, TAU);
-      ctx.fill();
-
-      // Focinho marrom
-      ctx.fillStyle = '#a66028';
-      ctx.beginPath();
-      ctx.arc(Math.cos(dog.ang) * 6, Math.sin(dog.ang) * 6, 3, 0, TAU);
-      ctx.fill();
-
-      // Coleira vermelha com cravos
-      ctx.strokeStyle = '#d32f2f';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
+      ctx.rotate(dog.ang + Math.PI / 2);
+      // Sombra
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.ellipse(2, 3, 7, 12, 0, 0, TAU); ctx.fill();
+      // Corpo do Rottweiler
+      ctx.fillStyle = '#1c1613';
+      ctx.beginPath(); ctx.ellipse(0, 0, 5.5, 11, 0, 0, TAU); ctx.fill();
+      // Peito e patas marrom canela
+      ctx.fillStyle = '#9c5525';
+      ctx.beginPath(); ctx.arc(-3.5, 5.5, 2.2, 0, TAU); ctx.arc(3.5, 5.5, 2.2, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(-3.5, -5.5, 2, 0, TAU); ctx.arc(3.5, -5.5, 2, 0, TAU); ctx.fill();
+      // Cabeça e focinho
+      ctx.fillStyle = '#1c1613';
+      ctx.beginPath(); ctx.ellipse(0, -9.5, 4.5, 4.8, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#9c5525';
+      ctx.fillRect(-2, -14.5, 4, 3.5);
+      // Coleira vermelha de couro com pingente ouro
+      ctx.fillStyle = '#d32f2f';
+      ctx.fillRect(-4.5, -6, 9, 2);
+      ctx.fillStyle = '#ffd54f';
+      ctx.beginPath(); ctx.arc(0, -4.5, 1.2, 0, TAU); ctx.fill();
+      // Rabo animado
+      ctx.strokeStyle = '#1c1613'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(0, 9.5); ctx.lineTo(Math.sin(time * 7) * 3, 15); ctx.stroke();
       ctx.restore();
     });
   });
@@ -15277,7 +15275,7 @@
   // ---------- o que cada agente visita ----------
   function alvosDe(ag) {
     const lista = [], dentro = x => x / T >= ag.lim.x0 && x / T <= ag.lim.x1;
-    W.places.forEach(pl => { if (pl.tipo !== 'casa' && pl.id !== 'casa' && dentro(pl.x)) lista.push({ tipo: 'lugar', id: 'p:' + pl.id, x: pl.x, y: pl.y + 4, pl }); });
+    W.places.forEach(pl => { if (pl.tipo !== 'casa' && pl.id !== 'casa' && pl.id !== 'mansao_chefao' && pl.tipo !== 'mansao' && dentro(pl.x)) lista.push({ tipo: 'lugar', id: 'p:' + pl.id, x: pl.x, y: pl.y + 4, pl }); });
     G.cidade.lotes.forEach(l => { if (dentro(l.cx) && l.tam !== 'p') lista.push({ tipo: 'obra', id: 'o:' + l.id, x: l.tam === 'a' ? l.x + l.w / 2 : l.cx, y: l.y + l.h + 26, lote: l }); });
     // pontos de calçada: vigilância de rua em todos os cantos da região
     W.spots.forEach((p, i) => { if (dentro(p.x) && i % 3 === 0 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T))) lista.push({ tipo: 'rua', id: 's:' + i, x: p.x, y: p.y }); });

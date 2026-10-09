@@ -74,7 +74,7 @@
   // ---------- o que cada agente visita ----------
   function alvosDe(ag) {
     const lista = [], dentro = x => x / T >= ag.lim.x0 && x / T <= ag.lim.x1;
-    W.places.forEach(pl => { if (pl.tipo !== 'casa' && pl.id !== 'casa' && dentro(pl.x)) lista.push({ tipo: 'lugar', id: 'p:' + pl.id, x: pl.x, y: pl.y + 4, pl }); });
+    W.places.forEach(pl => { if (pl.tipo !== 'casa' && pl.id !== 'casa' && pl.id !== 'mansao_chefao' && pl.tipo !== 'mansao' && dentro(pl.x)) lista.push({ tipo: 'lugar', id: 'p:' + pl.id, x: pl.x, y: pl.y + 4, pl }); });
     G.cidade.lotes.forEach(l => { if (dentro(l.cx) && l.tam !== 'p') lista.push({ tipo: 'obra', id: 'o:' + l.id, x: l.tam === 'a' ? l.x + l.w / 2 : l.cx, y: l.y + l.h + 26, lote: l }); });
     // pontos de calçada: vigilância de rua em todos os cantos da região
     W.spots.forEach((p, i) => { if (dentro(p.x) && i % 3 === 0 && caminhavel(Math.floor(p.x / T), Math.floor(p.y / T))) lista.push({ tipo: 'rua', id: 's:' + i, x: p.x, y: p.y }); });
