@@ -26,7 +26,7 @@
     const ref = { x: S.cam.x, y: S.cam.y };
     // ---- pombos ----
     if (!S.pombos) S.pombos = [];
-    const pl = S.player.car || S.player;
+    const pl = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     S.pombos.forEach(p => {
       p.t += dt;
       if (p.st === 'chao') {

@@ -79,7 +79,7 @@
         add(c.x, c.y, 190, ph ? [255, 40, 40] : [50, 90, 255], 0.95);
       }
     });
-    const ref = S.player.car || S.player;
+    const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     if (vis(ref.x, ref.y)) add(ref.x, ref.y, 95, [255, 235, 200], 0.4);
     S.particles.forEach(p => {
       if (!vis(p.x, p.y)) return;

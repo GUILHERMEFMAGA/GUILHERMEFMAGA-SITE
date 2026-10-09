@@ -443,7 +443,7 @@
   // ---------- Helicóptero ----------
   function updateHeli(S, dt) {
     const h = S.heli; if (!h) return;
-    const tg = S.player.car || S.player;
+    const tg = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     const dx = tg.x - h.x, dy = tg.y - h.y, d = Math.hypot(dx, dy) || 1;
     const sp = Math.min(330, d * 1.4 + 40);
     h.vx += (dx / d * sp - h.vx) * Math.min(1, 1.6 * dt); h.vy += (dy / d * sp - h.vy) * Math.min(1, 1.6 * dt);

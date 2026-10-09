@@ -151,7 +151,8 @@
 
   // armado na frente de um agente (vigiado o tempo todo, não só quando ele anda)
   function vigiaArma(ag, S) {
-    const P = S.player, ref = P.car || P;
+    const P = S.player; if (!P) return;
+    const ref = P.car || P;
     if (S.mode === 'play' && !P.car && (P.weapon === 'pistol' || P.weapon === 'smg' || P.weapon === 'shotgun') && Math.hypot(P.x - ag.x, P.y - ag.y) < 170 && S.time - ag.aviso > 25) {
       ag.aviso = S.time; G.say(ag.nome.toUpperCase() + ' (FBI): "Largue essa arma agora!"', 3.5); G.addHeat(14);
       G.cameras.registra('CRIME', ag.nome + ' viu o jogador armado na rua', 'crime', { x: P.x, y: P.y });
@@ -217,7 +218,7 @@
       if (ag.escondido || !inV(ag)) return;
       if (!ag.ped.shirt) Object.assign(ag.ped, ag.ped.look);   // o sprite lê as cores direto do pedestre
       SP.drawPed(ctx, ag.ped, t);
-      const near = Math.hypot(S.player.x - ag.x, S.player.y - ag.y) < 260;
+      const near = S.player && Math.hypot(S.player.x - ag.x, S.player.y - ag.y) < 260;
       ctx.save(); ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center';
       const nm = near ? 'FBI · ' + ag.nome.replace('Agente ', '').toUpperCase() : 'FBI', w = ctx.measureText(nm).width + 8;
       ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(ag.x - w / 2, ag.y - 24, w, 10); ctx.fillStyle = '#ffe04a'; ctx.fillText(nm, ag.x, ag.y - 16.5); ctx.restore();

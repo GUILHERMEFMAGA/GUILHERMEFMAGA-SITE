@@ -1722,7 +1722,7 @@
 
   // ---------- SPAWN INICIAL E RENASCIMENTO NO PORTÃO DA MANSÃO ----------
   L.extrasAtualizar.push((S, dt) => {
-    if (!S || S.mode === 'title' || S._mansaoSpawnFeito) return;
+    if (!S || S.mode === 'title' || S._mansaoSpawnFeito || !S.player) return;
     S._mansaoSpawnFeito = true;
     if (S.save && S.save.spawnMansao !== false) {
       // Força o spawn inicial direto no portão monumental da Mansão

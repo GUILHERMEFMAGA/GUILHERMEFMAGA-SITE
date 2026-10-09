@@ -422,7 +422,7 @@
   C.atualizar = function (S, dt) {
     C.t += dt * C.vel; S.save.cidadeT = C.t;
     acc += dt; if (acc < 0.5) return; acc = 0;
-    const ref = S.player.car || S.player;
+    const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     W.lotes.forEach(l => {
       if (l.img && Math.hypot(l.cx - ref.x, l.cy - ref.y) > 3600) l.img = null;   // solta a imagem pesada de lotes longe
       const e = estadoDe(l, C.t), ant = l.fase; l.est = e; l.fase = e.f;

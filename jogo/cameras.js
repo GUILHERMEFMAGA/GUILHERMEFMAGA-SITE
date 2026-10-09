@@ -126,7 +126,7 @@
     });
     // câmera da rua flagra fuga da polícia (só registro)
     if (S.heatLevel > 0 && S.mode === 'play') {
-      const ref = S.player.car || S.player;
+      const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
       for (const c of CM.ruas) { if (Math.hypot(ref.x - c.x, ref.y - c.y) < 230 && (!c.flag || S.time - c.flag > 40)) { c.flag = S.time; CM.registra('CRIME', c.nome() + ' — suspeito em fuga filmado (nível de procurado ' + S.heatLevel + ')', 'crime', { x: ref.x, y: ref.y }); break; } }
     }
   };
@@ -177,7 +177,7 @@
         C.desenhar(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenhar(x, S, vx0, vy0, vx1, vy1, t);
         const inV = o => o.x > vx0 - 60 && o.x < vx1 + 60 && o.y > vy0 - 60 && o.y < vy1 + 60;
         S.cars.filter(inV).forEach(c => SP.drawCar(x, c, t)); S.peds.filter(inV).forEach(p => SP.drawPed(x, p, t));
-        if (!S.player.car && S.mode !== 'inside' && inV(S.player)) SP.drawPed(x, S.player, t);
+        if (S.player && !S.player.car && S.mode !== 'inside' && inV(S.player)) SP.drawPed(x, S.player, t);
         if (G.fbi && G.fbi.desenhar) G.fbi.desenhar(x, S, inV, t);
         C.desenharAlto(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenharAlto(x, S, vx0, vy0, vx1, vy1, t);
         CM.desenharRua(x, S, vx0, vy0, vx1, vy1, t);

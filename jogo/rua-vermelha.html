@@ -3915,7 +3915,7 @@
   // ---------- Helicóptero ----------
   function updateHeli(S, dt) {
     const h = S.heli; if (!h) return;
-    const tg = S.player.car || S.player;
+    const tg = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     const dx = tg.x - h.x, dy = tg.y - h.y, d = Math.hypot(dx, dy) || 1;
     const sp = Math.min(330, d * 1.4 + 40);
     h.vx += (dx / d * sp - h.vx) * Math.min(1, 1.6 * dt); h.vy += (dy / d * sp - h.vy) * Math.min(1, 1.6 * dt);
@@ -4051,7 +4051,7 @@
       if (Math.abs(p.x - x) < r && Math.abs(p.y - y) < r && Math.hypot(p.x - x, p.y - y) < r) { p.state = 'flee'; p.fleeT = rand(3, 5.5); p.threat = { x, y }; }
     }
   }
-  const vol = (S, x, y) => { const ref = S.player.car || S.player; return clamp(1.05 - Math.hypot(x - ref.x, y - ref.y) / 950, 0.12, 1); };
+  const vol = (S, x, y) => { const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 }; return clamp(1.05 - Math.hypot(x - ref.x, y - ref.y) / 950, 0.12, 1); };
 
   // ---------- Dano ----------
   function hurtPlayer(S, dmg, fx, fy) {
@@ -5384,7 +5384,7 @@
         add(c.x, c.y, 190, ph ? [255, 40, 40] : [50, 90, 255], 0.95);
       }
     });
-    const ref = S.player.car || S.player;
+    const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     if (vis(ref.x, ref.y)) add(ref.x, ref.y, 95, [255, 235, 200], 0.4);
     S.particles.forEach(p => {
       if (!vis(p.x, p.y)) return;
@@ -5538,7 +5538,7 @@
     const ref = { x: S.cam.x, y: S.cam.y };
     // ---- pombos ----
     if (!S.pombos) S.pombos = [];
-    const pl = S.player.car || S.player;
+    const pl = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     S.pombos.forEach(p => {
       p.t += dt;
       if (p.st === 'chao') {
@@ -13701,7 +13701,7 @@
 
   // ---------- SPAWN INICIAL E RENASCIMENTO NO PORTÃO DA MANSÃO ----------
   L.extrasAtualizar.push((S, dt) => {
-    if (!S || S.mode === 'title' || S._mansaoSpawnFeito) return;
+    if (!S || S.mode === 'title' || S._mansaoSpawnFeito || !S.player) return;
     S._mansaoSpawnFeito = true;
     if (S.save && S.save.spawnMansao !== false) {
       // Força o spawn inicial direto no portão monumental da Mansão
@@ -14454,7 +14454,7 @@
   C.atualizar = function (S, dt) {
     C.t += dt * C.vel; S.save.cidadeT = C.t;
     acc += dt; if (acc < 0.5) return; acc = 0;
-    const ref = S.player.car || S.player;
+    const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
     W.lotes.forEach(l => {
       if (l.img && Math.hypot(l.cx - ref.x, l.cy - ref.y) > 3600) l.img = null;   // solta a imagem pesada de lotes longe
       const e = estadoDe(l, C.t), ant = l.fase; l.est = e; l.fase = e.f;
@@ -14792,7 +14792,7 @@
     });
     // câmera da rua flagra fuga da polícia (só registro)
     if (S.heatLevel > 0 && S.mode === 'play') {
-      const ref = S.player.car || S.player;
+      const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 };
       for (const c of CM.ruas) { if (Math.hypot(ref.x - c.x, ref.y - c.y) < 230 && (!c.flag || S.time - c.flag > 40)) { c.flag = S.time; CM.registra('CRIME', c.nome() + ' — suspeito em fuga filmado (nível de procurado ' + S.heatLevel + ')', 'crime', { x: ref.x, y: ref.y }); break; } }
     }
   };
@@ -14843,7 +14843,7 @@
         C.desenhar(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenhar(x, S, vx0, vy0, vx1, vy1, t);
         const inV = o => o.x > vx0 - 60 && o.x < vx1 + 60 && o.y > vy0 - 60 && o.y < vy1 + 60;
         S.cars.filter(inV).forEach(c => SP.drawCar(x, c, t)); S.peds.filter(inV).forEach(p => SP.drawPed(x, p, t));
-        if (!S.player.car && S.mode !== 'inside' && inV(S.player)) SP.drawPed(x, S.player, t);
+        if (S.player && !S.player.car && S.mode !== 'inside' && inV(S.player)) SP.drawPed(x, S.player, t);
         if (G.fbi && G.fbi.desenhar) G.fbi.desenhar(x, S, inV, t);
         C.desenharAlto(x, S, vx0, vy0, vx1, vy1, t); if (G.pedagio) G.pedagio.desenharAlto(x, S, vx0, vy0, vx1, vy1, t);
         CM.desenharRua(x, S, vx0, vy0, vx1, vy1, t);
@@ -15354,7 +15354,8 @@
 
   // armado na frente de um agente (vigiado o tempo todo, não só quando ele anda)
   function vigiaArma(ag, S) {
-    const P = S.player, ref = P.car || P;
+    const P = S.player; if (!P) return;
+    const ref = P.car || P;
     if (S.mode === 'play' && !P.car && (P.weapon === 'pistol' || P.weapon === 'smg' || P.weapon === 'shotgun') && Math.hypot(P.x - ag.x, P.y - ag.y) < 170 && S.time - ag.aviso > 25) {
       ag.aviso = S.time; G.say(ag.nome.toUpperCase() + ' (FBI): "Largue essa arma agora!"', 3.5); G.addHeat(14);
       G.cameras.registra('CRIME', ag.nome + ' viu o jogador armado na rua', 'crime', { x: P.x, y: P.y });
@@ -15420,7 +15421,7 @@
       if (ag.escondido || !inV(ag)) return;
       if (!ag.ped.shirt) Object.assign(ag.ped, ag.ped.look);   // o sprite lê as cores direto do pedestre
       SP.drawPed(ctx, ag.ped, t);
-      const near = Math.hypot(S.player.x - ag.x, S.player.y - ag.y) < 260;
+      const near = S.player && Math.hypot(S.player.x - ag.x, S.player.y - ag.y) < 260;
       ctx.save(); ctx.font = 'bold 7px Arial'; ctx.textAlign = 'center';
       const nm = near ? 'FBI · ' + ag.nome.replace('Agente ', '').toUpperCase() : 'FBI', w = ctx.measureText(nm).width + 8;
       ctx.fillStyle = 'rgba(0,0,0,0.72)'; ctx.fillRect(ag.x - w / 2, ag.y - 24, w, 10); ctx.fillStyle = '#ffe04a'; ctx.fillText(nm, ag.x, ag.y - 16.5); ctx.restore();
@@ -17305,19 +17306,28 @@
 
   let last = 0, titleCam = 0;
   function startGame(fresh) {
-    if (fresh) { S.save = { money: 50000, done: 12, paint: 0, king: true, mapaV: 2, arms: { own: { fist: 1, smg: 300, pistol: 150, shotgun: 50, grenade: 10, bat: 1 } }, spawnMansao: true }; G.save(); }
-    G.snd.init(); newWorld(); S.mode = 'play';
-    G.cidade.carregar(S);   // a cidade continua de onde parou
+    try {
+      if (fresh) { S.save = { money: 50000, done: 12, paint: 0, king: true, mapaV: 2, arms: { own: { fist: 1, smg: 300, pistol: 150, shotgun: 50, grenade: 10, bat: 1 } }, spawnMansao: true }; G.save(); }
+      G.snd.init(); newWorld(); S.mode = 'play';
+      if (G.cidade && G.cidade.carregar) G.cidade.carregar(S);
+    } catch (e) {
+      console.error('Error in startGame:', e);
+      S.mode = 'play';
+    }
   }
   function frame(ts) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     if (S.mode === 'loading') {
-      const pr = W.buildSome(16);
+      let pr = 1;
+      try { pr = W.buildSome(16); } catch (e) { console.warn(e); pr = 1; }
       ctx.fillStyle = '#14101f'; ctx.fillRect(0, 0, VW, VH);
       G.hud.txt(ctx, 'CARREGANDO A CIDADE...', 400, 290, 28, '#ffe04a', 'center');
       ctx.fillStyle = '#000'; ctx.fillRect(250, 310, 300, 22); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(253, 313, 294 * Math.min(1, pr), 16);
-      if (pr >= 1) { loadSave(); startGame(false); }
+      if (pr >= 1) {
+        try { loadSave(); } catch (e) { console.warn(e); }
+        startGame(false);
+      }
       return;
     }
     if (S.mode === 'title') {
@@ -17376,7 +17386,7 @@
     canvas.style.width = Math.floor(VW * r) + 'px'; canvas.style.height = Math.floor(VH * r) + 'px';
   }
   window.addEventListener('resize', fit); fit();
-  canvas.addEventListener('mousedown', () => { G.snd.init(); if (S.mode === 'title') startGame(false); });
+  canvas.addEventListener('mousedown', () => { G.snd.init(); if (S.mode === 'title' || S.mode === 'loading') startGame(false); });
   requestAnimationFrame(frame);
 
 })(window.G = window.G || {});

@@ -636,19 +636,28 @@
 
   let last = 0, titleCam = 0;
   function startGame(fresh) {
-    if (fresh) { S.save = { money: 50000, done: 12, paint: 0, king: true, mapaV: 2, arms: { own: { fist: 1, smg: 300, pistol: 150, shotgun: 50, grenade: 10, bat: 1 } }, spawnMansao: true }; G.save(); }
-    G.snd.init(); newWorld(); S.mode = 'play';
-    G.cidade.carregar(S);   // a cidade continua de onde parou
+    try {
+      if (fresh) { S.save = { money: 50000, done: 12, paint: 0, king: true, mapaV: 2, arms: { own: { fist: 1, smg: 300, pistol: 150, shotgun: 50, grenade: 10, bat: 1 } }, spawnMansao: true }; G.save(); }
+      G.snd.init(); newWorld(); S.mode = 'play';
+      if (G.cidade && G.cidade.carregar) G.cidade.carregar(S);
+    } catch (e) {
+      console.error('Error in startGame:', e);
+      S.mode = 'play';
+    }
   }
   function frame(ts) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (ts - last) / 1000 || 0.016); last = ts;
     if (S.mode === 'loading') {
-      const pr = W.buildSome(16);
+      let pr = 1;
+      try { pr = W.buildSome(16); } catch (e) { console.warn(e); pr = 1; }
       ctx.fillStyle = '#14101f'; ctx.fillRect(0, 0, VW, VH);
       G.hud.txt(ctx, 'CARREGANDO A CIDADE...', 400, 290, 28, '#ffe04a', 'center');
       ctx.fillStyle = '#000'; ctx.fillRect(250, 310, 300, 22); ctx.fillStyle = '#ff2a2a'; ctx.fillRect(253, 313, 294 * Math.min(1, pr), 16);
-      if (pr >= 1) { loadSave(); startGame(false); }
+      if (pr >= 1) {
+        try { loadSave(); } catch (e) { console.warn(e); }
+        startGame(false);
+      }
       return;
     }
     if (S.mode === 'title') {
@@ -707,7 +716,7 @@
     canvas.style.width = Math.floor(VW * r) + 'px'; canvas.style.height = Math.floor(VH * r) + 'px';
   }
   window.addEventListener('resize', fit); fit();
-  canvas.addEventListener('mousedown', () => { G.snd.init(); if (S.mode === 'title') startGame(false); });
+  canvas.addEventListener('mousedown', () => { G.snd.init(); if (S.mode === 'title' || S.mode === 'loading') startGame(false); });
   requestAnimationFrame(frame);
 
 })(window.G = window.G || {});

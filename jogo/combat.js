@@ -117,7 +117,7 @@
       if (Math.abs(p.x - x) < r && Math.abs(p.y - y) < r && Math.hypot(p.x - x, p.y - y) < r) { p.state = 'flee'; p.fleeT = rand(3, 5.5); p.threat = { x, y }; }
     }
   }
-  const vol = (S, x, y) => { const ref = S.player.car || S.player; return clamp(1.05 - Math.hypot(x - ref.x, y - ref.y) / 950, 0.12, 1); };
+  const vol = (S, x, y) => { const ref = S.player ? (S.player.car || S.player) : { x: 0, y: 0 }; return clamp(1.05 - Math.hypot(x - ref.x, y - ref.y) / 950, 0.12, 1); };
 
   // ---------- Dano ----------
   function hurtPlayer(S, dmg, fx, fy) {
