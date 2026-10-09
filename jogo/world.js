@@ -189,6 +189,7 @@
   }
   function kindDe(bx, by) {
     if (RIVERS.includes(bx)) return 'river';
+    if (bx === 20 && by === 1) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';
@@ -432,6 +433,37 @@
     }
     for (let k = 0; k < 4; k++) { const a = 1.5 + rr() * 17; trees.push({ x: (tx + a) * T, y: (ty + 0.7) * T, r: 14 + rr() * 5 }); }
   };
+  // ----- mansão do poderoso chefão: quartel-general da máfia -----
+  BUILDERS.mansao_chefao = blk => {
+    const { tx, ty, rr } = blk;
+    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
+    // Pátio frontal e alameda de acesso pavimentada
+    setRect(tx + 2, ty + 10, 16, 9, TILE.SIDE);
+    setRect(tx + 8, ty + 12, 4, 8, TILE.LOT);
+    // Prédio da Mansão Monumental (16x8 tiles)
+    setRect(tx + 2, ty + 2, 16, 8, TILE.BUILD);
+    const mb = mkBuilding((tx + 2) * T + 4, (ty + 2) * T + 4, 16 * T - 8, 8 * T - 8, 2, rr);
+    mb.mansao = true; mb.andares = 2; mb.det = [];
+    mb.p = { kind: 'tile', base: '#8b141a', edge: '#d4af37', dark: '#50080e' };
+    buildings.push(mb);
+    // Grande Piscina Olímpica (à direita)
+    setRect(tx + 13, ty + 11, 5, 4, TILE.WATER);
+    ponds.push({ x: (tx + 15.5) * T, y: (ty + 13) * T, rx: 2.5 * T, ry: 2 * T });
+    // Heliponto (à esquerda)
+    setRect(tx + 2, ty + 11, 4, 4, TILE.LOT);
+    blk.heli = { x: (tx + 4) * T, y: (ty + 13) * T };
+    // Árvores nobres
+    [3, 7, 12, 16].forEach(a => {
+      trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 16 });
+      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 16 });
+    });
+    // Registra lugar
+    const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'MANSÃO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Quartel-General do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 46 };
+    mb.place = pl;
+    places.push(pl);
+    blk.mansao = pl;
+  };
+
   // ----- fazenda de bilionário: mansão enorme, piscina, heliponto, estábulo e alameda -----
   BUILDERS.fazenda = blk => {
     const { tx, ty, bx, by, rr } = blk;

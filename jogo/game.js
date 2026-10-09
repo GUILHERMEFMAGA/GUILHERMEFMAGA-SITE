@@ -21,10 +21,21 @@
 
   // ---------- Salvar / carregar ----------
   G.save = function () { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.save)); } catch (e) { } };
-  function loadSave() { try { const j = JSON.parse(localStorage.getItem(SAVE_KEY)); if (j && typeof j.money === 'number') S.save = Object.assign({ money: 0, done: 0, paint: 0, king: false, look: {}, forca: 0 }, j); } catch (e) { }
+  function loadSave() {
+    try {
+      const j = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (j && typeof j.money === 'number') S.save = Object.assign({ money: 50000, done: 12, paint: 0, king: true, look: {}, forca: 0, spawnMansao: true }, j);
+      else S.save = { money: 50000, done: 12, paint: 0, king: true, look: {}, forca: 0, spawnMansao: true };
+    } catch (e) {
+      S.save = { money: 50000, done: 12, paint: 0, king: true, look: {}, forca: 0, spawnMansao: true };
+    }
     // o mapa foi refeito (gigante): casas compradas, quartos, obras do governo e crimes do save antigo apontam para lugares que não existem mais.
     // dinheiro, armas e missões continuam
     if (S.save.mapaV !== 2) { ['casas', 'quartos', 'gov', 'casos', 'noticias', 'crimeDia', 'serial'].forEach(k => { delete S.save[k]; }); S.save.mapaV = 2; }
+    S.save.money = Math.max(50000, S.save.money || 0);
+    S.save.done = Math.max(12, S.save.done || 0);
+    S.save.king = true;
+    S.save.spawnMansao = true;
   }
   const hasSave = () => { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } };
 
@@ -89,19 +100,76 @@
   function newWorld() {
     S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
+
+    // Localização da Mansão do Don na Mata Escura
+    const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: (MG + ROAD + 20 * PITCH + 10) * T, y: (MG + ROAD + 1 * PITCH + 10) * T + 20 };
+
+    // Limusine do Chefão na fachada
+    const limo = new G.Car({ x: plM.x - 70, y: plM.y + 10, a: 0, kind: 'limo', color: '#111216', driver: 'none', mode: 'parked', owned: true });
+    limo.hp = 250;
+    S.cars.push(limo);
+    S.limo = limo;
+
+    // Carro vermelho clássico
     const g = M.POI.garage;
     const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
-    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
+
+    // Jogador nasce direto como O PODEROSO CHEFÃO em frente à sua Mansão
+    S.save.money = Math.max(50000, S.save.money || 0);
+    S.save.done = Math.max(12, S.save.done || 0);
+    S.save.king = true;
+    S.save.spawnMansao = true;
+    S.save.look = Object.assign({ corte: 0, cor: 4, roupa: 1, calca: 1, tenis: 1, acess: 0 }, S.save.look || {});
+
+    S.player = Object.assign({
+      x: plM.x,
+      y: plM.y + 15,
+      vx: 0,
+      vy: 0,
+      h: 0,
+      walk: 0,
+      hp: 100,
+      armor: 100,
+      weapon: 'smg',
+      ammo: 300,
+      cdT: 0,
+      flashT: 0,
+      car: null,
+      player: true,
+      state: 'walk',
+      punchT: 0,
+      iframes: 0,
+      dead: false
+    }, {
+      shirt: '#141416',
+      skin: '#b9794a',
+      hair: '#111111',
+      hairStyle: 'topete',
+      sleeve: 'longa',
+      pat: 'jaqueta',
+      pants: '#141416',
+      shoe: '#0a0a0c',
+      acc: 'shades'
+    });
+
     G.combat.reset(S);
+    if (G.combat && G.combat.arms) {
+      const arm = G.combat.arms(S);
+      arm.own.pistol = 150;
+      arm.own.smg = 300;
+      arm.own.shotgun = 50;
+      arm.own.grenade = 10;
+      arm.own.bat = 1;
+    }
+
     S.sentado = null; S.trans = null; S.inside = null; S.bebado = 0; S.guia = null; S.prop = {};
     G.lugares.aplicarLook(S);
     for (let k = 0; k < 10; k++) AI.spawnTraffic(S);
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
-    // saudação
-    if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
-    else G.say('Bem-vindo de volta! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 6);
+
+    G.say('👑 BEM-VINDO À SUA MANSÃO, DON GUILHERME! Você é o PODEROSO CHEFÃO.', 8);
   }
 
   // ---------- Entrar / sair de carros ----------

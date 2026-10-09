@@ -43,14 +43,14 @@
   };
 
   // Pontos de interesse na propriedade
-  const P_MANSAO = { x: estate.cx, y: estate.cy - 120 };       // Porta principal da Mansão
-  const P_FONTE = { x: estate.cx, y: estate.cy + 30 };         // Pátio da Fonte Central
-  const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 40 }; // Portão Principal / Guaritas
-  const P_LIMO = { x: estate.cx - 90, y: estate.cy - 70 };     // Ponto da Limusine
-  const P_GOLF = { x: estate.cx - 210, y: estate.cy + 90 };    // Ponto do Carrinho de Golfe
-  const P_PISCINA = { x: estate.cx + 200, y: estate.cy + 40 }; // Grande Piscina Olímpica
-  const P_GOLFE_CAMPO = { x: estate.cx - 200, y: estate.cy + 50 }; // Campo de Golfe
-  const P_HELI = { x: estate.cx + 220, y: estate.cy - 170 };   // Heliponto Privativo
+  const P_MANSAO = { x: estate.cx, y: (ty0 + 10) * T + 20 };       // Porta principal da Mansão
+  const P_FONTE = { x: estate.cx, y: (ty0 + 14) * T };             // Pátio da Fonte Central
+  const P_PORTAO = { x: estate.cx, y: estate.y0 + estate.h - 30 }; // Portão Principal / Guaritas
+  const P_LIMO = { x: estate.cx - 90, y: (ty0 + 10) * T + 30 };    // Ponto da Limusine
+  const P_GOLF = { x: estate.cx - 210, y: (ty0 + 13) * T };        // Ponto do Carrinho de Golfe
+  const P_PISCINA = { x: estate.cx + 175, y: (ty0 + 13) * T };     // Grande Piscina Olímpica
+  const P_GOLFE_CAMPO = { x: estate.cx - 200, y: (ty0 + 13) * T }; // Campo de Golfe
+  const P_HELI = { x: estate.cx - 190, y: (ty0 + 13) * T };        // Heliponto Privativo
 
   M.estate = estate;
   M.pontos = { P_MANSAO, P_FONTE, P_PORTAO, P_LIMO, P_GOLF, P_PISCINA, P_HELI };

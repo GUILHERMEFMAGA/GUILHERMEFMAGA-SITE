@@ -54,9 +54,9 @@
     { type: 'race', name: 'Grande Prêmio', pay: 700, cps: 7, rivals: 3, brief: 'Grande Prêmio da cidade! Sete pontos, três rivais. Só o primeiro leva a bolada.' },
     { type: 'escape', name: 'Fuga Final', pay: 650, level: 4, brief: 'A cidade inteira está atrás de você. Sobreviva à perseguição e chegue à garagem!' },
   ];
-  const RANKS = ['Motorista Novato', 'Entregador', 'Piloto de Fuga', 'Mestre do Asfalto', 'Lenda da Rua', 'Rei da Cidade'];
+  const RANKS = ['Motorista Novato', 'Entregador', 'Piloto de Fuga', 'Mestre do Asfalto', 'Lenda da Rua', 'Rei da Cidade', 'O PODEROSO CHEFÃO'];
   const GOAL = 4000;
-  const rankIdx = done => Math.min(5, Math.floor(done / 2));
+  const rankIdx = done => done >= 12 ? 6 : Math.min(5, Math.floor(done / 2));
 
   function randSpot(S, minD, maxD, from) {
     const f = from || S.player;
