@@ -11,35 +11,39 @@
   let station = 0, nextBeat = 0, step = 0, bpm = 130;
 
   function init() {
-    if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
-    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    ac = new AC();
-    master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
-    sfx = ac.createGain(); sfx.gain.value = 0.8; sfx.connect(master);
-    music = ac.createGain(); music.gain.value = 0.26; music.connect(master);
-    noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate);
-    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    // motor
-    const o1 = ac.createOscillator(), o2 = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
-    o1.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0;
-    o1.connect(f); o2.connect(f); f.connect(g); g.connect(sfx); o1.start(); o2.start();
-    eng = { o1, o2, f, g };
-    // pneu cantando
-    const ns = ac.createBufferSource(); ns.buffer = noiseBuf; ns.loop = true;
-    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 3;
-    const sg = ac.createGain(); sg.gain.value = 0; ns.connect(bp); bp.connect(sg); sg.connect(sfx); ns.start();
-    screech = { g: sg };
-    // sirene
-    const so = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), sgn = ac.createGain();
-    so.type = 'triangle'; so.frequency.value = 780; lfo.frequency.value = 1.6; lg.gain.value = 170; sgn.gain.value = 0;
-    lfo.connect(lg); lg.connect(so.frequency); so.connect(sgn); sgn.connect(sfx); so.start(); lfo.start();
-    siren = { g: sgn };
-    // buzina
-    const h1 = ac.createOscillator(), h2 = ac.createOscillator(), hg = ac.createGain();
-    h1.type = 'sawtooth'; h2.type = 'sawtooth'; h1.frequency.value = 392; h2.frequency.value = 494; hg.gain.value = 0;
-    const hf = ac.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 1400;
-    h1.connect(hf); h2.connect(hf); hf.connect(hg); hg.connect(sfx); h1.start(); h2.start();
-    horn = { g: hg };
+    try {
+      if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      ac = new AC();
+      master = ac.createGain(); master.gain.value = 0.7; master.connect(ac.destination);
+      sfx = ac.createGain(); sfx.gain.value = 0.8; sfx.connect(master);
+      music = ac.createGain(); music.gain.value = 0.26; music.connect(master);
+      noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.5, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      // motor
+      const o1 = ac.createOscillator(), o2 = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+      o1.type = 'sawtooth'; o2.type = 'square'; f.type = 'lowpass'; f.frequency.value = 500; g.gain.value = 0;
+      o1.connect(f); o2.connect(f); f.connect(g); g.connect(sfx); o1.start(); o2.start();
+      eng = { o1, o2, f, g };
+      // pneu cantando
+      const ns = ac.createBufferSource(); ns.buffer = noiseBuf; ns.loop = true;
+      const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 3;
+      const sg = ac.createGain(); sg.gain.value = 0; ns.connect(bp); bp.connect(sg); sg.connect(sfx); ns.start();
+      screech = { g: sg };
+      // sirene
+      const so = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), sgn = ac.createGain();
+      so.type = 'triangle'; so.frequency.value = 780; lfo.frequency.value = 1.6; lg.gain.value = 170; sgn.gain.value = 0;
+      lfo.connect(lg); lg.connect(so.frequency); so.connect(sgn); sgn.connect(sfx); so.start(); lfo.start();
+      siren = { g: sgn };
+      // buzina
+      const h1 = ac.createOscillator(), h2 = ac.createOscillator(), hg = ac.createGain();
+      h1.type = 'sawtooth'; h2.type = 'sawtooth'; h1.frequency.value = 392; h2.frequency.value = 494; hg.gain.value = 0;
+      const hf = ac.createBiquadFilter(); hf.type = 'lowpass'; hf.frequency.value = 1400;
+      h1.connect(hf); h2.connect(hf); hf.connect(hg); hg.connect(sfx); h1.start(); h2.start();
+      horn = { g: hg };
+    } catch (e) {
+      console.warn('Audio init bypassed until user gesture', e);
+    }
   }
 
   function noiseBurst(dur, freq, vol, type) {

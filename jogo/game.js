@@ -14,8 +14,8 @@
 
   const S = G.S = {
     time: 0, dayT: 0.28, cars: [], peds: [], particles: [], heat: 0, heatLevel: 0, chasers: 0,
-    player: null, save: { money: 0, done: 0, paint: 0, king: false }, cam: { x: 0, y: 0, z: 1.5 },
-    msg: null, ban: null, radioT: 0, prompt: '', bustT: 0, heli: null, mode: 'loading', modeT: 0,
+    player: null, save: { money: 50000, done: 12, paint: 0, king: true, spawnMansao: true }, cam: { x: 0, y: 0, z: 1.5 },
+    msg: null, ban: null, radioT: 0, prompt: '', bustT: 0, heli: null, mode: 'play', modeT: 0,
     copT: 0, blockT: 0, spawnT: 0, pedSpawnT: 0, hornDown: false, redCar: null, shake: 0, hitCool: 0,
   };
 
