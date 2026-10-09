@@ -29,9 +29,9 @@
   const M = G.mansao = {};
 
   // ---------- COORDENADAS DA PROPRIEDADE NO MAPA MUNDIAL ----------
-  // Localizada na Mata Escura (coluna 20, linha 1) — isolada e cercada por floresta nativa
+  // Localizada nas Fazendas Santa Rita (coluna 11, linha 2) — vasto campo aberto de luxo
   const T = W.T || 32, ROAD = 8, BLOCK = 20, PITCH = ROAD + BLOCK, MG = 6;
-  const bx = 13, by = 1;
+  const bx = 11, by = 2;
   const tx0 = MG + ROAD + bx * PITCH, ty0 = MG + ROAD + by * PITCH;
   const estate = {
     x0: tx0 * T,
@@ -83,69 +83,44 @@
     W.places.push(plMansao);
   }
 
-  // ---------- LISTA ESTRATÉGICA DOS SEGURANÇAS DA MÁFIA ----------
+  // ---------- SEGURANÇA ESTRATÉGICA PERIMETRAL (LONGE DA CASA, SEM AMONTOAR) ----------
   const GUARDAS_POS = [
-    // 1. Portão Principal Sul & Guaritas (6 guardas - fora e dentro da entrada)
-    { x: P_PORTAO.x - 95, y: P_PORTAO.y + 25, h: 0, tag: 'portao_e1', arma: 'smg' },
-    { x: P_PORTAO.x + 95, y: P_PORTAO.y + 25, h: 0, tag: 'portao_d1', arma: 'smg' },
-    { x: P_PORTAO.x - 45, y: P_PORTAO.y - 35, h: 0, tag: 'portao_e2', arma: 'shotgun' },
-    { x: P_PORTAO.x + 45, y: P_PORTAO.y - 35, h: 0, tag: 'portao_d2', arma: 'shotgun' },
-    { x: P_PORTAO.x - 145, y: P_PORTAO.y + 15, h: -0.3, tag: 'guarita_torre_e', arma: 'sniper' },
-    { x: P_PORTAO.x + 145, y: P_PORTAO.y + 15, h: 0.3, tag: 'guarita_torre_d', arma: 'sniper' },
+    // 1. Torres de Vigia Perimetrais Distantes (Snipers nos 4 cantos extremos dos muros)
+    { x: estate.x0 + 40, y: estate.y0 + 40, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
+    { x: estate.x0 + estate.w - 40, y: estate.y0 + 40, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' },
+    { x: estate.x0 + 40, y: estate.y0 + estate.h - 40, h: 3 * Math.PI / 4, tag: 'torre_so', arma: 'sniper' },
+    { x: estate.x0 + estate.w - 40, y: estate.y0 + estate.h - 40, h: -3 * Math.PI / 4, tag: 'torre_se', arma: 'sniper' },
 
-    // 2. Alameda Nobre de Tijolos (6 guardas espaçados)
-    { x: estate.cx - 50, y: P_PORTAO.y - 75, h: -Math.PI / 2, tag: 'alameda_1', arma: 'smg' },
-    { x: estate.cx + 50, y: P_PORTAO.y - 75, h: Math.PI / 2, tag: 'alameda_2', arma: 'smg' },
-    { x: estate.cx - 50, y: P_PORTAO.y - 135, h: -Math.PI / 2, tag: 'alameda_3', arma: 'pistol' },
-    { x: estate.cx + 50, y: P_PORTAO.y - 135, h: Math.PI / 2, tag: 'alameda_4', arma: 'pistol' },
-    { x: estate.cx - 60, y: P_FONTE.y + 65, h: -0.4, tag: 'alameda_5', arma: 'shotgun' },
-    { x: estate.cx + 60, y: P_FONTE.y + 65, h: 0.4, tag: 'alameda_6', arma: 'shotgun' },
+    // 2. Posto de Controle da Estrada Sul (Guaritas e Bloqueio Rodoviário Distante)
+    { x: P_PORTAO.x - 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_e', arma: 'smg' },
+    { x: P_PORTAO.x + 70, y: P_PORTAO.y, h: 0, tag: 'guarita_sul_d', arma: 'smg' },
+    { x: P_PORTAO.x - 130, y: P_PORTAO.y + 35, h: 0.1, tag: 'estrada_bloqueio_e', arma: 'shotgun' },
+    { x: P_PORTAO.x + 130, y: P_PORTAO.y + 35, h: -0.1, tag: 'estrada_bloqueio_d', arma: 'shotgun' },
 
-    // 3. Pátio da Fonte Central (4 guardas ao redor)
-    { x: P_FONTE.x - 60, y: P_FONTE.y, h: Math.PI / 2, tag: 'fonte_o', arma: 'pistol' },
-    { x: P_FONTE.x + 60, y: P_FONTE.y, h: -Math.PI / 2, tag: 'fonte_l', arma: 'pistol' },
-    { x: P_FONTE.x, y: P_FONTE.y - 60, h: Math.PI, tag: 'fonte_n', arma: 'smg' },
-    { x: P_FONTE.x, y: P_FONTE.y + 60, h: 0, tag: 'fonte_s', arma: 'smg' },
+    // 3. Patrulhas Distantes nos Muros Laterais Externos
+    { x: estate.x0 + 35, y: estate.cy - 140, h: Math.PI / 2, tag: 'patrulha_oeste_1', arma: 'smg' },
+    { x: estate.x0 + 35, y: estate.cy + 140, h: Math.PI / 2, tag: 'patrulha_oeste_2', arma: 'smg' },
+    { x: estate.x0 + estate.w - 35, y: estate.cy - 140, h: -Math.PI / 2, tag: 'patrulha_leste_1', arma: 'smg' },
+    { x: estate.x0 + estate.w - 35, y: estate.cy + 140, h: -Math.PI / 2, tag: 'patrulha_leste_2', arma: 'smg' },
 
-    // 4. Fachada Principal da Mansão (4 guardas)
-    { x: P_MANSAO.x - 70, y: P_MANSAO.y + 20, h: Math.PI, tag: 'fachada_e', arma: 'smg' },
-    { x: P_MANSAO.x + 70, y: P_MANSAO.y + 20, h: Math.PI, tag: 'fachada_d', arma: 'smg' },
-    { x: P_MANSAO.x - 30, y: P_MANSAO.y + 10, h: Math.PI, tag: 'porta_e', arma: 'pistol' },
-    { x: P_MANSAO.x + 30, y: P_MANSAO.y + 10, h: Math.PI, tag: 'porta_d', arma: 'pistol' },
+    // 4. Instalações Externas Afastadas
+    { x: P_HELI.x - 45, y: P_HELI.y - 25, h: 0.8, tag: 'guarda_heli', arma: 'smg' },
+    { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y + 40, h: -0.5, tag: 'guarda_golfe', arma: 'pistol' },
+    { x: P_PISCINA.x + 65, y: P_PISCINA.y + 40, h: -0.8, tag: 'guarda_piscina', arma: 'pistol' },
 
-    // 5. Garagem & Estacionamento da Limusine (4 guardas)
-    { x: P_LIMO.x - 40, y: P_LIMO.y - 25, h: 0.8, tag: 'limo_guarda_1', arma: 'smg' },
-    { x: P_LIMO.x + 40, y: P_LIMO.y - 25, h: -0.8, tag: 'limo_guarda_2', arma: 'pistol' },
-    { x: P_LIMO.x - 50, y: P_LIMO.y + 35, h: 0.2, tag: 'garagem_1', arma: 'shotgun' },
-    { x: P_LIMO.x + 50, y: P_LIMO.y + 35, h: -0.2, tag: 'garagem_2', arma: 'smg' },
-
-    // 6. Deck & Piscina de Luxo (4 guardas)
-    { x: P_PISCINA.x - 65, y: P_PISCINA.y - 45, h: Math.PI / 2, tag: 'piscina_no', arma: 'pistol' },
-    { x: P_PISCINA.x + 65, y: P_PISCINA.y - 45, h: -Math.PI / 2, tag: 'piscina_ne', arma: 'pistol' },
-    { x: P_PISCINA.x - 65, y: P_PISCINA.y + 45, h: Math.PI / 2, tag: 'piscina_so', arma: 'smg' },
-    { x: P_PISCINA.x + 65, y: P_PISCINA.y + 45, h: -Math.PI / 2, tag: 'piscina_se', arma: 'smg' },
-
-    // 7. Campo de Golfe (4 guardas)
-    { x: P_GOLFE_CAMPO.x - 50, y: P_GOLFE_CAMPO.y - 40, h: 0.5, tag: 'golfe_1', arma: 'smg' },
-    { x: P_GOLFE_CAMPO.x + 50, y: P_GOLFE_CAMPO.y - 40, h: -0.5, tag: 'golfe_2', arma: 'pistol' },
-    { x: P_GOLFE_CAMPO.x - 50, y: P_GOLFE_CAMPO.y + 40, h: 0.8, tag: 'golfe_3', arma: 'shotgun' },
-    { x: P_GOLFE_CAMPO.x + 50, y: P_GOLFE_CAMPO.y + 40, h: -0.8, tag: 'golfe_4', arma: 'smg' },
-
-    // 8. Heliponto & Torres de Vigia Norte (4 guardas)
-    { x: P_HELI.x - 40, y: P_HELI.y - 30, h: 0.6, tag: 'heli_1', arma: 'smg' },
-    { x: P_HELI.x + 40, y: P_HELI.y - 30, h: -0.6, tag: 'heli_2', arma: 'smg' },
-    { x: estate.cx - 240, y: estate.y0 + 70, h: Math.PI / 4, tag: 'torre_no', arma: 'sniper' },
-    { x: estate.cx + 240, y: estate.y0 + 70, h: -Math.PI / 4, tag: 'torre_ne', arma: 'sniper' }
+    // 5. Entrada Principal da Mansão (Apenas 2 Guardas de Honra elegantes de prontidão)
+    { x: P_MANSAO.x - 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_e', arma: 'pistol' },
+    { x: P_MANSAO.x + 42, y: P_MANSAO.y + 12, h: Math.PI, tag: 'honra_d', arma: 'pistol' }
   ];
 
-  // ---------- CÃES DE GUARDA (ROTTWEILERS / DOBERMANS) ----------
+  // ---------- CÃES DE GUARDA (PATRULHA EXCLUSIVA NO PERÍMETRO EXTERNO) ----------
   const CAES_POS = [
-    { x: P_PORTAO.x - 110, y: P_PORTAO.y - 45, ang: 0, r: 25, latT: 0, nome: 'Brutus' },
-    { x: P_PORTAO.x + 110, y: P_PORTAO.y - 45, ang: Math.PI, r: 25, latT: 0, nome: 'Nero' },
-    { x: estate.cx - 110, y: estate.cy + 50, ang: 1.2, r: 35, latT: 0, nome: 'Titan' },
-    { x: estate.cx + 110, y: estate.cy + 50, ang: -1.2, r: 35, latT: 0, nome: 'Thor' },
-    { x: P_GOLFE_CAMPO.x - 30, y: P_GOLFE_CAMPO.y, ang: 0.5, r: 35, latT: 0, nome: 'Rex' },
-    { x: P_PISCINA.x + 60, y: P_PISCINA.y - 40, ang: -0.7, r: 35, latT: 0, nome: 'Apolo' }
+    { x: estate.x0 + 50, y: estate.cy - 80, ang: 1.5, r: 35, latT: 0, nome: 'Brutus' },
+    { x: estate.x0 + 50, y: estate.cy + 80, ang: 1.5, r: 35, latT: 0, nome: 'Titan' },
+    { x: estate.x0 + estate.w - 50, y: estate.cy - 80, ang: -1.5, r: 35, latT: 0, nome: 'Nero' },
+    { x: estate.x0 + estate.w - 50, y: estate.cy + 80, ang: -1.5, r: 35, latT: 0, nome: 'Thor' },
+    { x: P_PORTAO.x - 105, y: P_PORTAO.y - 25, ang: 0, r: 25, latT: 0, nome: 'Rex' },
+    { x: P_PORTAO.x + 105, y: P_PORTAO.y - 25, ang: Math.PI, r: 25, latT: 0, nome: 'Apolo' }
   ];
 
   // Falas dos seguranças da máfia

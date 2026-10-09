@@ -103,9 +103,9 @@
 
     // Coordenadas do Portão Monumental da Mansão (Residência do Chefão)
     const { MG, ROAD, PITCH, T } = W;
-    const gateX = (MG + ROAD + 13 * PITCH + 10) * T;
-    const gateY = (MG + ROAD + 1 * PITCH + 20) * T - 35;
-    const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: gateX, y: (MG + ROAD + 1 * PITCH + 10) * T + 20 };
+    const gateX = (MG + ROAD + 11 * PITCH + 10) * T;
+    const gateY = (MG + ROAD + 2 * PITCH + 20) * T - 35;
+    const plM = (W.places && W.places.find(p => p.id === 'mansao_chefao')) || { x: gateX, y: (MG + ROAD + 2 * PITCH + 10) * T + 20 };
 
     // Limusine do Chefão pronta na alameda
     const limo = new G.Car({ x: gateX - 45, y: gateY - 60, a: 0, kind: 'limo', color: '#111216', driver: 'none', mode: 'parked', owned: true });

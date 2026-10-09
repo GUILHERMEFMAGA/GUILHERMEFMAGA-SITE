@@ -182,6 +182,7 @@
   // ---------- que tipo de quadra fica em cada lugar ----------
   const hash2 = (bx, by, k) => mulberry32(bx * 7919 + by * 104729 + (k || 0) * 31 + 7)();
   function ruralKind(bx, by) {
+    if (Math.abs(bx - 11) <= 2 && Math.abs(by - 2) <= 2) return 'campo'; // Vasto campo aberto ao redor da mansão do Don
     const q = hash2(bx, by, 5), viz = (bx > 0 && hash2(bx - 1, by, 5) < 0.22) || (by > 0 && hash2(bx, by - 1, 5) < 0.22);
     if (q < 0.22 && !viz) return 'fazenda';      // fazendas de bilionário (nunca coladas uma na outra)
     if (q > 0.88) return 'bosque';
@@ -189,7 +190,7 @@
   }
   function kindDe(bx, by) {
     if (RIVERS.includes(bx)) return 'river';
-    if (bx === 13 && by === 1) return 'mansao_chefao';
+    if (bx === 11 && by === 2) return 'mansao_chefao';
     const c = regiaoDe(bx), key = bx + ',' + by;
     if (c.tipo === 'mata') return 'floresta';
     if (c.id === 'porto' && bx === 64) return 'porto';
@@ -437,9 +438,9 @@
   BUILDERS.mansao_chefao = blk => {
     const { tx, ty, rr } = blk;
     // Todo o terreno é calçado com Chão de Tijolos Nobres e Pátio Pavimentado
-    setRect(tx, ty, BLOCK, BLOCK, TILE.LOT);
+    setRect(tx, ty, BLOCK, BLOCK, TILE.GRASS);
+    setRect(tx + 8, ty + 10, 4, 10, TILE.LOT);
     setRect(tx + 2, ty + 10, 16, 9, TILE.SIDE);
-    setRect(tx + 6, ty + 11, 8, 8, TILE.LOT);
     // Prédio da Mansão Monumental (16x8 tiles)
     setRect(tx + 2, ty + 2, 16, 8, TILE.BUILD);
     const mb = mkBuilding((tx + 2) * T + 4, (ty + 2) * T + 4, 16 * T - 8, 8 * T - 8, 2, rr);
@@ -452,10 +453,10 @@
     // Heliponto (à esquerda)
     setRect(tx + 2, ty + 11, 4, 4, TILE.SIDE);
     blk.heli = { x: (tx + 4) * T, y: (ty + 13) * T };
-    // Palmeiras Imperiais
-    [3, 7, 12, 16].forEach(a => {
+    // Palmeiras Imperiais nas extremidades dos muros (longe do meio)
+    [1, 19].forEach(a => {
       trees.push({ x: (tx + a) * T, y: (ty + 10) * T, r: 14 });
-      trees.push({ x: (tx + a) * T, y: (ty + 18) * T, r: 14 });
+      trees.push({ x: (tx + a) * T, y: (ty + 16) * T, r: 14 });
     });
     // Registra lugar
     const pl = { id: 'mansao_chefao', tipo: 'mansao', nome: 'MANSÃO DO PODEROSO CHEFÃO', sub: 'Villa Mafiosa — Quartel-General do Don', cor: '#e5b834', x: (tx + 10) * T, y: (ty + 10) * T + 20, r: 46 };
