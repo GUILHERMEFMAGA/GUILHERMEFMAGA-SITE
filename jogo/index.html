@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#07080f">
+  <meta name="description" content="Noite na Cidade: jogo de ação em pixel art 2D, visto de cima, numa cidade iluminada por postes laranja.">
+  <title>Noite na Cidade — jogo em pixel art</title>
+  <link rel="preload" href="fontes/press-start-2p.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <canvas id="tela" aria-label="Cidade à noite vista de cima"></canvas>
+
+  <div id="loading" class="loading">MONTANDO A CIDADE...</div>
+
+  <!-- HUD -->
+  <div id="hud" class="hud" hidden>
+    <div class="hud-left">
+      <div class="bar-row"><span class="bar-label">VIDA</span><div class="bar"><div id="hud-hp" class="bar-fill"></div></div></div>
+      <div class="bar-row" id="hud-car" hidden><span class="bar-label">CARRO</span><div class="bar car"><div id="hud-carhp" class="bar-fill"></div></div></div>
+      <div id="hud-district" class="district"></div>
+    </div>
+    <div class="hud-right">
+      <div id="hud-money" class="money">$0000000</div>
+      <div id="hud-stars" class="stars" aria-label="Nível de procurado">
+        <span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span><span class="star"></span>
+      </div>
+      <div id="hud-done" class="done">MISSÕES 0</div>
+    </div>
+    <div id="hud-mission" class="mission" hidden>
+      <div class="m-head"><span id="m-title"></span><span id="m-time"></span></div>
+      <div id="m-text" class="m-text"></div>
+    </div>
+    <canvas id="minimap" class="minimap" aria-label="Minimapa"></canvas>
+    <button id="btn-pause" class="btn-pause" type="button" aria-label="Pausar">II</button>
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+  </div>
+
+  <div id="big" class="big" aria-live="assertive"><div class="big-title"></div><div class="big-sub"></div></div>
+
+  <!-- Menu inicial -->
+  <section id="menu" class="overlay menu">
+    <div class="panel">
+      <p class="kicker">UM JOGO EM PIXEL ART · VISTO DE CIMA</p>
+      <h1>NOITE NA<br><span>CIDADE</span></h1>
+      <button id="btn-play" class="btn primary" type="button">JOGAR</button>
+      <div class="best">RECORDE: <span id="best">$0000000</span></div>
+      <div class="controls">
+        <div><b>WASD / SETAS</b> andar e dirigir</div>
+        <div><b>E</b> entrar / sair do carro (ou roubar)</div>
+        <div><b>ESPAÇO</b> soco / freio de mão</div>
+        <div><b>SHIFT</b> correr · <b>H</b> buzina</div>
+        <div><b>P / ESC</b> pausa · <b>M</b> som</div>
+      </div>
+      <p class="tip">Atenda os <b class="yel">orelhões amarelos</b> para pegar missões. Fuja da polícia ou passe na garagem de <b class="pink">PINTURA</b> para despistar.</p>
+    </div>
+  </section>
+
+  <!-- Pausa -->
+  <section id="pause" class="overlay pause" hidden>
+    <div class="panel small">
+      <h2>PAUSADO</h2>
+      <button id="btn-resume" class="btn primary" type="button">CONTINUAR</button>
+      <button class="btn" type="button" data-action="mute" data-mute-label>SOM: LIGADO</button>
+      <button id="btn-restart" class="btn" type="button">RECOMEÇAR</button>
+      <button id="btn-menu" class="btn" type="button">MENU INICIAL</button>
+      <div class="controls">
+        <div><b>WASD / SETAS</b> andar e dirigir</div>
+        <div><b>E</b> entrar / sair do carro</div>
+        <div><b>ESPAÇO</b> soco / freio de mão</div>
+        <div><b>SHIFT</b> correr · <b>H</b> buzina</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Controles de toque -->
+  <div id="touch" class="touch" hidden>
+    <div id="joy" class="joy"><div id="joy-knob" class="joy-knob"></div></div>
+    <div class="touch-btns">
+      <button type="button" class="tbtn enter" data-act="enter">ENTRAR<br>SAIR</button>
+      <button type="button" class="tbtn action" data-act="action">SOCO<br>FREIO</button>
+      <button type="button" class="tbtn horn" data-act="horn">BUZINA</button>
+      <button type="button" class="tbtn run" data-act="run">CORRER</button>
+    </div>
+  </div>
+
+  <script src="js/core.js"></script>
+  <script src="js/mapa.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/arte.js"></script>
+  <script src="js/trafego.js"></script>
+  <script src="js/entidades.js"></script>
+  <script src="js/missoes.js"></script>
+  <script src="js/jogo.js"></script>
+</body>
+</html>
