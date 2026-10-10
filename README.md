@@ -74,7 +74,7 @@ No celular aparecem um joystick e botões de toque.
 
 - **Missões nos orelhões amarelos**, em ciclo: entrega expressa, táxi noturno, roubo de esportivo (entregar na Garagem do Porto) e corrida de checkpoints contra o relógio.
 - **Nível de procurado** de 1 a 5 estrelas, com viaturas que perseguem o jogador. Dá para ser preso ou detonado. A garagem de **PINTURA** troca a cor do carro e despista a polícia por $400, ou só conserta por $100.
-- **Trânsito em mão dupla**: duas faixas por sentido, mão direita, semáforos e conversões suaves. Os cruzamentos usam reserva de trajetória, então os carros não se sobrepõem. Os pedestres esperam o sinal fechar para atravessar.
+- **Trânsito em mão dupla** (cerca de 100 carros): duas faixas por sentido, mão direita, semáforos e conversões suaves. Os cruzamentos usam reserva de trajetória, então os carros não se sobrepõem. Os pedestres esperam o sinal fechar para atravessar.
 - **Visual**: luz ambiente noturna, brilho laranja dos postes, neon, faróis, sirenes, reflexos na água, barcos no rio e minimapa.
 - **Recorde** salvo no `localStorage`.
 

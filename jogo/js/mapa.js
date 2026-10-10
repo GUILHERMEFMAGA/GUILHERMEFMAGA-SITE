@@ -159,8 +159,8 @@ function genCity() {
 
   // --- Prédios ---
   const palette = [
-    [62, 60, 72], [72, 62, 60], [58, 66, 72], [76, 70, 62], [54, 58, 70], [66, 66, 76],
-    [80, 72, 66], [60, 70, 66], [70, 64, 78], [86, 80, 74],
+    [106, 106, 110], [114, 110, 108], [100, 102, 110], [120, 116, 112], [94, 96, 104], [110, 108, 114],
+    [124, 120, 114], [102, 106, 106], [90, 90, 96], [116, 114, 118],
   ];
   const addBuilding = (x, y, w, h, kind = 'normal', color = null) => {
     const b = { id: City.buildings.length, x, y, w, h, kind, color: color || palette[ri(0, palette.length - 1)], seed: ri(1, 1e9) };
@@ -208,7 +208,7 @@ function genCity() {
         continue;
       }
       if (ci === 1 && rj === 3) {
-        addBuilding(x0, y0, w, 11, 'hospital', [196, 196, 204]);
+        addBuilding(x0, y0, w, 11, 'hospital', [150, 150, 156]);
         fillRect(x0, y0 + 11, x1, y1, TL.PLAZA);
         City.parked.push({ type: 'ambulance', x: (x0 + 3) * T, y: (y0 + 13) * T, angle: 0 });
         continue;

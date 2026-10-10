@@ -5,7 +5,7 @@
    ========================================================= */
 
 let _uid = 0;
-const POP = { ai: 46, peds: 80, patrols: 2, maxFree: 16, pickups: 14 };
+const POP = { ai: 100, peds: 80, patrols: 2, maxFree: 16, pickups: 14 };
 
 function makeCar(type, color, x, y, angle, mode) {
   const spec = CAR_TYPES[type];

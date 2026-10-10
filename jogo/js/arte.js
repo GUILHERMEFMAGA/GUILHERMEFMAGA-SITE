@@ -5,7 +5,7 @@
    ========================================================= */
 
 const Art = { world: null, light: null, bloom: null, minimap: null, reflections: [], beacons: [] };
-const AMBIENT = [58, 66, 116];
+const AMBIENT = [138, 150, 190]; // noite azulada como na referência (v4)
 
 function pcircle(g, cx, cy, r, color) {
   g.fillStyle = Array.isArray(color) ? rgb(...color) : color;
@@ -41,7 +41,7 @@ function renderWorld() {
               if (t === TL.BRIDGE) { R = 46; G = 46; B = 56; if (px % 96 === 0) { R = 30; G = 30; B = 38; } }
               else if (t === TL.LOT) { R = 46; G = 48; B = 58; }
               else if (t === TL.GARAGE) { R = 60; G = 60; B = 66; }
-              else { R = 40; G = 42; B = 53; }
+              else { R = 40; G = 46; B = 62; }
               if (n < 0.07) { R += 9; G += 9; B += 9; } else if (n > 0.965) { R -= 7; G -= 7; B -= 7; }
               break;
             }
@@ -50,8 +50,8 @@ function renderWorld() {
               if (n < 0.08) { R += 8; G += 8; B += 8; } else if (n > 0.97) { R = 54; G = 48; B = 38; }
               break;
             case TL.SIDEWALK:
-              R = 78; G = 76; B = 86;
-              if ((px & 7) === 0 || (py & 7) === 0) { R = 64; G = 62; B = 72; }
+              R = 96; G = 98; B = 106;
+              if ((px & 7) === 0 || (py & 7) === 0) { R = 80; G = 82; B = 92; }
               else if (n < 0.06) { R += 8; G += 8; B += 8; }
               break;
             case TL.PLAZA:
@@ -61,8 +61,8 @@ function renderWorld() {
               if (n < 0.05) { R += 6; G += 6; B += 6; }
               break;
             case TL.GRASS: case TL.TREE:
-              R = 28; G = 56; B = 36;
-              if (n < 0.25) { R = 34; G = 66; B = 40; } else if (n > 0.86) { R = 22; G = 46; B = 30; }
+              R = 50; G = 76; B = 50;
+              if (n < 0.25) { R = 58; G = 86; B = 56; } else if (n > 0.86) { R = 42; G = 64; B = 44; }
               if (n > 0.992) { R = 96; G = 92; B = 140; }
               break;
             case TL.PATH:
@@ -288,9 +288,11 @@ function drawBuilding(g, b) {
     fill(x + lip, y + lip, 1, h - lip * 2, shade(col, 0.8));
   };
   roofRect(X, Y, W, H, base, 2);
+  // contorno escuro do telhado (separa os prédios, como na referência)
+  g.strokeStyle = rgb(...shade(base, 0.42)); g.lineWidth = 1; g.strokeRect(X + 0.5, Y + 0.5, W - 1, H - 1);
   // textura
-  const n = Math.floor(W * H / 30);
-  for (let i = 0; i < n; i++) fill(X + ri(3, W - 4), Y + ri(3, H - 4), 1, 1, tint(base, rr() < 0.5 ? 7 : -7));
+  const n = Math.floor(W * H / 90);
+  for (let i = 0; i < n; i++) fill(X + ri(3, W - 4), Y + ri(3, H - 4), 1, 1, tint(base, rr() < 0.5 ? 4 : -4));
 
   if (b.kind === 'police') {
     fill(X + 4, Y + 4, W - 8, 3, [210, 210, 220]);
@@ -331,7 +333,7 @@ function drawBuilding(g, b) {
     roofRect(x, y, w, h, tint(base, rr() < 0.5 ? 10 : -8), 2);
   }
   const area = (inner.w * inner.h) / (T * T);
-  const items = Math.max(2, Math.floor(area * (0.5 + rr() * 0.6)));
+  const items = Math.max(2, Math.floor(area * (0.28 + rr() * 0.3)));
   const rx = (w) => inner.x + ri(0, Math.max(0, inner.w - w));
   const ry = (h) => inner.y + ri(0, Math.max(0, inner.h - h));
   // painéis solares
@@ -347,16 +349,16 @@ function drawBuilding(g, b) {
     const k = rr();
     if (k < 0.32) { // ar-condicionado
       const x = rx(7), y = ry(6);
-      fill(x, y, 7, 6, [80, 84, 94]); fill(x + 1, y + 1, 5, 4, [124, 128, 136]);
-      fill(x + 2, y + 2, 3, 2, [44, 46, 52]); fill(x + 3, y + 2, 1, 1, [150, 154, 160]);
+      fill(x, y, 7, 6, [70, 72, 80]); fill(x + 1, y + 1, 5, 4, [168, 170, 176]);
+      fill(x + 2, y + 2, 3, 2, [60, 62, 70]); fill(x + 3, y + 2, 1, 1, [196, 198, 204]);
     } else if (k < 0.48) { // respiro
       const x = rx(4), y = ry(4);
       fill(x, y, 4, 4, [30, 30, 36]); fill(x + 1, y + 1, 2, 2, [56, 56, 64]);
     } else if (k < 0.6) { // caixa d'água
       const x = rx(10) + 5, y = ry(10) + 5;
-      pcircle(g, x, y, 4, [82, 64, 50]); pcircle(g, x, y, 3, [112, 88, 64]); fill(x, y, 1, 1, [60, 46, 36]);
+      pcircle(g, x, y, 4, [74, 76, 84]); pcircle(g, x, y, 3, [132, 134, 142]); fill(x, y, 1, 1, [70, 72, 80]);
     } else if (k < 0.72) { // claraboia acesa
-      const lit = rr() < 0.7;
+      const lit = rr() < 0.3;
       const v = rr() < 0.5;
       const w = v ? 4 : 8, h = v ? 8 : 4;
       const x = rx(w), y = ry(h);
@@ -368,7 +370,7 @@ function drawBuilding(g, b) {
       const x = rx(w), y = ry(h);
       roofRect(x, y, w, h, tint(base, 16), 1);
       fill(x + 2, y + h - 2, 3, 1, [30, 30, 36]);
-    } else if (k < 0.9) { // alçapão
+    } else if (k < 0.96) { // alçapão
       const x = rx(6), y = ry(6);
       fill(x, y, 6, 6, [50, 50, 56]); fill(x + 1, y + 1, 4, 4, [86, 86, 94]);
       for (let q = 1; q < 5; q++) fill(x + q, y + q, 1, 1, [50, 50, 56]);
@@ -406,15 +408,25 @@ function buildLightMaps() {
   const bg = B.getContext('2d');
   bg.globalCompositeOperation = 'lighter';
 
-  const lampGlow = glowSprite(255, 150, 56, 76, 1, 0.4);
-  const lampGlowSmall = glowSprite(255, 156, 64, 58, 1, 0.38);
-  const lampCore = glowSprite(255, 190, 110, 13, 1, 0.35);
+  const lampGlow = glowSprite(255, 150, 30, 64, 1, 0.4);
+  const lampGlowSmall = glowSprite(255, 156, 36, 50, 1, 0.4);
+  const lampCore = glowSprite(255, 210, 140, 7, 0.9, 0.5);
+  const lampPool = glowSprite(130, 48, 0, 34, 1, 0.5);      // poça laranja intensa no chão
+  const lampPoolSmall = glowSprite(120, 44, 0, 26, 1, 0.5);
   for (const l of City.lamps) {
     if (l.broken) continue;
-    const s = (l.kind === 'street') ? lampGlow : lampGlowSmall;
+    const street = l.kind === 'street';
+    const s = street ? lampGlow : lampGlowSmall;
     lg.drawImage(s, Math.round(l.bx - s.width / 2), Math.round(l.by - s.height / 2));
-    bg.drawImage(lampCore, Math.round(l.bx - 10), Math.round(l.by - 10));
+    const pool = street ? lampPool : lampPoolSmall;
+    bg.drawImage(pool, Math.round(l.bx - pool.width / 2), Math.round(l.by - pool.height / 2));
   }
+  // a poça de luz fica no chão: os telhados (bem mais altos) não recebem o laranja
+  bg.globalCompositeOperation = 'destination-out';
+  bg.fillStyle = 'rgba(0,0,0,0.85)';
+  for (const b of City.buildings) bg.fillRect(b.x * T, b.y * T, b.w * T, b.h * T);
+  bg.globalCompositeOperation = 'lighter';
+  for (const l of City.lamps) if (!l.broken) bg.drawImage(lampCore, Math.round(l.bx - 7), Math.round(l.by - 7));
   const sky = glowSprite(255, 190, 110, 12, 0.6);
   for (const s of City.skylights) lg.drawImage(sky, Math.round(s.x - 12), Math.round(s.y - 12));
   for (const n of City.neons) {
@@ -444,9 +456,13 @@ function buildLightMaps() {
   const id = lg.getImageData(0, 0, WORLD_W, WORLD_H);
   const dd = id.data;
   for (let i = 0; i < dd.length; i += 4) {
+    const px = (i >> 2) % WORLD_W, py = ((i >> 2) / WORLD_W) | 0;
+    if (tileAt((px / T) | 0, (py / T) | 0) === TL.BUILDING) { dd[i] = 0; dd[i + 1] = 0; dd[i + 2] = 0; }
+    // luz quente "come" o azul do ambiente: o chão iluminado fica laranja, não branco
+    const k = Math.min(1, dd[i] / 200);
     dd[i] = Math.min(255, Math.round(dd[i] / 14) * 14 + AMBIENT[0]);
-    dd[i + 1] = Math.min(255, Math.round(dd[i + 1] / 14) * 14 + AMBIENT[1]);
-    dd[i + 2] = Math.min(255, Math.round(dd[i + 2] / 14) * 14 + AMBIENT[2]);
+    dd[i + 1] = Math.min(255, Math.round(dd[i + 1] / 14) * 14 + AMBIENT[1] * (1 - 0.35 * k));
+    dd[i + 2] = Math.min(255, Math.round(dd[i + 2] / 14) * 14 + AMBIENT[2] * (1 - 0.7 * k));
     dd[i + 3] = 255;
   }
   lg.putImageData(id, 0, 0);
