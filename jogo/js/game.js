@@ -5,9 +5,10 @@
    ============================================================ */
 const cv = typeof document !== 'undefined' ? document.getElementById('cv') : null;
 const ctx = cv ? cv.getContext('2d') : null;
+const WORLD_ZOOM = 3.5; // enquadramento próximo do screenshot GTA 2
 
 const GAME = {
-  clock: 0, money: 0, wanted: 0, free: false,
+  clock: 0, money: 1850, wanted: 0, free: false,
   crimeCd: {}, calm: 0, bustedAcc: 0,
   player: { x: 0, y: 0, angle: 0, hp: 100, vest: 0, punch: 0 },
   inCar: false, car: null, playerCar: null,
@@ -17,11 +18,13 @@ const GAME = {
 
   init() {
     this.load();
-    const g = WORLD.zones.find(z => z.name === 'GARAGEM');
-    this.player.x = (g.x0 + g.x1) / 2; this.player.y = g.y1 - 10;
-    this.playerCar = new Car(WORLD.VXC[0] - 32, (WORLD.HY[0] + 5) * T, Math.PI / 2, 'coupe', '#c22e2e');
+    // Cena inicial já enquadrada numa avenida larga, com o carro do jogador no centro.
+    const sx = WORLD.VXC[2] + 32, sy = WORLD.HYC[2] + 32 + 88;
+    this.playerCar = new Car(sx, sy, -Math.PI / 2, 'coupe', '#b9829b');
     this.playerCar.driver = null;
     this.parked.push(this.playerCar);
+    this.player.x = sx - 32; this.player.y = sy + 18; // a pé, ao lado do cupê
+    HUD.msg('Responda os telefones para conseguir trabalhos. Fique de olho nas oportunidades.', 9999);
     // carros à venda no AUTO LOTE
     this.sale = [
       { car: new Car(36 * T, 12 * T, 0, 'sedan', '#3f6fb5'), price: 800, sold: false },
@@ -34,7 +37,17 @@ const GAME = {
       { x: PLAZA.x + 30, y: PLAZA.y + 20, name: 'Taxista', lines: ['A praça é minha, viu? Mas se um dia quiser dirigir um táxi... o volante chama.', 'Corre que tem passageiro esperando na PRAÇA!'] },
     ];
     AI.init();
-    this.cam.x = this.player.x - 400; this.cam.y = this.player.y - 300;
+    // Tráfego de abertura: veículos atravessam a avenida no enquadramento inicial.
+    for (const spec of [
+      [sx - 64, sy + 54, -Math.PI / 2, 'police', '#e8e8e8'],
+      [sx - 64, sy + 158, Math.PI / 2, 'truck', '#244c3d'],
+      [sx - 64, sy - 100, -Math.PI / 2, 'police', '#f2f0e8'],
+    ]) {
+      const c = new Car(spec[0], spec[1], spec[2], spec[3], spec[4]);
+      c.driver = 'ai'; c.dir = Math.round(((spec[2] + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 2));
+      c.cruise = c.max * .52; AI.traffic.push(c);
+    }
+    this.cam.x = this.player.x - 400 / WORLD_ZOOM; this.cam.y = this.player.y - 300 / WORLD_ZOOM;
   },
 
   /* ---------------- salvar / carregar ---------------- */
@@ -192,7 +205,7 @@ const GAME = {
     M.update(dt, S);
 
     // ---- câmera suave ----
-    const tx = P.x - 400, ty = P.y - 300;
+    const tx = P.x - 400 / WORLD_ZOOM, ty = P.y - 300 / WORLD_ZOOM;
     this.cam.x += (tx - this.cam.x) * Math.min(1, 5 * dt);
     this.cam.y += (ty - this.cam.y) * Math.min(1, 5 * dt);
 
@@ -363,7 +376,9 @@ const GAME = {
   /* ============================ DRAW ============================ */
   draw() {
     const cam = this.cam, night = this.nightF();
-    WORLD.draw(ctx, cam, this.clock);
+    // Mundo com câmera ampliada; o HUD fica em coordenadas normais da tela.
+    ctx.save(); ctx.scale(WORLD_ZOOM, WORLD_ZOOM);
+    WORLD.draw(ctx, cam, this.clock, WORLD_ZOOM);
     // marcas de pneu
     ctx.strokeStyle = 'rgba(20,20,26,.45)'; ctx.lineWidth = 3;
     for (const s of this.skids) {
@@ -371,7 +386,7 @@ const GAME = {
       ctx.beginPath(); ctx.moveTo(-4, -6); ctx.lineTo(4, -6); ctx.moveTo(-4, 6); ctx.lineTo(4, 6); ctx.stroke();
       ctx.restore();
     }
-    if (night > 0) { ctx.fillStyle = `rgba(8,10,40,${night * .55})`; ctx.fillRect(0, 0, 800, 600); }
+    if (night > 0) { ctx.fillStyle = `rgba(8,10,40,${night * .55})`; ctx.fillRect(0, 0, 800 / WORLD_ZOOM, 600 / WORLD_ZOOM); }
     AI.drawPeds(ctx, cam, this.clock);
     // jogador a pé
     if (!this.inCar) this.drawPlayer(ctx, cam);
@@ -385,18 +400,19 @@ const GAME = {
       else { ctx.fillStyle = `rgba(90,90,95,${p.t * .6})`; ctx.beginPath(); ctx.arc(px, py, p.r * (1.6 - p.t), 0, 7); ctx.fill(); }
     }
     AI.drawHeli(ctx, cam, this.clock, night);
-    // HUD
+    ctx.restore();
+    // HUD sem zoom (pixels no viewport).
     HUD.draw(ctx, {
       money: this.money, wanted: this.wanted, hp: this.player.hp, vest: this.player.vest,
       fuel: this.inCar ? this.car.fuel : 0, inCar: this.inCar, radio: this.radioName,
       rank: 'Rank: ' + RANKS[Math.min(M.done, RANKS.length - 1)] + (this.free ? '  ★ MODO LIVRE' : ''),
-      target: M.target(), px: this.player.x, py: this.player.y, camx: cam.x, camy: cam.y,
+      target: M.target(), px: this.player.x, py: this.player.y, camx: cam.x, camy: cam.y, zoom: WORLD_ZOOM,
       clock: this.clock, hint: this.hint()
     });
   },
   drawPlayer(ctx, cam) {
     const P = this.player, px = P.x - cam.x, py = P.y - cam.y;
-    ctx.save(); ctx.translate(px, py);
+    ctx.save(); ctx.translate(px, py); ctx.scale(.65, .65);
     ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(0, 4, 5, 3, 0, 0, 7); ctx.fill();
     ctx.rotate(P.angle + Math.PI / 2);
     ctx.fillStyle = '#c22e2e'; ctx.fillRect(-4, -4, 8, 8);            // camiseta vermelha

@@ -212,7 +212,7 @@ const AI = {
       const px = p.x - cam.x, py = p.y - cam.y;
       if (px < -20 || py < -20 || px > 820 || py > 620) continue;
       const bob = Math.sin(p.phase) * 1.5;
-      ctx.save(); ctx.translate(px, py);
+      ctx.save(); ctx.translate(px, py); ctx.scale(.62, .62);
       if (p.down > 0) { // caiu: deitado + nuvenzinha
         ctx.fillStyle = p.shirt; ctx.fillRect(-5, -2, 10, 4);
         ctx.fillStyle = '#e8c39a'; ctx.fillRect(5, -2, 4, 4);

@@ -27,13 +27,16 @@ const WORLD = {};
   for (let y = 54; y <= 57; y++) for (let x = 0; x < MW; x++) set(x, y, TY.WATER);
   for (const v of VX) for (let y = 54; y <= 57; y++) for (let x = v; x < v + 4; x++) set(x, y, TY.BRIDGE);
 
-  // ------- calçada: anel de 1 tile em volta de toda via -------
+  // ------- calçada larga de lajes texturizadas em torno das vias -------
+  const roadMask = tiles.slice();
   for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
-    if (get(x, y) !== TY.BLD) continue;
+    if (roadMask[idx(x, y)] !== TY.BLD) continue;
     let near = false;
     for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) {
-      const t = get(x + dx, y + dy);
-      if (t === TY.ROAD || t === TY.BRIDGE) { near = true; break; }
+      if (Math.abs(dx) + Math.abs(dy) > 1) continue;
+      const xx = x + dx, yy = y + dy;
+      if (xx < 0 || yy < 0 || xx >= MW || yy >= MH) continue;
+      if (roadMask[idx(xx, yy)] === TY.ROAD || roadMask[idx(xx, yy)] === TY.BRIDGE) { near = true; break; }
     }
     if (near) set(x, y, TY.SIDE);
   }
@@ -91,6 +94,42 @@ const WORLD = {};
     blocks.push({ x0: x * T, y0: y * T, x1: (x1 + 1) * T, y1: (y1 + 1) * T, ci: (x * 7 + y * 13) % 6 });
   }
   const ROOFS = ['#c78d4f', '#b9763f', '#d1a05e', '#a8672f', '#c9b28a', '#9c6b3a'];
+
+  // Pequenos mapas de textura em canvas: ruído/sujeira com escala fina, sem assets externos.
+  function textureCanvas(seed, sidewalk = false) {
+    const c = document.createElement('canvas'); c.width = T; c.height = T;
+    const q = c.getContext('2d');
+    let r = seed | 0;
+    const rand = () => { r = (r * 1664525 + 1013904223) >>> 0; return r / 4294967296; };
+    if (sidewalk) {
+      const tones = ['#d5cba9', '#c8bea0', '#d0c5a3', '#beb493'];
+      for (let yy = 0; yy < T; yy += 8) for (let xx = 0; xx < T; xx += 8) {
+        q.fillStyle = tones[(rand() * tones.length) | 0]; q.fillRect(xx, yy, 8, 8);
+        q.fillStyle = 'rgba(255,250,225,.25)'; q.fillRect(xx + 1, yy + 1, 6, 1);
+        q.fillStyle = 'rgba(75,67,48,.16)'; q.fillRect(xx, yy + 7, 8, 1); q.fillRect(xx + 7, yy, 1, 8);
+        for (let k = 0; k < 6; k++) {
+          q.fillStyle = rand() > .5 ? 'rgba(91,83,61,.18)' : 'rgba(255,255,235,.24)';
+          q.fillRect(xx + 1 + (rand() * 6 | 0), yy + 1 + (rand() * 5 | 0), 1 + (rand() * 2 | 0), 1);
+        }
+      }
+      q.strokeStyle = 'rgba(95,86,63,.5)'; q.lineWidth = 1;
+      q.beginPath(); for (let n = 0; n <= T; n += 8) { q.moveTo(n + .5, 0); q.lineTo(n + .5, T); q.moveTo(0, n + .5); q.lineTo(T, n + .5); } q.stroke();
+    } else {
+      const grad = q.createLinearGradient(0, 0, T, T);
+      grad.addColorStop(0, '#77788f'); grad.addColorStop(.45, '#73748d'); grad.addColorStop(1, '#7b7b91');
+      q.fillStyle = grad; q.fillRect(0, 0, T, T);
+      for (let k = 0; k < 60; k++) {
+        const a = .025 + rand() * .07;
+        q.fillStyle = rand() < .53 ? `rgba(255,255,255,${a})` : `rgba(21,22,39,${a})`;
+        q.fillRect(rand() * T | 0, rand() * T | 0, 1 + (rand() * 2 | 0), 1);
+      }
+      q.fillStyle = 'rgba(255,255,255,.04)'; q.fillRect(3 + rand() * 6, 0, 2, T);
+      q.fillStyle = 'rgba(20,21,36,.04)'; q.fillRect(21 + rand() * 6, 0, 2, T);
+    }
+    return c;
+  }
+  const roadTextures = Array.from({ length: 16 }, (_, i) => textureCanvas(i + 19));
+  const sideTextures = Array.from({ length: 16 }, (_, i) => textureCanvas(i + 61, true));
 
   // ------- marcas: dupla amarela central + tracejado de faixa + faixas de pedestres -------
   const isRoad = (x, y) => get(x, y) === TY.ROAD;
@@ -191,19 +230,18 @@ const WORLD = {};
     },
 
     /* ============================ DESENHO ============================ */
-    draw(ctx, cam, clock) {
+    draw(ctx, cam, clock, zoom = 1) {
+      const viewW = (ctx.canvas?.width || 800) / zoom, viewH = (ctx.canvas?.height || 600) / zoom;
       const x0 = Math.max(0, Math.floor(cam.x / T)), y0 = Math.max(0, Math.floor(cam.y / T));
-      const x1 = Math.min(MW - 1, Math.ceil((cam.x + 800) / T)), y1 = Math.min(MH - 1, Math.ceil((cam.y + 600) / T));
+      const x1 = Math.min(MW - 1, Math.ceil((cam.x + viewW) / T)), y1 = Math.min(MH - 1, Math.ceil((cam.y + viewH) / T));
       // ---- chão (ruas, calçadas, água, praças, lotes, grama) ----
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
         const t = tiles[idx(x, y)], px = x * T - cam.x, py = y * T - cam.y, m = mark[idx(x, y)], c = cw[idx(x, y)];
         if (t === TY.ROAD || t === TY.BRIDGE) {
-          ctx.fillStyle = '#63658c';                       // asfalto lavanda do print
-          ctx.fillRect(px, py, T, T);
-          ctx.fillStyle = 'rgba(255,255,255,.045)';        // estrias suaves
-          ctx.fillRect(px + ((x * 13) % 3) * 10 + 3, py, 6, T);
-          ctx.fillStyle = 'rgba(0,0,0,.05)';
-          ctx.fillRect(px + ((x * 7) % 3) * 10 + 16, py, 5, T);
+          ctx.drawImage(roadTextures[(x * 7 + y * 11) & 15], px, py, T, T);
+          // manchas compridas dão o aspecto de asfalto gasto/pré-renderizado.
+          ctx.fillStyle = 'rgba(255,255,255,.035)'; ctx.fillRect(px + ((x * 13) % 3) * 10 + 3, py, 5, T);
+          ctx.fillStyle = 'rgba(25,25,43,.035)'; ctx.fillRect(px + ((x * 7) % 3) * 10 + 17, py, 4, T);
           if (t === TY.BRIDGE) { ctx.fillStyle = '#9aa0ab'; ctx.fillRect(px, py, T, 3); ctx.fillRect(px, py + T - 3, T, 3); }
           ctx.fillStyle = '#d8b71a';
           if (m & 1) ctx.fillRect(px + T - 3, py, 2, T);    // dupla central
@@ -220,12 +258,7 @@ const WORLD = {};
           if (c & 4) for (let k = 0; k < 4; k++) ctx.fillRect(px + 6, py + k * 8 + 2, T - 12, 4);
           if (c & 8) for (let k = 0; k < 4; k++) ctx.fillRect(px + 6, py + k * 8 + 2, T - 12, 4);
         } else if (t === TY.SIDE) {
-          ctx.fillStyle = '#cdc39b'; ctx.fillRect(px, py, T, T);
-          ctx.strokeStyle = 'rgba(140,128,90,.55)'; ctx.lineWidth = 1;
-          ctx.strokeRect(px + .5, py + .5, T / 2, T / 2);   // grade fina da calçada
-          ctx.strokeRect(px + T / 2, py + .5, T / 2, T / 2);
-          ctx.strokeRect(px + .5, py + T / 2, T / 2, T / 2);
-          ctx.strokeRect(px + T / 2, py + T / 2, T / 2, T / 2);
+          ctx.drawImage(sideTextures[(x * 13 + y * 5) & 15], px, py, T, T);
           ctx.fillStyle = '#f2ecd8';                        // meio-fio branco
           if (get(x, y - 1) === TY.ROAD || get(x, y - 1) === TY.BRIDGE) ctx.fillRect(px, py, T, 3);
           if (get(x, y + 1) === TY.ROAD || get(x, y + 1) === TY.BRIDGE) ctx.fillRect(px, py + T - 3, T, 3);

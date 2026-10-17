@@ -95,6 +95,7 @@ class Car {
     if (px < -60 || py < -60 || px > 860 || py > 660) return;
     ctx.save();
     ctx.translate(px, py);
+    ctx.scale(.78, .78); // sprites maiores no mapa, sem carros gigantes no viewport ampliado
     // sombra projetada
     ctx.save(); ctx.rotate(this.angle);
     ctx.fillStyle = 'rgba(0,0,0,.3)';
@@ -102,32 +103,61 @@ class Car {
     ctx.restore();
 
     ctx.rotate(this.angle);
-    const g = ctx.createLinearGradient(0, -this.hw, 0, this.hw);
-    const base = this.wreck ? '#2a2a2a' : this.color;
-    g.addColorStop(0, shade(base, 26)); g.addColorStop(.5, base); g.addColorStop(1, shade(base, -26));
-    ctx.fillStyle = g;
-    roundRect(ctx, -this.hl - 2, -this.hw - 1, (this.hl + 2) * 2, (this.hw + 1) * 2, 6); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,.65)'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.22)';                 // brilho do verniz (luz de cima)
-    ctx.fillRect(-this.hl + 2, -this.hw + 1, this.hl * 2 - 4, 3);
-
-    if (this.kind === 'police' && !this.wreck) {           // faixa da polícia
-      ctx.fillStyle = '#24409a'; ctx.fillRect(-this.hl + 3, -3, this.hl * 2 - 6, 6);
+    const base = this.wreck ? '#36363a' : this.color;
+    // Pneus, vistos em planta, aparecem ligeiramente para fora da carroceria.
+    ctx.fillStyle = '#17191d';
+    for (const wx of [-this.hl * .57, this.hl * .57]) for (const wy of [-this.hw - 1, this.hw - 3]) {
+      roundRect(ctx, wx - 4, wy, 9, 5, 2); ctx.fill();
+      ctx.fillStyle = '#55585d'; ctx.fillRect(wx - 2, wy + 1, 5, 1); ctx.fillStyle = '#17191d';
     }
-    if (this.kind === 'taxi' && !this.wreck) { ctx.fillStyle = '#222'; ctx.fillRect(-4, -4, 8, 8); }
-    // vidros
+    // Silhueta com capô, cabine, porta-malas e para-choques separados.
+    const body = ctx.createLinearGradient(0, -this.hw, 0, this.hw);
+    body.addColorStop(0, shade(base, 36)); body.addColorStop(.25, shade(base, 18));
+    body.addColorStop(.55, base); body.addColorStop(1, shade(base, -42));
+    ctx.fillStyle = body;
+    roundRect(ctx, -this.hl - 2, -this.hw, this.hl * 2 + 4, this.hw * 2, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(12,13,17,.9)'; ctx.lineWidth = 2; ctx.stroke();
+    // borda brilhante e vinco longo do capô
+    ctx.strokeStyle = 'rgba(255,255,255,.33)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-this.hl + 4, -this.hw + 2); ctx.lineTo(this.hl - 6, -this.hw + 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.16)';
+    roundRect(ctx, 2, -this.hw + 2, this.hl - 8, this.hw * 2 - 4, 4); ctx.fill(); // capô
+    ctx.fillStyle = shade(base, -12);
+    roundRect(ctx, -this.hl + 3, -this.hw + 3, this.hl * .42, this.hw * 2 - 6, 3); ctx.fill(); // porta-malas
+    // cabine e vidros com moldura escura
     if (!this.wreck) {
-      ctx.fillStyle = '#1d2733';
-      ctx.fillRect(this.hl * .25, -this.hw + 3, 7, this.hw * 2 - 6);   // para-brisa
-      ctx.fillRect(-this.hl * .62, -this.hw + 3, 5, this.hw * 2 - 6);  // traseiro
-      ctx.fillStyle = shade(base, 34);
-      ctx.fillRect(-this.hl * .5, -this.hw + 3, this.hl * .72, this.hw * 2 - 6); // teto
+      ctx.fillStyle = '#121c25';
+      roundRect(ctx, -this.hl * .40, -this.hw + 2, this.hl * .83, this.hw * 2 - 4, 5); ctx.fill();
+      ctx.fillStyle = '#202f3a';
+      ctx.beginPath(); ctx.moveTo(this.hl * .16, -this.hw + 4); ctx.lineTo(this.hl * .32, -this.hw + 4);
+      ctx.lineTo(this.hl * .42, -this.hw + 6); ctx.lineTo(this.hl * .42, this.hw - 6);
+      ctx.lineTo(this.hl * .32, this.hw - 4); ctx.lineTo(this.hl * .16, this.hw - 4); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#18252e';
+      ctx.beginPath(); ctx.moveTo(-this.hl * .31, -this.hw + 5); ctx.lineTo(-this.hl * .18, -this.hw + 4);
+      ctx.lineTo(-this.hl * .18, this.hw - 4); ctx.lineTo(-this.hl * .31, this.hw - 5); ctx.closePath(); ctx.fill();
+      // teto metálico, duas janelas laterais e reflexo em faixa
+      const roof = ctx.createLinearGradient(0, -this.hw, 0, this.hw);
+      roof.addColorStop(0, shade(base, 22)); roof.addColorStop(.5, shade(base, 9)); roof.addColorStop(1, shade(base, -19));
+      ctx.fillStyle = roof; roundRect(ctx, -this.hl * .17, -this.hw + 3, this.hl * .43, this.hw * 2 - 6, 3); ctx.fill();
+      ctx.fillStyle = '#20303a'; ctx.fillRect(-this.hl * .12, -this.hw + 4, this.hl * .08, this.hw * 2 - 8);
+      ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(-this.hl * .08, -this.hw + 4, this.hl * .04, this.hw * 2 - 8);
     }
-    // faróis / lanternas
-    ctx.fillStyle = this.wreck ? '#555' : '#ffe9a3';
-    ctx.fillRect(this.hl - 3, -this.hw + 2, 3, 4); ctx.fillRect(this.hl - 3, this.hw - 6, 3, 4);
-    ctx.fillStyle = this.braking || this.hand ? '#ff4040' : '#a33';
-    ctx.fillRect(-this.hl, -this.hw + 2, 3, 4); ctx.fillRect(-this.hl, this.hw - 6, 3, 4);
+    // faixas de serviço/polícia e letreiro do táxi no teto
+    if (this.kind === 'police' && !this.wreck) {
+      ctx.fillStyle = '#263e89'; ctx.fillRect(-this.hl + 4, -this.hw + 2, 5, this.hw * 2 - 4);
+      ctx.fillStyle = '#f4f2ea'; ctx.fillRect(-this.hl + 9, -this.hw + 2, 3, this.hw * 2 - 4);
+    }
+    if (this.kind === 'taxi' && !this.wreck) {
+      ctx.fillStyle = '#222'; roundRect(ctx, -3, -4, 9, 8, 2); ctx.fill();
+      ctx.fillStyle = '#ffe34d'; ctx.font = 'bold 5px monospace'; ctx.textAlign = 'center'; ctx.fillText('TAXI', 1, 2);
+    }
+    // para-choques, faróis quentes e lanternas vermelhas
+    ctx.fillStyle = '#27292e'; ctx.fillRect(this.hl - 3, -this.hw + 2, 4, this.hw * 2 - 4);
+    ctx.fillRect(-this.hl - 1, -this.hw + 2, 4, this.hw * 2 - 4);
+    ctx.fillStyle = this.wreck ? '#666' : '#fff1b4';
+    ctx.fillRect(this.hl - 1, -this.hw + 3, 2, 4); ctx.fillRect(this.hl - 1, this.hw - 7, 2, 4);
+    ctx.fillStyle = this.braking || this.hand ? '#ff3737' : '#b33438';
+    ctx.fillRect(-this.hl - 1, -this.hw + 3, 2, 4); ctx.fillRect(-this.hl - 1, this.hw - 7, 2, 4);
     // giroflex
     if (this.kind === 'police' && !this.wreck) {
       ctx.fillStyle = Math.floor(clock * 6) % 2 ? '#ff3b3b' : '#3b6bff';
@@ -137,7 +167,7 @@ class Car {
 
     // cone de farol à noite
     if (night > 0.25 && !this.wreck && this.driver) {
-      ctx.save(); ctx.translate(px, py); ctx.rotate(this.angle);
+      ctx.save(); ctx.translate(px, py); ctx.scale(.78, .78); ctx.rotate(this.angle);
       ctx.globalCompositeOperation = 'lighter';
       const lg = ctx.createLinearGradient(this.hl, 0, this.hl + 110, 0);
       lg.addColorStop(0, `rgba(255,240,170,${.28 * night})`); lg.addColorStop(1, 'rgba(255,240,170,0)');

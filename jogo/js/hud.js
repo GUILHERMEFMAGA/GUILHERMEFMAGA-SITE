@@ -5,7 +5,7 @@
    pager, seta de destino, minimapa e telas de estado.
    ============================================================ */
 const HUD = {
-  msgs: [], bigText: null, bigT: 0, overlay: 'start', img: null,
+  msgs: [], bigText: null, bigT: 0, overlay: null, img: null,
   msg(text, secs = 4) { this.msgs = [{ text, t: secs }]; },
   big(text, secs) { this.bigText = text; this.bigT = secs; },
 
@@ -14,11 +14,11 @@ const HUD = {
     ctx.textAlign = 'left';
     // ---- dinheiro (canto sup. direito, como na referência) ----
     ctx.font = 'bold 18px monospace';
-    ctx.fillStyle = '#39d353'; ctx.fillText('x1', 744, 22);
+    ctx.fillStyle = '#39d353'; ctx.fillText('x1', 720, 22);
     ctx.fillStyle = '#ffe14a';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
-    ctx.strokeText(String(S.money).padStart(4, '0'), 766, 22);
-    ctx.fillText(String(S.money).padStart(4, '0'), 766, 22);
+    ctx.strokeText(String(S.money).padStart(4, '0'), 744, 22);
+    ctx.fillText(String(S.money).padStart(4, '0'), 744, 22);
     // ---- nível de procurado (topo centro) ----
     for (let i = 0; i < 5; i++) {
       const x = 368 + i * 16;
@@ -46,13 +46,13 @@ const HUD = {
       const dx = S.target.x - S.px, dy = S.target.y - S.py, d = Math.hypot(dx, dy);
       if (d > 60) {
         const a = Math.atan2(dy, dx);
-        ctx.save(); ctx.translate(S.px - S.camx + Math.cos(a) * 46, S.py - S.camy + Math.sin(a) * 46); ctx.rotate(a);
+        ctx.save(); ctx.translate((S.px - S.camx + Math.cos(a) * 46) * (S.zoom || 1), (S.py - S.camy + Math.sin(a) * 46) * (S.zoom || 1)); ctx.rotate(a);
         ctx.fillStyle = '#ffe14a';
         ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-6, -7); ctx.lineTo(-2, 0); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
         ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
         ctx.restore();
       } else { // beacon no alvo
-        const bx = S.target.x - S.camx, by = S.target.y - S.camy;
+        const bx = (S.target.x - S.camx) * (S.zoom || 1), by = (S.target.y - S.camy) * (S.zoom || 1);
         ctx.strokeStyle = `rgba(255,225,74,${.5 + .4 * Math.sin(S.clock * 6)})`;
         ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bx, by, 26, 0, 7); ctx.stroke();
       }
