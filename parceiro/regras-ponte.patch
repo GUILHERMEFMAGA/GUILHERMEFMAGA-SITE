@@ -1,0 +1,106 @@
+--- a/parceiro/PROMPT-RECUPERACAO.md
++++ b/parceiro/PROMPT-RECUPERACAO.md
+@@ -191,11 +191,11 @@
+ - Testes rodam em Linux puro (sem wine); .bat não rodam aqui — validar por
+   inspeção + linter do raio.
+ - Se precisar do repo da Arena: branch da sessão = espelho em `.arena-delivery/`
+-  (commit a cada entrega; PR #5 aberto apontando pra ele — merge só se ele pedir).
++  (commit a cada entrega; PR da conversa aberto apontando pra ele — merge só se ele pedir).
+ - Arquivos dele NO sandbox: nada. Conexão direta ao PC dele = NÃO existe.
+ - O espelho (`.arena-delivery/` + PR visual) pertence à SESSÃO que o criou (rampa
+-  própria). Conversa nova NUNCA empurra PR velho — publica na ponte e, se o humano
+-  quiser espelho do estado dela, abre PR NOVO do branch dela. Atualizar PR velho =
++  própria). Conversa nova NUNCA empurra PR velho — publica na ponte e, por ordem do dono,
++  abre PR NOVO do branch dela. Atualizar PR velho =
+   tarefa da sessão dona, puxando da ponte (que é a única fonte canônica).
+ - F5 não reemite GH_TOKEN; se gh gitrear, contornar via git puro (os pushes da
+   ponte funcionam pelo credential do clone).
+@@ -207,13 +207,12 @@
+ 1. **A ponte está viva e é canônica**: `GUILHERMEFMAGA-SITE` @ branch
+    `super-agente` = origem oficial. A SESSÃO que constrói publica na ponte a
+    cada tijolo (após portão + raio verdes).
+-2. **A janela canônica do usuário é o PR #5** (combinado 22/09, pedido explícito
+-   dele): o espelho `.arena-delivery` (branch da sessão dona) = conteúdo do PR #5
+-   = a VITRINE que o Guilherme abre pra ver código. Toda entrega que empurra a
+-   ponte RE-ESPELHA o PR #5 no MESMO fôlego (mesa sessão, na sequência imediata;
+-   `git archive` do tip da ponte, conferir byte a byte). Chat não cola código do
+-   projeto — só números, endereço e ritual (zero-cola). Se a ponte andou e o #5
+-   não, o #5 está velho: re-sincronizar antes de qualquer outra coisa.
++2. **VITRINE POR CONVERSA** (ordem do dono identificada como 24/09): cada
++   conversa abre PR NOVO no SITE, do branch da propria sessao, com TODO o
++   conteudo do tip da ponte via `git archive`. Toda entrega que publica na
++   ponte re-espelha esse PR no MESMO folego, conferindo byte a byte.
++   PR = vitrine (janela); a PONTE (SITE@super-agente) alimenta a maquina.
++   `puxar-atualizacao.bat` NUNCA le PR. Chat nao cola codigo.
+ 3. **O sandbox reseta** (apagou `/home/user/ponte` duas vezes em 22/09, mas o
+    clone do repo da Arena sobreviveu no `.arena-delivery`). Se `ponte` sumir:
+    reconstruir com `git clone -b super-agente https://github.com/GUILHERMEFMAGA/
+@@ -231,14 +230,12 @@
+    `GUILHERMEFMAGA/super-agente` no GitHub = o BACKUP (push existe SOMENTE quando
+    ELE roda `salvar-tudo.bat` — nunca da IA, nunca automático; estar atrás da
+    ponte é normal e saudável). Direção da escrita: sandbox → ① → ② → ③. E o
+-   espelho da vitrine (PR #5, seção 6.5) é um QUATRO canal só de VISUALIZAÇÃO:
++   espelho da vitrine (PR da conversa, seção 6.5) é um QUATRO canal só de VISUALIZAÇÃO:
+    ninguém puxa nada dele, é vitrine de revisão — não confundir com ①.
+-7. **Espelho só a sessão dona atualiza** (aula do PR velho, 22/09): cada conversa
+-   do Arena é presa ao branch `arena/<id>-...` dela; nenhuma sessão consegue
+-   empurrar o branch de outra. Sessão nova que quiser vitrine abre PR NOVO; o
+-   PR velho é tarefa da sessão dona. NUNCA fundir PR do repo do site sem ordem
+-   explícita do dono (o main é o perfil público dele); PRs antigos órfãos (1,2,3,4)
+-   ficam abertos até ele mandar limpar (oferta feita 22/09, aguardando `limpa`).
++7. **MUSEU e propriedade da sessao**: PRs-espelho antigos #1-#4 e #6 NAO
++   se apagam. A vitrine #5 encerrou com a conversa 01a0b1e5; nao e a janela
++   desta conversa. Ninguem fecha, apaga ou funde PR alheio sem ordem explicita.
++   Sessao nova abre PR NOVO do proprio branch; nao atualiza branch alheio.
+ 8. **Lembrete de fechamento de toda entrega** (ordem fixa, sempre): ① duplo clique
+    `puxar-atualizacao.bat` → ② duplo clique `verificar-tudo.bat` (esperado: portão
+    17 cenas, raio 0 problemas) → ③ duplo clique `salvar-tudo.bat` (backup dele).
+--- a/parceiro/ESTADO.md
++++ b/parceiro/ESTADO.md
+@@ -3,7 +3,7 @@
+ > **Cápsula completa (conversa perdida? leia isto primeiro):** `parceiro/PROMPT-RECUPERACAO.md`
+ > — arquitetura, leis, história B1→B16, ciclo da ponte, armadilhas e próximas ações.
+ 
+-## HOJE: combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
++## (historia superada pela ordem MUSEU) combinado da VITRINE ÚNICA (PR #5) + PROMPT FIXO na cápsula ✅ — ponte tip `d483d11`; próximo tijolo: B17 x F3 (decisão dele pendente)
+ 
+ **Verdade fresca (22/09 noite):** seção 0 da cápsula = PROMPT FIXO definitivo
+ (recuperação + ritual puxar→verificar→salvar + regras + tom sênior/comercial).
+@@ -288,3 +288,37 @@
+ - ACHADO (furo na lei 2, com evidencia dura): `--so-olhar` promete "observa, nao toca em nada" (ajuda do proprio loop) e a lei 3.2 diz "nao escreve, nao executa" — MAS `executar()` (agente/loop.py linha 165) nao consulta SO_OLHAR. Reproduzido 2x: com memoria/ so com .gitkeep, `python3 agente/loop.py --so-olhar` CRIA memoria/base.py ("o agente fez: Criei memoria/base.py seguindo a regra criar_arquivo_base") e o git ve `?? memoria/base.py`. Varredura AST: 8 funcoes consultam SO_OLHAR (executar_comando, tratar_fila, podar_sombra, corrente_etapa, registrar_experiencia, propor, rodar, _flags); escrevem SEM consultar: executar, lembrar, registrar_rodada (diario/contadores em observacao = "olha e anota" do tick, defensavel; criar ARQUIVO no mundo nao). A cena "modo observacao" do portao cobre so `propor` — por isso 17/17 verde convive com o furo. Candidato a B17: guarda em executar() + cena no portao ("so-olhar nao cria arquivo") + ajuda alinhada. DECISAO DELE: 1 = B17 (recomendado, tijolo pequeno, lei inegociavel) ou 2 = F3 primeiro.
+ - Detalhe cosmetico do raio (nao quebra nada): a checagem "portao" conta chamadas print() no AST (20) e compara com 21 linhas impressas — a dica "20 impressoes — o portao v11 tem 21" aparece para sempre. Correcao de 1 linha, entra de carona no proximo tijolo.
+ - Maquina dele: INTOCADA (lei 5). Nada empurrado pro super-agente.git (fora do meu alcance por desenho). Pendencia dele inalterada: 2 duplo-cliques pos-B16 (puxar, verificar) + salvar-tudo. Pergunta feita a ele: qual o placar do verificar-tudo.bat na maquina dele.
++
++
++# ESTADO desta conversa — 2026-09-22 UTC
++
++## Ordem do dono identificada como "24/09": MUSEU e vitrine por conversa
++
++- Capsula inteira (incluindo 0 e 6.5) e ESTADO da ponte lidos antes da decisao.
++- /home/user/ponte nao existia; nenhum commit local dela foi encontrado.
++- Fonte: SITE@super-agente, tip 3be2e9cc26b2a19a8b341ec01e6dba5d35c7d2eb.
++- .arena-delivery/ = git archive integral desse tip, sem alteracoes.
++- PR NOVO desta sessao = VITRINE (janela). Quem alimenta o PC e a PONTE
++  (SITE@super-agente); puxar-atualizacao.bat nunca le PR.
++- A cada publicacao na ponte, re-espelhar o PR da conversa no mesmo folego.
++  Nao ha watcher instalado; esta e a obrigacao de cada entrega.
++- MUSEU: preservar PRs #1-#4 e #6; #5 encerrou com a conversa 01a0b1e5.
++  Ninguem fecha, apaga, reabre ou funde PR alheio sem ordem explicita.
++  Consulta nesta sessao: #1-#4 abertos, #5 e #6 ja fechados; nenhum alterado.
++- Conforme relato do dono nesta mensagem, o "verificar verde" colado em 24/09
++  rodou no codigo VELHO: loop 1070 linhas / portao 14 cenas. Nao e validacao
++  pos-B16. O print original nao foi anexado nesta conversa.
++- Medido aqui no archive pos-B16: loop 1495 linhas; portao 17 cenas OK,
++  exit 0; raio 20 ok | 9 dicas | 1 aviso | 0 problemas, exit 0.
++  Aviso: desktop/downloads ausentes no Linux; dicas incluem estado local vazio.
++- LIMITACAO: esta sessao esta fixa ao branch arena/01a0cb37-guilhermefmaga-site;
++  push permitido somente nele. Nenhum push em super-agente foi feito.
++  Correcoes canonicas preparadas em parceiro/regras-ponte.patch, ainda NAO
++  publicadas na ponte. O espelho exato mantem a documentacao antiga da fonte.
++- Decisao recomendada: B17 antes de F3. executar() nao consulta SO_OLHAR;
++  a cena atual de observacao cobre propor(), nao a criacao de arquivo.
++  B17: guarda + regressao que prove ausencia de criacao + ajuda coerente.
++  F3 (diario de evolucao) depois; nao adicionar recurso sobre quebra de contrato.
++  Nenhum dos dois implementado: aguardar aprovacao do dono.
++- Ritual no PC: puxar-atualizacao.bat -> verificar-tudo.bat -> salvar-tudo.bat.
++  O PR desta conversa nao altera o que o puxar recebe.

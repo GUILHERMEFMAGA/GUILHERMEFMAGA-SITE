@@ -1,0 +1,39 @@
+O agente de inteligencia artificial roda no seu computador e aprende com exemplos.
+A rede neural ajusta os seus pesos usando o erro da resposta anterior.
+Quanto mais exemplos de treino o agente recebe, melhor ele reconhece a intencao do usuario.
+Um agente de verdade percebe o ambiente, decide o proximo passo e usa ferramentas para agir.
+A memoria curta guarda a conversa de agora e a memoria longa guarda os fatos importantes.
+O orquestrador executa fluxos de automacao parecidos com os fluxos do n8n.
+Cada fluxo tem um gatilho, uma lista de passos e variaveis que passam de um passo para o outro.
+A calculadora usa a biblioteca ast para resolver contas sem risco de executar codigo estranho.
+As ferramentas do agente leem arquivos, salvam anotacoes, resumem textos e olham a hora.
+O gerador de texto aprende quais palavras costumam aparecer depois de quais palavras.
+O programador que testa cada pedacinho descobre o erro mais rapido e com menos estresse.
+Programar e como montar um quebra cabeca: cada peca pequena precisa encaixar primeiro.
+O Visual Studio Code tem terminal integrado, painel de git e depurador de codigo.
+Guardar o projeto no GitHub cria um historico e permite voltar atras quando algo quebra.
+Um passo pequeno por dia vale mais do que uma promessa grande que nunca comeca.
+Errar no terminal e normal e a mensagem de erro sempre diz onde esta o problema.
+O agente local funciona sem internet, sem api paga e sem servico na nuvem.
+Python puro resolve muita coisa e a biblioteca padrao ja vem instalada.
+A curiosidade e o motor do aprendizado e a constancia e o combustivel.
+Um agente bem feito decide sozinho qual ferramenta usar para cada pedido.
+A base de conhecimento responde perguntas sobre o próprio projeto e sobre programação.
+Quando a confiança é baixa, o agente pergunta em vez de inventar uma resposta.
+Cada intenção nova precisa de pelo menos cinco exemplos diferentes de frase.
+A memoria guarda o nome do usuario e outras informacoes importantes da conversa.
+O terminal mostra o resultado de cada teste e ensina onde esta o erro.
+Aprender programacao exige paciencia e pratica todos os dias.
+O melhor jeito de entender uma rede neural e desenhar os neuronios no papel.
+O erro de treino diminui a cada epoca e mostra que o aprendizado esta funcionando.
+Um projeto pequeno que funciona vale mais que um projeto gigante pela metade.
+A automacao economiza tempo e evita esquecer tarefas importantes.
+O fluxo de trabalho comeca com um gatilho e termina com uma acao concreta.
+Cada passo do fluxo recebe o resultado do passo anterior.
+O painel no navegador mostra o estado do agente em tempo real.
+Guardar o codigo no GitHub deixa o projeto seguro e organizado.
+Testar uma ideia pequena por vez reduz o estresse e aumenta o foco.
+A curiosidade leva o programador a descobrir solucoes novas.
+O agente aprende mais rapido quando recebe exemplos claros e variados.
+A pratica diaria transforma codigo complicado em codigo simples.
+Uma frase curta e clara ajuda o agente a entender a intencao do usuario.
