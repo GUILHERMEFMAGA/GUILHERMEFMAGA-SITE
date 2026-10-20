@@ -1,0 +1,59 @@
+# ===== SEGREDOS: NUNCA subir chaves reais para o GitHub =====
+chaves.txt
+.env
+.env.*
+*.key
+
+# ===== Dados pessoais / gerados em tempo de execucao pelo agente =====
+config.json
+historico.json
+memoria_longa.json
+memoria_core.md
+licoes_aprendidas.md
+contatos.json
+grupos.json
+logs_whatsapp.json
+projetos.json
+regras.json
+tarefas_agendadas.json
+cache.json
+crash_log.json
+prints/
+projetos/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+notas.json
+gastos.json
+tarefas_todo.json
+agenda.json
+historico_clipboard.json
+habitos.json
+agendamentos.json
+historico_comandos.json
+
+# ===== IA neural local (motor llama.cpp + modelo GGUF baixados; NAO versionar) =====
+ia_local/
+agente_backup.py
+agente_novo.py
+SEM_ATUALIZAR.txt
+ATUALIZAR_INICIAR.bat
+ideias_agente.md
+rotinas.json
+diario.md
+atalhos_aprendidos.json
+rede_conhecida.json
+indice_conhecimento.json
+aprendizado_busca.json
+backups_edicao/
+historico_edicoes.json
+fluxos.json
+
+# Propostas e backups locais (podem conter dados privados)
+autoedicao_pendente/
+backups_codigo/
+
+# Respostas e relatorios da avaliacao local
+avaliacoes_ia_local/
