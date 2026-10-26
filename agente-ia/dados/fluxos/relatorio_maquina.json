@@ -1,0 +1,11 @@
+{
+  "nome": "relatorio_maquina",
+  "descricao": "A cada 5 minutos grava um relatório do computador e a lista de arquivos criados.",
+  "gatilho": { "tipo": "intervalo", "segundos": 300 },
+  "passos": [
+    { "acao": "data_hora", "salvar_como": "agora" },
+    { "acao": "info_sistema", "salvar_como": "sistema" },
+    { "acao": "listar_arquivos", "salvar_como": "arquivos" },
+    { "acao": "salvar_arquivo", "args": ["relatorio_maquina.txt"], "entrada": "RELATÓRIO GERADO EM: {{agora}}\n\nSISTEMA:\n{{sistema}}\n\nARQUIVOS:\n{{arquivos}}\n" }
+  ]
+}
