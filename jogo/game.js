@@ -557,8 +557,8 @@
       ['POLÍCIA', 'Crime na frente da polícia dá PROCURADO. Eles descem e atiram. Fuja ou lute!'],
     ];
     ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(40, 320, 720, 230);
-    L.forEach((l, i) => { H.txt(ctx, l[0], 60, 352 + i * 42, 16, '#ffe04a'); H.txt(ctx, l[1], 160, 352 + i * 42, 13, '#fff'); });
-    H.txt(ctx, 'Clique na tela para ativar o teclado • ATENÇÃO: violência explícita, sangue e armas (+16) • HTML5 Canvas', 400, 580, 13, '#bbb', 'center');
+    L.forEach((l, i) => { H.txt(ctx, l[0], 60, 352 + i * 42, 16, '#ffe04a'); H.txt(ctx, l[1], 160, 352 + i * 42, 12, '#fff'); });   // 12 = fonte de pixel pequena (escala 1): as linhas são compridas
+    H.txt(ctx, 'Clique na tela para ativar o teclado • ATENÇÃO: violência explícita, sangue e armas (+16) • HTML5 Canvas', 400, 580, 12, '#bbb', 'center');
   }
   function drawOverlay(title, sub, col) {
     const H = G.hud;

@@ -12,7 +12,7 @@
   function txt(ctx, s, x, y, size, col, align, stroke) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
     // fonte de PIXEL (pixfont.js); se faltar alguma letra nela, cai na fonte normal logo abaixo
-    if (G.pixfont && G.pixfont.desenhar(ctx, s, x, y, col || '#ffe04a', align || 'left', stroke || '#000', size)) return;
+    if (G.pixfont && G.pixfont.desenhar(ctx, s, x, y, col || '#ffe04a', align || 'left', stroke || '#000', size, ctx.measureText(s).width)) return;
     ctx.textAlign = align || 'left'; ctx.textBaseline = 'alphabetic';
     ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, size / 4); ctx.strokeStyle = stroke || '#000';
     ctx.strokeText(s, x, y); ctx.fillStyle = col || '#ffe04a'; ctx.fillText(s, x, y);
@@ -20,7 +20,7 @@
   function wrapText(ctx, s, maxW, size) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
     const words = s.split(' '), lines = []; let cur = '';
-    const larg = t => { const p = G.pixfont && G.pixfont.largura(t, size); return p !== undefined ? p : ctx.measureText(t).width; };   // largura real do texto (fonte de pixel ou normal)
+    const larg = t => { const p = G.pixfont && G.pixfont.largura(t, size, ctx.measureText(t).width); return p !== undefined ? p : ctx.measureText(t).width; };   // largura real do texto (fonte de pixel ou normal)
     words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (larg(t) > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
     if (cur) lines.push(cur); return lines;
   }

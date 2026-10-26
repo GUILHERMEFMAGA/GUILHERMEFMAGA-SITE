@@ -121,6 +121,11 @@
   def('°', 0, '.#./#.#/.#./.../.../.../...');
   def('…', 0, '...../...../...../...../...../...../#.#.#');
   def('º', 0, '.#./#.#/#.#/.#./###');
+  def('•', 0, '.../.../.../###/###/.../...');
+  def('↑', 0, '..#../.###./#.#.#/..#../..#../..#../..#..');
+  def('↓', 0, '..#../..#../..#../..#../#.#.#/.###./..#..');
+  def('←', 0, '...../..#../.#.../#####/.#.../..#../.....');
+  def('→', 0, '...../..#../...#./#####/...#./..#../.....');
   def('♪', 0, '...##/...#./...#./...#./.###./####./.##..');
 
   // ---------- acentos (marcas sobre a letra) ----------
@@ -165,21 +170,21 @@
     e = { c, w: cols * sc, pad }; if (cache.size > 400) cache.clear(); cache.set(chave, e); return e;
   }
 
-  // escala (tamanho de cada pixel da fonte) pelo tamanho do texto pedido: assim o resultado não depende da fonte do navegador.
-  // A altura da letra de pixel (7 x escala) fica parecida com a da letra normal do mesmo tamanho; e se mesmo assim o texto
-  // ficar bem mais largo que o normal (estimativa de 0,6 x tamanho por letra), diminui a escala: nenhuma caixa estoura.
-  function escala(cols, tam, n) {
+  // escala (tamanho de cada pixel da fonte): vem do tamanho do texto pedido, para a letra de pixel ter altura parecida com a letra
+  // normal (7 x escala). Uma trava evita casos extremos: se o texto de pixel ficar mais de 45% mais largo que o texto normal
+  // (medido na hora, "nativo"), diminui a escala. Linhas compridas que já cabem por pouco devem pedir tamanho 12 (= escala 1).
+  function escala(cols, tam, nativo) {
     let sc = tam < 13 ? 1 : tam < 24 ? 2 : tam < 36 ? 3 : tam < 48 ? 4 : 6;
-    while (sc > 1 && cols * sc > 0.6 * tam * n * 1.5) sc--;
+    if (nativo > 0) while (sc > 1 && cols * sc > nativo * 1.45) sc--;
     return sc;
   }
   // largura em pixels da tela que o texto terá com essa fonte (ou undefined se faltar letra: aí vale a fonte normal)
-  function largura(s, tam) { s = String(s); const cols = colunas(s); return cols === undefined ? undefined : cols * escala(cols, tam, s.length); }
+  function largura(s, tam, nativo) { s = String(s); const cols = colunas(s); return cols === undefined ? undefined : cols * escala(cols, tam, nativo); }
 
   // desenha o texto com a base da letra em y. devolve false se não puder (aí quem chamou usa a fonte normal)
-  function desenhar(ctx, s, x, y, cor, alinhar, contorno, tam) {
+  function desenhar(ctx, s, x, y, cor, alinhar, contorno, tam, nativo) {
     s = String(s); const cols = colunas(s); if (cols === undefined || !s.length) return false;
-    const sc = escala(cols, tam, s.length), e = montar(s, sc, cor, contorno);
+    const sc = escala(cols, tam, nativo), e = montar(s, sc, cor, contorno);
     const x0 = alinhar === 'center' ? x - e.w / 2 : alinhar === 'right' ? x - e.w : x;
     ctx.save(); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(e.c, Math.round(x0 - e.pad), Math.round(y - BASE * sc - e.pad));
@@ -203,7 +208,7 @@
       if (pode(this, s)) {
         const tam = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)[1]), b = this.textBaseline, cor = this.fillStyle;
         const yy = b === 'middle' ? y + tam * 0.36 : b === 'top' || b === 'hanging' ? y + tam * 0.72 : b === 'bottom' ? y - tam * 0.2 : y;
-        if (desenhar(this, s, x, yy, cor, this.textAlign || 'left', brilho(cor) > 90 ? '#000' : null, tam)) return;
+        if (desenhar(this, s, x, yy, cor, this.textAlign || 'left', brilho(cor) > 90 ? '#000' : null, tam, this.measureText(String(s)).width)) return;
       }
       return P.fillText.call(this, s, x, y, mw);
     };
