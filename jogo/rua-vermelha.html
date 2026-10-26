@@ -1625,7 +1625,7 @@
     const livre = (u, v, m) => {
       m = m || 0;
       const nao = [[21 - m, 8 - m, 55 + m, 21 + m], [27 - m, 1 - m, 49 + m, 11 + m], [28 - m, 19 - m, 49 + m, 25 + m], [31 - m, 22 - m, 46 + m, 38 + m], [33 - m, 36 - m, 43 + m, 48 + m], [4 - m, 22 - m, 33 + m, 34 + m],
-        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3], [-1, 45, 77, 49], [-1, -1, 3, 49], [73, -1, 77, 49]];
+        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3.6], [-1, 43, 77, 49], [-1, -1, 5.4, 49], [70.6, -1, 77, 49]];   // as quatro últimas = corredores das rondas dos seguranças
       return !nao.some(r => u > r[0] && u < r[2] && v > r[1] && v < r[3]);
     };
     for (let k = 0; k < 6; k++) for (const sx of [33.7, 42.3]) { const v = 38 + k * 1.6; if (v < 46) trees.push({ x: mu(sx), y: mv(v), r: 13, cipreste: true }); }   // alameda do portão
@@ -1774,6 +1774,15 @@
       ctx.strokeStyle = '#f2c231'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(hx, hy, 4.1 * T, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#f4f4f4'; ctx.fillRect(hx - 30, hy - 36, 10, 72); ctx.fillRect(hx + 20, hy - 36, 10, 72); ctx.fillRect(hx - 30, hy - 5, 60, 10);
       [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, b]) => { ctx.fillStyle = '#ffd24a'; ctx.fillRect(mu(h.u) + 6 + a * (h.w * T - 18), mv(h.v) + 6 + b * (h.h * T - 18), 6, 6); });
+      // helicóptero preto da família estacionado no H (com as pás paradas)
+      ctx.fillStyle = 'rgba(0,0,10,0.28)'; ctx.beginPath(); ctx.ellipse(hx + 14, hy + 18, 20, 42, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(hx + 10, hy + 34, 10, 58);
+      ctx.fillStyle = '#16181e'; ctx.fillRect(hx - 4, hy + 20, 8, 64); ctx.fillRect(hx - 14, hy + 76, 28, 4); ctx.fillRect(hx - 2, hy + 70, 4, 18);              // cauda e rotor traseiro
+      ctx.fillStyle = '#20232b'; ctx.beginPath(); ctx.ellipse(hx, hy, 19, 40, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#08090c'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#7fb0d8'; ctx.beginPath(); ctx.ellipse(hx, hy - 16, 13, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b9dcf0'; ctx.beginPath(); ctx.ellipse(hx - 4, hy - 20, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8c860'; ctx.fillRect(hx - 3, hy + 8, 6, 3);
+      ctx.strokeStyle = '#08090c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 22, hy - 26); ctx.lineTo(hx - 22, hy + 30); ctx.moveTo(hx + 22, hy - 26); ctx.lineTo(hx + 22, hy + 30); ctx.stroke();   // esquis
+      ctx.strokeStyle = 'rgba(20,22,28,0.55)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hx - 80, hy + 6); ctx.lineTo(hx + 80, hy - 6); ctx.moveTo(hx - 10, hy - 78); ctx.lineTo(hx + 10, hy + 78); ctx.stroke();   // pás paradas
+      ctx.fillStyle = '#e8c860'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
       // ---------- piscina com deck, espreguiçadeiras e guarda-sóis ----------
       const p = M.piscina;
       ctx.fillStyle = '#d9cfba'; ctx.fillRect(mu(p.u - 3), mv(p.v - 1.5), (p.w + 6) * T, (p.h + 3) * T);
@@ -5604,6 +5613,16 @@
     const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     G.world.places.forEach(pl => dot(pl.x, pl.y, pl.cor, pl.tipo === 'loja' ? 1.7 : 2.5));
     G.world.casas.forEach(c => { if (c.semPorta) return; const mine = S.save.casas && S.save.casas[c.id]; if (mine) dot(c.x, c.y, '#9dff9d', 2); else if (c.venda) dot(c.x, c.y, '#ff4a4a', 1.5); });   // casas suas (verde) e à venda (vermelho)
+    // seta verde na borda do minimapa apontando para a SUA MANSÃO (ela fica longe, na Mata Escura, ao lado da rodovia)
+    { const M0 = G.world.MANSAO;
+      if (M0 && M0.casa && S.save.casas && S.save.casas[M0.casa.id]) {
+        const [px, py] = tm(M0.casa.x, M0.casa.y);
+        if (px < x || px > x + w || py < y || py > y + h) {
+          const ang = Math.atan2(py - (y + h / 2), px - (x + w / 2)), ex = Math.max(x + 8, Math.min(x + w - 8, px)), ey = Math.max(y + 8, Math.min(y + h - 8, py));
+          ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang); ctx.fillStyle = Math.floor(time * 2) % 2 ? '#9dff9d' : '#e8ffe8'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-5, -5); ctx.lineTo(-2, 0); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+      } }
     if (S.guia) { const gp = G.world.places.find(q => q.id === S.guia.id); if (gp) dot(gp.x, gp.y, Math.floor(time * 5) % 2 ? '#ffffff' : gp.cor, 4); }
     S.cars.forEach(c => { if (c.kind === 'police' && !c.dead && c.mode !== 'wander') dot(c.x, c.y, Math.floor(time * 6) % 2 ? '#ff3030' : '#3a5bff', 2); });
     S.peds.forEach(p => { if ((p.kind === 'cop' || p.target) && p.state !== 'dead') dot(p.x, p.y, p.kind === 'cop' ? '#5a7bff' : '#ff3030', 1.5); });
@@ -6269,7 +6288,7 @@
   ];
   const DICAS = [
     'Dica: sente num banco da calçada para recuperar a vida.', 'Dica: as máquinas de refrigerante curam um pouquinho.',
-    'Dica: nos pontos de ônibus você viaja pela cidade por $5.', 'Dica: a barbearia e o shopping mudam o seu visual.',
+    'Dica: nos pontos de ônibus você viaja pela cidade por $5.', 'Dica: a sua mansão, a VILLA BELLAROSA, fica na MATA ESCURA, ao lado da rodovia: cama, cofre, bar e seguranças.', 'Dica: a barbearia e o shopping mudam o seu visual.',
     'Dica: durma em casa para salvar o jogo e passar a noite.', 'Dica: fale com o padre para despistar a polícia.',
     'Dica: remexer lixeira às vezes rende uns trocados.', 'Dica: a academia aumenta a força dos seus socos.'
   ];
@@ -9879,6 +9898,209 @@
 </script>
 <script>
 /* =====================================================================
+   MOBILIA5.JS — móveis da MANSÃO DO CHEFÃO (estilo máfia):
+   piano de cauda, mesa de sinuca (sinuca_mafia), mesa de pôquer, balcão de bar com garrafas, adega (prateleira de vinhos),
+   barril de vinho, estátua de mármore, escadaria grande, lustre, charuteira, armário de armas e telefone.
+   Convenção: o.x,o.y,o.w,o.h = pegada no chão; o.e = altura. Quem usa: mansao_int.js
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const L = G.lugares, K = L.kit, D = G.deco, TAU = Math.PI * 2;
+  const shade = K.shade, rr = D.rr, rng = D.rng, reg = D.reg, caixa = D.caixa, sombra = D.sombra;
+  const circ = (c, x, y, r, cor) => { c.fillStyle = cor; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
+  const brilho = (c, x, y, w, a) => { c.fillStyle = 'rgba(255,255,255,' + (a || 0.4) + ')'; c.fillRect(x, y, w, 1.2); };
+  const OURO = '#e8c860';
+
+  // ---------- piano de cauda ----------
+  reg('piano', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 34, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 8 });
+    caixa(c, x, y, w, h, e, '#1a1a20', '#0a0a0e', { r: 7, semSombra: true });
+    // tampa em forma de asa (curva do lado direito)
+    const g = c.createLinearGradient(x, ty, x + w, ty + h); g.addColorStop(0, '#2c2c36'); g.addColorStop(1, '#101016');
+    c.fillStyle = g; c.beginPath(); c.moveTo(x + 6, ty + 6); c.lineTo(x + w * 0.55, ty + 6); c.bezierCurveTo(x + w * 0.99, ty + 2, x + w - 2, ty + h * 0.46, x + w * 0.72, ty + h * 0.8); c.lineTo(x + w * 0.55, ty + h - 14); c.lineTo(x + 6, ty + h - 14); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.12)'; c.lineWidth = 1; c.stroke();
+    brilho(c, x + 12, ty + 11, w * 0.42, 0.22);
+    c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(x + 12, ty + 16, w * 0.3, h * 0.35);
+    // tampa levantada (a haste)
+    c.strokeStyle = '#3a3a44'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + w * 0.58, ty + 8); c.lineTo(x + w * 0.74, ty - 12); c.stroke();
+    // teclado na frente
+    const kx = x + 8, kw = w * 0.62, ky = ty + h - 14;
+    c.fillStyle = '#fbf8ee'; c.fillRect(kx, ky, kw, 12); c.fillStyle = '#b8b4a6'; for (let i = 1; i < kw / 6; i++) c.fillRect(kx + i * 6, ky + 7, 1, 5);
+    c.fillStyle = '#16161a'; for (let i = 0; i < kw / 6 - 1; i++) if (i % 7 !== 2 && i % 7 !== 6) c.fillRect(kx + i * 6 + 4, ky, 4, 7.5);
+    c.fillStyle = OURO; c.fillRect(x + w * 0.3, ty + h - 17, 22, 2);       // plaquinha dourada
+  }, { alto: 24 });
+
+  // ---------- mesa de sinuca ----------
+  reg('sinuca_mafia', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 30, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 6 });
+    caixa(c, x, y, w, h, e, '#5c3b22', '#34200f', { r: 5, semSombra: true });
+    // pernas torneadas na frente
+    c.fillStyle = '#2a190c'; c.fillRect(x + 6, ty + h + 2, 10, e - 4); c.fillRect(x + w - 16, ty + h + 2, 10, e - 4);
+    // feltro verde com tabelas e caçapas
+    c.fillStyle = '#1b5e36'; rr(c, x + 7, ty + 7, w - 14, h - 14, 4); c.fill();
+    const g = c.createLinearGradient(0, ty + 12, 0, ty + h - 12); g.addColorStop(0, '#2c9a58'); g.addColorStop(1, '#1d7544'); c.fillStyle = g; rr(c, x + 14, ty + 14, w - 28, h - 28, 3); c.fill();
+    c.fillStyle = '#e8e2d0'; for (let i = 1; i < 8; i++) { c.fillRect(x + w * i / 8 - 1, ty + 9, 2, 2); c.fillRect(x + w * i / 8 - 1, ty + h - 11, 2, 2); }   // sinais da borda
+    [[x + 12, ty + 12], [x + w / 2, ty + 10], [x + w - 12, ty + 12], [x + 12, ty + h - 12], [x + w / 2, ty + h - 10], [x + w - 12, ty + h - 12]].forEach(([px, py]) => circ(c, px, py, 6.5, '#0a0a0e'));
+    // as bolas em triângulo e a branca
+    const cores = ['#e8c820', '#2050c8', '#d02020', '#6a2a8a', '#e87818', '#1f8a3a', '#7a1a20', '#16161a', '#e8c820', '#2050c8'];
+    let k = 0; const bx = x + w * 0.66, by = ty + h / 2;
+    for (let col = 0; col < 4; col++) for (let r = 0; r <= col; r++) { const px = bx + col * 9, py = by + (r - col / 2) * 9.6; circ(c, px, py, 4.3, cores[k++ % cores.length]); brilho(c, px - 2, py - 2, 3, 0.7); }
+    circ(c, x + w * 0.28, by + 2, 4.3, '#f8f6ee'); brilho(c, x + w * 0.28 - 2, by, 3, 0.8);
+    c.strokeStyle = '#c8a064'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x + w * 0.1, by + 24); c.lineTo(x + w * 0.27, by + 5); c.stroke();   // taco
+  }, { alto: 8 });
+
+  // ---------- mesa de pôquer (oval, feltro verde, fichas e cartas) ----------
+  reg('mesa_poker', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 26, ty = y - e, rad = Math.min(w, h) / 2 - 1;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: rad });
+    caixa(c, x, y, w, h, e, '#3a2214', '#1c0f08', { r: rad, semSombra: true });
+    c.fillStyle = '#16542e'; rr(c, x + 8, ty + 8, w - 16, h - 16, rad - 8); c.fill();
+    const g = c.createRadialGradient(x + w / 2, ty + h / 2, 5, x + w / 2, ty + h / 2, w / 2); g.addColorStop(0, '#2c8a52'); g.addColorStop(1, '#1d6a3c'); c.fillStyle = g; rr(c, x + 13, ty + 13, w - 26, h - 26, rad - 13); c.fill();
+    c.strokeStyle = 'rgba(232,200,96,0.55)'; c.lineWidth = 1.2; rr(c, x + 20, ty + 20, w - 40, h - 40, rad - 20); c.stroke();
+    for (let i = 0; i < 5; i++) { const px = x + w * 0.3 + i * 14; c.fillStyle = '#fbfaf4'; c.fillRect(px, ty + h / 2 - 8, 10, 15); c.fillStyle = i % 2 ? '#c81c1c' : '#16161a'; c.fillRect(px + 3, ty + h / 2 - 5, 4, 4); }   // cartas no meio
+    [[0.2, 0.3, '#c81c1c'], [0.78, 0.32, '#2050c8'], [0.25, 0.7, '#16161a'], [0.74, 0.7, '#c81c1c'], [0.5, 0.78, '#2050c8']].forEach(([fx, fy, cor]) => { for (let k = 0; k < 4; k++) circ(c, x + w * fx, ty + h * fy - k * 1.6, 5, k % 2 ? '#f4f4f0' : cor); });   // pilhas de fichas
+    circ(c, x + w * 0.5, ty + h * 0.28, 5, OURO); circ(c, x + w * 0.5, ty + h * 0.28, 3, '#8a6a1a');   // botão do carteador
+  }, { alto: 10 });
+
+  // ---------- balcão de bar (madeira, couro com tachas, trilho de latão, garrafas) ----------
+  reg('bar_mafia', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 44, ty = y - e, fy = y + h - e, r = rng(x + 5);
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 5 });
+    caixa(c, x, y, w, h, e, '#7a4a26', '#4a2814', { r: 4, semSombra: true });
+    // frente de couro vermelho com tachas douradas
+    c.fillStyle = '#5a1a1e'; rr(c, x + 6, fy + 6, w - 12, e - 14, 3); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.07)'; for (let i = 0; i < w - 20; i += 38) c.fillRect(x + 12 + i, fy + 8, 2, e - 18);
+    c.fillStyle = OURO; for (let i = 0; i < w - 14; i += 14) { c.fillRect(x + 9 + i, fy + 9, 2, 2); c.fillRect(x + 9 + i, fy + e - 12, 2, 2); }
+    c.fillStyle = '#d8b050'; c.fillRect(x + 4, fy + e - 7, w - 8, 3);            // trilho de latão
+    brilho(c, x + 2, ty + 1, w - 4, 0.35); c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(x + 2, ty + h - 6, w - 4, 4);
+    // garrafas e copos em cima do balcão
+    const gc = ['#2f5a2c', '#7a3a14', '#2a3a6a', '#7a1a1a', '#c8a030', '#3a2a1a'];
+    for (let i = 0; i < w / 26; i++) { const bx = x + 14 + i * 26 + r() * 6; c.fillStyle = gc[i % gc.length]; c.fillRect(bx, ty + 5, 6, 14); c.fillRect(bx + 1.5, ty - 2, 3, 8); c.fillStyle = OURO; c.fillRect(bx + 1, ty - 3, 4, 2); brilho(c, bx + 1, ty + 7, 2, 0.5); }
+    for (let i = 0; i < 4; i++) { const gx = x + w * 0.18 + i * (w * 0.22); circ(c, gx, ty + h - 14, 4, 'rgba(255,255,255,0.55)'); circ(c, gx, ty + h - 14, 2.4, 'rgba(120,70,20,0.7)'); }
+  }, { alto: 14 });
+
+  // ---------- adega: prateleira de vinhos ----------
+  reg('adega_rack', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 86, fy = y + h - e, r = rng(x + 9);
+    sombra(c, x, y, w, h, { dx: 4, dy: 6, r: 3 });
+    caixa(c, x, y, w, h, e, '#4a2a16', '#2e180c', { r: 3, semSombra: true });
+    c.fillStyle = '#1a0e08'; rr(c, x + 5, fy + 5, w - 10, e - 10, 2); c.fill();
+    const cols = Math.floor((w - 16) / 15), rows = Math.floor((e - 14) / 14), gc = ['#27382a', '#3a1a1c', '#222c3a', '#40301a'];
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const bx = x + 14 + i * 15 + (j % 2) * 5, by = fy + 14 + j * 14;
+      if (r() < 0.12) continue;                                                // buraco vazio
+      circ(c, bx, by, 5.2, gc[(i + j) % gc.length]); circ(c, bx, by, 2.8, '#c8a868'); circ(c, bx - 1, by - 1, 1.2, 'rgba(255,255,255,0.5)');
+    }
+    c.fillStyle = '#6a3e1e'; for (let j = 0; j <= rows; j++) c.fillRect(x + 5, fy + 6 + j * 14, w - 10, 2);
+    brilho(c, x + 2, y - e + 1, w - 4, 0.3);
+  }, { alto: 10 });
+
+  // ---------- barril de vinho ----------
+  reg('barril', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 34, cx = x + w / 2, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 4, dy: 6, r: w / 2 });
+    c.fillStyle = '#5a3418'; c.fillRect(x + 2, ty + h / 2, w - 4, e); c.beginPath(); c.ellipse(cx, y + h / 2, w / 2 - 2, h / 2, 0, 0, TAU); c.fill();
+    c.fillStyle = '#7a4a24'; for (let i = 0; i < 6; i++) c.fillRect(x + 4 + i * (w - 8) / 6, ty + h / 2, 1.2, e);
+    c.fillStyle = '#2a2a30'; c.fillRect(x + 1, ty + h / 2 + e * 0.22, w - 2, 3); c.fillRect(x + 1, ty + h / 2 + e * 0.72, w - 2, 3);
+    c.fillStyle = '#8a5a2e'; c.beginPath(); c.ellipse(cx, ty + h / 2, w / 2 - 1, h / 2 - 1, 0, 0, TAU); c.fill();
+    c.strokeStyle = '#4a2810'; c.lineWidth = 1; c.beginPath(); c.ellipse(cx, ty + h / 2, w / 2 - 6, h / 2 - 6, 0, 0, TAU); c.stroke();
+    c.fillStyle = '#6a3e1e'; c.fillRect(cx - w / 2 + 3, ty + h / 2 - 1, w - 6, 1.4);
+    circ(c, cx, ty + h / 2, 3, '#2a2a30'); circ(c, cx, y + h - 6, 3, OURO);                                  // tampa e torneira
+  }, { alto: 6 });
+
+  // ---------- estátua de mármore sobre pedestal ----------
+  reg('estatua', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 78, cx = x + w / 2, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 5, dy: 8, r: 4 });
+    caixa(c, x, y, w, h, e * 0.42, '#d8d2c4', '#a8a090', { r: 3, semSombra: true });
+    const py = y - e * 0.42 + h / 2;
+    c.fillStyle = '#ece8de'; c.beginPath(); c.ellipse(cx, py - e * 0.2, w * 0.3, e * 0.26, 0, 0, TAU); c.fill();      // corpo
+    c.fillStyle = '#d4cfc2'; c.beginPath(); c.ellipse(cx + 3, py - e * 0.18, w * 0.18, e * 0.2, 0, 0, TAU); c.fill();
+    circ(c, cx, py - e * 0.5, w * 0.17, '#f2eee6'); circ(c, cx + 2, py - e * 0.5 + 1, w * 0.1, '#d8d3c6');          // cabeça
+    c.strokeStyle = '#ece8de'; c.lineWidth = 4; c.lineCap = 'round'; c.beginPath(); c.moveTo(cx - w * 0.28, py - e * 0.3); c.lineTo(cx - w * 0.36, py - e * 0.5); c.moveTo(cx + w * 0.28, py - e * 0.3); c.lineTo(cx + w * 0.34, py - e * 0.1); c.stroke();
+    brilho(c, cx - w * 0.2, py - e * 0.4, w * 0.2, 0.5);
+  }, { alto: 16 });
+
+  // ---------- escadaria grande (de frente, com tapete vermelho e corrimão) ----------
+  reg('escada_grande', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, n = 10, sh = h / n;
+    sombra(c, x, y, w, h, { dx: 4, dy: 6, r: 3 });
+    for (let k = 0; k < n; k++) {                                                          // k = 0 é o degrau mais alto (fundo)
+      const ins = (n - 1 - k) * 0.0 + (k * 1.2), sx = x + ins, sw = w - ins * 2, sy = y + k * sh;
+      c.fillStyle = shade('#d8d0c0', -0.02 * (n - k)); c.fillRect(sx, sy, sw, sh);
+      c.fillStyle = '#efe9db'; c.fillRect(sx, sy, sw, 4);                                  // piso do degrau (mais claro)
+      c.fillStyle = shade('#a89c88', -0.03 * (n - k)); c.fillRect(sx, sy + 4, sw, sh - 4);   // espelho do degrau
+    }
+    const cw = w * 0.4, cx0 = x + (w - cw) / 2;                                            // tapete vermelho com varões dourados
+    c.fillStyle = '#8a1c24'; c.fillRect(cx0, y, cw, h); c.fillStyle = '#a82a32'; c.fillRect(cx0 + 3, y, 4, h); c.fillStyle = '#5a0f16'; c.fillRect(cx0 + cw - 5, y, 5, h);
+    c.fillStyle = OURO; for (let k = 0; k < n; k++) { c.fillRect(cx0 - 2, y + k * sh + sh - 3, cw + 4, 2); }
+    [[x - 8, 1], [x + w + 2, -1]].forEach(([rx, s]) => {                                   // corrimãos de madeira e balaústres
+      c.fillStyle = '#4a2814'; c.fillRect(rx, y, 7, h); c.fillStyle = '#7a4a26'; c.fillRect(rx + (s > 0 ? 0 : 4), y, 3, h);
+      for (let k = 0; k < n; k++) { c.fillStyle = '#3a2010'; c.fillRect(rx + 2, y + k * sh + 3, 3, sh - 2); }
+      circ(c, rx + 3.5, y + h + 2, 5.5, OURO); brilho(c, rx + 1, y + h - 1, 3, 0.8);       // bola dourada no poste
+    });
+  }, { alto: 4 });
+
+  // ---------- lustre de cristal (pendurado do teto) ----------
+  reg('lustre', (c, o) => {
+    const cx = o.x + o.w / 2, ty = o.y - (o.e || 130);
+    c.strokeStyle = '#16181e'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(cx, ty - 60); c.lineTo(cx, ty - 8); c.stroke();
+    c.fillStyle = 'rgba(255,224,150,0.10)'; c.beginPath(); c.arc(cx, ty + 4, 54, 0, TAU); c.fill();
+    c.strokeStyle = OURO; c.lineWidth = 3; c.beginPath(); c.ellipse(cx, ty, 40, 13, 0, 0, TAU); c.stroke(); c.lineWidth = 2; c.beginPath(); c.ellipse(cx, ty - 6, 24, 8, 0, 0, TAU); c.stroke();
+    for (let k = 0; k < 8; k++) {
+      const a = k * TAU / 8, px = cx + Math.cos(a) * 40, py = ty + Math.sin(a) * 13;
+      c.strokeStyle = OURO; c.lineWidth = 1.5; c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 8); c.stroke();
+      circ(c, px, py - 11, 3.4, '#fff4c0'); circ(c, px, py - 11, 1.6, '#ffffff');                       // lâmpadas-vela
+      c.fillStyle = 'rgba(210,235,255,0.85)'; c.beginPath(); c.moveTo(px - 2, py + 2); c.lineTo(px + 2, py + 2); c.lineTo(px, py + 11 + (k % 2) * 4); c.closePath(); c.fill();   // cristais
+    }
+    circ(c, cx, ty - 8, 4, OURO);
+  }, { alto: 80 });
+
+  // ---------- charuteira ----------
+  reg('humidor', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 22, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 3, dy: 5, r: 3 });
+    caixa(c, x, y, w, h, e, '#8a5a30', '#563518', { r: 3, semSombra: true });
+    c.fillStyle = OURO; c.fillRect(x + w / 2 - 4, y + h - e + 5, 8, 6); c.fillStyle = '#6a4a14'; c.fillRect(x + w / 2 - 1, y + h - e + 7, 2, 2);   // fecho dourado
+    brilho(c, x + 2, ty + 1, w - 4, 0.4);
+    ['#6a3a14', '#7a4a1c', '#5a2e10'].forEach((cor, i) => { c.fillStyle = cor; c.fillRect(x + 5 + i * 3, ty + 4, 2.4, h - 9); c.fillStyle = '#e8c860'; c.fillRect(x + 5 + i * 3, ty + 6, 2.4, 1.4); });   // charutos
+  }, { alto: 6 });
+
+  // ---------- armário de armas (vitrine com espingardas) ----------
+  reg('arsenal', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 92, fy = y + h - e;
+    sombra(c, x, y, w, h, { dx: 4, dy: 6, r: 3 });
+    caixa(c, x, y, w, h, e, '#2c2f38', '#1a1c22', { r: 3, semSombra: true });
+    c.fillStyle = '#0c0d10'; rr(c, x + 6, fy + 6, w - 12, e - 12, 2); c.fill();
+    for (let k = 0; k < 4; k++) {                                                           // espingardas na vertical
+      const gx = x + 16 + k * ((w - 32) / 3);
+      c.fillStyle = '#3a2410'; c.fillRect(gx - 2.4, fy + e * 0.55, 5, e * 0.34); c.fillStyle = '#16181c'; c.fillRect(gx - 1.4, fy + 12, 3, e * 0.5);
+      c.fillStyle = '#6a707a'; c.fillRect(gx - 0.6, fy + 12, 1.2, e * 0.5);
+    }
+    c.fillStyle = '#d8b050'; for (let k = 0; k < 5; k++) c.fillRect(x + 12 + k * 14, fy + e - 17, 8, 5);                  // caixas de munição
+    const g = c.createLinearGradient(x, fy, x + w, fy + e); g.addColorStop(0, 'rgba(190,230,255,0.22)'); g.addColorStop(0.5, 'rgba(190,230,255,0.04)'); g.addColorStop(1, 'rgba(190,230,255,0.16)');
+    c.fillStyle = g; rr(c, x + 6, fy + 6, w - 12, e - 12, 2); c.fill();
+    c.strokeStyle = '#555a66'; c.lineWidth = 1.2; rr(c, x + 6, fy + 6, w - 12, e - 12, 2); c.stroke();
+    circ(c, x + w - 12, fy + e / 2, 3, '#d8b050');                                          // fechadura
+  }, { alto: 8 });
+
+  // ---------- telefone de disco ----------
+  reg('telefone', (c, o) => {
+    const x = o.x, y = o.y, w = o.w, h = o.h, e = o.e || 12, ty = y - e;
+    sombra(c, x, y, w, h, { dx: 2, dy: 3, r: 4 });
+    caixa(c, x, y, w, h, e, '#16161a', '#0a0a0c', { r: 5, semSombra: true });
+    circ(c, x + w / 2, ty + h / 2 + 1, h * 0.28, OURO); circ(c, x + w / 2, ty + h / 2 + 1, h * 0.14, '#16161a');
+    c.fillStyle = '#16161a'; rr(c, x + 3, ty - 2, w - 6, 6, 3); c.fill(); brilho(c, x + 5, ty - 1, w - 10, 0.5);        // fone no gancho
+  }, { alto: 8 });
+
+  G.mobilia5 = true;
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
    VIDA.JS — as pessoas da cidade têm FAMÍLIA, NOME e ROTINA
      • cada casa tem uma família (pai, mãe, filhos, às vezes um avô ou avó)
      • a rotina muda com a HORA do jogo: dormir, café, trabalho, escola, TV...
@@ -10205,6 +10427,7 @@
   L.construtores['tipo:casa'] = {
     criar(id, lg) {
       const S = G.S, c = lg.place.casa; lg.casa = c;
+      if (c.mafia && G.mansaoInt) return G.mansaoInt.criar(id, lg, c);   // a VILLA BELLAROSA (mansão do chefão) tem as próprias salas (mansao_int.js)
       if (!lg.ini) { lg.ini = true; iniciaFamilia(S, lg); }
       const R = L.casaLay ? L.casaLay.criar(id, S, lg, c) : (id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c));
       R.objs.forEach(o => { if (o.t === 'placa_venda') o.preco = c.preco; });
@@ -15570,10 +15793,10 @@
   const est = S => S.mansao || (S.mansao = { gate: 0, fechado: false, hostilT: 0, postos: null, t: 0, vao: 0, dentroAntes: false, somT: 0 });
   const algoNoVao = (S, mg) => {
     const gx = M.portao.x, gy = M.portao.y;
-    const perto = o => o && Math.abs(o.x - gx) < 110 && Math.abs(o.y - gy) < 70;
+    const perto = o => o && Math.abs(o.x - gx) < 104 && Math.abs(o.y - gy) < 50;          // o vão do portão (6 tiles de largura)
     if (perto(S.player.car || S.player)) return true;
     for (const c of S.cars) if (!c.dead && perto(c)) return true;
-    for (const p of S.peds) if (p.state !== 'dead' && perto(p)) return true;
+    for (const p of S.peds) if (p.kind !== 'guarda' && p.state !== 'dead' && perto(p)) return true;   // os seguranças ficam fora do vão: não contam
     return false;
   };
 
@@ -15592,7 +15815,8 @@
   function atualizar(S, dt) {
     if (S.mode !== 'play') return;
     const st = est(S), P = S.player, ref = P.car || P, c = M.casa;
-    st.t += dt;
+    if (S.time + 0.5 < (st.ultimoT || 0)) { st.postos = null; st.carrosOk = false; st.gate = 0; st.fechado = false; st.hostilT = 0; }   // começou um jogo novo: recomeça tudo
+    st.ultimoT = S.time; st.t += dt;
     // 1) a mansão é sua
     S.save.casas = S.save.casas || {}; if (!S.save.casas[c.id]) S.save.casas[c.id] = true;
     const longe = Math.hypot(ref.x - (M.x + M.w / 2), ref.y - (M.y + M.h / 2)) > 3300;
@@ -15620,6 +15844,8 @@
     }
     st.dentroAntes = emDentro;
     if (longe) return;
+    // 3b) os carros da família ficam estacionados em frente à garagem (e são seus!)
+    if (!st.carrosOk) { st.carrosOk = true; [['sedan', '#14141a', 8], ['sedan', '#2a2a32', 11], ['coupe', '#6a1f26', 14]].forEach(([kind, cor, u]) => { const k = new G.Car({ x: mu(u), y: mv(30.4), a: Math.PI / 2, kind, color: cor, driver: 'none', mode: 'parked', owned: true }); S.cars.push(k); }); }
     // 4) seguranças: repõe os que faltam e atualiza os que existem
     st.reposT = (st.reposT || 0) - dt;
     if (!st.postos) st.postos = defsPostos().map(def => ({ def, ref: null, morreuT: 0 }));
@@ -15722,6 +15948,16 @@
     ctx.restore();
   }
 
+  // o motorista traz o carro preto da família até o pátio da mansão
+  function chamarCarro(S) {
+    const px = mu(33), py = mv(22);
+    let k = S.carroMansao;
+    if (!k || k.dead || !S.cars.includes(k)) {
+      k = new G.Car({ x: px, y: py, a: 0, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
+      S.cars.push(k); S.carroMansao = k; G.say('O motorista trouxe o carro preto até o pátio da mansão.', 4);
+    } else { k.x = px; k.y = py; k.a = 0; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
+  }
+
   // ---------- conversa com os seguranças ----------
   L.extrasAcao.push((S, P) => {
     for (const g of S.peds) {
@@ -15731,7 +15967,297 @@
     return null;
   });
 
-  G.mansao = { M, atualizar, desenhar, desenharAlto, guardaFerido, hostilizar, dentro };
+  G.mansao = { M, atualizar, desenhar, desenharAlto, guardaFerido, hostilizar, dentro, chamarCarro };
+})(window.G = window.G || {});
+
+</script>
+<script>
+/* =====================================================================
+   MANSAO_INT.JS — por dentro da VILLA BELLAROSA, a mansão do chefão (estilo máfia).
+   Salas (todas ligadas ao SALÃO DE ENTRADA):
+     • SALÃO DE ENTRADA  mármore xadrez, escadaria, lustre, estátuas, seguranças e o mordomo (chama o carro)
+     • ESCRITÓRIO        mesa de mogno, biblioteca, lareira, TELEFONE e o COFRE (guarda dinheiro a salvo)
+     • SALÃO DE ESTAR    bar com barman (bebidas), piano de cauda, charuteira, sofás de couro
+     • SALA DE JOGOS     sinuca e pôquer (aposta de dinheiro)
+     • JANTAR E COZINHA  mesa comprida, chef (prato do dia) e geladeira
+     • SUÍTE              cama king: DORME E SALVA o jogo, banheira
+     • ADEGA E ARSENAL   vinhos, barris; repõe munição e dá colete 1x por dia
+   O terreno e a casa por fora estão em world.js (p7/p8) e o portão/seguranças em mansao.js.
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const W = G.world, M = W.MANSAO;
+  if (!M) return;
+  const L = G.lugares, K = L.kit, D = G.deco, SP = G.sprites;
+  const O = K.O, TAU = Math.PI * 2, rand = K.rand, pick = K.pick;
+  const look = o => Object.assign(SP.randomLook(), { acc: 'none' }, o);
+  const TERNO = { shirt: '#101014', pants: '#101014', shoe: '#08080a', sleeve: 'longa', acc: 'shades', accCol: '#101014', hairStyle: 'curto', hair: '#111114', fem: false, dress: false, pat: 'liso' };
+  const sv = S => { const s = S.save.mansao = S.save.mansao || {}; if (s.cofre == null) s.cofre = 0; return s; };
+  const dia = S => Math.floor(S.dayT);
+  const porta = (x, y, w, o) => O('porta', x, y, w, 54, Object.assign({ solid: false, k: 10, r: 50 }, o));
+
+  // tamanho de cada sala e onde fica cada porta no salão de entrada (cx = centro da porta)
+  const DIM = { hall: { w: 960, h: 520 }, escritorio: { w: 760, h: 480 }, salao: { w: 900, h: 520 }, jogos: { w: 760, h: 480 }, jantar: { w: 900, h: 500 }, suite: { w: 820, h: 480 }, adega: { w: 760, h: 460 } };
+  const PORTAS = { escritorio: { x: 110, cx: 140 }, adega: { x: 200, cx: 230 }, salao: { x: 290, cx: 320 }, jantar: { x: 730, cx: 760 }, jogos: { x: 820, cx: 850 }, suite: { cx: 550, y: 340 } };
+  const irPara = (S, id) => { const d = DIM[id]; L.irSala(S, id, 70 + d.w / 2, 150 + d.h - 40, Math.PI); };
+  const nova = (lg, id, nome, o) => {
+    const d = DIM[id], R = L.novaSala(Object.assign({ place: lg.place, w: d.w, h: d.h, nome: 'VILLA BELLAROSA — ' + nome, cor: '#8a1c24', capacho: '#5a1218' }, o));
+    R.casa = lg.place.casa;
+    if (id !== 'hall') { const p = PORTAS[id]; R.porta = { para: 'hall', px: p.cx, py: p.y || 200, ph: Math.PI, label: 'VOLTAR AO SALÃO DE ENTRADA', rotulo: 'SALÃO' }; }
+    return R;
+  };
+  const paredeMafia = { estiloParede: 'papel', lambri: '#3a2214', lambriAlt: 34, rodape: '#24140a' };
+  const npc = (R, x, y, nome, falas, o) => { const n = Object.assign({ x, y, p: look({}), h: Math.PI, falas, nome, dinheiro: 0, k: y + 50 }, o || {}); R.npcs.push(n); return n; };
+
+  // ---------- coisas que acontecem na mansão ----------
+  function menuCofre(S) {
+    const dep = v => ({ n: 'Guardar $' + v, desc: 'fica a salvo de multas, da polícia e de ladrões', fn: S2 => { if (S2.save.money < v) { G.say('Você não tem $' + v + ' na mão.', 2.5); return; } S2.save.money -= v; sv(S2).cofre += v; G.snd.cash(); G.save(); } });
+    const saq = v => ({ n: 'Sacar $' + v, desc: 'tira dinheiro do cofre', fn: S2 => { const s = sv(S2); if (s.cofre < v) { G.say('O cofre só tem $' + s.cofre + '.', 2.5); return; } s.cofre -= v; S2.save.money += v; G.snd.cash(); G.save(); } });
+    L.abrirMenu(S, {
+      titulo: 'COFRE DO CHEFE', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => 'no cofre $' + sv(S2).cofre + '  ·  na mão $' + Math.floor(S2.save.money),
+      itens: [dep(100), dep(500), dep(2000),
+        { n: 'Guardar tudo', desc: 'todo o dinheiro que você tem na mão', fn: S2 => { const v = Math.floor(S2.save.money); if (v <= 0) { G.say('Você está sem dinheiro na mão.', 2.5); return; } S2.save.money -= v; sv(S2).cofre += v; G.snd.cash(); G.save(); } },
+        saq(100), saq(500), { n: 'Sacar tudo', desc: 'esvazia o cofre', fn: S2 => { const s = sv(S2); if (s.cofre <= 0) { G.say('O cofre está vazio.', 2.5); return; } S2.save.money += s.cofre; s.cofre = 0; G.snd.cash(); G.save(); } },
+        { n: 'Fechar o cofre', fn: () => 'fechar' }]
+    });
+  }
+  function menuTelefone(S) {
+    L.abrirMenu(S, {
+      titulo: 'TELEFONE DO CHEFE', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair',
+      itens: [
+        { n: 'Chamar o motorista', desc: 'o carro preto da família é levado até o pátio', fn: S2 => { G.mansao.chamarCarro(S2); return 'fechar'; } },
+        { n: 'Pedir uma pizza ($30)', desc: 'chega quentinha: +40 de vida', fn: S2 => { K.compra(S2, 30, () => { K.cura(S2, 40); G.say('A pizza chegou e estava ótima! (+40 vida)', 3); }); } },
+        { n: 'Desligar', fn: () => 'fechar' }]
+    });
+  }
+  const bebida = (n, desc, vida, beb, ene) => ({ n, desc, fn: S2 => { K.cura(S2, vida); if (beb) S2.bebado = (S2.bebado || 0) + beb; if (ene) S2.energia = (S2.energia || 0) + ene; G.say(n + ': ' + (vida ? '+' + vida + ' vida. ' : '') + (beb ? 'Cuidado: dá tontura.' : ''), 3); } });
+  function menuBar(S) {
+    L.abrirMenu(S, {
+      titulo: 'BAR DA VILLA — VITTORIO', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: () => 'a casa oferece',
+      itens: [bebida('Café expresso', 'desperta: corre mais por um tempo', 6, 0, 40), bebida('Vinho tinto da adega', 'um clássico', 8, 6, 0), bebida('Uísque 18 anos', 'forte, hein?', 5, 12, 0), bebida('Grappa', 'bem forte', 4, 16, 0), bebida('Água com gás', 'sem culpa', 3, 0, 0), { n: 'Fechar', fn: () => 'fechar' }]
+    });
+  }
+  function aposta(S, titulo, valores, p, mult) {
+    const it = valores.map(v => ({ n: 'Apostar $' + v, desc: 'chance de ganhar: ' + Math.round(p * 100) + '%  ·  prêmio $' + Math.round(v * mult), fn: S2 => {
+      if (S2.save.money < v) { G.say('Você não tem $' + v + '.', 2.5); return; }
+      S2.save.money -= v;
+      if (Math.random() < p) { S2.save.money += Math.round(v * mult); G.snd.cash(); G.say('Você ganhou! +$' + Math.round(v * mult), 3); } else G.say('Você perdeu $' + v + '... a casa sempre ganha.', 3);
+      G.save();
+    } }));
+    it.push({ n: 'Sair da mesa', fn: () => 'fechar' });
+    L.abrirMenu(S, { titulo, rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: S2 => 'você tem $' + Math.floor(S2.save.money), itens: it });
+  }
+  function menuArsenal(S) {
+    const s = sv(S), C = G.combat;
+    L.abrirMenu(S, {
+      titulo: 'ARSENAL DA VILLA', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair', info: () => 'só para o chefe',
+      itens: [
+        { n: 'Repor munição', desc: 'enche as armas que você já tem (1x por dia)', fn: S2 => {
+          if (s.armaDia === dia(S2)) { G.say('Hoje você já repôs a munição. Volte amanhã.', 3); return; }
+          const a = C.arms(S2); let n = 0;
+          Object.keys(a.own).forEach(id => { const w = C.WEAPONS[id]; if (w && !w.melee && w.id !== 'fist' && !/gren/.test(id)) { a.ammo[id] = Math.min(240, (a.ammo[id] || 0) + 40); n++; } });
+          if (!n) { G.say('Você não tem armas de fogo. Compre uma na loja rosa.', 3.5); return; }
+          s.armaDia = dia(S2); G.save(); G.snd.cash(); G.say('Munição reposta em ' + n + ' arma(s). (+40 balas cada)', 3.5);
+        } },
+        { n: 'Pegar um colete', desc: 'colete à prova de balas novo (1x por dia)', fn: S2 => {
+          if (s.coleteDia === dia(S2)) { G.say('Hoje você já pegou um colete.', 3); return; }
+          s.coleteDia = dia(S2); S2.player.armor = 100; G.save(); G.say('Colete à prova de balas vestido!', 3);
+        } },
+        { n: 'Fechar', fn: () => 'fechar' }]
+    });
+  }
+  const dorme = (S2) => L.trans(S2, () => { S2.dayT = Math.floor(S2.dayT) + 1.02; S2.player.hp = 100; S2.heat = 0; S2.heatLevel = 0; G.save(); G.say('Bom dia, chefe! Vida cheia e jogo salvo na Villa Bellarosa.', 5); });
+  const menuMordomo = S => L.abrirMenu(S, {
+    titulo: 'ALFREDO, O MORDOMO', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair',
+    itens: [{ n: 'Chamar o motorista', desc: 'o carro preto é levado até o pátio', fn: S2 => { G.mansao.chamarCarro(S2); return 'fechar'; } },
+      bebida('Um café, Alfredo', 'sempre quentinho', 6, 0, 40), { n: 'Obrigado, Alfredo', fn: () => 'fechar' }]
+  });
+  const menuChef = S => L.abrirMenu(S, {
+    titulo: 'CHEF GENNARO', rodape: 'W/S escolher  ·  E confirmar  ·  ESC sair',
+    itens: [{ n: 'Prato do dia', desc: 'macarrão da nonna: +40 de vida (a cada 2 horas do jogo)', fn: S2 => {
+      const s = sv(S2); if (s.pratoT != null && S2.dayT - s.pratoT < 0.09) { G.say('Gennaro: "Calma, chefe! O próximo prato ainda está no forno."', 3.5); return; }
+      s.pratoT = S2.dayT; K.cura(S2, 40); G.say('Delicioso! O macarrão da nonna. (+40 vida)', 3.5);
+    } }, { n: 'Só estava olhando', fn: () => 'fechar' }]
+  });
+
+  // =====================================================================
+  //  SALÃO DE ENTRADA
+  // =====================================================================
+  function hall(lg) {
+    const R = nova(lg, 'hall', 'SALÃO DE ENTRADA', Object.assign({ piso: 'xadrez', pisoCores: ['#efe9dc', '#25252b'], parede: '#d8cdb4', subtitulo: 'o chefe chegou' }, paredeMafia, { lambri: '#3a2214' }));
+    R.porta = null; R.casa = lg.place.casa;
+    const add = (...a) => R.objs.push(...a);
+    add(porta(PORTAS.escritorio.x, 96, 60, { placa: 'GABINETE', label: 'IR AO ESCRITÓRIO', act: S2 => irPara(S2, 'escritorio') }));
+    add(porta(PORTAS.adega.x, 96, 60, { placa: 'ADEGA', label: 'DESCER PARA A ADEGA', act: S2 => irPara(S2, 'adega') }));
+    add(porta(PORTAS.salao.x, 96, 60, { placa: 'SALÃO', label: 'IR AO SALÃO DE ESTAR', act: S2 => irPara(S2, 'salao') }));
+    add(porta(PORTAS.jantar.x, 96, 60, { placa: 'JANTAR', label: 'IR À SALA DE JANTAR', act: S2 => irPara(S2, 'jantar') }));
+    add(porta(PORTAS.jogos.x, 96, 60, { placa: 'JOGOS', label: 'IR À SALA DE JOGOS', act: S2 => irPara(S2, 'jogos') }));
+    add(O('escada_grande', 420, 160, 260, 140, { solid: true, label: 'SUBIR PARA A SUÍTE', r: 100, k: 400, act: S2 => L.irSala(S2, 'suite', 70 + DIM.suite.w / 2, 150 + DIM.suite.h - 40, Math.PI) }));
+    add(O('tapete', 300, 330, 500, 170, { solid: false, k: -50, cor: '#7a1c24', cor2: '#d8b878', padrao: 'persa' }));
+    add(O('estatua', 368, 168, 44, 44, { e: 80 }), O('estatua', 690, 168, 44, 44, { e: 80 }));
+    add(O('poltrona', 100, 420, 56, 54, { e: 22, cor: '#5a1a22', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Poltrona de couro. (+5 vida)', 2.5); } }));
+    add(O('poltrona', 904, 420, 56, 54, { e: 22, cor: '#5a1a22', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Poltrona de couro. (+5 vida)', 2.5); } }));
+    add(O('planta', 84, 172, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }), O('planta', 924, 172, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }));
+    add(O('lustre', 520, 540, 60, 40, { e: 150, solid: false, k: 900 }));
+    npc(R, 330, 420, 'Segurança', ['Boa noite, chefe.', 'Tudo sob controle.', 'Ninguém entra sem o senhor autorizar.'], { p: look(TERNO), h: 0, armed: true });
+    npc(R, 790, 420, 'Segurança', ['O senhor precisa de algo?', 'A ronda está completa.'], { p: look(TERNO), h: 0, armed: true });
+    npc(R, 550, 330, 'Alfredo, o mordomo', ['Boa noite, patrão. Deseja algo?', 'O jantar será servido às oito.', 'A casa está em ordem, senhor.'], { p: look({ shirt: '#f2f2f2', pants: '#101014', shoe: '#08080a', sleeve: 'longa', hair: '#c8c8c8', hairStyle: 'curto', skin: '#f0c8a0', fem: false, pat: 'liso' }), h: 0, label: 'FALAR COM O MORDOMO', act: S2 => menuMordomo(S2) });
+    R.deco = x => {
+      D.quadro(x, 480, 100, 120, 42, 'retrato', '#c8a24a');
+      x.fillStyle = '#c8a24a'; [372, 394, 716, 738].forEach(px => { x.fillRect(px, 134, 3, 8); x.fillStyle = '#fff1b0'; x.fillRect(px, 128, 3, 6); x.fillStyle = '#c8a24a'; });   // arandelas
+    };
+    R.luzes.push({ x: 550, y: 330, r: 420 }, { x: 250, y: 220, r: 200 }, { x: 850, y: 220, r: 200 });
+    return R;
+  }
+
+  // =====================================================================
+  //  ESCRITÓRIO DO CHEFÃO
+  // =====================================================================
+  function escritorio(lg) {
+    const R = nova(lg, 'escritorio', 'ESCRITÓRIO DO CHEFE', Object.assign({ piso: 'madeira', pisoCores: ['#5a3a24', '#47301c'], parede: '#4a1c22', subtitulo: 'negócios da família' }, paredeMafia));
+    const add = (...a) => R.objs.push(...a);
+    add(O('tapete', 200, 270, 380, 210, { solid: false, k: -50, cor: '#1f3050', cor2: '#d8b878', padrao: 'persa' }));
+    add(O('estante', 86, 162, 70, 58, { e: 52 }), O('estante', 160, 162, 70, 58, { e: 52 }), O('estante', 234, 162, 70, 58, { e: 52 }));
+    add(O('lareira', 440, 160, 140, 60, { e: 70 }));
+    add(O('cofre', 640, 166, 76, 50, { e: 54, r: 46, label: 'ABRIR O COFRE DO CHEFE', k: 170, act: S2 => menuCofre(S2) }));
+    add(O('cadeira_esc', 372, 262, 44, 44, { dir: 'n', cor: '#2a1a14' }));
+    add(O('escrivaninha', 290, 300, 200, 74, { e: 32 }));
+    add(O('telefone', 420, 288, 34, 26, { e: 12, solid: false, k: 520, r: 44, label: 'USAR O TELEFONE', act: S2 => menuTelefone(S2) }));
+    add(O('poltrona', 150, 400, 54, 52, { e: 22, cor: '#5a1a22', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Couro macio. (+5 vida)', 2.5); } }));
+    add(O('poltrona', 600, 400, 54, 52, { e: 22, cor: '#5a1a22', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Couro macio. (+5 vida)', 2.5); } }));
+    add(O('mesa_centro', 340, 420, 100, 46, { e: 14 }));
+    add(O('planta', 690, 400, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }), O('humidor', 520, 336, 34, 26, { e: 22, label: 'FUMAR UM CHARUTO', r: 36, act: S2 => { S2.energia = (S2.energia || 0) + 25; K.cura(S2, 2); G.say('Charuto cubano. Você se sente poderoso. (+energia)', 3); } }));
+    npc(R, 340, 250, 'Tommaso, o conselheiro', ['Os negócios vão bem, chefe.', 'Chefe, a polícia anda fuçando a cidade.', 'Guarde o dinheiro no cofre. É mais seguro.', 'Confie na família, só na família.'], { p: look({ shirt: '#4a4e58', pants: '#2a2e38', shoe: '#08080a', sleeve: 'longa', acc: 'shades', accCol: '#2a2e38', hair: '#8a8a8a', hairStyle: 'curto', fem: false, pat: 'liso' }), h: 0 });
+    R.deco = x => {
+      D.quadro(x, 460, 100, 100, 40, 'retrato', '#c8a24a'); D.quadro(x, 330, 104, 56, 38, 'mapa', '#6a4a2a'); D.quadro(x, 600, 104, 60, 38, 'santo', '#c8a24a');
+      K.janela(x, 740, 96, 50, 40, { vista: 'jardim', cortina: '#8a1c24', persiana: 0, semLuz: false });
+    };
+    R.luzes.push({ x: 380, y: 340, r: 360 }, { x: 640, y: 230, r: 180 });
+    return R;
+  }
+
+  // =====================================================================
+  //  SALÃO DE ESTAR (bar, piano, sofás, charutos)
+  // =====================================================================
+  function salao(lg) {
+    const R = nova(lg, 'salao', 'SALÃO DE ESTAR', Object.assign({ piso: 'madeira', pisoCores: ['#6a4428', '#53361e'], parede: '#5a1a22', subtitulo: 'bar e piano' }, paredeMafia));
+    const add = (...a) => R.objs.push(...a);
+    add(O('tapete', 420, 300, 300, 200, { solid: false, k: -50, cor: '#6a1f26', cor2: '#d8b878', padrao: 'persa' }));
+    add(O('adega_rack', 100, 160, 230, 24, { e: 88 }));
+    add(O('bar_mafia', 100, 292, 300, 52, { e: 44, r: 70, k: 300, label: 'PEDIR UMA BEBIDA', act: S2 => menuBar(S2) }));
+    for (let i = 0; i < 5; i++) add(O('banqueta', 126 + i * 58, 366, 28, 28, { e: 24, cor: '#5a1a22', label: i === 2 ? 'SENTAR NO BAR' : undefined, r: 30, act: i === 2 ? S2 => { K.cura(S2, 4); G.say('Você se sentou no bar. (+4 vida)', 2.5); } : undefined }));
+    add(O('lareira', 470, 160, 150, 60, { e: 72 }));
+    add(O('sofa', 450, 440, 220, 46, { e: 20, cor: '#5a1a22', dir: 'n', label: 'SENTAR NO SOFÁ', r: 50, act: S2 => { K.cura(S2, 8); G.say('Sofá de couro. (+8 vida)', 2.5); } }));
+    add(O('mesa_centro', 500, 370, 120, 50, { e: 14 }));
+    add(O('poltrona', 390, 340, 54, 52, { e: 22, cor: '#2a2a30', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }));
+    add(O('poltrona', 690, 340, 54, 52, { e: 22, cor: '#2a2a30', dir: 'n', label: 'SENTAR NA POLTRONA', r: 40, act: S2 => { K.cura(S2, 5); G.say('Poltrona confortável. (+5 vida)', 2.5); } }));
+    add(O('piano', 720, 190, 154, 104, { e: 34, r: 70, k: 296, label: 'TOCAR PIANO', act: S2 => { K.cura(S2, 3); G.say('Você toca uma melodia italiana. Todos sorriem. (+3 vida)', 3.5); } }));
+    add(O('banqueta', 770, 312, 40, 28, { e: 22, cor: '#16161a' }));
+    add(O('humidor', 860, 372, 34, 26, { e: 22, label: 'FUMAR UM CHARUTO', r: 36, act: S2 => { S2.energia = (S2.energia || 0) + 25; K.cura(S2, 2); G.say('Charuto cubano. (+energia)', 3); } }));
+    add(O('planta', 100, 450, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }), O('planta', 900, 450, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }));
+    npc(R, 250, 226, 'Vittorio, o barman', ['O que vai ser hoje, chefe?', 'O vinho da adega está no ponto.', 'Aqui ninguém paga: a casa é sua.'], { p: look({ shirt: '#f4f4f4', pants: '#101014', shoe: '#08080a', sleeve: 'longa', acc: 'none', hair: '#222', hairStyle: 'curto', skin: '#d9a577', fem: false, pat: 'liso' }), h: Math.PI / 1, label: 'FALAR COM O BARMAN', act: S2 => menuBar(S2), k: 290 });
+    npc(R, 184, 356, 'Primo Carmine', ['Esse uísque é dos bons, primo.', 'Dizem que a polícia tem medo do seu portão.'], { p: look({ shirt: '#3a2a22', sleeve: 'longa', pants: '#1c1c20', acc: 'hat', accCol: '#2a2a30' }), sentado: true, h: 0 });
+    R.deco = x => {
+      D.quadro(x, 360, 104, 64, 40, 'paisagem', '#c8a24a'); D.quadro(x, 650, 100, 56, 40, 'retrato', '#c8a24a');
+      K.janela(x, 820, 96, 50, 40, { vista: 'jardim', cortina: '#8a1c24', semLuz: false });
+    };
+    R.luzes.push({ x: 250, y: 280, r: 260 }, { x: 540, y: 330, r: 300 }, { x: 780, y: 270, r: 200 });
+    return R;
+  }
+
+  // =====================================================================
+  //  SALA DE JOGOS
+  // =====================================================================
+  function jogos(lg) {
+    const R = nova(lg, 'jogos', 'SALA DE JOGOS', Object.assign({ piso: 'carpete', pisoCores: ['#1f4a30', '#1a3d28'], parede: '#2a1c14', subtitulo: 'sinuca e pôquer' }, paredeMafia, { lambri: '#4a2814' }));
+    const add = (...a) => R.objs.push(...a);
+    add(O('sinuca_mafia', 110, 210, 214, 114, { e: 30, r: 70, label: 'JOGAR SINUCA', k: 320, act: S2 => aposta(S2, 'SINUCA', [50, 200], 0.5, 2) }));
+    add(O('mesa_poker', 440, 240, 186, 118, { e: 26, r: 80, label: 'JOGAR PÔQUER', k: 360, act: S2 => aposta(S2, 'PÔQUER', [100, 500, 1000], 0.46, 2) }));
+    [[470, 224, 's'], [560, 224, 's'], [410, 296, 'e'], [650, 296, 'w'], [470, 372, 'n'], [560, 372, 'n']].forEach(([cx, cy, d], i) => add(O('cadeira_rest', cx, cy, 26, 28, { dir: d, cor: '#5a1a22', solid: i > 3 ? false : false })));
+    add(O('bar_mafia', 540, 164, 190, 46, { e: 40, r: 60, label: 'PEGAR UMA BEBIDA', act: S2 => menuBar(S2) }));
+    add(O('humidor', 110, 394, 34, 26, { e: 22, label: 'FUMAR UM CHARUTO', r: 36, act: S2 => { S2.energia = (S2.energia || 0) + 25; K.cura(S2, 2); G.say('Charuto cubano. (+energia)', 3); } }));
+    add(O('planta', 90, 172, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }), O('planta', 690, 400, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }));
+    npc(R, 440, 214, 'Don Salvatore', ['Eu pago pra ver, chefe.', 'Hoje a sorte é minha.', 'Sente-se, jogue uma mão!'], { p: look({ shirt: '#2a2a30', sleeve: 'longa', pants: '#101014', acc: 'hat', accCol: '#1a1a1e', hair: '#aaa' }), sentado: true, h: Math.PI / 2 });
+    npc(R, 650, 330, 'Luigi Quatro-Dedos', ['Só tenho nove dedos pra contar o dinheiro.', 'Blefar é uma arte, chefe.'], { p: look({ shirt: '#6a1f26', sleeve: 'longa', pants: '#1a1a20' }), sentado: true, h: -Math.PI / 2 });
+    R.deco = x => {
+      x.fillStyle = '#16161a'; x.beginPath(); x.arc(380, 120, 22, 0, TAU); x.fill();
+      ['#e8e0c8', '#1a1a1e', '#c81c1c', '#1a1a1e'].forEach((cor, i) => { x.fillStyle = cor; x.beginPath(); x.arc(380, 120, 20 - i * 5, 0, TAU); x.fill(); });
+      x.fillStyle = '#c81c1c'; x.beginPath(); x.arc(380, 120, 2.6, 0, TAU); x.fill();                      // alvo de dardos
+      D.quadro(x, 250, 104, 70, 38, 'time', '#c8a24a'); D.quadro(x, 100, 104, 56, 38, 'retrato', '#c8a24a');
+      K.janela(x, 640, 96, 50, 40, { vista: 'jardim', cortina: '#1f4a30', semLuz: false });
+    };
+    R.luzes.push({ x: 220, y: 300, r: 240 }, { x: 540, y: 320, r: 280 });
+    return R;
+  }
+
+  // =====================================================================
+  //  JANTAR E COZINHA
+  // =====================================================================
+  function jantar(lg) {
+    const R = nova(lg, 'jantar', 'JANTAR E COZINHA', Object.assign({ piso: 'taco', pisoCores: ['#6a4a2e', '#533820'], parede: '#6a1f26', subtitulo: 'à mesa com a família' }, paredeMafia));
+    const add = (...a) => R.objs.push(...a);
+    add(O('tapete', 380, 290, 470, 200, { solid: false, k: -50, cor: '#4a1a22', cor2: '#d8b878', padrao: 'persa' }));
+    add(O('mesa_rest', 420, 320, 400, 100, { e: 18, forma: 'ret', toalha: '#f4f0e2', cor: '#8a1c24', prato: '#e8e0c8' }));
+    for (let i = 0; i < 5; i++) { add(O('cadeira_rest', 440 + i * 76, 286, 26, 28, { dir: 's', cor: '#2a1a14' })); add(O('cadeira_rest', 440 + i * 76, 426, 26, 28, { dir: 'n', cor: '#2a1a14' })); }
+    add(O('cadeira_rest', 386, 350, 26, 28, { dir: 'e', cor: '#2a1a14' }), O('cadeira_rest', 832, 350, 26, 28, { dir: 'w', cor: '#2a1a14' }));
+    add(O('lustre', 560, 410, 60, 40, { e: 150, solid: false, k: 900 }), O('lustre', 740, 410, 60, 40, { e: 150, solid: false, k: 900 }));
+    add(O('adega_rack', 480, 160, 200, 24, { e: 84 }));
+    add(O('pia', 100, 168, 80, 40, { e: 30 }), O('fogao', 186, 168, 60, 40, { e: 30, ligado: true }), O('geladeira', 254, 160, 64, 46, { e: 58, label: 'ABRIR A GELADEIRA', r: 46, act: S2 => { const s = sv(S2); if (s.geladDia === dia(S2)) { G.say('Você já lanchou hoje. A geladeira está esperando amanhã!', 3); return; } s.geladDia = dia(S2); K.cura(S2, 25); G.say('Você petiscou frios e queijos. (+25 vida)', 3); } }));
+    add(O('ilha', 110, 310, 190, 70, { e: 34 }));
+    add(O('planta', 900, 170, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }), O('estatua', 360, 168, 44, 44, { e: 78 }));
+    npc(R, 200, 236, 'Chef Gennaro', ['Hoje é a receita da nonna!', 'Ninguém sai da minha cozinha com fome.', 'Manjericão fresco, chefe. Só o melhor.'], { p: look({ shirt: '#f8f8f8', pants: '#2a2a30', shoe: '#08080a', sleeve: 'longa', acc: 'hat', accCol: '#fafafa', hair: '#222', skin: '#d9a577', fem: false, pat: 'liso' }), h: Math.PI / 1, label: 'FALAR COM O CHEF', act: S2 => menuChef(S2), k: 330 });
+    R.deco = x => {
+      D.quadro(x, 380, 100, 80, 40, 'flor', '#c8a24a'); D.quadro(x, 700, 100, 90, 40, 'paisagem', '#c8a24a');
+      K.janela(x, 120, 96, 60, 40, { vista: 'jardim', cortina: '#e8e0c8', semLuz: false }); D.azulejoParede(x, 90, 112, 250, 38, '#efe8d8', '#c8a24a');
+    };
+    R.luzes.push({ x: 200, y: 300, r: 260 }, { x: 600, y: 330, r: 300 }, { x: 790, y: 300, r: 200 });
+    return R;
+  }
+
+  // =====================================================================
+  //  SUÍTE DO CHEFE
+  // =====================================================================
+  function suite(lg) {
+    const R = nova(lg, 'suite', 'SUÍTE DO CHEFE', Object.assign({ piso: 'madeira', pisoCores: ['#4a3020', '#3a2616'], parede: '#4a1a22', subtitulo: 'vista para o campo' }, paredeMafia));
+    R.porta = { para: 'hall', px: 550, py: 330, ph: Math.PI, label: 'DESCER PARA O SALÃO DE ENTRADA', rotulo: 'ESCADA' };
+    const add = (...a) => R.objs.push(...a);
+    add(O('tapete', 160, 270, 400, 220, { solid: false, k: -50, cor: '#6a1f26', cor2: '#d8b878', padrao: 'persa' }));
+    add(O('cama2', 190, 180, 210, 120, { cor: '#8a1c24', padrao: 'listras', label: 'DORMIR ATÉ AMANHECER (SALVA O JOGO)', r: 60, act: S2 => dorme(S2) }));
+    add(O('bloco', 150, 200, 34, 34, { e: 30, top: '#4a2a16', front: '#2e180c', label: 'CRIADO-MUDO', r: 30, act: S2 => G.say('Uma foto da família e um terço. Nada mais.', 3) }), O('bloco', 410, 200, 34, 34, { e: 30, top: '#4a2a16', front: '#2e180c' }));
+    add(O('armario', 520, 164, 140, 54, { e: 80, label: 'GUARDA-ROUPA', r: 50, act: S2 => G.say('Dezenas de ternos pretos, todos iguais. O chefe tem estilo.', 3.5) }));
+    add(O('sofa', 100, 420, 150, 46, { e: 20, cor: '#2a2a30', dir: 'n', label: 'SENTAR NO SOFÁ', r: 46, act: S2 => { K.cura(S2, 8); G.say('Você relaxou no sofá. (+8 vida)', 2.5); } }));
+    add(O('tv', 300, 444, 100, 34, { e: 36, label: 'LIGAR A TV', r: 40, act: S2 => G.say('Noticiário: "Polícia procura motorista de fuga em carro vermelho..."', 4) }));
+    add(O('banheira', 560, 300, 170, 76, {}), O('lavatorio', 640, 190, 70, 40, { e: 28, label: 'LAVAR O ROSTO', r: 30, act: S2 => { K.cura(S2, 2); G.say('Você lavou o rosto. (+2 vida)', 2.2); } }));
+    add(O('planta', 690, 420, 44, 54, { variante: 'palmeira', vaso: '#c8a24a' }));
+    R.deco = x => {
+      K.janela(x, 120, 92, 70, 44, { vista: 'jardim', cortina: '#8a1c24', semLuz: false }); K.janela(x, 420, 92, 70, 44, { vista: 'jardim', cortina: '#8a1c24', semLuz: false });
+      D.quadro(x, 300, 100, 72, 40, 'retrato', '#c8a24a'); D.espelhoParede(x, 700, 100, 56, 44, '#c8a24a');
+    };
+    R.luzes.push({ x: 290, y: 320, r: 300 }, { x: 640, y: 300, r: 220 });
+    return R;
+  }
+
+  // =====================================================================
+  //  ADEGA E ARSENAL
+  // =====================================================================
+  function adega(lg) {
+    const R = nova(lg, 'adega', 'ADEGA E ARSENAL', { piso: 'pedra', pisoCores: ['#6a645a', '#58534a'], parede: '#8a6a50', estiloParede: 'tijolo', lambri: false, rodape: '#3a2a1c', subtitulo: 'só para o chefe' });
+    const add = (...a) => R.objs.push(...a);
+    add(O('adega_rack', 90, 160, 170, 24, { e: 88 }), O('adega_rack', 270, 160, 170, 24, { e: 88 }));
+    add(O('arsenal', 520, 160, 150, 26, { e: 94, r: 70, label: 'ABRIR O ARSENAL', k: 200, act: S2 => menuArsenal(S2) }));
+    for (let i = 0; i < 5; i++) add(O('barril', 100 + i * 70, 280, 48, 48, { e: 36, label: i === 2 ? 'PROVAR O VINHO DO BARRIL' : undefined, r: 34, act: i === 2 ? S2 => { K.cura(S2, 6); S2.bebado = (S2.bebado || 0) + 5; G.say('Vinho direto do barril. Delicioso... e forte! (+6 vida)', 3.5); } : undefined }));
+    for (let i = 0; i < 3; i++) add(O('barril', 130 + i * 76, 380, 48, 48, { e: 36 }));
+    add(O('mesa', 470, 330, 140, 70, { e: 24, estilo: 'bar' }), O('cadeira', 450, 420, 26, 28, { dir: 'n' }), O('cadeira', 590, 420, 26, 28, { dir: 'n' }));
+    add(O('caixote_frutas', 640, 380, 70, 34, { e: 20 }), O('pilha_caixas', 660, 280, 60, 44, { e: 30 }));
+    R.deco = x => {
+      for (let i = 0; i < 6; i++) { x.fillStyle = '#4a4036'; x.fillRect(100 + i * 110, 100, 54, 44); x.fillStyle = '#2a241c'; x.fillRect(104 + i * 110, 104, 46, 36); x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(104 + i * 110, 104, 46, 6); }   // nichos de pedra
+      x.fillStyle = '#c8a24a'; x.fillRect(676, 104, 3, 10); x.fillStyle = '#fff1b0'; x.fillRect(676, 98, 3, 6);                                           // tocha
+    };
+    R.luzes.push({ x: 300, y: 320, r: 280 }, { x: 590, y: 300, r: 220 });
+    return R;
+  }
+
+  G.mansaoInt = { criar(id, lg, c) { const F = { entrada: hall, hall, escritorio, salao, jogos, jantar, suite, adega }; return (F[id] || hall)(lg); } };
 })(window.G = window.G || {});
 
 </script>

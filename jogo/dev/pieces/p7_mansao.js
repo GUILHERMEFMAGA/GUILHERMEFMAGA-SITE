@@ -80,7 +80,7 @@
     const livre = (u, v, m) => {
       m = m || 0;
       const nao = [[21 - m, 8 - m, 55 + m, 21 + m], [27 - m, 1 - m, 49 + m, 11 + m], [28 - m, 19 - m, 49 + m, 25 + m], [31 - m, 22 - m, 46 + m, 38 + m], [33 - m, 36 - m, 43 + m, 48 + m], [4 - m, 22 - m, 33 + m, 34 + m],
-        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3], [-1, 45, 77, 49], [-1, -1, 3, 49], [73, -1, 77, 49]];
+        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3.6], [-1, 43, 77, 49], [-1, -1, 5.4, 49], [70.6, -1, 77, 49]];   // as quatro últimas = corredores das rondas dos seguranças
       return !nao.some(r => u > r[0] && u < r[2] && v > r[1] && v < r[3]);
     };
     for (let k = 0; k < 6; k++) for (const sx of [33.7, 42.3]) { const v = 38 + k * 1.6; if (v < 46) trees.push({ x: mu(sx), y: mv(v), r: 13, cipreste: true }); }   // alameda do portão

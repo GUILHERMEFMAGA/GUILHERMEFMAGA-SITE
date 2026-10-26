@@ -76,6 +76,16 @@
     const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     G.world.places.forEach(pl => dot(pl.x, pl.y, pl.cor, pl.tipo === 'loja' ? 1.7 : 2.5));
     G.world.casas.forEach(c => { if (c.semPorta) return; const mine = S.save.casas && S.save.casas[c.id]; if (mine) dot(c.x, c.y, '#9dff9d', 2); else if (c.venda) dot(c.x, c.y, '#ff4a4a', 1.5); });   // casas suas (verde) e à venda (vermelho)
+    // seta verde na borda do minimapa apontando para a SUA MANSÃO (ela fica longe, na Mata Escura, ao lado da rodovia)
+    { const M0 = G.world.MANSAO;
+      if (M0 && M0.casa && S.save.casas && S.save.casas[M0.casa.id]) {
+        const [px, py] = tm(M0.casa.x, M0.casa.y);
+        if (px < x || px > x + w || py < y || py > y + h) {
+          const ang = Math.atan2(py - (y + h / 2), px - (x + w / 2)), ex = Math.max(x + 8, Math.min(x + w - 8, px)), ey = Math.max(y + 8, Math.min(y + h - 8, py));
+          ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang); ctx.fillStyle = Math.floor(time * 2) % 2 ? '#9dff9d' : '#e8ffe8'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-5, -5); ctx.lineTo(-2, 0); ctx.lineTo(-5, 5); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+      } }
     if (S.guia) { const gp = G.world.places.find(q => q.id === S.guia.id); if (gp) dot(gp.x, gp.y, Math.floor(time * 5) % 2 ? '#ffffff' : gp.cor, 4); }
     S.cars.forEach(c => { if (c.kind === 'police' && !c.dead && c.mode !== 'wander') dot(c.x, c.y, Math.floor(time * 6) % 2 ? '#ff3030' : '#3a5bff', 2); });
     S.peds.forEach(p => { if ((p.kind === 'cop' || p.target) && p.state !== 'dead') dot(p.x, p.y, p.kind === 'cop' ? '#5a7bff' : '#ff3030', 1.5); });

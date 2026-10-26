@@ -251,6 +251,7 @@
   L.construtores['tipo:casa'] = {
     criar(id, lg) {
       const S = G.S, c = lg.place.casa; lg.casa = c;
+      if (c.mafia && G.mansaoInt) return G.mansaoInt.criar(id, lg, c);   // a VILLA BELLAROSA (mansão do chefão) tem as próprias salas (mansao_int.js)
       if (!lg.ini) { lg.ini = true; iniciaFamilia(S, lg); }
       const R = L.casaLay ? L.casaLay.criar(id, S, lg, c) : (id === 'entrada' ? salaCasa(S, lg, c) : quartosCasa(S, lg, c));
       R.objs.forEach(o => { if (o.t === 'placa_venda') o.preco = c.preco; });

@@ -539,7 +539,7 @@
     const livre = (u, v, m) => {
       m = m || 0;
       const nao = [[21 - m, 8 - m, 55 + m, 21 + m], [27 - m, 1 - m, 49 + m, 11 + m], [28 - m, 19 - m, 49 + m, 25 + m], [31 - m, 22 - m, 46 + m, 38 + m], [33 - m, 36 - m, 43 + m, 48 + m], [4 - m, 22 - m, 33 + m, 34 + m],
-        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3], [-1, 45, 77, 49], [-1, -1, 3, 49], [73, -1, 77, 49]];
+        [3 - m, 2 - m, 24 + m, 14 + m], [57 - m, 24 - m, 72 + m, 38 + m], [40 - m, 40 - m, 50 + m, 48 + m], [-1, -1, 77, 3.6], [-1, 43, 77, 49], [-1, -1, 5.4, 49], [70.6, -1, 77, 49]];   // as quatro últimas = corredores das rondas dos seguranças
       return !nao.some(r => u > r[0] && u < r[2] && v > r[1] && v < r[3]);
     };
     for (let k = 0; k < 6; k++) for (const sx of [33.7, 42.3]) { const v = 38 + k * 1.6; if (v < 46) trees.push({ x: mu(sx), y: mv(v), r: 13, cipreste: true }); }   // alameda do portão
@@ -688,6 +688,15 @@
       ctx.strokeStyle = '#f2c231'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(hx, hy, 4.1 * T, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#f4f4f4'; ctx.fillRect(hx - 30, hy - 36, 10, 72); ctx.fillRect(hx + 20, hy - 36, 10, 72); ctx.fillRect(hx - 30, hy - 5, 60, 10);
       [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, b]) => { ctx.fillStyle = '#ffd24a'; ctx.fillRect(mu(h.u) + 6 + a * (h.w * T - 18), mv(h.v) + 6 + b * (h.h * T - 18), 6, 6); });
+      // helicóptero preto da família estacionado no H (com as pás paradas)
+      ctx.fillStyle = 'rgba(0,0,10,0.28)'; ctx.beginPath(); ctx.ellipse(hx + 14, hy + 18, 20, 42, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(hx + 10, hy + 34, 10, 58);
+      ctx.fillStyle = '#16181e'; ctx.fillRect(hx - 4, hy + 20, 8, 64); ctx.fillRect(hx - 14, hy + 76, 28, 4); ctx.fillRect(hx - 2, hy + 70, 4, 18);              // cauda e rotor traseiro
+      ctx.fillStyle = '#20232b'; ctx.beginPath(); ctx.ellipse(hx, hy, 19, 40, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#08090c'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#7fb0d8'; ctx.beginPath(); ctx.ellipse(hx, hy - 16, 13, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b9dcf0'; ctx.beginPath(); ctx.ellipse(hx - 4, hy - 20, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8c860'; ctx.fillRect(hx - 3, hy + 8, 6, 3);
+      ctx.strokeStyle = '#08090c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 22, hy - 26); ctx.lineTo(hx - 22, hy + 30); ctx.moveTo(hx + 22, hy - 26); ctx.lineTo(hx + 22, hy + 30); ctx.stroke();   // esquis
+      ctx.strokeStyle = 'rgba(20,22,28,0.55)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hx - 80, hy + 6); ctx.lineTo(hx + 80, hy - 6); ctx.moveTo(hx - 10, hy - 78); ctx.lineTo(hx + 10, hy + 78); ctx.stroke();   // pás paradas
+      ctx.fillStyle = '#e8c860'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
       // ---------- piscina com deck, espreguiçadeiras e guarda-sóis ----------
       const p = M.piscina;
       ctx.fillStyle = '#d9cfba'; ctx.fillRect(mu(p.u - 3), mv(p.v - 1.5), (p.w + 6) * T, (p.h + 3) * T);

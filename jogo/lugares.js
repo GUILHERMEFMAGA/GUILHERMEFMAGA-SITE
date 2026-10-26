@@ -53,7 +53,7 @@
   ];
   const DICAS = [
     'Dica: sente num banco da calçada para recuperar a vida.', 'Dica: as máquinas de refrigerante curam um pouquinho.',
-    'Dica: nos pontos de ônibus você viaja pela cidade por $5.', 'Dica: a barbearia e o shopping mudam o seu visual.',
+    'Dica: nos pontos de ônibus você viaja pela cidade por $5.', 'Dica: a sua mansão, a VILLA BELLAROSA, fica na MATA ESCURA, ao lado da rodovia: cama, cofre, bar e seguranças.', 'Dica: a barbearia e o shopping mudam o seu visual.',
     'Dica: durma em casa para salvar o jogo e passar a noite.', 'Dica: fale com o padre para despistar a polícia.',
     'Dica: remexer lixeira às vezes rende uns trocados.', 'Dica: a academia aumenta a força dos seus socos.'
   ];

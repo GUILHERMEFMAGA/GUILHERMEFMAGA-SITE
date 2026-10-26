@@ -47,10 +47,10 @@
   const est = S => S.mansao || (S.mansao = { gate: 0, fechado: false, hostilT: 0, postos: null, t: 0, vao: 0, dentroAntes: false, somT: 0 });
   const algoNoVao = (S, mg) => {
     const gx = M.portao.x, gy = M.portao.y;
-    const perto = o => o && Math.abs(o.x - gx) < 110 && Math.abs(o.y - gy) < 70;
+    const perto = o => o && Math.abs(o.x - gx) < 104 && Math.abs(o.y - gy) < 50;          // o vão do portão (6 tiles de largura)
     if (perto(S.player.car || S.player)) return true;
     for (const c of S.cars) if (!c.dead && perto(c)) return true;
-    for (const p of S.peds) if (p.state !== 'dead' && perto(p)) return true;
+    for (const p of S.peds) if (p.kind !== 'guarda' && p.state !== 'dead' && perto(p)) return true;   // os seguranças ficam fora do vão: não contam
     return false;
   };
 
@@ -69,7 +69,8 @@
   function atualizar(S, dt) {
     if (S.mode !== 'play') return;
     const st = est(S), P = S.player, ref = P.car || P, c = M.casa;
-    st.t += dt;
+    if (S.time + 0.5 < (st.ultimoT || 0)) { st.postos = null; st.carrosOk = false; st.gate = 0; st.fechado = false; st.hostilT = 0; }   // começou um jogo novo: recomeça tudo
+    st.ultimoT = S.time; st.t += dt;
     // 1) a mansão é sua
     S.save.casas = S.save.casas || {}; if (!S.save.casas[c.id]) S.save.casas[c.id] = true;
     const longe = Math.hypot(ref.x - (M.x + M.w / 2), ref.y - (M.y + M.h / 2)) > 3300;
@@ -97,6 +98,8 @@
     }
     st.dentroAntes = emDentro;
     if (longe) return;
+    // 3b) os carros da família ficam estacionados em frente à garagem (e são seus!)
+    if (!st.carrosOk) { st.carrosOk = true; [['sedan', '#14141a', 8], ['sedan', '#2a2a32', 11], ['coupe', '#6a1f26', 14]].forEach(([kind, cor, u]) => { const k = new G.Car({ x: mu(u), y: mv(30.4), a: Math.PI / 2, kind, color: cor, driver: 'none', mode: 'parked', owned: true }); S.cars.push(k); }); }
     // 4) seguranças: repõe os que faltam e atualiza os que existem
     st.reposT = (st.reposT || 0) - dt;
     if (!st.postos) st.postos = defsPostos().map(def => ({ def, ref: null, morreuT: 0 }));
@@ -199,6 +202,16 @@
     ctx.restore();
   }
 
+  // o motorista traz o carro preto da família até o pátio da mansão
+  function chamarCarro(S) {
+    const px = mu(33), py = mv(22);
+    let k = S.carroMansao;
+    if (!k || k.dead || !S.cars.includes(k)) {
+      k = new G.Car({ x: px, y: py, a: 0, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
+      S.cars.push(k); S.carroMansao = k; G.say('O motorista trouxe o carro preto até o pátio da mansão.', 4);
+    } else { k.x = px; k.y = py; k.a = 0; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
+  }
+
   // ---------- conversa com os seguranças ----------
   L.extrasAcao.push((S, P) => {
     for (const g of S.peds) {
@@ -208,5 +221,5 @@
     return null;
   });
 
-  G.mansao = { M, atualizar, desenhar, desenharAlto, guardaFerido, hostilizar, dentro };
+  G.mansao = { M, atualizar, desenhar, desenharAlto, guardaFerido, hostilizar, dentro, chamarCarro };
 })(window.G = window.G || {});

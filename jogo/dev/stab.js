@@ -13,3 +13,4 @@ function medir(nome, x, y, quadros) {
 medir('bairro', W.nodeX(7) + 400, W.nodeY(1) + 300, 600);
 medir('rodovia-mata', W.nodeX(24) + 300, W.nodeY(5) + 110, 600);
 medir('centro', W.nodeX(2) + 300, W.nodeY(2) + 300, 600);
+if (W.MANSAO) { S.heat = 70; medir('mansao (procurado 70)', W.MANSAO.mu(38), W.MANSAO.mv(38), 600); }   // dentro dos muros, com seguranças, portão e zona segura funcionando

@@ -5,6 +5,11 @@ const L = G.lugares, K = L.kit, D = G.deco;
 const nome = process.argv[2] || 'galeria', grupo = process.argv[3] || 'casa';
 const O = (t, w, h, e, p) => Object.assign({ t, x: 0, y: 0, w, h, e: e || 0, solid: true }, p || {});
 const GR = {
+  mafia: [
+    O('piano', 150, 100, 34), O('sinuca_mafia', 200, 110, 30), O('mesa_poker', 170, 110, 26), O('bar_mafia', 320, 52, 44),
+    O('adega_rack', 160, 22, 86), O('barril', 46, 46, 34), O('estatua', 42, 42, 78), O('escada_grande', 300, 150, 0),
+    O('lustre', 60, 40, 130), O('humidor', 34, 26, 22), O('arsenal', 120, 24, 92), O('telefone', 34, 26, 12),
+  ],
   casa: [
     O('sofa', 150, 46, 18, { cor: '#a8483a' }), O('sofa', 150, 46, 18, { dir: 's', cor: '#2f4a7a', cor2: '#e8d8a0' }), O('poltrona', 50, 50, 20, { cor: '#4f7a5a', dir: 's' }), O('tv', 120, 34, 34),
     O('geladeira', 60, 44, 56), O('fogao', 56, 40, 30, { ligado: true }), O('pia', 74, 40, 30), O('armario', 110, 44, 64),

@@ -10,6 +10,7 @@ function acha(c) {
     const lista = W.casas.filter(h => (h.riqueza != null ? h.riqueza : (h.area < 14 ? 0 : h.area < 34 ? 1 : 2)) === q && h.b && h.b.casa3 && !h.b.place && !!h.venda === venda);
     return pdc(lista[n]);
   }
+  if (k === 'mansao') return pdc(W.MANSAO.casa);
   if (k === 'casac') return pdc(W.casas.find(h => !h.b.casa3 && !h.b.place));
   if (k === 'id') return W.places.find(p => p.id === v);
   if (k === 'loja') return (W.lojas || []).find(p => p.loja === v);

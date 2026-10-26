@@ -117,6 +117,15 @@
       ctx.strokeStyle = '#f2c231'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(hx, hy, 4.1 * T, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#f4f4f4'; ctx.fillRect(hx - 30, hy - 36, 10, 72); ctx.fillRect(hx + 20, hy - 36, 10, 72); ctx.fillRect(hx - 30, hy - 5, 60, 10);
       [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([a, b]) => { ctx.fillStyle = '#ffd24a'; ctx.fillRect(mu(h.u) + 6 + a * (h.w * T - 18), mv(h.v) + 6 + b * (h.h * T - 18), 6, 6); });
+      // helicóptero preto da família estacionado no H (com as pás paradas)
+      ctx.fillStyle = 'rgba(0,0,10,0.28)'; ctx.beginPath(); ctx.ellipse(hx + 14, hy + 18, 20, 42, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(hx + 10, hy + 34, 10, 58);
+      ctx.fillStyle = '#16181e'; ctx.fillRect(hx - 4, hy + 20, 8, 64); ctx.fillRect(hx - 14, hy + 76, 28, 4); ctx.fillRect(hx - 2, hy + 70, 4, 18);              // cauda e rotor traseiro
+      ctx.fillStyle = '#20232b'; ctx.beginPath(); ctx.ellipse(hx, hy, 19, 40, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#08090c'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#7fb0d8'; ctx.beginPath(); ctx.ellipse(hx, hy - 16, 13, 17, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b9dcf0'; ctx.beginPath(); ctx.ellipse(hx - 4, hy - 20, 5, 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e8c860'; ctx.fillRect(hx - 3, hy + 8, 6, 3);
+      ctx.strokeStyle = '#08090c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 22, hy - 26); ctx.lineTo(hx - 22, hy + 30); ctx.moveTo(hx + 22, hy - 26); ctx.lineTo(hx + 22, hy + 30); ctx.stroke();   // esquis
+      ctx.strokeStyle = 'rgba(20,22,28,0.55)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(hx - 80, hy + 6); ctx.lineTo(hx + 80, hy - 6); ctx.moveTo(hx - 10, hy - 78); ctx.lineTo(hx + 10, hy + 78); ctx.stroke();   // pás paradas
+      ctx.fillStyle = '#e8c860'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();
       // ---------- piscina com deck, espreguiçadeiras e guarda-sóis ----------
       const p = M.piscina;
       ctx.fillStyle = '#d9cfba'; ctx.fillRect(mu(p.u - 3), mv(p.v - 1.5), (p.w + 6) * T, (p.h + 3) * T);
