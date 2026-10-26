@@ -53,6 +53,7 @@
     ctx.fillStyle = ctx.createPattern(tex.grass, 'repeat'); ctx.fillRect(ax, ay, bx - ax, by - ay);
     ctx.fillStyle = 'rgba(5,32,12,0.52)'; ctx.fillRect(ax, ay, bx - ax, by - ay);
     const cs = 128, sd = m.id.length * 131 + m.bx0;
+    ctx.save(); ctx.beginPath(); ctx.rect(ax, ay, bx - ax, by - ay); ctx.clip();   // manchas e troncos não passam da borda da mata (antes caíam no asfalto da rodovia)
     for (let gy = Math.floor(ay / cs); gy <= Math.floor(by / cs); gy++) for (let gx = Math.floor(ax / cs); gx <= Math.floor(bx / cs); gx++) {
       const r = mulberry32(gx * 7349 + gy * 9151 + sd);
       for (let k = 0; k < 3; k++) {   // manchas de musgo e folhas secas
@@ -73,6 +74,7 @@
         for (let k = 0; k < 3; k++) { const ox = px + k * 5 - 5, oy = py + (k % 2) * 4; ctx.fillStyle = '#e8e0cc'; ctx.fillRect(ox, oy, 2, 3); ctx.fillStyle = k % 2 ? '#d9352a' : '#b5651d'; ctx.beginPath(); ctx.arc(ox + 1, oy, 3, Math.PI, 0); ctx.fill(); }
       }
     }
+    ctx.restore();
     // estradas de terra (no lugar das ruas apagadas)
     (R.trilhas || []).forEach(tr => {
       if (tr.mega !== m.id || tr.x > bx || tr.x + tr.w < ax || tr.y > by || tr.y + tr.h < ay) return;

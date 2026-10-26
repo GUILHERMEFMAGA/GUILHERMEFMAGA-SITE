@@ -654,9 +654,32 @@
     }
     return c;
   }
+  // água de pixel art: azul liso com ondinhas horizontais em 3 tons (sem pontilhado transparente)
+  function makeAgua() {
+    const S = 128, c = document.createElement('canvas'); c.width = c.height = S;
+    const x = c.getContext('2d'); x.fillStyle = '#2a58a0'; x.fillRect(0, 0, S, S);
+    const r = mulberry32(2121), tons = ['#1f4084', '#3f7ac8', '#3069b4'];
+    for (let k = 0; k < 190; k++) {
+      const q = r(); x.fillStyle = q < 0.4 ? tons[0] : q < 0.75 ? tons[1] : tons[2];
+      const w = 6 + Math.floor(r() * 5) * 2, px = Math.floor(r() * S / 2) * 2, py = Math.floor(r() * S / 2) * 2;
+      for (const ox of [-S, 0]) x.fillRect(px + ox, py, w, 2);   // repete na borda para a textura emendar
+    }
+    return c;
+  }
+  // asfalto de pixel art: cor lisa + pontinhos em blocos de 2x2 com 3 tons (sem manchas macias nem meio-tom,
+  // porque a paleta fixa "pisca" entre cores quando o degradê é muito fraquinho)
+  function makeAsfalto() {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const x = c.getContext('2d'); x.fillStyle = '#625889'; x.fillRect(0, 0, S, S);
+    const r = mulberry32(5200), tons = ['#5a5080', '#6a5f92', '#554b7a'];
+    for (let k = 0; k < 1400; k++) {
+      const q = r(); x.fillStyle = q < 0.42 ? tons[0] : q < 0.78 ? tons[1] : tons[2];
+      x.fillRect(Math.floor(r() * S / 2) * 2, Math.floor(r() * S / 2) * 2, r() < 0.25 ? 4 : 2, 2);
+    }
+    return c;
+  }
   function makeTextures() {
-    tex.asphalt = makeNoise('#625889', 5200, 'rgba(255,255,255,0.07)', 'rgba(0,0,0,0.10)', 256,
-      [['rgba(0,0,0,0.035)', 46, 8, 28], ['rgba(255,255,255,0.03)', 34, 8, 24], ['rgba(40,20,70,0.04)', 14, 14, 40]]);
+    tex.asphalt = makeAsfalto();
     tex.rim = makeNoise('#3b3442', 1200, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
     tex.grass = makeNoise('#4a9038', 2600, 'rgba(190,255,150,0.16)', 'rgba(0,50,0,0.2)', 128,
       [['rgba(20,80,20,0.06)', 18, 6, 18], ['rgba(180,230,110,0.05)', 14, 6, 16]]);
@@ -664,7 +687,7 @@
       const g = tex.grass.getContext('2d'), r = mulberry32(4242);
       for (let k = 0; k < 420; k++) { g.strokeStyle = r() < 0.5 ? 'rgba(200,255,140,0.35)' : 'rgba(10,60,10,0.35)'; g.lineWidth = 1; const gx = r() * 128, gy = r() * 128; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + (r() - 0.5) * 3, gy - 2 - r() * 3); g.stroke(); }
     }
-    tex.water = makeNoise('#21407e', 1500, 'rgba(140,190,255,0.14)', 'rgba(0,0,30,0.2)', 128);
+    tex.water = makeAgua();
     tex.terra = makeNoise('#8c6e49', 1400, 'rgba(210,170,110,0.22)', 'rgba(60,40,20,0.25)', 128, [['rgba(110,80,48,0.35)', 12, 10, 28], ['rgba(170,140,95,0.25)', 8, 8, 20]]);
     tex.alley = makeNoise('#59505f', 700, 'rgba(255,255,255,0.04)', 'rgba(0,0,0,0.12)');
     { // cascalho do telhado (transparente, vai por cima da cor do telhado)
@@ -678,6 +701,7 @@
       tex.paving = c;
     }
   }
+
 
   function rrect(ctx, x, y, w, h, r) {
     ctx.beginPath();
@@ -907,39 +931,51 @@
     if (b.hotel || b.mercado) roofEspecial(ctx, b, fh);
   }
 
-  // rachaduras, remendos, manchas de óleo e bueiros (sorteados sempre do mesmo jeito)
+  // rachaduras, remendos, manchas de óleo, bueiros e poças (sorteados sempre do mesmo jeito).
+  // Visual de PIXEL ART: rachaduras feitas de quadradinhos 2x2, remendos retos e lisos, óleo em degraus e poças pequenas.
+  // (a ordem dos sorteios e as faixas de "kind" não mudam: o manholes() lá embaixo usa as mesmas contas)
+  function pixelTraco(ctx, pts, cor) {          // desenha uma linha de quadradinhos 2x2 (rachadura "serrilhada" de pixel art)
+    ctx.fillStyle = cor;
+    for (let k = 1; k < pts.length; k++) {
+      const [ax, ay] = pts[k - 1], [bx, by] = pts[k], n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / 1.5));
+      for (let q = 0; q <= n; q++) ctx.fillRect(Math.round((ax + (bx - ax) * q / n) / 2) * 2, Math.round((ay + (by - ay) * q / n) / 2) * 2, 2, 2);
+    }
+  }
   function drawRoadDetail(ctx, x0, y0, x1, y1) {
     const cs = 120;
     for (let gy = Math.floor(y0 / cs) - 1; gy <= Math.floor(y1 / cs) + 1; gy++) for (let gx = Math.floor(x0 / cs) - 1; gx <= Math.floor(x1 / cs) + 1; gx++) {
       const r = mulberry32(gx * 7349 + gy * 9151 + 13);
       const px = (gx + r()) * cs, py = (gy + r()) * cs, kind = r(), a1 = r(), a2 = r(), a3 = r();
       if (tileAt(px, py) !== TILE.ROAD) continue;
-      ctx.save(); ctx.translate(px, py);
-      if (kind < 0.42) { // rachadura
-        ctx.rotate(a1 * 6.28); ctx.beginPath(); ctx.moveTo(0, 0); let cx = 0, cy = 0;
-        const n = 5 + Math.floor(a2 * 5);
-        for (let k = 0; k < n; k++) { cx += 6 + r() * 14; cy += (r() - 0.5) * 14; ctx.lineTo(cx, cy); }
-        ctx.strokeStyle = 'rgba(14,8,28,0.42)'; ctx.lineWidth = 1.3; ctx.stroke();
-        ctx.translate(0.8, 0.8); ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 1; ctx.stroke();
-      } else if (kind < 0.56) { // remendo de asfalto
-        ctx.rotate((a1 - 0.5) * 0.2); const w = 30 + a2 * 40, h = 18 + a3 * 28;
-        ctx.fillStyle = 'rgba(10,6,24,0.17)'; ctx.fillRect(-w / 2, -h / 2, w, h);
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1; ctx.strokeRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1);
-      } else if (kind < 0.70) { // óleo
-        const g = ctx.createRadialGradient(0, 0, 1, 0, 0, 16 + a1 * 10);
-        g.addColorStop(0, 'rgba(8,4,18,0.38)'); g.addColorStop(1, 'rgba(8,4,18,0)');
-        ctx.scale(1, 0.7 + a2 * 0.5); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 16 + a1 * 10, 0, 7); ctx.fill();
+      const X = Math.round(px / 2) * 2, Y = Math.round(py / 2) * 2;
+      ctx.save(); ctx.translate(X, Y);
+      if (kind < 0.42) { // rachadura (só algumas aparecem: rua muito rachada fica feia)
+        if (a3 < 0.6) {
+          const ang = a1 * 6.28, ca = Math.cos(ang), sa = Math.sin(ang), n = 5 + Math.floor(a2 * 5), pts = [[0, 0]];
+          let cx = 0, cy = 0;
+          for (let k = 0; k < n; k++) { cx += 6 + r() * 14; cy += (r() - 0.5) * 14; pts.push([cx * ca - cy * sa, cx * sa + cy * ca]); }
+          pixelTraco(ctx, pts.map(p => [p[0] + 1, p[1] + 1]), 'rgba(255,255,255,0.10)');   // brilho de um lado
+          pixelTraco(ctx, pts, '#41376a');                                                  // fenda escura
+        }
+      } else if (kind < 0.56) { // remendo de asfalto: retângulo liso, um tom mais escuro, sem contorno
+        const w = Math.round((30 + a2 * 40) / 2) * 2, h = Math.round((18 + a3 * 28) / 2) * 2;
+        ctx.fillStyle = 'rgba(30,20,56,0.15)'; ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = 'rgba(30,20,56,0.10)'; ctx.fillRect(-w / 2, -h / 2, w, 2); ctx.fillRect(-w / 2, -h / 2, 2, h);   // beiradinha mais escura em cima e à esquerda
+      } else if (kind < 0.70) { // óleo: três elipses em degraus (cada uma mais escura que a anterior)
+        const rad = 14 + a1 * 10, ach = 0.7 + a2 * 0.5;
+        ctx.scale(1, ach);
+        [[1, 0.09], [0.66, 0.09], [0.34, 0.10]].forEach(([k, a]) => { ctx.fillStyle = 'rgba(14,8,34,' + a + ')'; ctx.beginPath(); ctx.arc(0, 0, rad * k, 0, 7); ctx.fill(); });
       } else if (kind < 0.75) { // bueiro
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(1.5, 2, 10, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.arc(2, 2, 10, 0, 7); ctx.fill();
         ctx.fillStyle = '#4a4458'; ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, 7); ctx.fill();
-        ctx.strokeStyle = '#2a2633'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.beginPath(); for (let k = -6; k <= 6; k += 3) { ctx.moveTo(k, -7); ctx.lineTo(k, 7); ctx.moveTo(-7, k); ctx.lineTo(7, k); } ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.arc(-3, -3, 4, 0, 7); ctx.fill();
-      } else if (kind < 0.83) { // poça d'água
-        ctx.rotate(a3 * 3); const pw = 14 + a1 * 18, ph = 7 + a2 * 8;
-        ctx.fillStyle = 'rgba(40,52,120,0.34)'; ctx.beginPath(); ctx.ellipse(0, 0, pw, ph, 0, 0, 7); ctx.fill();
-        ctx.strokeStyle = 'rgba(190,205,255,0.28)'; ctx.lineWidth = 1.2; ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.beginPath(); ctx.ellipse(-pw * 0.25, -ph * 0.3, pw * 0.45, ph * 0.3, 0, 0, 7); ctx.fill();
+        ctx.strokeStyle = '#2a2633'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#383245'; for (let k = -6; k <= 6; k += 4) { ctx.fillRect(k - 1, -6, 2, 12); ctx.fillRect(-6, k - 1, 12, 2); }
+        ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(-6, -6, 4, 2); ctx.fillRect(-6, -6, 2, 4);
+      } else if (kind < 0.83) { // poça d'água: pequena, azul-acinzentada, com um reflexo
+        const pw = 8 + a1 * 12, ph = 4 + a2 * 6;
+        ctx.rotate(Math.round(a3 * 3) * 0.5);
+        ctx.fillStyle = 'rgba(120,138,200,0.30)'; ctx.beginPath(); ctx.ellipse(0, 0, pw, ph, 0, 0, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(235,242,255,0.26)'; ctx.beginPath(); ctx.ellipse(-pw * 0.25, -ph * 0.3, pw * 0.4, ph * 0.28, 0, 0, 7); ctx.fill();
       }
       ctx.restore();
     }
@@ -1080,14 +1116,14 @@
       for (let yy = Math.max(rv.y, Math.floor(y0 / 36) * 36); yy < Math.min(rv.y + rv.h, y1); yy += 36) {
         const k = yy / 36, rx = rv.x + 14 + ((k * 53 + t * (9 + (k % 5) * 3)) % (rv.w - 40));
         if (naPonte(rx, yy)) continue;
-        ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);
+        ctx.fillStyle = 'rgba(220,240,255,' + (0.18 + 0.14 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(Math.round(rx / 2) * 2, Math.round((yy + (k % 3) * 8) / 2) * 2, 14 + (k % 4) * 4, 2);
       }
     });
     ponds.forEach(p => {
       if (p.x < x0 - 80 || p.x > x1 + 80 || p.y < y0 - 80 || p.y > y1 + 80) return;
       for (let k = 0; k < 7; k++) {
         const a = k * 0.9 + p.x, ex = p.x + Math.cos(a) * p.rx * 0.6 + Math.sin(t * 0.6 + k) * 6, ey = p.y + Math.sin(a) * p.ry * 0.6;
-        ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2.2 + k * 2)) + ')'; ctx.fillRect(ex, ey, 9, 1.6);
+        ctx.fillStyle = 'rgba(220,240,255,' + (0.18 + 0.14 * Math.sin(t * 2.2 + k * 2)) + ')'; ctx.fillRect(Math.round(ex / 2) * 2, Math.round(ey / 2) * 2, 10, 2);
       }
     });
     ctx.restore();
@@ -1300,19 +1336,19 @@
     const { x, y, w, h, kind } = blk;
     if (kind === 'river') {
       ctx.fillStyle = ctx.createPattern(tex.water, 'repeat'); ctx.fillRect(x, y, w, h);
-      // reflexos
-      ctx.fillStyle = 'rgba(180,220,255,0.10)';
-      for (let k = 0; k < 70; k++) { const rx = x + ((k * 97) % w), ry = y + ((k * 61) % h); ctx.fillRect(rx, ry, 18, 2); }
-      // profundidade: raso e claro perto das margens, fundo e escuro no meio
-      const gd = ctx.createLinearGradient(x, 0, x + w, 0);
-      gd.addColorStop(0, 'rgba(110,200,220,0.34)'); gd.addColorStop(0.16, 'rgba(110,200,220,0.04)'); gd.addColorStop(0.5, 'rgba(0,10,70,0.26)'); gd.addColorStop(0.84, 'rgba(110,200,220,0.04)'); gd.addColorStop(1, 'rgba(110,200,220,0.34)');
-      ctx.fillStyle = gd; ctx.fillRect(x, y, w, h);
+      // reflexos: traços horizontais claros (pixel art)
+      ctx.fillStyle = 'rgba(190,225,255,0.22)';
+      for (let k = 0; k < 70; k++) { const rx = x + ((k * 97) % w), ry = y + ((k * 61) % h); ctx.fillRect(Math.round(rx / 2) * 2, Math.round(ry / 2) * 2, 12, 2); }
+      // profundidade em DEGRAUS (como curvas de nível): raso e esverdeado perto das margens, fundo e escuro no meio
+      const faixa = (f0, f1, cor) => { ctx.fillStyle = cor; ctx.fillRect(x + Math.round(w * f0 / 2) * 2, y, Math.round(w * (f1 - f0) / 2) * 2, h); };
+      faixa(0, 0.05, 'rgba(120,214,214,0.34)'); faixa(0.05, 0.10, 'rgba(120,214,214,0.20)'); faixa(0.10, 0.16, 'rgba(120,214,214,0.08)');
+      faixa(0.95, 1, 'rgba(120,214,214,0.34)'); faixa(0.90, 0.95, 'rgba(120,214,214,0.20)'); faixa(0.84, 0.90, 'rgba(120,214,214,0.08)');
+      faixa(0.30, 0.70, 'rgba(0,10,70,0.10)'); faixa(0.40, 0.60, 'rgba(0,10,70,0.10)'); faixa(0.46, 0.54, 'rgba(0,10,70,0.08)');
       const rg = mulberry32(blk.bx * 31 + blk.by * 7 + 5);
-      // correnteza: fios claros ondulados
-      ctx.lineCap = 'round';
-      for (let k = 0; k < 28; k++) {
-        const sx = x + 30 + rg() * (w - 60), sy = y + rg() * h, len = 60 + rg() * 110; ctx.strokeStyle = 'rgba(200,238,255,' + (0.10 + rg() * 0.12) + ')'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + 12, sy + len * 0.3, sx - 12, sy + len * 0.7, sx + 4, sy + len); ctx.stroke();
+      // correnteza: traços curtos claros e escuros no sentido do rio
+      for (let k = 0; k < 170; k++) {
+        const sx = Math.round((x + 30 + rg() * (w - 60)) / 2) * 2, sy = Math.round((y + rg() * h) / 2) * 2, len = 8 + Math.floor(rg() * 6) * 2;
+        ctx.fillStyle = rg() < 0.7 ? 'rgba(210,240,255,0.42)' : 'rgba(10,30,90,0.30)'; ctx.fillRect(sx, sy, 2, len);
       }
       // vitórias-régias com flor, pedras e juncos nas margens
       for (let k = 0; k < 12; k++) {
@@ -1392,24 +1428,31 @@
   // rastros de pneu e faixas das ruas, trecho por trecho (as ruas apagadas da floresta não ganham marcas)
   function drawMarcas(ctx, x0, y0, x1, y1) {
     const R2 = ROAD / 2 * T, ruralV = (i, s) => !urbano(i, s) && !urbano(i, s + 1), ruralH = (j, s) => !urbano(s, j) && !urbano(s + 1, j);
-    ctx.save(); ctx.strokeStyle = 'rgba(30,20,60,0.10)'; ctx.lineWidth = 5;
+    // rastros de pneu em PIXEL ART: pontinhos 2x2 espalhados só nos trechos retos (sorteio pela posição = igual em qualquer pedaço do mapa)
+    ctx.fillStyle = 'rgba(30,20,60,0.20)';
+    const rastro = (ax, ay, aw, ah) => {
+      const xa = Math.max(ax, x0), xb = Math.min(ax + aw, x1), ya = Math.max(ay, y0), yb = Math.min(ay + ah, y1);
+      for (let yy = Math.floor(ya / 4) * 4; yy < yb; yy += 4) for (let xx = Math.floor(xa / 4) * 4; xx < xb; xx += 4) {
+        const h = (Math.imul(xx, 73856093) ^ Math.imul(yy, 19349663)) >>> 0;
+        if (h % 100 < 26 && xx >= ax && xx + 2 <= ax + aw && yy >= ay && yy + 2 <= ay + ah) ctx.fillRect(xx + ((h >> 8) & 2), yy + ((h >> 10) & 2), 2, 2);
+      }
+    };
     for (let i = 0; i <= COLS; i++) {
       const xl = roadLeft(i); if (xl + ROAD * T < x0 - 8 || xl > x1 + 8) continue;
       for (let s = 0; s < ROWS; s++) {
         if (!viaV(i, s) || ruralV(i, s)) continue;
-        const ya = nodeY(s) - R2, yb = nodeY(s + 1) + R2; if (yb < y0 - 8 || ya > y1 + 8) continue;
-        for (const off of [1.4, 2.6, 5.4, 6.6]) { const xx = xl + off * T; ctx.beginPath(); ctx.moveTo(xx, Math.max(ya, y0)); ctx.lineTo(xx, Math.min(yb, y1)); ctx.stroke(); }
+        const ya = nodeY(s) + R2 + 8, yb = nodeY(s + 1) - R2 - 8; if (yb < y0 - 8 || ya > y1 + 8) continue;
+        for (const off of [1.4, 2.6, 5.4, 6.6]) rastro(xl + off * T - 4, ya, 8, yb - ya);
       }
     }
     for (let j = 0; j <= ROWS; j++) {
       const yt = roadTop(j); if (yt + ROAD * T < y0 - 8 || yt > y1 + 8) continue;
       for (let s = 0; s < COLS; s++) {
         if (!viaH(j, s) || ruralH(j, s)) continue;
-        const xa = nodeX(s) - R2, xb = nodeX(s + 1) + R2; if (xb < x0 - 8 || xa > x1 + 8) continue;
-        for (const off of [1.4, 2.6, 5.4, 6.6]) { const yy = yt + off * T; ctx.beginPath(); ctx.moveTo(Math.max(xa, x0), yy); ctx.lineTo(Math.min(xb, x1), yy); ctx.stroke(); }
+        const xa = nodeX(s) + R2 + 8, xb = nodeX(s + 1) - R2 - 8; if (xb < x0 - 8 || xa > x1 + 8) continue;
+        for (const off of [1.4, 2.6, 5.4, 6.6]) rastro(xa, yt + off * T - 4, xb - xa, 8);
       }
     }
-    ctx.restore();
     drawRoadDetail(ctx, x0, y0, x1, y1);
     const cruzV = (i, j) => viaH(j, i - 1) || viaH(j, i), cruzH = (i, j) => viaV(i, j - 1) || viaV(i, j);   // existe rua cruzando o nó?
     // ruas verticais
@@ -1469,13 +1512,19 @@
     // 3) marcas nas ruas
     drawMarcas(ctx, x0, y0, x1, y1);
     // 4) faixas de pedestre (só nas cidades)
-    ctx.fillStyle = 'rgba(245,245,245,0.92)';
     crossings.forEach(c => {
       const cx = c.x * T, cy = c.y * T, cw = c.w * T, ch = c.h * T;
       if (!hit(cx, cy, cw, ch)) return;
-      const cr = mulberry32(Math.floor(cx * 3 + cy * 5)), tinta = () => { ctx.fillStyle = 'rgba(' + (236 + cr() * 14 | 0) + ',' + (236 + cr() * 14 | 0) + ',' + (236 + cr() * 10 | 0) + ',' + (0.55 + cr() * 0.4) + ')'; };
-      if (c.dir === 'h') { for (let xx = cx + 6; xx < cx + cw - 6; xx += 16) { tinta(); ctx.fillRect(xx, cy + 4, 9, ch - 8); } }
-      else { for (let yy = cy + 6; yy < cy + ch - 6; yy += 16) { tinta(); ctx.fillRect(cx + 4, yy, cw - 8, 9); } }
+      const cr = mulberry32(Math.floor(cx * 3 + cy * 5));
+      // faixa de pedestre de pixel art: listras brancas lisas (algumas gastas, em outro tom), brilho em cima e sombra fininha embaixo
+      const lista = (x, y, w, h) => {
+        const gasta = cr() < 0.22;
+        ctx.fillStyle = 'rgba(24,14,48,0.24)'; ctx.fillRect(x + 2, y + 2, w, h);
+        ctx.fillStyle = gasta ? '#cfcade' : '#eeeaf4'; ctx.fillRect(x, y, w, h);
+        if (!gasta) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, 2); }
+      };
+      if (c.dir === 'h') { for (let xx = cx + 6; xx < cx + cw - 6; xx += 16) lista(xx, cy + 4, 9, ch - 8); }
+      else { for (let yy = cy + 6; yy < cy + ch - 6; yy += 16) lista(cx + 4, yy, cw - 8, 9); }
     });
     // 4b) chão das florestas gigantes (cobre as ruas apagadas)
     MEGAS.forEach(m => { if (hit(m.x, m.y, m.w, m.h)) G.rural.chaoMata(ctx, m, tex, x0, y0, x1, y1); });

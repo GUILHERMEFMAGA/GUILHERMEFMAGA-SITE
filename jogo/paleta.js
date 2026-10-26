@@ -68,11 +68,36 @@
     'e39f8a8dd297d2b870aebbc6c4b9a8e7bb49d7aebbe9b48394d0e4c6c4bfe5c77bd6c6aa' +
     'abe0bbe2c3cacbcfccebd788e1d4b7d9d7d1f2e360e6e0d4f3e7b3edeae3f5f2e7fffdf5';
 
+  // cores-chave do mundo (as mesmas do asfalto e das faixas em world.js)
+  const CHAVE = ['#625889', '#5a5080', '#6a5f92', '#554b7a', '#41376a', '#eeeaf4', '#cfcade', '#f2c231'];
+  // o ajuste de cor de pixelar (saturação, contraste, sombra azulada, luz quente, brancos), para uma cor só
+  function ajusteCor(r, g, b) {
+    const c = P.cfg, m = r * 0.3 + g * 0.59 + b * 0.11;
+    r = (m + (r - m) * c.sat - 128) * c.contraste + 128; g = (m + (g - m) * c.sat - 128) * c.contraste + 128; b = (m + (b - m) * c.sat - 128) * c.contraste + 128;
+    if (c.tinta) { const l = m / 255, sh = (1 - l) * (1 - l) * 9 * c.tinta, hi = l * l * l * 4 * c.tinta; r += hi - sh * 0.35; g += hi * 0.35 + sh * 0.1; b += sh - hi * 0.7; }
+    if (r > 215) r = 215 + (r - 215) * c.brancos; if (g > 215) g = 215 + (g - 215) * c.brancos; if (b > 215) b = 215 + (b - 215) * c.brancos;
+    const f = v => Math.max(0, Math.min(255, Math.round(v)));
+    return [f(r), f(g), f(b)];
+  }
+
   // cores de SEGURANÇA: matizes vivos em 3 luminosidades, só entram onde a paleta ajustada não tem nada parecido
   // (explosões, neons, efeitos raros que não estavam nas fotos de ajuste)
   function construir() {
     const out = FIXA.match(/.{6}/g).map(h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]);
     const labs = out.map(c => paraLab(c[0], c[1], c[2]));
+    // CORES-CHAVE: cores lisas que cobrem a tela inteira (asfalto, rachaduras, faixas). Sem isto, os pontinhos do ASFALTO
+    // (roxo-acinzentado) caíam em azuis da paleta e davam "chuvisco azul". Para cada cor-chave calculamos como ela aparece em
+    // 24 horas do dia (luz do ambiente da luz.js + o ajuste de cor de pixelar) e acrescentamos à paleta as que ainda não existem.
+    const amb = G.luz && G.luz.ambiente;
+    for (let k = 0; k < 24; k++) {
+      const a = amb ? amb(k / 24) : [238, 236, 228];
+      for (const hex of CHAVE) {
+        const cor = ajusteCor(parseInt(hex.slice(1, 3), 16) * a[0] / 255, parseInt(hex.slice(3, 5), 16) * a[1] / 255, parseInt(hex.slice(5, 7), 16) * a[2] / 255), q = paraLab(cor[0], cor[1], cor[2]);
+        let perto = false;
+        for (const o of labs) { const dl = q[0] - o[0], da = q[1] - o[1], db = q[2] - o[2]; if (100 * Math.sqrt(dl * dl + da * da + db * db) < 2.2) { perto = true; break; } }
+        if (!perto) { out.push(cor); labs.push(q); }
+      }
+    }
     for (let k = 0; k < 12; k++) for (const L of [0.45, 0.65, 0.84]) {
       const c = lch(L, 0.30, k * 30 + 12);   // lch() já reduz o croma até caber no sRGB
       const q = paraLab(c[0], c[1], c[2]); let perto = false;
@@ -107,7 +132,7 @@
 
   // ---------- telas auxiliares ----------
   const pixC = mk(PW, PH), pxx = pixC.getContext('2d', { willReadFrequently: true });
-  const copia = new Uint8ClampedArray(PW * PH * 4);
+  const copia = new Uint8ClampedArray(PW * PH * 4), ort = new Uint32Array(PW * PH);
 
   // faz o passe completo sobre o ctx principal (800x600). o: opções que trocam P.cfg
   P.pixelar = function (ctx, o) {
@@ -118,17 +143,17 @@
     const im = pxx.getImageData(0, 0, PW, PH), d = im.data;
     copia.set(d);
     const s = copia, ok32 = (d.byteOffset & 3) === 0, o32 = ok32 ? new Uint32Array(d.buffer, d.byteOffset, d.length >> 2) : null;
-    const NIT = c.nitidez, SAT = c.sat, CON = c.contraste, DIT = c.dither, TI = c.tinta, BR = c.brancos, lut = LUT, rowB = PW * 4;
+    const NUCLEO = c.nucleo || 40, NIT = c.nitidez, SAT = c.sat, CON = c.contraste, DIT = c.dither, TI = c.tinta, BR = c.brancos, lut = LUT, rowB = PW * 4;
     const GU = c.guardar ? (P.guardado || (P.guardado = new Uint8Array(PW * PH * 3))) : null;   // (ferramenta de teste) guarda a imagem antes da paleta
     for (let y = 0; y < PH; y++) {
       const ym = y > 0 ? -rowB : 0, yp = y < PH - 1 ? rowB : 0, by = (y & 7) << 3;
       for (let x = 0; x < PW; x++) {
         const i = (y * PW + x) * 4, xm = x > 0 ? -4 : 0, xp = x < PW - 1 ? 4 : 0;
         let r = s[i], g = s[i + 1], b = s[i + 2];
-        if (NIT > 0) {   // nitidez: realça a diferença para a média dos 4 vizinhos
-          r += (r - (s[i + xm] + s[i + xp] + s[i + ym] + s[i + yp]) * 0.25) * NIT;
-          g += (g - (s[i + xm + 1] + s[i + xp + 1] + s[i + ym + 1] + s[i + yp + 1]) * 0.25) * NIT;
-          b += (b - (s[i + xm + 2] + s[i + xp + 2] + s[i + ym + 2] + s[i + yp + 2]) * 0.25) * NIT;
+        if (NIT > 0) {   // nitidez: realça a diferença para a média dos 4 vizinhos (diferenças pequenas = ruído do asfalto: quase não realça)
+          let dr = r - (s[i + xm] + s[i + xp] + s[i + ym] + s[i + yp]) * 0.25, dg = g - (s[i + xm + 1] + s[i + xp + 1] + s[i + ym + 1] + s[i + yp + 1]) * 0.25, db = b - (s[i + xm + 2] + s[i + xp + 2] + s[i + ym + 2] + s[i + yp + 2]) * 0.25;
+          const ad = (dr < 0 ? -dr : dr) + (dg < 0 ? -dg : dg) + (db < 0 ? -db : db), k = ad < NUCLEO ? ad / NUCLEO : 1;   // 0..1: cresce com o contraste da borda
+          r += dr * NIT * k; g += dg * NIT * k; b += db * NIT * k;
         }
         const m = r * 0.3 + g * 0.59 + b * 0.11;
         r = (m + (r - m) * SAT - 128) * CON + 128; g = (m + (g - m) * SAT - 128) * CON + 128; b = (m + (b - m) * SAT - 128) * CON + 128;
@@ -144,6 +169,15 @@
         r = r < 0 ? 0 : r > 255 ? 255 : r; g = g < 0 ? 0 : g > 255 ? 255 : g; b = b < 0 ? 0 : b > 255 ? 255 : b;
         const cor = lut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
         if (o32) o32[y * PW + x] = cor; else { d[i] = cor & 255; d[i + 1] = (cor >> 8) & 255; d[i + 2] = (cor >> 16) & 255; d[i + 3] = 255; }
+      }
+    }
+    if (o32 && c.limpa !== 0) {   // pontos soltos: um pixel de cor parecida cercado por 8 vizinhos iguais é ruído, vira a cor dos vizinhos (o tramado em xadrez e os detalhes de contraste ficam)
+      ort.set(o32); const LIM = (c.limpa || 62) * (c.limpa || 62);
+      for (let y = 1; y < PH - 1; y++) for (let x = 1, k = y * PW + 1; x < PW - 1; x++, k++) {
+        const p = ort[k], n = ort[k - 1];
+        if (p === n || ort[k + 1] !== n || ort[k - PW] !== n || ort[k + PW] !== n || ort[k - PW - 1] !== n || ort[k - PW + 1] !== n || ort[k + PW - 1] !== n || ort[k + PW + 1] !== n) continue;
+        const dr = (p & 255) - (n & 255), dg = ((p >> 8) & 255) - ((n >> 8) & 255), db = ((p >> 16) & 255) - ((n >> 16) & 255);
+        if (dr * dr + dg * dg + db * db < LIM) o32[k] = n;
       }
     }
     pxx.putImageData(im, 0, 0);

@@ -60,6 +60,8 @@
     return [236, 208, 176];
   }
 
+  L.ambiente = ambiente;   // a paleta.js usa esta curva para prever como as cores lisas aparecem em cada hora
+
   // altura da fachada (parede) de um prédio — usada também pelo mundo
   // ---- lista de luzes do quadro ----
   function juntarLuzes(S, W, cam, z, inV, noite) {

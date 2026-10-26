@@ -447,7 +447,9 @@
     const cam = S.cam, z = cam.z;
     const sx = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0, sy = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0;
     ctx.save();
-    ctx.translate(VW / 2 + sx, VH / 2 + sy); ctx.scale(z, z); ctx.translate(-cam.x, -cam.y);
+    // câmera "presa" à grade de pixels 2x2 da pixel art: o chão não treme nem "ferve" quando a câmera anda
+    const gp = G.luz.nivel >= 2 ? 2 : 1;
+    ctx.translate(Math.round((VW / 2 + sx - cam.x * z) / gp) * gp, Math.round((VH / 2 + sy - cam.y * z) / gp) * gp); ctx.scale(z, z);
     const vx0 = cam.x - VW / 2 / z - 40, vy0 = cam.y - VH / 2 / z - 40, vx1 = cam.x + VW / 2 / z + 40, vy1 = cam.y + VH / 2 / z + 40;
     W.drawChunks(ctx, vx0, vy0, vx1, vy1);
     W.drawWaterFx(ctx, S.time, vx0, vy0, vx1, vy1);   // brilhos na água

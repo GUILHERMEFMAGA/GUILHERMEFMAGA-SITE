@@ -61,6 +61,9 @@ rio = old_bg[old_bg.index("    if (kind === 'river') {\n"):old_bg.index("      r
 rio = rio.replace('k < 40;', 'k < 70;').replace('k < 16;', 'k < 28;').replace('k < 7;', 'k < 12;').replace('k < 26;', 'k < 44;')
 anel = old_bg[old_bg.index('    // calçada com cantos arredondados\n'):old_bg.index("    if (kind === 'city' || kind === 'hotel') {")]
 anel = anel.replace('Math.floor(r() * 12) * T + 1, y + Math.floor(r() * 12) * T + 1', 'Math.floor(r() * BLOCK) * T + 1, y + Math.floor(r() * BLOCK) * T + 1').replace('k < 40;', 'k < 110;').replace('k < 26;', 'k < 70;')
+# 9b) rio em pixel art: reflexos, profundidade em degraus e correnteza em traços curtos
+_i = rio.index('      // reflexos\n'); _j = rio.index('      // vitórias-régias com flor')
+rio = rio[:_i] + P('p6_rio.js') + rio[_j:]
 g = P('p3_ground.js').replace('/*RIO*/\n', rio).replace('/*ANEL*/\n', anel)
 s = s.replace(old_bg, g)
 # 10) árvores: as da mata têm desenho próprio
@@ -73,5 +76,13 @@ s = between(s, '  // mapa pequeno (minimapa): pintado direto dos tiles, bem ráp
 s = sub(s, "    if (b.kind === 'river') return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>", "    if (SEM_PROPS[b.kind]) return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>")
 # 14) exportações
 s = sub(s, "    chunkCount: NCX * NCY,\n  };", "    chunkCount: NCX * NCY,\n    RODOVIA, MEGAS, trilhas, urbano, viaH, viaV, regiaoDe, PUB_DIMS, naTrilha, megaDe,\n    AR, tex, criaCasaB, casaNoLote, sorteiaParede, estiloDe,\n  };\n  if (G.rural) G.rural.trilhas = trilhas;")
+# 15) asfalto de pixel art (sem manchas macias) e detalhes das ruas (rachaduras, remendos, óleo, poças) em pixel art
+s = between(s, '  function makeTextures() {\n', '  function rrect(', P('p6_tex.js') + '\n')
+s = between(s, '  // rachaduras, remendos, manchas de óleo e bueiros', '  // bueiros (mesma sorte do drawRoadDetail)', P('p6_detalhe.js'))
+# 16) brilhos da água (animados) alinhados à grade de pixels e um pouco mais fortes
+s = sub(s, "ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(rx, yy + (k % 3) * 8, 14 + (k % 4) * 4, 2);",
+        "ctx.fillStyle = 'rgba(220,240,255,' + (0.18 + 0.14 * Math.sin(t * 2 + k)) + ')'; ctx.fillRect(Math.round(rx / 2) * 2, Math.round((yy + (k % 3) * 8) / 2) * 2, 14 + (k % 4) * 4, 2);")   # brilhos da água
+s = sub(s, "ctx.fillStyle = 'rgba(255,255,255,' + (0.10 + 0.10 * Math.sin(t * 2.2 + k * 2)) + ')'; ctx.fillRect(ex, ey, 9, 1.6);",
+        "ctx.fillStyle = 'rgba(220,240,255,' + (0.18 + 0.14 * Math.sin(t * 2.2 + k * 2)) + ')'; ctx.fillRect(Math.round(ex / 2) * 2, Math.round(ey / 2) * 2, 10, 2);")
 open(D + '/../world.js', 'w', encoding='utf-8').write(s)
 print('world.js:', s.count('\n'), 'linhas')

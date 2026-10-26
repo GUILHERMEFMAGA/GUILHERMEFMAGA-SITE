@@ -1,24 +1,31 @@
   // rastros de pneu e faixas das ruas, trecho por trecho (as ruas apagadas da floresta não ganham marcas)
   function drawMarcas(ctx, x0, y0, x1, y1) {
     const R2 = ROAD / 2 * T, ruralV = (i, s) => !urbano(i, s) && !urbano(i, s + 1), ruralH = (j, s) => !urbano(s, j) && !urbano(s + 1, j);
-    ctx.save(); ctx.strokeStyle = 'rgba(30,20,60,0.10)'; ctx.lineWidth = 5;
+    // rastros de pneu em PIXEL ART: pontinhos 2x2 espalhados só nos trechos retos (sorteio pela posição = igual em qualquer pedaço do mapa)
+    ctx.fillStyle = 'rgba(30,20,60,0.20)';
+    const rastro = (ax, ay, aw, ah) => {
+      const xa = Math.max(ax, x0), xb = Math.min(ax + aw, x1), ya = Math.max(ay, y0), yb = Math.min(ay + ah, y1);
+      for (let yy = Math.floor(ya / 4) * 4; yy < yb; yy += 4) for (let xx = Math.floor(xa / 4) * 4; xx < xb; xx += 4) {
+        const h = (Math.imul(xx, 73856093) ^ Math.imul(yy, 19349663)) >>> 0;
+        if (h % 100 < 26 && xx >= ax && xx + 2 <= ax + aw && yy >= ay && yy + 2 <= ay + ah) ctx.fillRect(xx + ((h >> 8) & 2), yy + ((h >> 10) & 2), 2, 2);
+      }
+    };
     for (let i = 0; i <= COLS; i++) {
       const xl = roadLeft(i); if (xl + ROAD * T < x0 - 8 || xl > x1 + 8) continue;
       for (let s = 0; s < ROWS; s++) {
         if (!viaV(i, s) || ruralV(i, s)) continue;
-        const ya = nodeY(s) - R2, yb = nodeY(s + 1) + R2; if (yb < y0 - 8 || ya > y1 + 8) continue;
-        for (const off of [1.4, 2.6, 5.4, 6.6]) { const xx = xl + off * T; ctx.beginPath(); ctx.moveTo(xx, Math.max(ya, y0)); ctx.lineTo(xx, Math.min(yb, y1)); ctx.stroke(); }
+        const ya = nodeY(s) + R2 + 8, yb = nodeY(s + 1) - R2 - 8; if (yb < y0 - 8 || ya > y1 + 8) continue;
+        for (const off of [1.4, 2.6, 5.4, 6.6]) rastro(xl + off * T - 4, ya, 8, yb - ya);
       }
     }
     for (let j = 0; j <= ROWS; j++) {
       const yt = roadTop(j); if (yt + ROAD * T < y0 - 8 || yt > y1 + 8) continue;
       for (let s = 0; s < COLS; s++) {
         if (!viaH(j, s) || ruralH(j, s)) continue;
-        const xa = nodeX(s) - R2, xb = nodeX(s + 1) + R2; if (xb < x0 - 8 || xa > x1 + 8) continue;
-        for (const off of [1.4, 2.6, 5.4, 6.6]) { const yy = yt + off * T; ctx.beginPath(); ctx.moveTo(Math.max(xa, x0), yy); ctx.lineTo(Math.min(xb, x1), yy); ctx.stroke(); }
+        const xa = nodeX(s) + R2 + 8, xb = nodeX(s + 1) - R2 - 8; if (xb < x0 - 8 || xa > x1 + 8) continue;
+        for (const off of [1.4, 2.6, 5.4, 6.6]) rastro(xa, yt + off * T - 4, xb - xa, 8);
       }
     }
-    ctx.restore();
     drawRoadDetail(ctx, x0, y0, x1, y1);
     const cruzV = (i, j) => viaH(j, i - 1) || viaH(j, i), cruzH = (i, j) => viaV(i, j - 1) || viaV(i, j);   // existe rua cruzando o nó?
     // ruas verticais
@@ -78,13 +85,19 @@
     // 3) marcas nas ruas
     drawMarcas(ctx, x0, y0, x1, y1);
     // 4) faixas de pedestre (só nas cidades)
-    ctx.fillStyle = 'rgba(245,245,245,0.92)';
     crossings.forEach(c => {
       const cx = c.x * T, cy = c.y * T, cw = c.w * T, ch = c.h * T;
       if (!hit(cx, cy, cw, ch)) return;
-      const cr = mulberry32(Math.floor(cx * 3 + cy * 5)), tinta = () => { ctx.fillStyle = 'rgba(' + (236 + cr() * 14 | 0) + ',' + (236 + cr() * 14 | 0) + ',' + (236 + cr() * 10 | 0) + ',' + (0.55 + cr() * 0.4) + ')'; };
-      if (c.dir === 'h') { for (let xx = cx + 6; xx < cx + cw - 6; xx += 16) { tinta(); ctx.fillRect(xx, cy + 4, 9, ch - 8); } }
-      else { for (let yy = cy + 6; yy < cy + ch - 6; yy += 16) { tinta(); ctx.fillRect(cx + 4, yy, cw - 8, 9); } }
+      const cr = mulberry32(Math.floor(cx * 3 + cy * 5));
+      // faixa de pedestre de pixel art: listras brancas lisas (algumas gastas, em outro tom), brilho em cima e sombra fininha embaixo
+      const lista = (x, y, w, h) => {
+        const gasta = cr() < 0.22;
+        ctx.fillStyle = 'rgba(24,14,48,0.24)'; ctx.fillRect(x + 2, y + 2, w, h);
+        ctx.fillStyle = gasta ? '#cfcade' : '#eeeaf4'; ctx.fillRect(x, y, w, h);
+        if (!gasta) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y, w, 2); }
+      };
+      if (c.dir === 'h') { for (let xx = cx + 6; xx < cx + cw - 6; xx += 16) lista(xx, cy + 4, 9, ch - 8); }
+      else { for (let yy = cy + 6; yy < cy + ch - 6; yy += 16) lista(cx + 4, yy, cw - 8, 9); }
     });
     // 4b) chão das florestas gigantes (cobre as ruas apagadas)
     MEGAS.forEach(m => { if (hit(m.x, m.y, m.w, m.h)) G.rural.chaoMata(ctx, m, tex, x0, y0, x1, y1); });
