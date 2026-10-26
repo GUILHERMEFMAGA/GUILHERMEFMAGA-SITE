@@ -3036,6 +3036,20 @@
     }
   }
 
+  // ---- contorno de pixel art dos pedestres: o corpo é pintado numa telinha (2x de resolução) e copiado com uma borda preta de 1 pixel ----
+  const telaPed = document.createElement('canvas'), silPed = document.createElement('canvas');
+  telaPed.width = telaPed.height = silPed.width = silPed.height = 96;
+  const tPx = telaPed.getContext('2d'), sPx = silPed.getContext('2d');
+  const BORDA = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  function pedTela() { tPx.setTransform(1, 0, 0, 1, 0, 0); tPx.clearRect(0, 0, 96, 96); tPx.save(); tPx.setTransform(2, 0, 0, 2, 48, 48); return tPx; }
+  function contornoPed(w) {   // w já está transladado para o centro do pedestre
+    sPx.setTransform(1, 0, 0, 1, 0, 0); sPx.globalCompositeOperation = 'source-over'; sPx.clearRect(0, 0, 96, 96); sPx.drawImage(telaPed, 0, 0);
+    sPx.globalCompositeOperation = 'source-in'; sPx.fillStyle = '#0c0816'; sPx.fillRect(0, 0, 96, 96); sPx.globalCompositeOperation = 'source-over';
+    w.save(); w.imageSmoothingEnabled = true;
+    for (let k = 0; k < BORDA.length; k++) w.drawImage(silPed, -24 + BORDA[k][0], -24 + BORDA[k][1], 48, 48);
+    w.drawImage(telaPed, -24, -24, 48, 48); w.restore();
+  }
+
   function drawPed(ctx, p, time) {
     const r = 7;
     if (p.state === 'dead') {
@@ -3061,6 +3075,8 @@
     if (p.player && !p.noRing) { // anel amarelo discreto para você se achar na multidão
       ctx.strokeStyle = 'rgba(255,224,74,' + (0.28 + 0.12 * Math.sin(time * 4)) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, 1, 11, 11, 0, 0, 7); ctx.stroke();
     }
+    const mundo = ctx, cont = !!(G.luz && G.luz.nivel >= 2);   // com a pixel art ligada, o corpo vai para a telinha (e ganha contorno no fim)
+    if (cont) ctx = pedTela();
     ctx.rotate(p.h); { const resp = 1.12 + 0.014 * Math.sin(time * 2.3 + (p.x || 0) * 0.37); ctx.scale(resp, 1.12 + (resp - 1.12) * 0.6); }   // respiração
     const cop = p.cap === 'cop' || p.cap === 'swat', fem = !!p.fem && !cop, vest = !!p.dress && fem;
     const calca = cop ? (p.cap === 'swat' ? '#15171c' : '#16224a') : (p.pants || '#2a2a35');
@@ -3115,6 +3131,7 @@
     pedHead(ctx, p);
     if (wid && wid !== 'fist') drawHeld(ctx, p, wid);
     if (p.punchT > 0 && (!wid || wid === 'fist')) { ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(3, -12, 3, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.8; ctx.stroke(); ctx.fillStyle = shade(p.skin, 0.2); ctx.fillRect(1.6, -13.4, 2, 0.8); }
+    if (cont) { ctx.restore(); ctx = mundo; contornoPed(mundo); }
     ctx.restore();
   }
 
@@ -4946,6 +4963,224 @@
 
 </script>
 <script>
+/* =====================================================================
+   PIXFONT.JS — fonte de PIXEL (5x7) para a interface do jogo
+   Cada letra é um desenho de "#" (pixel aceso) e "." (apagado). O texto é montado em
+   uma tela pequena (com contorno preto de 1 pixel) e fica guardado em memória para não
+   ser refeito a cada quadro. As letras acentuadas (á, ã, ç, ô...) são montadas juntando
+   a letra com o acento.
+   Quem usa: hud.js (G.hud.txt). Se alguma letra não existir na fonte, o texto é
+   desenhado com a fonte normal do navegador (nada fica faltando).
+   ===================================================================== */
+(function (G) {
+  'use strict';
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+
+  // célula: 11 linhas = 2 (acentos) + 7 (letra) + 2 (rabinho de g, j, p, q, y). A linha de base fica depois da linha 8.
+  const TOPO = 2, CEL = 11, BASE = 9;
+  const GL = {};                                    // caractere -> { w, px: [[x, y], ...] }
+  function def(ch, y0, rows) {
+    if (typeof rows === 'string') rows = rows.split('/');
+    const w = rows[0].length, px = [];
+    rows.forEach((r, j) => { if (r.length !== w) throw new Error('pixfont: linha torta em ' + ch); for (let i = 0; i < w; i++) if (r[i] === '#') px.push([i, y0 + TOPO + j]); });
+    GL[ch] = { w, px };
+  }
+
+  // ---------- MAIÚSCULAS ----------
+  def('A', 0, '.###./#...#/#...#/#####/#...#/#...#/#...#');
+  def('B', 0, '####./#...#/#...#/####./#...#/#...#/####.');
+  def('C', 0, '.###./#...#/#..../#..../#..../#...#/.###.');
+  def('D', 0, '####./#...#/#...#/#...#/#...#/#...#/####.');
+  def('E', 0, '#####/#..../#..../####./#..../#..../#####');
+  def('F', 0, '#####/#..../#..../####./#..../#..../#....');
+  def('G', 0, '.###./#...#/#..../#.###/#...#/#...#/.####');
+  def('H', 0, '#...#/#...#/#...#/#####/#...#/#...#/#...#');
+  def('I', 0, '###/.#./.#./.#./.#./.#./###');
+  def('J', 0, '....#/....#/....#/....#/#...#/#...#/.###.');
+  def('K', 0, '#...#/#..#./#.#../##.../#.#../#..#./#...#');
+  def('L', 0, '#..../#..../#..../#..../#..../#..../#####');
+  def('M', 0, '#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#');
+  def('N', 0, '#...#/##..#/#.#.#/#..##/#...#/#...#/#...#');
+  def('O', 0, '.###./#...#/#...#/#...#/#...#/#...#/.###.');
+  def('P', 0, '####./#...#/#...#/####./#..../#..../#....');
+  def('Q', 0, '.###./#...#/#...#/#...#/#.#.#/#..#./.##.#');
+  def('R', 0, '####./#...#/#...#/####./#.#../#..#./#...#');
+  def('S', 0, '.####/#..../#..../.###./....#/....#/####.');
+  def('T', 0, '#####/..#../..#../..#../..#../..#../..#..');
+  def('U', 0, '#...#/#...#/#...#/#...#/#...#/#...#/.###.');
+  def('V', 0, '#...#/#...#/#...#/#...#/#...#/.#.#./..#..');
+  def('W', 0, '#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#');
+  def('X', 0, '#...#/#...#/.#.#./..#../.#.#./#...#/#...#');
+  def('Y', 0, '#...#/#...#/.#.#./..#../..#../..#../..#..');
+  def('Z', 0, '#####/....#/...#./..#../.#.../#..../#####');
+  // ---------- NÚMEROS ----------
+  def('0', 0, '.###./#...#/#..##/#.#.#/##..#/#...#/.###.');
+  def('1', 0, '..#../.##../..#../..#../..#../..#../.###.');
+  def('2', 0, '.###./#...#/....#/...#./..#../.#.../#####');
+  def('3', 0, '####./....#/....#/.###./....#/....#/####.');
+  def('4', 0, '...#./..##./.#.#./#..#./#####/...#./...#.');
+  def('5', 0, '#####/#..../####./....#/....#/#...#/.###.');
+  def('6', 0, '.###./#..../#..../####./#...#/#...#/.###.');
+  def('7', 0, '#####/....#/...#./..#../.#.../.#.../.#...');
+  def('8', 0, '.###./#...#/#...#/.###./#...#/#...#/.###.');
+  def('9', 0, '.###./#...#/#...#/.####/....#/....#/.###.');
+  // ---------- minúsculas ----------
+  def('a', 2, '.###./....#/.####/#...#/.####');
+  def('b', 0, '#..../#..../####./#...#/#...#/#...#/####.');
+  def('c', 2, '.###./#...#/#..../#...#/.###.');
+  def('d', 0, '....#/....#/.####/#...#/#...#/#...#/.####');
+  def('e', 2, '.###./#...#/#####/#..../.###.');
+  def('f', 0, '..##/.#../###./.#../.#../.#../.#..');
+  def('g', 2, '.####/#...#/#...#/#...#/.####/....#/.###.');
+  def('h', 0, '#..../#..../####./#...#/#...#/#...#/#...#');
+  def('i', 0, '.#./.../##./.#./.#./.#./###');
+  def('ı', 2, '##./.#./.#./.#./###');                 // "i" sem pingo (base dos acentos)
+  def('j', 0, '..#./..../.##./..#./..#./..#./..#./#.#./.#..');
+  def('k', 0, '#..../#..../#..#./#.#../##.../#.#../#..#.');
+  def('l', 0, '##./.#./.#./.#./.#./.#./###');
+  def('m', 2, '##.#./#.#.#/#.#.#/#...#/#...#');
+  def('n', 2, '####./#...#/#...#/#...#/#...#');
+  def('o', 2, '.###./#...#/#...#/#...#/.###.');
+  def('p', 2, '####./#...#/#...#/#...#/####./#..../#....');
+  def('q', 2, '.####/#...#/#...#/#...#/.####/....#/....#');
+  def('r', 2, '#.##/##../#.../#.../#...');
+  def('s', 2, '.####/#..../.###./....#/####.');
+  def('t', 1, '.#../###./.#../.#../.#.#/..#.');
+  def('u', 2, '#...#/#...#/#...#/#..##/.##.#');
+  def('v', 2, '#...#/#...#/#...#/.#.#./..#..');
+  def('w', 2, '#...#/#...#/#.#.#/#.#.#/.#.#.');
+  def('x', 2, '#...#/.#.#./..#../.#.#./#...#');
+  def('y', 2, '#...#/#...#/#...#/.####/....#/#...#/.###.');
+  def('z', 2, '#####/...#./..#../.#.../#####');
+  // ---------- pontuação e símbolos ----------
+  def(' ', 0, '.../.../.../.../.../.../...');
+  def('.', 0, ['.', '.', '.', '.', '.', '.', '#']);
+  def(',', 0, ['..', '..', '..', '..', '..', '.#', '#.']);
+  def('!', 0, ['#', '#', '#', '#', '#', '.', '#']);
+  def('?', 0, '.###./#...#/....#/...#./..#../...../..#..');
+  def(':', 0, ['.', '.', '#', '.', '.', '#', '.']);
+  def(';', 0, ['..', '..', '.#', '..', '..', '.#', '#.']);
+  def('-', 0, '..../..../..../####/..../..../....');
+  def('—', 0, '......./......./......./#######/......./......./.......');
+  def('–', 0, '...../...../...../#####/...../...../.....');
+  def('+', 0, '...../..#../..#../#####/..#../..#../.....');
+  def('=', 0, '...../...../#####/...../#####/...../.....');
+  def('/', 0, '....#/....#/...#./..#../.#.../#..../#....');
+  def('(', 0, '..#/.#./#../#../#../.#./..#');
+  def(')', 0, '#../.#./..#/..#/..#/.#./#..');
+  def('[', 0, '###/#../#../#../#../#../###');
+  def(']', 0, '###/..#/..#/..#/..#/..#/###');
+  def('%', 0, '##..#/##..#/...#./..#../.#.../#..##/#..##');
+  def('$', 0, '..#../.####/#.#../.###./..#.#/####./..#..');
+  def('&', 0, '.##../#..#./#.#../.#.../#.#.#/#..#./.##.#');
+  def('#', 0, '.#.#./.#.#./#####/.#.#./#####/.#.#./.#.#.');
+  def('*', 0, '...../..#../#.#.#/.###./#.#.#/..#../.....');
+  def('"', 0, '#.#/#.#/.../.../.../.../...');
+  def("'", 0, ['#', '#', '.', '.', '.', '.', '.']);
+  def('_', 0, '...../...../...../...../...../...../#####');
+  def('<', 0, '...#./..#../.#.../#..../.#.../..#../...#.');
+  def('>', 0, '.#.../..#../...#./....#/...#./..#../.#...');
+  def('|', 0, ['#', '#', '#', '#', '#', '#', '#']);
+  def('·', 0, ['.', '.', '.', '#', '.', '.', '.']);
+  def('×', 0, '...../...../#...#/.#.#./..#../.#.#./#...#');
+  def('°', 0, '.#./#.#/.#./.../.../.../...');
+  def('…', 0, '...../...../...../...../...../...../#.#.#');
+  def('º', 0, '.#./#.#/#.#/.#./###');
+  def('♪', 0, '...##/...#./...#./...#./.###./####./.##..');
+
+  // ---------- acentos (marcas sobre a letra) ----------
+  const MARCA = { agudo: ['..#', '.#.'], grave: ['#..', '.#.'], circ: ['.#.', '#.#'], til: ['.#.#', '#.#.'], trema: ['#.#'], cedilha: ['.#.', '##.'] };
+  function junta(novo, base, marca, maiusc) {
+    const b = GL[base], m = MARCA[marca], px = b.px.map(p => p.slice());
+    const w = Math.max(b.w, m[0].length), dx = Math.floor((b.w - m[0].length) / 2) + (marca === 'agudo' ? 1 : 0);
+    if (marca === 'cedilha') m.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') px.push([Math.max(0, dx) + i, 9 + j]); });
+    else {
+      const topo = maiusc ? 0 : 1, y = topo + (m.length === 1 ? 1 : 0);
+      m.forEach((r, j) => { for (let i = 0; i < r.length; i++) if (r[i] === '#') px.push([Math.max(0, dx) + i, y + j]); });
+    }
+    GL[novo] = { w, px };
+  }
+  [['a', 'á', 'agudo'], ['e', 'é', 'agudo'], ['ı', 'í', 'agudo'], ['o', 'ó', 'agudo'], ['u', 'ú', 'agudo'],
+   ['a', 'à', 'grave'], ['e', 'è', 'grave'], ['o', 'ò', 'grave'], ['a', 'â', 'circ'], ['e', 'ê', 'circ'], ['o', 'ô', 'circ'],
+   ['a', 'ã', 'til'], ['o', 'õ', 'til'], ['u', 'ü', 'trema'], ['c', 'ç', 'cedilha']].forEach(([b, n, m]) => junta(n, b, m, false));
+  [['A', 'Á', 'agudo'], ['E', 'É', 'agudo'], ['I', 'Í', 'agudo'], ['O', 'Ó', 'agudo'], ['U', 'Ú', 'agudo'],
+   ['A', 'À', 'grave'], ['E', 'È', 'grave'], ['A', 'Â', 'circ'], ['E', 'Ê', 'circ'], ['O', 'Ô', 'circ'],
+   ['A', 'Ã', 'til'], ['O', 'Õ', 'til'], ['U', 'Ü', 'trema'], ['C', 'Ç', 'cedilha']].forEach(([b, n, m]) => junta(n, b, m, true));
+
+  const TROCA = { '’': "'", '‘': "'", '“': '"', '”': '"' };
+  const glifo = ch => GL[TROCA[ch] || ch];
+
+  // largura em pixels da fonte (sem escala); undefined se algum caractere não existe
+  function colunas(s) {
+    let n = 0;
+    for (const ch of s) { const g = glifo(ch); if (!g) return undefined; n += g.w + 1; }
+    return n - 1;
+  }
+  const VIZ = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+  const cache = new Map();
+  function montar(s, sc, cor, contorno) {
+    const chave = sc + '|' + cor + '|' + contorno + '|' + s;
+    let e = cache.get(chave); if (e) return e;
+    const cols = colunas(s), pad = contorno ? sc : 0;
+    const c = mk(cols * sc + pad * 2, CEL * sc + pad * 2), g = c.getContext('2d');
+    let cx = 0; const lista = [];
+    for (const ch of s) { const gl = glifo(ch); lista.push([cx, gl]); cx += gl.w + 1; }
+    if (contorno) { g.fillStyle = contorno; lista.forEach(([x0, gl]) => gl.px.forEach(([px, py]) => VIZ.forEach(([dx, dy]) => g.fillRect(pad + (x0 + px + dx) * sc, pad + (py + dy) * sc, sc, sc)))); }
+    g.fillStyle = cor; lista.forEach(([x0, gl]) => gl.px.forEach(([px, py]) => g.fillRect(pad + (x0 + px) * sc, pad + py * sc, sc, sc)));
+    e = { c, w: cols * sc, pad }; if (cache.size > 400) cache.clear(); cache.set(chave, e); return e;
+  }
+
+  // escala (tamanho de cada pixel da fonte) pelo tamanho do texto pedido: assim o resultado não depende da fonte do navegador.
+  // A altura da letra de pixel (7 x escala) fica parecida com a da letra normal do mesmo tamanho; e se mesmo assim o texto
+  // ficar bem mais largo que o normal (estimativa de 0,6 x tamanho por letra), diminui a escala: nenhuma caixa estoura.
+  function escala(cols, tam, n) {
+    let sc = tam < 13 ? 1 : tam < 24 ? 2 : tam < 36 ? 3 : tam < 48 ? 4 : 6;
+    while (sc > 1 && cols * sc > 0.6 * tam * n * 1.5) sc--;
+    return sc;
+  }
+  // largura em pixels da tela que o texto terá com essa fonte (ou undefined se faltar letra: aí vale a fonte normal)
+  function largura(s, tam) { s = String(s); const cols = colunas(s); return cols === undefined ? undefined : cols * escala(cols, tam, s.length); }
+
+  // desenha o texto com a base da letra em y. devolve false se não puder (aí quem chamou usa a fonte normal)
+  function desenhar(ctx, s, x, y, cor, alinhar, contorno, tam) {
+    s = String(s); const cols = colunas(s); if (cols === undefined || !s.length) return false;
+    const sc = escala(cols, tam, s.length), e = montar(s, sc, cor, contorno);
+    const x0 = alinhar === 'center' ? x - e.w / 2 : alinhar === 'right' ? x - e.w : x;
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(e.c, Math.round(x0 - e.pad), Math.round(y - BASE * sc - e.pad));
+    ctx.restore();
+    return true;
+  }
+
+  // ---------- interruptor: faz TODO fillText/strokeText deste ctx usar a fonte de pixel (telas de dentro dos lugares) ----------
+  // (vale só para este ctx; textos com degradê, sombra brilhante ou letras que a fonte não tem continuam normais)
+  function brilho(cor) {
+    let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor);
+    if (m) return 0.3 * parseInt(m[1], 16) + 0.59 * parseInt(m[2], 16) + 0.11 * parseInt(m[3], 16);
+    m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/.exec(cor);
+    return m ? 0.3 * +m[1] + 0.59 * +m[2] + 0.11 * +m[3] : 255;
+  }
+  function ligar(ctx) {
+    if (ctx.__pf) return; ctx.__pf = true;
+    const P = Object.getPrototypeOf(ctx);
+    const pode = (c, s) => /(\d+(?:\.\d+)?)px/.test(c.font) && typeof c.fillStyle === 'string' && !(c.shadowBlur > 0) && colunas(String(s)) !== undefined;
+    ctx.fillText = function (s, x, y, mw) {
+      if (pode(this, s)) {
+        const tam = parseFloat(/(\d+(?:\.\d+)?)px/.exec(this.font)[1]), b = this.textBaseline, cor = this.fillStyle;
+        const yy = b === 'middle' ? y + tam * 0.36 : b === 'top' || b === 'hanging' ? y + tam * 0.72 : b === 'bottom' ? y - tam * 0.2 : y;
+        if (desenhar(this, s, x, yy, cor, this.textAlign || 'left', brilho(cor) > 90 ? '#000' : null, tam)) return;
+      }
+      return P.fillText.call(this, s, x, y, mw);
+    };
+    ctx.strokeText = function (s, x, y, mw) { if (pode(this, s)) return; return P.strokeText.call(this, s, x, y, mw); };   // o contorno já vem na própria fonte de pixel
+  }
+  function desligar(ctx) { if (!ctx.__pf) return; delete ctx.fillText; delete ctx.strokeText; ctx.__pf = false; }
+
+  G.pixfont = { ligar, desligar, desenhar, largura, colunas, escala, montar, glifos: GL, CEL, BASE };
+})(window.G = window.G || {});
+
+</script>
+<script>
 /* ============================================================
    hud.js — interface no estilo dos GTA antigos:
    dinheiro, policiais (procurado), vida, legenda amarela com pager,
@@ -4959,6 +5194,8 @@
 
   function txt(ctx, s, x, y, size, col, align, stroke) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
+    // fonte de PIXEL (pixfont.js); se faltar alguma letra nela, cai na fonte normal logo abaixo
+    if (G.pixfont && G.pixfont.desenhar(ctx, s, x, y, col || '#ffe04a', align || 'left', stroke || '#000', size)) return;
     ctx.textAlign = align || 'left'; ctx.textBaseline = 'alphabetic';
     ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, size / 4); ctx.strokeStyle = stroke || '#000';
     ctx.strokeText(s, x, y); ctx.fillStyle = col || '#ffe04a'; ctx.fillText(s, x, y);
@@ -4966,17 +5203,27 @@
   function wrapText(ctx, s, maxW, size) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
     const words = s.split(' '), lines = []; let cur = '';
-    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
+    const larg = t => { const p = G.pixfont && G.pixfont.largura(t, size); return p !== undefined ? p : ctx.measureText(t).width; };   // largura real do texto (fonte de pixel ou normal)
+    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (larg(t) > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
     if (cur) lines.push(cur); return lines;
   }
   const money = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
+  // coração de PIXEL ART (11x10 pixels, cada um com 2x2 da tela) com contorno preto, brilho e sombra
+  const CORACAO = ['..###.###..', '.#########.', '###########', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '.....#.....'];
+  const hSpr = {};
+  function heartSprite(full) {
+    if (hSpr[full]) return hSpr[full];
+    const k = 2, c = document.createElement('canvas'); c.width = (11 + 2) * k; c.height = (10 + 2) * k; const g = c.getContext('2d');
+    g.fillStyle = '#000';
+    CORACAO.forEach((r, j) => { for (let i = 0; i < 11; i++) if (r[i] === '#') for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.fillRect((1 + i + dx) * k, (1 + j + dy) * k, k, k); });
+    CORACAO.forEach((r, j) => { for (let i = 0; i < 11; i++) if (r[i] === '#') { g.fillStyle = full ? (j >= 6 ? '#b01820' : '#e3262e') : (j >= 6 ? '#2a1216' : '#3a1a1e'); g.fillRect((1 + i) * k, (1 + j) * k, k, k); } });
+    if (full) { g.fillStyle = '#ff9a9a'; [[2, 1], [3, 1], [1, 2], [2, 2], [1, 3]].forEach(([i, j]) => g.fillRect((1 + i) * k, (1 + j) * k, k, k)); g.fillStyle = '#fff'; g.fillRect(3 * k, 2 * k, k, k); }
+    return (hSpr[full] = c);
+  }
   function heart(ctx, x, y, s, full) {
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
-    ctx.beginPath(); ctx.moveTo(0, 6); ctx.bezierCurveTo(-12, -2, -6, -10, 0, -4); ctx.bezierCurveTo(6, -10, 12, -2, 0, 6);
-    ctx.fillStyle = full ? '#e3262e' : '#3a1a1e'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
-    if (full) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(-5, -4, 3, 2); }
-    ctx.restore();
+    const c = heartSprite(!!full); ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2)); ctx.restore();
   }
   function cop(ctx, x, y, col) {
     ctx.save(); ctx.translate(x, y);
@@ -5194,28 +5441,28 @@
   // agrupamento (k-means em OKLab) com a ferramenta dev/pal_fit.js; as 16 mais escuras/claras são uma rampa de cinzas fixa.
   // Escurecem de forma suave e mantêm o visual das cores originais.
   const FIXA =
-    '00000202020302020d06060d0b0c1811132c14151c0b1d202a111a1d1a2a151b410e2428' +
-    '13271d2e1d1d23203241162024252b1b21592123421a2e1e162f312a283a20351e3a2723' +
-    '3225494e1e233b1f58232d5f302e39152c8f213e1b243b2c5f1f23343048472e2934353a' +
-    '22481d432d552f42262d3670573028323b593f3b4370272a24501f5033454d3b293b4a23' +
-    '2a4f3c60372c275821384664842b2a4e3d5e45464a2544ac3744827139275b442e425326' +
-    '5e3e4b2c5f246e326a514e4f43506c3267276d4733475c2b60502f58496b8a3942814329' +
-    '973c266c4b5543598156575a3c56a93b6f2a576328705436416b4e62537b9e3f473d782c' +
-    '625e5cb63c308452457b5a3696427155647d5e702e9753317b586750649f457f2f756637' +
-    '814da577625068686aa84d5288643f488831cd45384a6fc0517f5f9560535278936e6d87' +
-    '67813777706985733e946d4990667b539237aa6441b75a57ba52847a7a7a5583c8578aa1' +
-    'df56469479585a9d377a7e9263926da5726bbd6c4aa564c588837aa97a539b854564a156' +
-    'a378918d8c8bd77639c87665b68258808eab6296d469ad4ad76999ec6c549e8e7367a0b3' +
-    'b6858ab1944896959478a881c38d615bafd9e7873e9f9e9cac9c847abc61da8971bba163' +
-    'be95a492a7c6d49b6aaaa7a5d1a8428cbc9767c2e2e28fb1b9aa94ef9e57b2b1aecead78' +
-    'e39f8a8dd297d2b870aebbc6c4b9a8e7bb49d7aebbe9b48394d0e4c6c4bfe5c77bd6c6aa' +
-    'abe0bbe2c3cacbcfccebd788e1d4b7d9d7d1f2e360e6e0d4f3e7b3edeae3f5f2e7fffdf5';
+    '00000206060d14151c24252b34353a45464a56575a68686a7a7a7a8d8c8b9f9e9cb2b1ae' +
+    'c6c4bfd9d7d1edeae3fffdf539653bcd9e6dd044361d44161a3493261b1ea4794d77483b' +
+    'd774369c424b5fad2b3f4d68428727ba5d59f197481d3a166423211a311659934a5b89a2' +
+    'debe6f315739ebc74f452d57e06a9bebaf7f573f2a7b56496c57832b3e22e088af556323' +
+    'f4e9b7e6e0d8e19b801d1d33d9a5b3b4477e5549242327697c576675b85e3475233c5020' +
+    'f5f1e7325ec8744625932a2087653c91cce161354197acca64542bb29140477acd766f65' +
+    '23571a8a765a222d4fa55e40f4e764533e58825a3464a45814291c394281639da5264932' +
+    '2e2c3864492f3c7d244a2c2d6aa6cf1a2150b997647926295868a63f4e88ce886d393347' +
+    '8bc991916e8adeb045e8c9876690cda36e5e9e864f39171d581d1f5d702ab9bbbd745231' +
+    '413c495c4d814433218e635d285f1d716a7f9b5b7d11142f02020d638f6e91959f654a5f' +
+    '9455be1f3727aa7d8b182f27b8ab94c2a54eecd8809e927e499126292435b8855be7dbba' +
+    '554c4c6c7e2e1d4e181f3f3754667fba683c0b0c176a311ca5deb7b247454b7690a53a27' +
+    '3927210d221ee25b498f8371c5639460bfe0dccfb77cad854a191e485921ceb0738c4424' +
+    'e38740683e3081838de1bec7d5c4a9396d24bd755e946d3e6d7789985336726034aaa7a6' +
+    'c7b8a20202032a3467549d29465b96bc8f9e260e19eb765d8637407c371e2547b42a681d' +
+    '54342936461f34224a333d6dab9e89677bb088396b515b70cbcfce5140714b804e487053';
 
   // cores-chave do mundo (as mesmas do asfalto e das faixas em world.js)
   const CHAVE = ['#625889', '#5a5080', '#6a5f92', '#554b7a', '#41376a', '#eeeaf4', '#cfcade', '#f2c231'];
   // o ajuste de cor de pixelar (saturação, contraste, sombra azulada, luz quente, brancos), para uma cor só
-  function ajusteCor(r, g, b) {
-    const c = P.cfg, m = r * 0.3 + g * 0.59 + b * 0.11;
+  function ajusteCor(r, g, b, opc) {
+    const c = opc ? Object.assign({}, P.cfg, opc) : P.cfg, m = r * 0.3 + g * 0.59 + b * 0.11;
     r = (m + (r - m) * c.sat - 128) * c.contraste + 128; g = (m + (g - m) * c.sat - 128) * c.contraste + 128; b = (m + (b - m) * c.sat - 128) * c.contraste + 128;
     if (c.tinta) { const l = m / 255, sh = (1 - l) * (1 - l) * 9 * c.tinta, hi = l * l * l * 4 * c.tinta; r += hi - sh * 0.35; g += hi * 0.35 + sh * 0.1; b += sh - hi * 0.7; }
     if (r > 215) r = 215 + (r - 215) * c.brancos; if (g > 215) g = 215 + (g - 215) * c.brancos; if (b > 215) b = 215 + (b - 215) * c.brancos;
@@ -5233,9 +5480,9 @@
     // 24 horas do dia (luz do ambiente da luz.js + o ajuste de cor de pixelar) e acrescentamos à paleta as que ainda não existem.
     const amb = G.luz && G.luz.ambiente;
     for (let k = 0; k < 24; k++) {
-      const a = amb ? amb(k / 24) : [238, 236, 228];
+      const a = amb ? amb(k / 24) : [238, 236, 228], opc = G.luz && G.luz.opcoesPaleta ? G.luz.opcoesPaleta(G.luz.noiteDe(k / 24)) : null;   // as mesmas opções que o jogo usa naquela hora
       for (const hex of CHAVE) {
-        const cor = ajusteCor(parseInt(hex.slice(1, 3), 16) * a[0] / 255, parseInt(hex.slice(3, 5), 16) * a[1] / 255, parseInt(hex.slice(5, 7), 16) * a[2] / 255), q = paraLab(cor[0], cor[1], cor[2]);
+        const cor = ajusteCor(parseInt(hex.slice(1, 3), 16) * a[0] / 255, parseInt(hex.slice(3, 5), 16) * a[1] / 255, parseInt(hex.slice(5, 7), 16) * a[2] / 255, opc), q = paraLab(cor[0], cor[1], cor[2]);
         let perto = false;
         for (const o of labs) { const dl = q[0] - o[0], da = q[1] - o[1], db = q[2] - o[2]; if (100 * Math.sqrt(dl * dl + da * da + db * db) < 2.2) { perto = true; break; } }
         if (!perto) { out.push(cor); labs.push(q); }
@@ -5381,7 +5628,7 @@
   // ---- cor do ambiente conforme a hora (f = 0..1; 0.55-0.65 entardecer, 0.65-0.92 noite) ----
   const CORES = [
     [0.00, 236, 208, 176], [0.08, 238, 232, 220], [0.40, 238, 236, 228], [0.52, 238, 208, 166],
-    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 190, 130, 140], [1.00, 236, 208, 176]
+    [0.60, 255, 150, 110], [0.67, 100, 112, 180], [0.90, 100, 112, 180], [0.96, 196, 134, 142], [1.00, 236, 208, 176]
   ];
   function ambiente(f) {
     for (let i = 1; i < CORES.length; i++) {
@@ -5394,6 +5641,9 @@
   }
 
   L.ambiente = ambiente;   // a paleta.js usa esta curva para prever como as cores lisas aparecem em cada hora
+  // quanto é "noite" (0 = dia claro, 1 = noite fechada) em cada hora, e as opções do passe de pixel para esse valor
+  L.noiteDe = f => { const a = ambiente(f), lum = (a[0] * 0.3 + a[1] * 0.59 + a[2] * 0.11) / 255; return clamp(1.12 - lum * 1.28, 0, 1); };
+  L.opcoesPaleta = noite => ({ sat: 1.22 - 0.34 * noite, contraste: 1.06 - 0.02 * noite, tinta: 1 - 0.4 * noite });
 
   // altura da fachada (parede) de um prédio — usada também pelo mundo
   // ---- lista de luzes do quadro ----
@@ -5402,7 +5652,7 @@
     const add = (x, y, r, col, a, ang, spread) => out.push({ x, y, r, col, a, ang, spread });
     const vx0 = cam.x - VW / 2 / z - 160, vx1 = cam.x + VW / 2 / z + 160, vy0 = cam.y - VH / 2 / z - 160, vy1 = cam.y + VH / 2 / z + 160;
     const vis = (x, y) => x > vx0 && x < vx1 && y > vy0 && y < vy1;
-    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 140, [255, 196, 110], 0.8); });
+    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 150, [255, 200, 112], 0.9); });
     S.cars.forEach(c => {
       if (c.dead || !vis(c.x, c.y)) return;
       const ang = Math.atan2(c.fy, c.fx);
@@ -5530,7 +5780,7 @@
 
     // 7) pixel art de verdade (paleta fixa + tramado), por último
     // (de dia as cores ficam bem vivas; de noite menos saturadas, senão o azul da lua vira ciano)
-    if (L.nivel >= 2 && G.paleta) G.paleta.pixelar(ctx, { sat: 1.22 - 0.34 * noite, contraste: 1.06 - 0.02 * noite, tinta: 1 - 0.4 * noite });
+    if (L.nivel >= 2 && G.paleta) G.paleta.pixelar(ctx, L.opcoesPaleta(noite));
     return true;
   };
 
@@ -6566,6 +6816,7 @@
     const v = ctx.createRadialGradient(400, 320, 220, 400, 320, 520); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
     ctx.restore();
     if (G.paleta && G.luz && G.luz.nivel >= 2) G.paleta.pixelar(ctx, G.paleta.cfgSala);
+    if (G.pixfont && G.luz && G.luz.nivel >= 2) G.pixfont.ligar(ctx);   // daqui em diante o texto (título, menus, balões) sai em fonte de pixel
     // balões de fala (no mundo da sala)
     R.npcs.forEach(n => { if (n.p.bub) desenhaBolha(ctx, n.x, n.y - 30, n.p.bub.txt, clamp(n.p.bub.t * 2, 0, 1)); else if (n.nome && Math.hypot(n.x - R.px, n.y - R.py) < 64 && !n.dorme) { ctx.save(); ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.6)'; const w = ctx.measureText(n.nome).width + 10; ctx.fillRect(n.x - w / 2, n.y - 50, w, 14); ctx.fillStyle = '#fff'; ctx.fillText(n.nome, n.x, n.y - 40); ctx.restore(); } });
     ctx.restore();
@@ -6590,6 +6841,7 @@
     if (R.mini) desenhaMini(ctx, S, R);
     if (S.msg && S.msg.t > 0) { ctx.save(); ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; if (ctx.measureText(S.msg.text).width > 730) ctx.font = 'bold 11px Arial'; const w = Math.min(780, ctx.measureText(S.msg.text).width + 30); ctx.fillStyle = 'rgba(0,0,0,0.78)'; W.rrect(ctx, 400 - w / 2, 540, w, 34, 8); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(S.msg.text, 400, 562); ctx.restore(); }
     ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '11px Arial'; ctx.textAlign = 'right'; ctx.fillText('WASD andar · E usar · F ameaçar (armado) · X comer · ESC sair', VW - 12, VH - 8); ctx.textAlign = 'left';
+    if (G.pixfont) G.pixfont.desligar(ctx);
   };
 
   // mochila e hora, no canto da tela (fora dos lugares)
@@ -15370,6 +15622,7 @@
   }
 
   function drawWorld() {
+    if (G.pixfont) G.pixfont.desligar(ctx);
     const cam = S.cam, z = cam.z;
     const sx = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0, sy = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0;
     ctx.save();

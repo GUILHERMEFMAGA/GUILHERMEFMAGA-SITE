@@ -51,28 +51,28 @@
   // agrupamento (k-means em OKLab) com a ferramenta dev/pal_fit.js; as 16 mais escuras/claras são uma rampa de cinzas fixa.
   // Escurecem de forma suave e mantêm o visual das cores originais.
   const FIXA =
-    '00000202020302020d06060d0b0c1811132c14151c0b1d202a111a1d1a2a151b410e2428' +
-    '13271d2e1d1d23203241162024252b1b21592123421a2e1e162f312a283a20351e3a2723' +
-    '3225494e1e233b1f58232d5f302e39152c8f213e1b243b2c5f1f23343048472e2934353a' +
-    '22481d432d552f42262d3670573028323b593f3b4370272a24501f5033454d3b293b4a23' +
-    '2a4f3c60372c275821384664842b2a4e3d5e45464a2544ac3744827139275b442e425326' +
-    '5e3e4b2c5f246e326a514e4f43506c3267276d4733475c2b60502f58496b8a3942814329' +
-    '973c266c4b5543598156575a3c56a93b6f2a576328705436416b4e62537b9e3f473d782c' +
-    '625e5cb63c308452457b5a3696427155647d5e702e9753317b586750649f457f2f756637' +
-    '814da577625068686aa84d5288643f488831cd45384a6fc0517f5f9560535278936e6d87' +
-    '67813777706985733e946d4990667b539237aa6441b75a57ba52847a7a7a5583c8578aa1' +
-    'df56469479585a9d377a7e9263926da5726bbd6c4aa564c588837aa97a539b854564a156' +
-    'a378918d8c8bd77639c87665b68258808eab6296d469ad4ad76999ec6c549e8e7367a0b3' +
-    'b6858ab1944896959478a881c38d615bafd9e7873e9f9e9cac9c847abc61da8971bba163' +
-    'be95a492a7c6d49b6aaaa7a5d1a8428cbc9767c2e2e28fb1b9aa94ef9e57b2b1aecead78' +
-    'e39f8a8dd297d2b870aebbc6c4b9a8e7bb49d7aebbe9b48394d0e4c6c4bfe5c77bd6c6aa' +
-    'abe0bbe2c3cacbcfccebd788e1d4b7d9d7d1f2e360e6e0d4f3e7b3edeae3f5f2e7fffdf5';
+    '00000206060d14151c24252b34353a45464a56575a68686a7a7a7a8d8c8b9f9e9cb2b1ae' +
+    'c6c4bfd9d7d1edeae3fffdf539653bcd9e6dd044361d44161a3493261b1ea4794d77483b' +
+    'd774369c424b5fad2b3f4d68428727ba5d59f197481d3a166423211a311659934a5b89a2' +
+    'debe6f315739ebc74f452d57e06a9bebaf7f573f2a7b56496c57832b3e22e088af556323' +
+    'f4e9b7e6e0d8e19b801d1d33d9a5b3b4477e5549242327697c576675b85e3475233c5020' +
+    'f5f1e7325ec8744625932a2087653c91cce161354197acca64542bb29140477acd766f65' +
+    '23571a8a765a222d4fa55e40f4e764533e58825a3464a45814291c394281639da5264932' +
+    '2e2c3864492f3c7d244a2c2d6aa6cf1a2150b997647926295868a63f4e88ce886d393347' +
+    '8bc991916e8adeb045e8c9876690cda36e5e9e864f39171d581d1f5d702ab9bbbd745231' +
+    '413c495c4d814433218e635d285f1d716a7f9b5b7d11142f02020d638f6e91959f654a5f' +
+    '9455be1f3727aa7d8b182f27b8ab94c2a54eecd8809e927e499126292435b8855be7dbba' +
+    '554c4c6c7e2e1d4e181f3f3754667fba683c0b0c176a311ca5deb7b247454b7690a53a27' +
+    '3927210d221ee25b498f8371c5639460bfe0dccfb77cad854a191e485921ceb0738c4424' +
+    'e38740683e3081838de1bec7d5c4a9396d24bd755e946d3e6d7789985336726034aaa7a6' +
+    'c7b8a20202032a3467549d29465b96bc8f9e260e19eb765d8637407c371e2547b42a681d' +
+    '54342936461f34224a333d6dab9e89677bb088396b515b70cbcfce5140714b804e487053';
 
   // cores-chave do mundo (as mesmas do asfalto e das faixas em world.js)
   const CHAVE = ['#625889', '#5a5080', '#6a5f92', '#554b7a', '#41376a', '#eeeaf4', '#cfcade', '#f2c231'];
   // o ajuste de cor de pixelar (saturação, contraste, sombra azulada, luz quente, brancos), para uma cor só
-  function ajusteCor(r, g, b) {
-    const c = P.cfg, m = r * 0.3 + g * 0.59 + b * 0.11;
+  function ajusteCor(r, g, b, opc) {
+    const c = opc ? Object.assign({}, P.cfg, opc) : P.cfg, m = r * 0.3 + g * 0.59 + b * 0.11;
     r = (m + (r - m) * c.sat - 128) * c.contraste + 128; g = (m + (g - m) * c.sat - 128) * c.contraste + 128; b = (m + (b - m) * c.sat - 128) * c.contraste + 128;
     if (c.tinta) { const l = m / 255, sh = (1 - l) * (1 - l) * 9 * c.tinta, hi = l * l * l * 4 * c.tinta; r += hi - sh * 0.35; g += hi * 0.35 + sh * 0.1; b += sh - hi * 0.7; }
     if (r > 215) r = 215 + (r - 215) * c.brancos; if (g > 215) g = 215 + (g - 215) * c.brancos; if (b > 215) b = 215 + (b - 215) * c.brancos;
@@ -90,9 +90,9 @@
     // 24 horas do dia (luz do ambiente da luz.js + o ajuste de cor de pixelar) e acrescentamos à paleta as que ainda não existem.
     const amb = G.luz && G.luz.ambiente;
     for (let k = 0; k < 24; k++) {
-      const a = amb ? amb(k / 24) : [238, 236, 228];
+      const a = amb ? amb(k / 24) : [238, 236, 228], opc = G.luz && G.luz.opcoesPaleta ? G.luz.opcoesPaleta(G.luz.noiteDe(k / 24)) : null;   // as mesmas opções que o jogo usa naquela hora
       for (const hex of CHAVE) {
-        const cor = ajusteCor(parseInt(hex.slice(1, 3), 16) * a[0] / 255, parseInt(hex.slice(3, 5), 16) * a[1] / 255, parseInt(hex.slice(5, 7), 16) * a[2] / 255), q = paraLab(cor[0], cor[1], cor[2]);
+        const cor = ajusteCor(parseInt(hex.slice(1, 3), 16) * a[0] / 255, parseInt(hex.slice(3, 5), 16) * a[1] / 255, parseInt(hex.slice(5, 7), 16) * a[2] / 255, opc), q = paraLab(cor[0], cor[1], cor[2]);
         let perto = false;
         for (const o of labs) { const dl = q[0] - o[0], da = q[1] - o[1], db = q[2] - o[2]; if (100 * Math.sqrt(dl * dl + da * da + db * db) < 2.2) { perto = true; break; } }
         if (!perto) { out.push(cor); labs.push(q); }

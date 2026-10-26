@@ -444,6 +444,7 @@
   }
 
   function drawWorld() {
+    if (G.pixfont) G.pixfont.desligar(ctx);
     const cam = S.cam, z = cam.z;
     const sx = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0, sy = S.shake ? rand(-S.shake, S.shake) * 0.5 : 0;
     ctx.save();

@@ -289,6 +289,20 @@
     }
   }
 
+  // ---- contorno de pixel art dos pedestres: o corpo é pintado numa telinha (2x de resolução) e copiado com uma borda preta de 1 pixel ----
+  const telaPed = document.createElement('canvas'), silPed = document.createElement('canvas');
+  telaPed.width = telaPed.height = silPed.width = silPed.height = 96;
+  const tPx = telaPed.getContext('2d'), sPx = silPed.getContext('2d');
+  const BORDA = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]];
+  function pedTela() { tPx.setTransform(1, 0, 0, 1, 0, 0); tPx.clearRect(0, 0, 96, 96); tPx.save(); tPx.setTransform(2, 0, 0, 2, 48, 48); return tPx; }
+  function contornoPed(w) {   // w já está transladado para o centro do pedestre
+    sPx.setTransform(1, 0, 0, 1, 0, 0); sPx.globalCompositeOperation = 'source-over'; sPx.clearRect(0, 0, 96, 96); sPx.drawImage(telaPed, 0, 0);
+    sPx.globalCompositeOperation = 'source-in'; sPx.fillStyle = '#0c0816'; sPx.fillRect(0, 0, 96, 96); sPx.globalCompositeOperation = 'source-over';
+    w.save(); w.imageSmoothingEnabled = true;
+    for (let k = 0; k < BORDA.length; k++) w.drawImage(silPed, -24 + BORDA[k][0], -24 + BORDA[k][1], 48, 48);
+    w.drawImage(telaPed, -24, -24, 48, 48); w.restore();
+  }
+
   function drawPed(ctx, p, time) {
     const r = 7;
     if (p.state === 'dead') {
@@ -314,6 +328,8 @@
     if (p.player && !p.noRing) { // anel amarelo discreto para você se achar na multidão
       ctx.strokeStyle = 'rgba(255,224,74,' + (0.28 + 0.12 * Math.sin(time * 4)) + ')'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(0, 1, 11, 11, 0, 0, 7); ctx.stroke();
     }
+    const mundo = ctx, cont = !!(G.luz && G.luz.nivel >= 2);   // com a pixel art ligada, o corpo vai para a telinha (e ganha contorno no fim)
+    if (cont) ctx = pedTela();
     ctx.rotate(p.h); { const resp = 1.12 + 0.014 * Math.sin(time * 2.3 + (p.x || 0) * 0.37); ctx.scale(resp, 1.12 + (resp - 1.12) * 0.6); }   // respiração
     const cop = p.cap === 'cop' || p.cap === 'swat', fem = !!p.fem && !cop, vest = !!p.dress && fem;
     const calca = cop ? (p.cap === 'swat' ? '#15171c' : '#16224a') : (p.pants || '#2a2a35');
@@ -368,6 +384,7 @@
     pedHead(ctx, p);
     if (wid && wid !== 'fist') drawHeld(ctx, p, wid);
     if (p.punchT > 0 && (!wid || wid === 'fist')) { ctx.fillStyle = p.skin; ctx.beginPath(); ctx.arc(3, -12, 3, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 0.8; ctx.stroke(); ctx.fillStyle = shade(p.skin, 0.2); ctx.fillRect(1.6, -13.4, 2, 0.8); }
+    if (cont) { ctx.restore(); ctx = mundo; contornoPed(mundo); }
     ctx.restore();
   }
 

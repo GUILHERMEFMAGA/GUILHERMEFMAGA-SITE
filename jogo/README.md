@@ -158,6 +158,8 @@ Motoristas com personalidade (calmos, normais e apressados), pisca-pisca antes d
 | `lojas_novas.js` | os 14 tipos de comércio comum, cada um com interior próprio |
 | `publicos.js` | **hospital** (recepção, enfermaria, consultório) e **estádio** (saguão e campo com partida de verdade) |
 | `enriquece.js` | acrescenta detalhes às salas antigas (farmácia, barbearia, shopping, banco, padaria, pizzaria, delegacia, prefeitura, saguão dos hotéis) |
+| `paleta.js` | o "passe de pixel art": reduz a imagem, afia as bordas, ajusta a cor e troca cada pixel pela cor mais parecida de uma **paleta fixa** (mundo, salas e menus) |
+| `pixfont.js` | **fonte de pixel 5x7** (com acentos do português) usada no HUD e nas telas de dentro dos lugares; letra que não existe nela cai na fonte normal |
 | `hud.js` | dinheiro, vida, procurado, legenda amarela, minimapa |
 | `audio.js` | motor, pneu, batida, sirene e rádios (WebAudio) |
 | `game.js` | laço principal, jogador, câmera, dia/noite, telas |
@@ -211,3 +213,13 @@ Nenhum lugar é mais um "quadrado vazio": cada sala tem piso, parede, móveis, g
 - **Quartos de hotel**: cama de casal, criado-mudo, TV na cômoda, guarda-roupa, tapete, planta e janela com vista.
 - **Como acrescentar uma sala nova**: crie o interior com `L.novaSala(...)` e registre `L.construtores['tipo:meu_lugar'] = { criar(idSala, lg) { ... return R; } }`. Para só **acrescentar detalhes** a uma sala que já existe, use `L.enriquecer['<idDoLugar>:<sala>'] = (R, pl) => { R.objs.push(...) }` (roda uma vez, logo depois da sala ser criada; veja `enriquece.js`).
 - **Ferramentas**: `dev/sala.js` (foto da sala inteira: `OUTDIR=$PWD/out/ node sala.js hosp tipo:hospital entrada enfermaria consultorio`), `dev/sala_prisao.js` (o mesmo para as salas da penitenciária e da ilha), `dev/publicos_teste.js` (entra no hospital e no estádio, aperta todos os botões e itens de menu, compra o ingresso, assiste à partida e invade o campo para conferir a multa de $50).
+
+## Pixel art mais bonita (asfalto, água, fonte, contornos, paleta)
+- **Câmera presa à grade de pixels** (`game.js`): o mundo anda de 2 em 2 pixels da tela, então o chão não treme nem "ferve" quando a câmera se mexe.
+- **Asfalto limpo** (`dev/pieces/p6_tex.js`, `p6_detalhe.js`, `p4_static.js`): roxo liso com pontinhos 2x2 em 3 tons (sem manchas macias), rachaduras e remendos feitos de quadradinhos, poças pequenas, rastros de pneu pontilhados só nos trechos retos e **faixas de pedestre brancas e lisas**. Nada disso mexe no `world.js` na mão: rode `python3 jogo/dev/splice.py` para montá-lo de novo.
+- **Água em pixel art** (`p6_tex.js`, `p6_rio.js`): ondinhas horizontais em 3 tons, profundidade do rio em degraus e correnteza em traços curtos.
+- **Pedestres com contorno preto** (`sprites.js`): o corpo é pintado numa telinha e copiado com uma borda de 1 pixel, como já acontecia com os carros.
+- **Fonte de pixel** (`pixfont.js`): o texto do HUD (`G.hud.txt`) e **toda a tela de dentro dos lugares** (título, menus, mensagens) saem em letras de pixel com contorno. O tamanho da letra vem do tamanho pedido (e nunca fica bem mais larga que a fonte normal, para não estourar caixas). Corações do HUD também são pixel art.
+- **Paleta fixa de ~190 cores** (`paleta.js`): fica igual de dia, de tarde e de noite. Os pontos soltos de ruído viram a cor dos vizinhos e a nitidez só atua nas bordas de verdade. As cores lisas que ocupam a tela inteira (asfalto, faixas) são calculadas para cada hora do dia e entram na paleta, para nunca caírem num azul qualquer.
+- **Refazer a paleta** (depois de mudar muito as cores do jogo): `cd jogo/dev && nohup bash refazer_paleta.sh > out/refazer.log 2>&1 &` (fotografa o mundo em 8 horas e as salas, e agrupa as cores) e depois `python3 aplicar_paleta.py` (grava as cores novas em `paleta.js`). `dev/pal_teste.js` mostra em que cor da paleta cai cada cor, e `dev/pal_err.js` mede o erro médio.
+- **Ferramentas de foto**: `dev/fotos_visual2.js` (cruzamento, rua, praça, vila... de manhã, dia, tarde ou noite), `dev/fotos_hud.js` (HUD com faixa e legenda), `dev/fotos_dentro.js` (tela de dentro de um lugar com menu), `dev/fotos_peds.js` e `dev/fotos_carros.js` (sprites de perto) e `dev/fonte_teste.js` (todas as letras da fonte). Para servir o jogo no navegador: `python3 /home/user/servidor_preview.py 8080` (ou qualquer servidor estático na pasta `jogo/`).

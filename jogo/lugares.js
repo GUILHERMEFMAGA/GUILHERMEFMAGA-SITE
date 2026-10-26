@@ -945,6 +945,7 @@
     const v = ctx.createRadialGradient(400, 320, 220, 400, 320, 520); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = v; ctx.fillRect(0, 0, VW, VH);
     ctx.restore();
     if (G.paleta && G.luz && G.luz.nivel >= 2) G.paleta.pixelar(ctx, G.paleta.cfgSala);
+    if (G.pixfont && G.luz && G.luz.nivel >= 2) G.pixfont.ligar(ctx);   // daqui em diante o texto (título, menus, balões) sai em fonte de pixel
     // balões de fala (no mundo da sala)
     R.npcs.forEach(n => { if (n.p.bub) desenhaBolha(ctx, n.x, n.y - 30, n.p.bub.txt, clamp(n.p.bub.t * 2, 0, 1)); else if (n.nome && Math.hypot(n.x - R.px, n.y - R.py) < 64 && !n.dorme) { ctx.save(); ctx.font = 'bold 10px Arial'; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(0,0,0,0.6)'; const w = ctx.measureText(n.nome).width + 10; ctx.fillRect(n.x - w / 2, n.y - 50, w, 14); ctx.fillStyle = '#fff'; ctx.fillText(n.nome, n.x, n.y - 40); ctx.restore(); } });
     ctx.restore();
@@ -969,6 +970,7 @@
     if (R.mini) desenhaMini(ctx, S, R);
     if (S.msg && S.msg.t > 0) { ctx.save(); ctx.font = 'bold 14px Arial'; ctx.textAlign = 'center'; if (ctx.measureText(S.msg.text).width > 730) ctx.font = 'bold 11px Arial'; const w = Math.min(780, ctx.measureText(S.msg.text).width + 30); ctx.fillStyle = 'rgba(0,0,0,0.78)'; W.rrect(ctx, 400 - w / 2, 540, w, 34, 8); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(S.msg.text, 400, 562); ctx.restore(); }
     ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '11px Arial'; ctx.textAlign = 'right'; ctx.fillText('WASD andar · E usar · F ameaçar (armado) · X comer · ESC sair', VW - 12, VH - 8); ctx.textAlign = 'left';
+    if (G.pixfont) G.pixfont.desligar(ctx);
   };
 
   // mochila e hora, no canto da tela (fora dos lugares)

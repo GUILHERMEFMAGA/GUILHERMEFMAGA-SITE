@@ -48,7 +48,7 @@
   // ---- cor do ambiente conforme a hora (f = 0..1; 0.55-0.65 entardecer, 0.65-0.92 noite) ----
   const CORES = [
     [0.00, 236, 208, 176], [0.08, 238, 232, 220], [0.40, 238, 236, 228], [0.52, 238, 208, 166],
-    [0.60, 255, 150, 110], [0.67, 84, 94, 160], [0.90, 84, 94, 160], [0.96, 190, 130, 140], [1.00, 236, 208, 176]
+    [0.60, 255, 150, 110], [0.67, 100, 112, 180], [0.90, 100, 112, 180], [0.96, 196, 134, 142], [1.00, 236, 208, 176]
   ];
   function ambiente(f) {
     for (let i = 1; i < CORES.length; i++) {
@@ -61,6 +61,9 @@
   }
 
   L.ambiente = ambiente;   // a paleta.js usa esta curva para prever como as cores lisas aparecem em cada hora
+  // quanto é "noite" (0 = dia claro, 1 = noite fechada) em cada hora, e as opções do passe de pixel para esse valor
+  L.noiteDe = f => { const a = ambiente(f), lum = (a[0] * 0.3 + a[1] * 0.59 + a[2] * 0.11) / 255; return clamp(1.12 - lum * 1.28, 0, 1); };
+  L.opcoesPaleta = noite => ({ sat: 1.22 - 0.34 * noite, contraste: 1.06 - 0.02 * noite, tinta: 1 - 0.4 * noite });
 
   // altura da fachada (parede) de um prédio — usada também pelo mundo
   // ---- lista de luzes do quadro ----
@@ -69,7 +72,7 @@
     const add = (x, y, r, col, a, ang, spread) => out.push({ x, y, r, col, a, ang, spread });
     const vx0 = cam.x - VW / 2 / z - 160, vx1 = cam.x + VW / 2 / z + 160, vy0 = cam.y - VH / 2 / z - 160, vy1 = cam.y + VH / 2 / z + 160;
     const vis = (x, y) => x > vx0 && x < vx1 && y > vy0 && y < vy1;
-    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 140, [255, 196, 110], 0.8); });
+    W.lamps.forEach(l => { if (vis(l.x, l.y)) add(l.x, l.y, 150, [255, 200, 112], 0.9); });
     S.cars.forEach(c => {
       if (c.dead || !vis(c.x, c.y)) return;
       const ang = Math.atan2(c.fy, c.fx);
@@ -197,7 +200,7 @@
 
     // 7) pixel art de verdade (paleta fixa + tramado), por último
     // (de dia as cores ficam bem vivas; de noite menos saturadas, senão o azul da lua vira ciano)
-    if (L.nivel >= 2 && G.paleta) G.paleta.pixelar(ctx, { sat: 1.22 - 0.34 * noite, contraste: 1.06 - 0.02 * noite, tinta: 1 - 0.4 * noite });
+    if (L.nivel >= 2 && G.paleta) G.paleta.pixelar(ctx, L.opcoesPaleta(noite));
     return true;
   };
 

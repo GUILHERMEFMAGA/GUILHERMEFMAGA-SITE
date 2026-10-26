@@ -11,6 +11,8 @@
 
   function txt(ctx, s, x, y, size, col, align, stroke) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
+    // fonte de PIXEL (pixfont.js); se faltar alguma letra nela, cai na fonte normal logo abaixo
+    if (G.pixfont && G.pixfont.desenhar(ctx, s, x, y, col || '#ffe04a', align || 'left', stroke || '#000', size)) return;
     ctx.textAlign = align || 'left'; ctx.textBaseline = 'alphabetic';
     ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, size / 4); ctx.strokeStyle = stroke || '#000';
     ctx.strokeText(s, x, y); ctx.fillStyle = col || '#ffe04a'; ctx.fillText(s, x, y);
@@ -18,17 +20,27 @@
   function wrapText(ctx, s, maxW, size) {
     ctx.font = 'bold ' + size + 'px ' + FONT;
     const words = s.split(' '), lines = []; let cur = '';
-    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
+    const larg = t => { const p = G.pixfont && G.pixfont.largura(t, size); return p !== undefined ? p : ctx.measureText(t).width; };   // largura real do texto (fonte de pixel ou normal)
+    words.forEach(w => { const t = cur ? cur + ' ' + w : w; if (larg(t) > maxW && cur) { lines.push(cur); cur = w; } else cur = t; });
     if (cur) lines.push(cur); return lines;
   }
   const money = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
+  // coração de PIXEL ART (11x10 pixels, cada um com 2x2 da tela) com contorno preto, brilho e sombra
+  const CORACAO = ['..###.###..', '.#########.', '###########', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '.....#.....'];
+  const hSpr = {};
+  function heartSprite(full) {
+    if (hSpr[full]) return hSpr[full];
+    const k = 2, c = document.createElement('canvas'); c.width = (11 + 2) * k; c.height = (10 + 2) * k; const g = c.getContext('2d');
+    g.fillStyle = '#000';
+    CORACAO.forEach((r, j) => { for (let i = 0; i < 11; i++) if (r[i] === '#') for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) g.fillRect((1 + i + dx) * k, (1 + j + dy) * k, k, k); });
+    CORACAO.forEach((r, j) => { for (let i = 0; i < 11; i++) if (r[i] === '#') { g.fillStyle = full ? (j >= 6 ? '#b01820' : '#e3262e') : (j >= 6 ? '#2a1216' : '#3a1a1e'); g.fillRect((1 + i) * k, (1 + j) * k, k, k); } });
+    if (full) { g.fillStyle = '#ff9a9a'; [[2, 1], [3, 1], [1, 2], [2, 2], [1, 3]].forEach(([i, j]) => g.fillRect((1 + i) * k, (1 + j) * k, k, k)); g.fillStyle = '#fff'; g.fillRect(3 * k, 2 * k, k, k); }
+    return (hSpr[full] = c);
+  }
   function heart(ctx, x, y, s, full) {
-    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
-    ctx.beginPath(); ctx.moveTo(0, 6); ctx.bezierCurveTo(-12, -2, -6, -10, 0, -4); ctx.bezierCurveTo(6, -10, 12, -2, 0, 6);
-    ctx.fillStyle = full ? '#e3262e' : '#3a1a1e'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#000'; ctx.stroke();
-    if (full) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(-5, -4, 3, 2); }
-    ctx.restore();
+    const c = heartSprite(!!full); ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(c, Math.round(x - c.width / 2), Math.round(y - c.height / 2)); ctx.restore();
   }
   function cop(ctx, x, y, col) {
     ctx.save(); ctx.translate(x, y);
