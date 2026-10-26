@@ -89,10 +89,12 @@
   function newWorld() {
     S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
-    const g = M.POI.garage;
-    const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
+    const g = M.POI.garage, MS = W.MANSAO;
+    // o jogador NASCE na mansão (no pátio, de frente para a casa), com o carro vermelho ao lado; sem mansão no mapa, nasce na garagem da cidade
+    const inicio = MS ? { x: MS.casa.x, y: MS.casa.y + 72, h: Math.PI, cx: MS.mu(34), cy: MS.mv(22) } : { x: g.x + 40, y: g.y + 4, h: 0, cx: g.x + 110, cy: g.y };
+    const red = new G.Car({ x: inicio.cx, y: inicio.cy, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
-    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
+    S.player = Object.assign({ x: inicio.x, y: inicio.y, vx: 0, vy: 0, h: inicio.h, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
     G.combat.reset(S);
     S.sentado = null; S.trans = null; S.inside = null; S.bebado = 0; S.guia = null; S.prop = {};
     G.lugares.aplicarLook(S);
@@ -100,7 +102,10 @@
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
     // saudação
-    if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
+    if (W.MANSAO) {
+      if (S.save.done === 0) G.say('Bem-vindo à sua mansão, chefe! O carro vermelho está no pátio: aperte E perto dele. Siga a seta amarela do minimapa até um telefone amarelo para pegar missões.', 11);
+      else G.say('Bem-vindo de volta à sua mansão! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 7);
+    } else if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
     else G.say('Bem-vindo de volta! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 6);
   }
 
@@ -548,6 +553,7 @@
     H.txt(ctx, 'RUA VERMELHA', 0, 0, 80, '#ff2a2a', 'center', '#200');
     ctx.restore();
     H.txt(ctx, 'mundo aberto, tiroteio e perseguições • estilo GTA antigo', 400, 172, 20, '#ffe04a', 'center');
+    H.txt(ctx, 'VERSÃO 7  ·  você começa na sua mansão (VILLA BELLAROSA), no meio da Mata Escura', 12, 22, 12, '#9ff0ff', 'left');   // etiqueta para conferir que é a versão nova
     const saved = hasSave() && S.save.done + S.save.money > 0;
     H.txt(ctx, saved ? 'ENTER: CONTINUAR (Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' • $' + S.save.money + ')' : 'ENTER: COMEÇAR', 400, 255, 24, Math.floor(time * 2) % 2 ? '#fff' : '#ffe04a', 'center');
     if (saved) H.txt(ctx, 'N: NOVO JOGO (apaga o progresso)', 400, 285, 16, '#ff9a9a', 'center');
@@ -589,7 +595,8 @@
       titleCam += dt * 60;
       S.time += dt; S.dayT += dt / 300;
       const ang = titleCam / 400;
-      S.cam.x = W.nodeX(2) + Math.cos(ang) * 500 + 300; S.cam.y = W.nodeY(1) + Math.sin(ang * 0.7) * 380; S.cam.z = 1.3;
+      if (W.MANSAO) { S.cam.x = W.MANSAO.mu(38) + Math.cos(ang) * 430; S.cam.y = W.MANSAO.mv(24) + Math.sin(ang * 0.7) * 300; S.cam.z = 1.15; }   // o jogo começa na VILLA BELLAROSA
+      else { S.cam.x = W.nodeX(2) + Math.cos(ang) * 500 + 300; S.cam.y = W.nodeY(1) + Math.sin(ang * 0.7) * 380; S.cam.z = 1.3; }
       S.player.x = -9999; S.player.y = -9999; S.player.iframes = 0;
       // o tráfego corre em volta da câmera
       const fake = S.player; fake.x = S.cam.x; fake.y = S.cam.y;

@@ -204,12 +204,12 @@
 
   // o motorista traz o carro preto da família até o pátio da mansão
   function chamarCarro(S) {
-    const px = mu(33), py = mv(22);
+    const px = mu(43), py = mv(22);     // o carro vermelho (de quem nasce aqui) fica do outro lado do pátio
     let k = S.carroMansao;
     if (!k || k.dead || !S.cars.includes(k)) {
-      k = new G.Car({ x: px, y: py, a: 0, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
+      k = new G.Car({ x: px, y: py, a: Math.PI / 2, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
       S.cars.push(k); S.carroMansao = k; G.say('O motorista trouxe o carro preto até o pátio da mansão.', 4);
-    } else { k.x = px; k.y = py; k.a = 0; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
+    } else { k.x = px; k.y = py; k.a = Math.PI / 2; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
   }
 
   // ---------- conversa com os seguranças ----------

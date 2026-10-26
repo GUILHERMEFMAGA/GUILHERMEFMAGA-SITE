@@ -5562,6 +5562,13 @@
     if (cur) lines.push(cur); return lines;
   }
   const money = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // telefone amarelo mais perto de quem joga (a cidade fica longe da mansão): usado na seta do minimapa e na dica
+  function telefoneMaisPerto(S) {
+    const ref = S.player.car || S.player; let best = null, bd = 1e12;
+    G.missions.PHONES.forEach(p => { const d = Math.hypot(p.x - ref.x, p.y - ref.y); if (d < bd) { bd = d; best = p; } });
+    return best ? { p: best, d: bd } : null;
+  }
+
 
   // coração de PIXEL ART (11x10 pixels, cada um com 2x2 da tela) com contorno preto, brilho e sombra
   const CORACAO = ['..###.###..', '.#########.', '###########', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '.....#.....'];
@@ -5613,6 +5620,18 @@
     const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     G.world.places.forEach(pl => dot(pl.x, pl.y, pl.cor, pl.tipo === 'loja' ? 1.7 : 2.5));
     G.world.casas.forEach(c => { if (c.semPorta) return; const mine = S.save.casas && S.save.casas[c.id]; if (mine) dot(c.x, c.y, '#9dff9d', 2); else if (c.venda) dot(c.x, c.y, '#ff4a4a', 1.5); });   // casas suas (verde) e à venda (vermelho)
+    // sem missão: seta AMARELA na borda do minimapa apontando para o telefone amarelo mais perto
+    if (!G.missions.active) {
+      const tp = telefoneMaisPerto(S);
+      if (tp) {
+        const [px, py] = tm(tp.p.x, tp.p.y);
+        if (px < x || px > x + w || py < y || py > y + h) {
+          const ang = Math.atan2(py - (y + h / 2), px - (x + w / 2)), ex = Math.max(x + 8, Math.min(x + w - 8, px)), ey = Math.max(y + 8, Math.min(y + h - 8, py));
+          ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang); ctx.fillStyle = Math.floor(time * 2.5) % 2 ? '#ffe04a' : '#fff6b0'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-5, -6); ctx.lineTo(-2, 0); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+      }
+    }
     // seta verde na borda do minimapa apontando para a SUA MANSÃO (ela fica longe, na Mata Escura, ao lado da rodovia)
     { const M0 = G.world.MANSAO;
       if (M0 && M0.casa && S.save.casas && S.save.casas[M0.casa.id]) {
@@ -5717,7 +5736,8 @@
         txt(ctx, place + 'º LUGAR   PONTO ' + Math.min(m.cp + 1, m.cps.length) + '/' + m.cps.length, 12, ty, 15, '#fff'); ty += 18;
       }
     } else {
-      txt(ctx, 'Procure um telefone amarelo no mapa', 12, ty, 13, '#ffffff');
+      const tpd = telefoneMaisPerto(S);
+      txt(ctx, tpd && tpd.d > 1100 ? 'Siga a seta amarela do minimapa até um telefone amarelo (missões)' : 'Procure um telefone amarelo no mapa', 12, ty, 13, '#ffffff');
     }
     // --- rádio ---
     if (S.radioT > 0) txt(ctx, '♪ ' + G.snd.stationName(), 400, 70, 16, '#ff9ae0', 'center');
@@ -15950,12 +15970,12 @@
 
   // o motorista traz o carro preto da família até o pátio da mansão
   function chamarCarro(S) {
-    const px = mu(33), py = mv(22);
+    const px = mu(43), py = mv(22);     // o carro vermelho (de quem nasce aqui) fica do outro lado do pátio
     let k = S.carroMansao;
     if (!k || k.dead || !S.cars.includes(k)) {
-      k = new G.Car({ x: px, y: py, a: 0, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
+      k = new G.Car({ x: px, y: py, a: Math.PI / 2, kind: 'sedan', color: '#101016', driver: 'none', mode: 'parked', owned: true });
       S.cars.push(k); S.carroMansao = k; G.say('O motorista trouxe o carro preto até o pátio da mansão.', 4);
-    } else { k.x = px; k.y = py; k.a = 0; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
+    } else { k.x = px; k.y = py; k.a = Math.PI / 2; k.vx = k.vy = 0; G.say('O motorista levou o carro preto de volta ao pátio da mansão.', 4); }
   }
 
   // ---------- conversa com os seguranças ----------
@@ -16353,10 +16373,12 @@
   function newWorld() {
     S.cars = []; S.peds = []; S.particles = []; S.pombos = []; S.heat = 0; S.heatLevel = 0; S.heli = null; S.bustT = 0; S.time = 0;
     M.active = null;
-    const g = M.POI.garage;
-    const red = new G.Car({ x: g.x + 110, y: g.y, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
+    const g = M.POI.garage, MS = W.MANSAO;
+    // o jogador NASCE na mansão (no pátio, de frente para a casa), com o carro vermelho ao lado; sem mansão no mapa, nasce na garagem da cidade
+    const inicio = MS ? { x: MS.casa.x, y: MS.casa.y + 72, h: Math.PI, cx: MS.mu(34), cy: MS.mv(22) } : { x: g.x + 40, y: g.y + 4, h: 0, cx: g.x + 110, cy: g.y };
+    const red = new G.Car({ x: inicio.cx, y: inicio.cy, a: Math.PI / 2, kind: 'coupe', color: PAINTS[S.save.paint % PAINTS.length], driver: 'none', mode: 'parked', owned: true });
     S.cars.push(red); S.redCar = red;
-    S.player = Object.assign({ x: g.x + 40, y: g.y + 4, vx: 0, vy: 0, h: 0, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
+    S.player = Object.assign({ x: inicio.x, y: inicio.y, vx: 0, vy: 0, h: inicio.h, walk: 0, hp: 100, armor: 0, weapon: 'fist', cdT: 0, flashT: 0, car: null, player: true, state: 'walk', punchT: 0, iframes: 0, dead: false }, { shirt: '#e8832a', skin: '#b9794a', hair: '#1a1208', hairStyle: 'topete', sleeve: 'curta', pat: 'liso', acc: 'shades' });
     G.combat.reset(S);
     S.sentado = null; S.trans = null; S.inside = null; S.bebado = 0; S.guia = null; S.prop = {};
     G.lugares.aplicarLook(S);
@@ -16364,7 +16386,10 @@
     for (let k = 0; k < 14; k++) AI.spawnPed(S);
     S.cam.x = S.player.x; S.cam.y = S.player.y;
     // saudação
-    if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
+    if (W.MANSAO) {
+      if (S.save.done === 0) G.say('Bem-vindo à sua mansão, chefe! O carro vermelho está no pátio: aperte E perto dele. Siga a seta amarela do minimapa até um telefone amarelo para pegar missões.', 11);
+      else G.say('Bem-vindo de volta à sua mansão! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 7);
+    } else if (S.save.done === 0) G.say('Bem-vindo! Aperte E perto do carro vermelho. Telefones amarelos dão missões e a loja rosa vende armas.', 9);
     else G.say('Bem-vindo de volta! Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' de ' + M.TOTAL + ' esperando no telefone.', 6);
   }
 
@@ -16812,6 +16837,7 @@
     H.txt(ctx, 'RUA VERMELHA', 0, 0, 80, '#ff2a2a', 'center', '#200');
     ctx.restore();
     H.txt(ctx, 'mundo aberto, tiroteio e perseguições • estilo GTA antigo', 400, 172, 20, '#ffe04a', 'center');
+    H.txt(ctx, 'VERSÃO 7  ·  você começa na sua mansão (VILLA BELLAROSA), no meio da Mata Escura', 12, 22, 12, '#9ff0ff', 'left');   // etiqueta para conferir que é a versão nova
     const saved = hasSave() && S.save.done + S.save.money > 0;
     H.txt(ctx, saved ? 'ENTER: CONTINUAR (Missão ' + Math.min(S.save.done + 1, M.TOTAL) + ' • $' + S.save.money + ')' : 'ENTER: COMEÇAR', 400, 255, 24, Math.floor(time * 2) % 2 ? '#fff' : '#ffe04a', 'center');
     if (saved) H.txt(ctx, 'N: NOVO JOGO (apaga o progresso)', 400, 285, 16, '#ff9a9a', 'center');
@@ -16853,7 +16879,8 @@
       titleCam += dt * 60;
       S.time += dt; S.dayT += dt / 300;
       const ang = titleCam / 400;
-      S.cam.x = W.nodeX(2) + Math.cos(ang) * 500 + 300; S.cam.y = W.nodeY(1) + Math.sin(ang * 0.7) * 380; S.cam.z = 1.3;
+      if (W.MANSAO) { S.cam.x = W.MANSAO.mu(38) + Math.cos(ang) * 430; S.cam.y = W.MANSAO.mv(24) + Math.sin(ang * 0.7) * 300; S.cam.z = 1.15; }   // o jogo começa na VILLA BELLAROSA
+      else { S.cam.x = W.nodeX(2) + Math.cos(ang) * 500 + 300; S.cam.y = W.nodeY(1) + Math.sin(ang * 0.7) * 380; S.cam.z = 1.3; }
       S.player.x = -9999; S.player.y = -9999; S.player.iframes = 0;
       // o tráfego corre em volta da câmera
       const fake = S.player; fake.x = S.cam.x; fake.y = S.cam.y;

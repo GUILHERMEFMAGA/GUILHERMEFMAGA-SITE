@@ -25,6 +25,13 @@
     if (cur) lines.push(cur); return lines;
   }
   const money = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // telefone amarelo mais perto de quem joga (a cidade fica longe da mansão): usado na seta do minimapa e na dica
+  function telefoneMaisPerto(S) {
+    const ref = S.player.car || S.player; let best = null, bd = 1e12;
+    G.missions.PHONES.forEach(p => { const d = Math.hypot(p.x - ref.x, p.y - ref.y); if (d < bd) { bd = d; best = p; } });
+    return best ? { p: best, d: bd } : null;
+  }
+
 
   // coração de PIXEL ART (11x10 pixels, cada um com 2x2 da tela) com contorno preto, brilho e sombra
   const CORACAO = ['..###.###..', '.#########.', '###########', '###########', '###########', '.#########.', '..#######..', '...#####...', '....###....', '.....#.....'];
@@ -76,6 +83,18 @@
     const po = G.missions.POI; dot(po.garage.x, po.garage.y, '#6fd0ff', 2.5); dot(po.oficina.x, po.oficina.y, '#ff9a3d', 2.5); dot(po.hospital.x, po.hospital.y, '#ff6b6b', 2.5); dot(po.armas.x, po.armas.y, '#ff4fd8', 2.5);
     G.world.places.forEach(pl => dot(pl.x, pl.y, pl.cor, pl.tipo === 'loja' ? 1.7 : 2.5));
     G.world.casas.forEach(c => { if (c.semPorta) return; const mine = S.save.casas && S.save.casas[c.id]; if (mine) dot(c.x, c.y, '#9dff9d', 2); else if (c.venda) dot(c.x, c.y, '#ff4a4a', 1.5); });   // casas suas (verde) e à venda (vermelho)
+    // sem missão: seta AMARELA na borda do minimapa apontando para o telefone amarelo mais perto
+    if (!G.missions.active) {
+      const tp = telefoneMaisPerto(S);
+      if (tp) {
+        const [px, py] = tm(tp.p.x, tp.p.y);
+        if (px < x || px > x + w || py < y || py > y + h) {
+          const ang = Math.atan2(py - (y + h / 2), px - (x + w / 2)), ex = Math.max(x + 8, Math.min(x + w - 8, px)), ey = Math.max(y + 8, Math.min(y + h - 8, py));
+          ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang); ctx.fillStyle = Math.floor(time * 2.5) % 2 ? '#ffe04a' : '#fff6b0'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-5, -6); ctx.lineTo(-2, 0); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+        }
+      }
+    }
     // seta verde na borda do minimapa apontando para a SUA MANSÃO (ela fica longe, na Mata Escura, ao lado da rodovia)
     { const M0 = G.world.MANSAO;
       if (M0 && M0.casa && S.save.casas && S.save.casas[M0.casa.id]) {
@@ -180,7 +199,8 @@
         txt(ctx, place + 'º LUGAR   PONTO ' + Math.min(m.cp + 1, m.cps.length) + '/' + m.cps.length, 12, ty, 15, '#fff'); ty += 18;
       }
     } else {
-      txt(ctx, 'Procure um telefone amarelo no mapa', 12, ty, 13, '#ffffff');
+      const tpd = telefoneMaisPerto(S);
+      txt(ctx, tpd && tpd.d > 1100 ? 'Siga a seta amarela do minimapa até um telefone amarelo (missões)' : 'Procure um telefone amarelo no mapa', 12, ty, 13, '#ffffff');
     }
     // --- rádio ---
     if (S.radioT > 0) txt(ctx, '♪ ' + G.snd.stationName(), 400, 70, 16, '#ff9ae0', 'center');

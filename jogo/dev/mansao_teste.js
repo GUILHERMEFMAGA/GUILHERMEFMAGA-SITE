@@ -9,6 +9,11 @@ const guardas = () => S.peds.filter(p => p.kind === 'guarda' && p.state !== 'dea
 const vao = () => W.tileAt(M.portao.x, M.portao.y), BUILD = W.TILE.BUILD;
 const rodaAte = (f, max) => { for (let i = 0; i < max; i++) { step(1); if (f()) return i; } return -1; };
 
+// ---------- parte 0: onde o jogador nasce (o tp.js já apertou ENTER e começou o jogo) ----------
+{ const P0 = S.player;
+  ok(G.mansao.dentro(P0.x, P0.y), 'o jogador NASCE dentro dos muros da mansão (' + Math.round(P0.x) + ',' + Math.round(P0.y) + ')');
+  ok(S.redCar && Math.hypot(S.redCar.x - P0.x, S.redCar.y - P0.y) < 260, 'o carro vermelho nasce no pátio, perto do jogador'); }
+
 // ---------- parte 1: o mundo lá fora ----------
 S.dayT = 0.3; S.heat = 0; S.heatLevel = 0; S.save.money = 5000;
 ok(M && M.pronta && M.casa, 'a mansão existe (' + (M.casa && M.casa.nome) + ', porta em ' + Math.round(M.casa.x) + ',' + Math.round(M.casa.y) + ')');
