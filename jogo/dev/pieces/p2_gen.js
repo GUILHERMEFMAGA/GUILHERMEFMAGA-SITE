@@ -256,6 +256,7 @@
   // ----- florestas: todas as árvores, clareiras com cabana, lagos, acampamentos... -----
   BUILDERS.floresta = blk => {
     const { tx, ty, bx, by, rr } = blk, m = megaDe(bx, by);
+    if (dentroMansao(bx, by)) { construirMansao(blk); return; }   // aqui fica a MANSÃO DO CHEFÃO (clareira gigante)
     const q = rr(); let clare = null, lago = null, camp = null, torre = null;
     const cx = tx + 6 + rr() * 8, cy = ty + 6 + rr() * 8;
     if (q < 0.20) clare = { x: cx, y: cy, r: 3.2 + rr() * 1.5 };
@@ -280,6 +281,7 @@
       if (ft && Math.hypot(x - ft.x, y - ft.y) < ft.r) continue;
       if (lago && Math.pow((x - lago.x) / (lago.rx + 0.8), 2) + Math.pow((y - lago.y) / (lago.ry + 0.8), 2) < 1) continue;
       if (naTrilha(px, py, 26)) continue;
+      if (naMansao(px, py)) continue;   // sem árvores no terreno da mansão, em volta do muro e na estrada particular
       trees.push({ x: px, y: py, r: 17 + qq * 14, mata: true, k: qq < 0.32 ? 1 : qq < 0.40 ? 3 : 0 });
     }
   };
@@ -334,6 +336,7 @@
     blk.fazenda = { dono: FAZENDEIROS[(bx + by * 3) % FAZENDEIROS.length] };
   };
 
+  /*MANSAO*/
   function criarBloco(bx, by) {
     const tx = MG + ROAD + bx * PITCH, ty = MG + ROAD + by * PITCH, kind = kindDe(bx, by);
     const blk = { bx, by, tx, ty, x: tx * T, y: ty * T, w: BLOCK * T, h: BLOCK * T, kind, rr: mulberry32(bx * 7919 + by * 104729 + 17), lotes: [] };

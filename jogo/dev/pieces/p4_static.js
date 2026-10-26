@@ -101,6 +101,7 @@
     });
     // 4b) chão das florestas gigantes (cobre as ruas apagadas)
     MEGAS.forEach(m => { if (hit(m.x, m.y, m.w, m.h)) G.rural.chaoMata(ctx, m, tex, x0, y0, x1, y1); });
+    desenhaMansaoChao(ctx, x0, y0, x1, y1);   // terreno, muros e estrada da mansão (por cima do chão da mata)
     // 5) quadras (chão) e objetos de calçada
     blocks.forEach(b => { if (hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawBlockGround(ctx, b, x0, y0, x1, y1); });
     blocks.forEach(b => { if (!SEM_PROPS[b.kind] && hit(b.x - 8, b.y - 8, b.w + 16, b.h + 16)) drawProps(ctx, b); });

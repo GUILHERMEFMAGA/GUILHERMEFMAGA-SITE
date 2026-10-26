@@ -149,6 +149,7 @@
   }
 
   function killPed(S, p, fx, fy, force, src) {
+    if (p.kind === 'guarda' && G.mansao) G.mansao.guardaFerido(S, p, src);   // matou um segurança da mansão: todos viram inimigos
     p.state = 'dead'; p.corpseT = 0; p.hp = 0; p.pool = 0;
     const a = Math.atan2(p.y - fy, p.x - fx);
     p.vx = Math.cos(a) * (force || 100) * 0.3; p.vy = Math.sin(a) * (force || 100) * 0.3;
@@ -176,6 +177,7 @@
     spray(S, p.x, p.y, a, 5 + Math.round(dmg / 6), 150);
     p.vx += Math.cos(a) * (force || 60) * 0.4; p.vy += Math.sin(a) * (force || 60) * 0.4;
     G.snd.hurt();
+    if (p.kind === 'guarda') { if (G.mansao) G.mansao.guardaFerido(S, p, opts && opts.car ? 'player' : src); return false; }   // segurança da mansão: quem decide é o mansao.js
     if (opts && opts.car) { p.state = 'down'; p.downT = 0; p.threat = { x: fx, y: fy }; }
     else if (p.state === 'guard') { p.state = 'fight'; S.thugAlert = true; }
     else if (p.kind !== 'civ' || p.armed) { if (p.state !== 'down') p.state = 'fight'; }
@@ -232,7 +234,13 @@
 
   function bulletHit(S, b) {
     const P = S.player;
-    if (b.own === 'player') {
+    if (b.own === 'guarda') {   // tiros dos seguranças da mansão: só acertam policiais a pé (e viaturas, mais abaixo); nunca você
+      for (const p of S.peds) {
+        if (p.kind !== 'cop' || p.state === 'dead') continue;
+        if (Math.abs(p.x - b.x) > 10 || Math.abs(p.y - b.y) > 10) continue;
+        if (Math.hypot(p.x - b.x, p.y - b.y) < 8.5) { hurtPed(S, p, b.dmg, b.x - b.vx * 0.02, b.y - b.vy * 0.02, 110, 'guarda'); return true; }
+      }
+    } else if (b.own === 'player') {
       for (const p of S.peds) {
         if (p.state === 'dead' || p.mission) continue;
         if (Math.abs(p.x - b.x) > 10 || Math.abs(p.y - b.y) > 10) continue;
@@ -243,7 +251,7 @@
     }
     for (const c of S.cars) {
       if (Math.abs(c.x - b.x) > 62 || Math.abs(c.y - b.y) > 62) continue;
-      if (c === b.car || (b.own === 'player' && c === P.car) || (b.own === 'cop' && c.kind === 'police')) continue;
+      if (c === b.car || (b.own === 'player' && c === P.car) || (b.own === 'cop' && c.kind === 'police') || (b.own === 'guarda' && c.kind !== 'police')) continue;
       const cc = G.carCircles(c);
       let hit = false;
       for (let k = 0; k < 2; k++) if (Math.hypot(b.x - cc[k][0], b.y - cc[k][1]) < cc[k][2] * 0.85) hit = true;

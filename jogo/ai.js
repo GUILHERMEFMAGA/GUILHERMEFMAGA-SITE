@@ -352,6 +352,7 @@
   }
   const pedOk = (x, y) => { const t = W.tileAt(x, y); return W.pedWalkable(t) && !W.treeHit(x, y, 4); };
   function updatePed(p, dt, S) {
+    if (p.fixo) return;       // segurança da mansão: quem controla é o mansao.js
     if (p.script) return;     // pedestre controlado por uma cena (ex.: policial que escolta o preso)
     // combate: mortos, caídos, atiradores e guardas são tratados em combat.js
     if (G.combat && G.combat.updatePed(p, dt, S)) return;

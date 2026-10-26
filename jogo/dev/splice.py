@@ -21,7 +21,7 @@ s = between(s, '  // ---------- Medidas do mapa ----------\n', '  const tiles = 
 # 2) prédio: andares
 s = sub(s, "const b = { x, y, w, h, p, ridge: w >= h ? 'h' : 'v', det: [] };", "const b = { x, y, w, h, p, ridge: w >= h ? 'h' : 'v', det: [], andares: 1 };")
 # 3) geração do mapa (cidades, vilas, florestas, fazendas...)
-s = between(s, '  // ---------- Montagem do mapa ----------\n', '  // prédios da borda do mapa\n', P('p2_gen.js'))
+s = between(s, '  // ---------- Montagem do mapa ----------\n', '  // prédios da borda do mapa\n', P('p2_gen.js').replace('  /*MANSAO*/\n', P('p7_mansao.js') + P('p8_mansao_arte.js')))
 # 4) postes só nas cidades
 s = sub(s, "for (let j = 0; j <= ROWS; j++) {\n    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {", "for (let j = 0; j <= ROWS; j++) {\n    if (!urbano(i, j)) continue;\n    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {")
 # 5) objetos de calçada só onde há calçada
@@ -30,6 +30,7 @@ s = sub(s, "  const propList = [];\n  blocks.forEach(blk => { if (blk.kind !== '
 s = sub(s, "const n = 3 + Math.floor(r() * 3);", "const n = Math.max(2, Math.round((3 + Math.floor(r() * 3)) * len / 384));")
 # 6) altura da fachada pelo número de andares
 FACH = '''  function fachada(b) {
+    if (b.fh) return b.fh;
     if (b.casa3) return AR.fachadaAltura(b.casa3.partes.find(p => p.t === 'corpo'));
     if (b.celeiro || b.estabulo) return 32;
     if (b.galpao) return 40;
@@ -67,7 +68,7 @@ rio = rio[:_i] + P('p6_rio.js') + rio[_j:]
 g = P('p3_ground.js').replace('/*RIO*/\n', rio).replace('/*ANEL*/\n', anel)
 s = s.replace(old_bg, g)
 # 10) árvores: as da mata têm desenho próprio
-s = sub(s, '  function drawTree(ctx, t) {', '  function drawTree(ctx, t) { if (t.mata) G.rural.drawTree(ctx, t); else drawTreeCity(ctx, t); }\n  function drawTreeCity(ctx, t) {')
+s = sub(s, '  function drawTree(ctx, t) {', '  function drawTree(ctx, t) { if (t.cipreste) drawCipreste(ctx, t); else if (t.mata) G.rural.drawTree(ctx, t); else drawTreeCity(ctx, t); }\n  function drawTreeCity(ctx, t) {')
 # 11) desenho do mapa em pedaços
 s = between(s, '  function drawStatic(ctx, x0, y0, x1, y1) {', '  // ---------- Chunks (o cenário pré-desenhado) ----------', P('p4_static.js') + '\n')
 # 12) minimapa
@@ -75,7 +76,7 @@ s = between(s, '  // mapa pequeno (minimapa): pintado direto dos tiles, bem ráp
 # 13) pontos de calçada para missões
 s = sub(s, "    if (b.kind === 'river') return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>", "    if (SEM_PROPS[b.kind]) return;\n    ['top', 'bottom', 'left', 'right'].forEach(s =>")
 # 14) exportações
-s = sub(s, "    chunkCount: NCX * NCY,\n  };", "    chunkCount: NCX * NCY,\n    RODOVIA, MEGAS, trilhas, urbano, viaH, viaV, regiaoDe, PUB_DIMS, naTrilha, megaDe,\n    AR, tex, criaCasaB, casaNoLote, sorteiaParede, estiloDe,\n  };\n  if (G.rural) G.rural.trilhas = trilhas;")
+s = sub(s, "    chunkCount: NCX * NCY,\n  };", "    chunkCount: NCX * NCY,\n    RODOVIA, MEGAS, trilhas, urbano, viaH, viaV, regiaoDe, PUB_DIMS, naTrilha, megaDe, MANSAO, naMansao,\n    AR, tex, criaCasaB, casaNoLote, sorteiaParede, estiloDe,\n  };\n  if (G.rural) G.rural.trilhas = trilhas;")
 # 15) asfalto de pixel art (sem manchas macias) e detalhes das ruas (rachaduras, remendos, óleo, poças) em pixel art
 s = between(s, '  function makeTextures() {\n', '  function rrect(', P('p6_tex.js') + '\n')
 s = between(s, '  // rachaduras, remendos, manchas de óleo e bueiros', '  // bueiros (mesma sorte do drawRoadDetail)', P('p6_detalhe.js'))

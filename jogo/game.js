@@ -374,10 +374,10 @@
     });
     // pedestres
     S.pedSpawnT -= dt;
-    const alive = S.peds.filter(p => !p.mission && !p.target && p.state !== 'dead').length;
+    const alive = S.peds.filter(p => !p.mission && !p.target && !p.fixo && p.state !== 'dead').length;
     const hr = G.lugares.hora(S), capPeds = (hr >= 22 || hr < 5) ? 14 : (hr >= 6 && hr < 9) || (hr >= 12 && hr < 14) || (hr >= 17 && hr < 20) ? 40 : 30;   // a rua enche na hora do rush e esvazia de madrugada
     if (alive < capPeds && S.pedSpawnT <= 0) { S.pedSpawnT = 0.25; AI.spawnPed(S); }
-    S.peds = S.peds.filter(p => !p.dead && (p.mission || p.target || Math.hypot(p.x - ref.x, p.y - ref.y) < 1150));
+    S.peds = S.peds.filter(p => !p.dead && (p.mission || p.target || p.fixo || Math.hypot(p.x - ref.x, p.y - ref.y) < 1150));   // fixo = segurança da mansão (não some)
     for (const p of S.peds) if (p.state === 'wait') { p.walk = 0; } else AI.updatePed(p, dt, S);
   }
 
@@ -412,6 +412,7 @@
       updatePlayer(dt);
       updateCars(dt);
       managePopulation(dt);
+      if (G.mansao) G.mansao.atualizar(S, dt);   // mansão do chefão: portão, seguranças e zona segura
       G.detalhes.update(S, W, dt);
       G.lugares.atualizar(S, dt);
       updatePolice(dt);
@@ -460,6 +461,7 @@
     G.combat.drawDecals(ctx, S, inV);       // sangue, marcas de pneu e chamuscado
     M.drawWorld(ctx, S, S.time);
     G.combat.drawPickups(ctx, S, inV, S.time);
+    if (G.mansao) G.mansao.desenhar(ctx, S, inV, S.time);   // folhas do portão da mansão
     const vis = S.peds.filter(inV);
     vis.forEach(p => { if (p.state === 'dead') SP.drawPed(ctx, p, S.time); }); // corpos ficam embaixo dos carros
     // destroços e estacionados primeiro

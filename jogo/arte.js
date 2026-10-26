@@ -49,7 +49,8 @@
     moderna: [['#f4f4f2', 'reboco'], ['#d9dde2', 'concreto'], ['#3f4650', 'reboco'], ['#e8e2d6', 'reboco'], ['#b7bdc6', 'concreto'], ['#8a6f55', 'madeira']],
     ecologica: [['#d9e4c8', 'reboco'], ['#9a7650', 'madeira'], ['#e7dcbd', 'reboco'], ['#7d9a6c', 'madeira'], ['#c9d8b4', 'reboco'], ['#b08a5a', 'madeira']],
     portuaria: [['#8fc3dd', 'reboco'], ['#f2e3b0', 'reboco'], ['#f4a58a', 'reboco'], ['#ffffff', 'reboco'], ['#a9d6b0', 'reboco'], ['#6f8fb8', 'madeira'], ['#e9c46a', 'reboco']],
-    rustica: [['#a4552f', 'tijolo'], ['#8f6a45', 'madeira'], ['#b9a98a', 'pedra'], ['#d8c7a0', 'reboco'], ['#7a5a3a', 'madeira']]
+    rustica: [['#a4552f', 'tijolo'], ['#8f6a45', 'madeira'], ['#b9a98a', 'pedra'], ['#d8c7a0', 'reboco'], ['#7a5a3a', 'madeira']],
+    mafia: [['#7a2d25', 'tijolo']]     // a mansão do chefão: tijolo vermelho-escuro
   };
   // cores de telha: [base]
   A.TELHAS = {
@@ -57,7 +58,8 @@
     moderna: ['#5b6068', '#3c3f47', '#8b9098', '#6a6f78'],
     ecologica: ['#476b50', '#6a7a44', '#7b5a42', '#5a7a5a'],
     portuaria: ['#3f6d96', '#c0463a', '#5d7a9a', '#2f5b7a', '#b8493a'],
-    rustica: ['#7b5a42', '#5d4636', '#8a6a48', '#4a4038']
+    rustica: ['#7b5a42', '#5d4636', '#8a6a48', '#4a4038'],
+    mafia: ['#3b3f4a']                    // telhado de ardósia escura
   };
   const MOLDURAS = ['#f4f1e8', '#f4f1e8', '#ffffff', '#4a3526', '#2f3640', '#d9d2bd'];
 
@@ -381,7 +383,7 @@
   //  p = parte em pixels { x,y,w,h, andares, teto, crista, t, varanda }
   //  c = a casa (c.wall, c.pal, c.moldura, c.porta, c.seed, c.rq, c.est)
   // ============================================================
-  function fachadaAltura(p) { return p.t === 'garagem' ? 30 : p.andares === 2 ? 58 : 36; }
+  function fachadaAltura(p) { return p.t === 'garagem' ? 30 : p.andares >= 3 ? 88 : p.andares === 2 ? 58 : 36; }   // 3 andares = a mansão do chefão
   A.fachadaAltura = fachadaAltura;
   function desenhaParte(ctx, p, c, jl) {
     const fh = fachadaAltura(p), wy = p.y + p.h - fh, r = mulberry32(c.seed + p.x * 3 + p.y * 7);

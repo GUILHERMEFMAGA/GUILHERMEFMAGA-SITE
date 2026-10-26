@@ -138,7 +138,7 @@
     const janelas = [];
     if (noite > 0.05) {
       const vx0 = cam.x - VW / 2 / z, vx1 = cam.x + VW / 2 / z, vy0 = cam.y - VH / 2 / z, vy1 = cam.y + VH / 2 / z;
-      W.buildings.forEach(b => { const bb = b.box || b; if (bb.x < vx1 && bb.x + bb.w > vx0 && bb.y < vy1 && bb.y + bb.h > vy0 && ((b.x * 7 + b.y * 3) % 10) < 8) janelas.push(b); });
+      W.buildings.forEach(b => { if (b.semJanelas) return; const bb = b.box || b; if (bb.x < vx1 && bb.x + bb.w > vx0 && bb.y < vy1 && bb.y + bb.h > vy0 && ((b.x * 7 + b.y * 3) % 10) < 8) janelas.push(b); });
     }
     lx.save(); lx.setTransform(z, 0, 0, z, VW / 2 - cam.x * z, VH / 2 - cam.y * z);
     lx.globalCompositeOperation = 'lighter';
